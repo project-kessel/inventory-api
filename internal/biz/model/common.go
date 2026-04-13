@@ -394,6 +394,11 @@ func NewRepresentation(data internal.JsonObject) (Representation, error) {
 	return Representation(data), nil
 }
 
+// NewEmptyRepresentation returns a non-nil empty JSON object for reporter/common payloads.
+func NewEmptyRepresentation() Representation {
+	return Representation(map[string]interface{}{})
+}
+
 func (r Representation) Data() internal.JsonObject {
 	return internal.JsonObject(r)
 }

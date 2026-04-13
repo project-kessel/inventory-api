@@ -54,6 +54,13 @@ func NewResource(id ResourceId, localResourceId LocalResourceId, resourceType Re
 		return Resource{}, fmt.Errorf("resource invalid ReporterResource: %w", err)
 	}
 
+	if len(reporterRepresentationData) == 0 && len(commonRepresentationData) > 0 {
+		reporterRepresentationData = NewEmptyRepresentation()
+	}
+	if len(reporterRepresentationData) == 0 && len(commonRepresentationData) == 0 {
+		reporterRepresentationData = NewEmptyRepresentation()
+	}
+
 	resourceEvent, err := resourceEventAndRepresentations(
 		reporterResource.resourceID,
 		resourceType,
@@ -133,6 +140,13 @@ func (r *Resource) Update(
 		if err != nil {
 			return err
 		}
+	}
+
+	if len(reporterRepresentationData) == 0 && len(commonRepresentationData) > 0 {
+		reporterRepresentationData = NewEmptyRepresentation()
+	}
+	if len(reporterRepresentationData) == 0 && len(commonRepresentationData) == 0 {
+		reporterRepresentationData = NewEmptyRepresentation()
 	}
 
 	resourceEvent, err := resourceEventAndRepresentations(

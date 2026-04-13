@@ -638,20 +638,26 @@ func toReportResourceCommand(r *pb.ReportResourceRequest) (resources.ReportResou
 
 	var reporterRepresentation *model.Representation
 	if r.GetRepresentations().GetReporter() != nil {
-		rep, err := model.NewRepresentation(r.GetRepresentations().GetReporter().AsMap())
-		if err != nil {
-			return resources.ReportResourceCommand{}, fmt.Errorf("invalid reporter representation: %w", err)
+		reporterMap := r.GetRepresentations().GetReporter().AsMap()
+		if len(reporterMap) > 0 {
+			rep, err := model.NewRepresentation(reporterMap)
+			if err != nil {
+				return resources.ReportResourceCommand{}, fmt.Errorf("invalid reporter representation: %w", err)
+			}
+			reporterRepresentation = &rep
 		}
-		reporterRepresentation = &rep
 	}
 
 	var commonRepresentation *model.Representation
 	if r.GetRepresentations().GetCommon() != nil {
-		rep, err := model.NewRepresentation(r.GetRepresentations().GetCommon().AsMap())
-		if err != nil {
-			return resources.ReportResourceCommand{}, fmt.Errorf("invalid common representation: %w", err)
+		commonMap := r.GetRepresentations().GetCommon().AsMap()
+		if len(commonMap) > 0 {
+			rep, err := model.NewRepresentation(commonMap)
+			if err != nil {
+				return resources.ReportResourceCommand{}, fmt.Errorf("invalid common representation: %w", err)
+			}
+			commonRepresentation = &rep
 		}
-		commonRepresentation = &rep
 	}
 
 	var transactionId *model.TransactionId

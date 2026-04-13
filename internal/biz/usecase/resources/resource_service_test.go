@@ -3,7 +3,6 @@ package resources
 import (
 	"bytes"
 	"context"
-	"errors"
 	"fmt"
 	"strings"
 	"testing"
@@ -1672,15 +1671,6 @@ func TestReportResource_ValidationErrors(t *testing.T) {
 			cmd:         fixture(t).Basic("host", "unknown_reporter", "instance-1", "test-host", "ws-123"),
 			expectError: "reporter unknown_reporter does not report resource types: host",
 		},
-		{
-			name: "missing reporter representation",
-			cmd: func() ReportResourceCommand {
-				cmd := fixture(t).Basic("host", "hbi", "instance-1", "test-host", "ws-123")
-				cmd.ReporterRepresentation = nil
-				return cmd
-			}(),
-			expectError: "invalid reporter representation: representation required",
-		},
 	}
 
 	for _, tc := range tests {
@@ -1880,9 +1870,9 @@ func TestReportResource_SchemaValidation(t *testing.T) {
 // These tests verify the exact error message format returned by the usecase layer.
 // They serve as a contract and must be updated if error formats change.
 
-// TestReportResource_RepresentationRequiredError tests that nil representations
-// return RepresentationRequiredError with the correct message format.
-func TestReportResource_RepresentationRequiredError(t *testing.T) {
+// TestReportResource_OptionalRepresentations verifies common-only and metadata-only
+// ReportResource commands succeed without a reporter payload.
+func TestReportResource_OptionalRepresentations(t *testing.T) {
 	ctx := testAuthzContext()
 	schemaRepo := newFakeSchemaRepository(t)
 	usecase := New(
@@ -1904,25 +1894,25 @@ func TestReportResource_RepresentationRequiredError(t *testing.T) {
 		name                   string
 		reporterRepresentation *model.Representation
 		commonRepresentation   *model.Representation
-		expectErrorMsg         string
+		localResourceIdSuffix  string
 	}{
 		{
-			name:                   "nil reporter representation",
+			name:                   "nil reporter with common",
 			reporterRepresentation: nil,
 			commonRepresentation:   &commonRep,
-			expectErrorMsg:         "invalid reporter representation: representation required",
+			localResourceIdSuffix:  "common-only",
 		},
 		{
-			name:                   "both nil",
+			name:                   "both nil metadata only",
 			reporterRepresentation: nil,
 			commonRepresentation:   nil,
-			expectErrorMsg:         "invalid reporter representation: representation required",
+			localResourceIdSuffix:  "metadata-only",
 		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			localResId, _ := model.NewLocalResourceId("test-host")
+			localResId, _ := model.NewLocalResourceId("test-host-" + tc.localResourceIdSuffix)
 			resType, _ := model.NewResourceType("host")
 			repType, _ := model.NewReporterType("hbi")
 			repInstanceId, _ := model.NewReporterInstanceId("instance-1")
@@ -1940,12 +1930,7 @@ func TestReportResource_RepresentationRequiredError(t *testing.T) {
 			}
 
 			err := usecase.ReportResource(ctx, cmd)
-			assert.Error(t, err)
-			assert.Contains(t, err.Error(), tc.expectErrorMsg)
-
-			// Verify it's a RepresentationRequiredError type
-			var repReqErr *RepresentationRequiredError
-			assert.True(t, errors.As(err, &repReqErr), "expected RepresentationRequiredError type")
+			assert.NoError(t, err)
 		})
 	}
 }

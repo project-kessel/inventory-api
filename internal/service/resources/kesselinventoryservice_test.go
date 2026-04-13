@@ -2844,12 +2844,9 @@ func TestInventoryService_ReportResource_AllOptionalMetadataFields(t *testing.T)
 
 // --- ReportResource: Nil/Empty Optional Struct Combinations ---
 
-// The model layer requires both common and reporter representation data to be
-// non-empty. Sending nil or empty structs produces an error. These tests verify
-// the error paths.
-
-// TODO: This is actually not correct behavior.
-// These should be optional, and it depends on schema.
+// Omitted or empty google.protobuf.Struct for common/reporter is treated as no payload.
+// Metadata-only (both absent) and common-only succeed; schema validation runs only when
+// a side has non-empty JSON fields.
 func TestInventoryService_ReportResource_NilOrEmptyRepresentationStructs(t *testing.T) {
 	claims := &authnapi.Claims{
 		SubjectId: authnapi.SubjectId("reporter-service"),
@@ -2868,7 +2865,7 @@ func TestInventoryService_ReportResource_NilOrEmptyRepresentationStructs(t *test
 			localResourceId: "host-both-nil",
 			common:          nil,
 			reporter:        nil,
-			expectMsg:       "invalid reporter representation: representation required",
+			expectMsg:       "",
 		},
 		{
 			name:            "common set, reporter nil",
@@ -2879,14 +2876,14 @@ func TestInventoryService_ReportResource_NilOrEmptyRepresentationStructs(t *test
 				},
 			},
 			reporter:  nil,
-			expectMsg: "invalid reporter representation: representation required",
+			expectMsg: "",
 		},
 		{
 			name:            "both empty structs",
 			localResourceId: "host-both-empty",
 			common:          &structpb.Struct{},
 			reporter:        &structpb.Struct{},
-			expectMsg:       "invalid data structure",
+			expectMsg:       "",
 		},
 		{
 			// Reporter is required and non-empty; empty common struct is treated as
@@ -3077,19 +3074,6 @@ func TestInventoryService_ReportResource_ValidationErrorFormats(t *testing.T) {
 			},
 			expectCode:        codes.InvalidArgument,
 			expectMsgContains: "failed validation for report resource",
-		},
-		{
-			name:         "nil reporter representation",
-			resourceType: "host",
-			reporterType: "hbi",
-			common: &structpb.Struct{
-				Fields: map[string]*structpb.Value{
-					"workspace_id": structpb.NewStringValue("ws-123"),
-				},
-			},
-			reporter:          nil,
-			expectCode:        codes.InvalidArgument,
-			expectMsgContains: "invalid reporter representation: representation required",
 		},
 	}
 

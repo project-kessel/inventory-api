@@ -41,7 +41,7 @@ func NewReporterDataRepresentation(
 		return ReporterDataRepresentation{}, fmt.Errorf("%w: ReporterResourceId", ErrInvalidUUID)
 	}
 
-	if len(data) == 0 {
+	if data == nil {
 		return ReporterDataRepresentation{}, fmt.Errorf("%w: ReporterDataRepresentation data", ErrInvalidData)
 	}
 

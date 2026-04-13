@@ -114,7 +114,7 @@ func TestReporterDataRepresentation_Initialization(t *testing.T) {
 		assertInvalidReporterDataRepresentation(t, dataRep, err, ErrInvalidData)
 	})
 
-	t.Run("should reject data representation with empty data", func(t *testing.T) {
+	t.Run("should create data representation with empty data (optional reporter payload)", func(t *testing.T) {
 		t.Parallel()
 
 		dataRep, err := NewReporterDataRepresentation(
@@ -127,7 +127,7 @@ func TestReporterDataRepresentation_Initialization(t *testing.T) {
 			fixture.ValidTransactionIdType(),
 		)
 
-		assertInvalidReporterDataRepresentation(t, dataRep, err, ErrInvalidData)
+		assertValidReporterDataRepresentation(t, dataRep, err, "empty reporter data")
 	})
 
 	t.Run("should reject data representation with empty reporter resource ID", func(t *testing.T) {

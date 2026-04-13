@@ -640,8 +640,9 @@ func (uc *Usecase) enforceMetaAuthzObject(ctx context.Context, relation metaauth
 }
 
 // validateReportResourceCommand validates a ReportResourceCommand against schemas.
-// It checks that the reporter is allowed for the resource type,
-// and validates both reporter and common representations.
+// It checks that the reporter is allowed for the resource type, and validates
+// reporter and/or common representations when non-empty (metadata-only requests
+// omit both).
 func (uc *Usecase) validateReportResourceCommand(ctx context.Context, cmd ReportResourceCommand) error {
 	resourceType := cmd.ResourceType.String()
 	reporterType := cmd.ReporterType.String()
@@ -660,29 +661,22 @@ func (uc *Usecase) validateReportResourceCommand(ctx context.Context, cmd Report
 		return fmt.Errorf("reporter %s does not report resource types: %s", reporterType, resourceType)
 	}
 
-	if cmd.ReporterRepresentation == nil {
-		return &RepresentationRequiredError{Kind: "reporter"}
+	if cmd.ReporterRepresentation != nil {
+		sanitizedReporterRepresentation := removeNulls(map[string]interface{}(*cmd.ReporterRepresentation))
+		if len(sanitizedReporterRepresentation) > 0 {
+			if err := uc.schemaService.ReporterShallowValidate(ctx, resourceType, reporterType, sanitizedReporterRepresentation); err != nil {
+				return err
+			}
+		}
 	}
 
-	sanitizedReporterRepresentation := removeNulls(map[string]interface{}(*cmd.ReporterRepresentation))
-
-	// Validate reporter-specific data using the sanitized map
-	if err := uc.schemaService.ReporterShallowValidate(ctx, resourceType, reporterType, sanitizedReporterRepresentation); err != nil {
-		return err
-	}
-
-	// Allow nil common representation — CommonShallowValidate will reject it
-	// only if the schema for this resource type declares required fields.
-	var commonRepresentation map[string]interface{}
 	if cmd.CommonRepresentation != nil {
-		commonRepresentation = map[string]interface{}(*cmd.CommonRepresentation)
-	} else {
-		commonRepresentation = map[string]interface{}{}
-	}
-
-	// Validate common data
-	if err := uc.schemaService.CommonShallowValidate(ctx, resourceType, commonRepresentation); err != nil {
-		return err
+		commonRepresentation := map[string]interface{}(*cmd.CommonRepresentation)
+		if len(commonRepresentation) > 0 {
+			if err := uc.schemaService.CommonShallowValidate(ctx, resourceType, commonRepresentation); err != nil {
+				return err
+			}
+		}
 	}
 
 	return nil

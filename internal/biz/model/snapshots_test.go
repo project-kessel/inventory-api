@@ -301,7 +301,7 @@ func TestReporterRepresentationSnapshot_TransactionId_EmptyMeansNotSet(t *testin
 		Generation:         0,
 		ReporterVersion:    nil,
 		CommonVersion:      nil,
-		TransactionId:      "", // empty = not set
+		TransactionId:      "",
 		Tombstone:          false,
 		CreatedAt:          time.Time{},
 	}

@@ -27,10 +27,6 @@ type Resource struct {
 
 // Factory methods
 func NewResource(id ResourceId, localResourceId LocalResourceId, resourceType ResourceType, reporterType ReporterType, reporterInstanceId ReporterInstanceId, transactionId TransactionId, reporterResourceId ReporterResourceId, apiHref ApiHref, consoleHref *ConsoleHref, reporterRepresentationData *Representation, commonRepresentationData *Representation, reporterVersion *ReporterVersion) (Resource, error) {
-	if transactionId == "" {
-		return Resource{}, fmt.Errorf("%w: TransactionId", ErrEmpty)
-	}
-
 	if reporterRepresentationData == nil && commonRepresentationData != nil {
 		emptyRep := NewEmptyRepresentation()
 		reporterRepresentationData = &emptyRep
@@ -105,10 +101,6 @@ func (r *Resource) Update(
 	commonRepresentationData *Representation,
 	transactionId TransactionId,
 ) error {
-	if transactionId == "" {
-		return fmt.Errorf("%w: TransactionId", ErrEmpty)
-	}
-
 	// Only increment commonVersion if common representation data is provided
 	var commonVersion *Version
 	if commonRepresentationData != nil && len(*commonRepresentationData) > 0 {

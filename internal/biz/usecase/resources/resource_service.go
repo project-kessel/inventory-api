@@ -123,14 +123,13 @@ func (uc *Usecase) ReportResource(ctx context.Context, cmd ReportResourceCommand
 
 	var subscription pubsub.Subscription
 
-	txidStr, err := getNextTransactionID()
+	txid, err := getNextTransactionID()
 	if err != nil {
 		return err
 	}
 
 	if cmd.TransactionId == nil || *cmd.TransactionId == "" {
-		generated := model.NewTransactionId(txidStr)
-		cmd.TransactionId = &generated
+		cmd.TransactionId = &txid
 	}
 
 	// Validate command against schemas
@@ -140,7 +139,7 @@ func (uc *Usecase) ReportResource(ctx context.Context, cmd ReportResourceCommand
 
 	readAfterWriteEnabled := computeReadAfterWrite(uc, cmd.WriteVisibility, authzCtx.Subject.SubjectId)
 	if readAfterWriteEnabled && uc.Config.ConsumerEnabled {
-		subscription = uc.ListenManager.Subscribe(txidStr)
+		subscription = uc.ListenManager.Subscribe(txid.String())
 		defer subscription.Unsubscribe()
 	}
 
@@ -170,14 +169,14 @@ func (uc *Usecase) ReportResource(ctx context.Context, cmd ReportResourceCommand
 			}
 
 			if err == nil && res != nil {
-				log.Info("Resource already exists, updating: ")
+			log.Info("Resource already exists, updating: ")
 				operationType = model.OperationTypeUpdated
-				return uc.updateResource(tx, cmd, res, txidStr)
+				return uc.updateResource(tx, cmd, res, txid.String())
 			}
 
 			log.Info("Creating new resource")
 			operationType = model.OperationTypeCreated
-			return uc.createResource(tx, cmd, txidStr)
+			return uc.createResource(tx, cmd, txid.String())
 		},
 	)
 
@@ -287,7 +286,7 @@ func (uc *Usecase) Delete(ctx context.Context, reporterResourceKey model.Reporte
 		return err
 	}
 
-	txidStr, err := getNextTransactionID()
+	txid, err := getNextTransactionID()
 	if err != nil {
 		return err
 	}
@@ -308,7 +307,7 @@ func (uc *Usecase) Delete(ctx context.Context, reporterResourceKey model.Reporte
 				if err != nil {
 					return fmt.Errorf("failed to delete resource: %w", err)
 				}
-				return uc.resourceRepository.Save(tx, *res, model.OperationTypeDeleted, txidStr)
+				return uc.resourceRepository.Save(tx, *res, model.OperationTypeDeleted, txid.String())
 			} else {
 				if errors.Is(err, gorm.ErrRecordNotFound) {
 					return ErrResourceNotFound
@@ -731,12 +730,12 @@ func (uc *Usecase) validateReportResourceCommand(ctx context.Context, cmd Report
 	return nil
 }
 
-func getNextTransactionID() (string, error) {
+func getNextTransactionID() (model.TransactionId, error) {
 	txid, err := uuid.NewV7()
 	if err != nil {
 		return "", err
 	}
-	return txid.String(), nil
+	return model.NewTransactionId(txid.String()), nil
 }
 
 // isSPInAllowlist checks if the caller subject is in the allowlist.

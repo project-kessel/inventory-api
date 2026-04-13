@@ -41,7 +41,7 @@ func NewReporterDataRepresentation(
 		return ReporterDataRepresentation{}, fmt.Errorf("%w: ReporterResourceId", ErrInvalidUUID)
 	}
 
-	if len(data) == 0 {
+	if data == nil {
 		return ReporterDataRepresentation{}, fmt.Errorf("%w: ReporterDataRepresentation data", ErrInvalidData)
 	}
 
@@ -116,7 +116,7 @@ func (rr ReporterRepresentation) Serialize() ReporterRepresentationSnapshot {
 		CommonVersion:      commonVersionUint,
 		Tombstone:          rr.tombstone.Serialize(),
 		TransactionId:      rr.transactionId.Serialize(),
-		CreatedAt:          time.Now(),
+		CreatedAt:          time.Now(), // TODO: Add proper timestamp from domain entity if available
 	}
 }
 

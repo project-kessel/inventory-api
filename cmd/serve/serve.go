@@ -257,7 +257,7 @@ func NewCommand(
 			// indefinitely if the consumer is not responding via notifications.
 			// This is a naive solution until we can implement a more robust
 			// solution for navigating consumer health.
-			waitForNotifCircuitBreaker := gobreaker.NewCircuitBreaker(gobreaker.Settings{
+			waitForNotifCircuitBreaker := gobreaker.NewCircuitBreaker[any](gobreaker.Settings{
 				Name:    "wait-for-notif-breaker",
 				Timeout: 60 * time.Second, // Reset after 60s if tripped
 				ReadyToTrip: func(counts gobreaker.Counts) bool {

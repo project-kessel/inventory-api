@@ -169,7 +169,7 @@ func (uc *Usecase) ReportResource(ctx context.Context, cmd ReportResourceCommand
 			}
 
 			if err == nil && res != nil {
-			log.Info("Resource already exists, updating: ")
+				log.Info("Resource already exists, updating: ")
 				operationType = model.OperationTypeUpdated
 				return uc.updateResource(tx, cmd, res, txid.String())
 			}

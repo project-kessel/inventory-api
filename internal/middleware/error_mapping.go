@@ -11,6 +11,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/project-kessel/inventory-api/internal/biz/model"
+	"github.com/project-kessel/inventory-api/internal/biz/usecase/metaauthorizer"
 	"github.com/project-kessel/inventory-api/internal/biz/usecase/resources"
 )
 
@@ -60,13 +61,13 @@ func MapError(err error) error {
 
 	switch {
 	// Application-layer errors (from usecase)
-	case errors.Is(err, resources.ErrMetaAuthzContextMissing):
+	case errors.Is(err, metaauthorizer.ErrMetaAuthzContextMissing):
 		return status.Error(codes.Unauthenticated, "authz context missing")
 	case errors.Is(err, resources.ErrSelfSubjectMissing):
 		return status.Error(codes.Unauthenticated, "self subject missing")
-	case errors.Is(err, resources.ErrMetaAuthorizerUnavailable):
+	case errors.Is(err, metaauthorizer.ErrMetaAuthorizerUnavailable):
 		return status.Error(codes.Internal, "meta authorizer unavailable")
-	case errors.Is(err, resources.ErrMetaAuthorizationDenied):
+	case errors.Is(err, metaauthorizer.ErrMetaAuthorizationDenied):
 		return status.Error(codes.PermissionDenied, "meta authorization denied")
 	// Domain errors (from model)
 	case errors.Is(err, model.ErrResourceNotFound):

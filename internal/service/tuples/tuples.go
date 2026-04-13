@@ -2,106 +2,74 @@ package tuples
 
 import (
 	"context"
+	"fmt"
 	"io"
 
-	"github.com/go-kratos/kratos/v2/log"
 	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
+	tuplesctl "github.com/project-kessel/inventory-api/internal/biz/usecase/tuples"
 	relationspb "github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
 )
 
 // TupleService implements the deprecated KesselTupleService.
 // This service exists only for RBAC backward compatibility and should not be extended.
-// All operations are proxied to relations-api via the Authorizer interface.
 type TupleService struct {
 	pb.UnimplementedKesselTupleServiceServer
-	authz model.Authorizer
+	Ctl *tuplesctl.TupleCrudUseCase
 }
 
-// New creates a new TupleService with the given authorizer.
-func New(authz model.Authorizer) *TupleService {
-	return &TupleService{
-		authz: authz,
-	}
+// New creates a new TupleService with the given usecase.
+func New(uc *tuplesctl.TupleCrudUseCase) *TupleService {
+	return &TupleService{Ctl: uc}
 }
 
-// CreateTuples creates relationship tuples.
-// DEPRECATED: This endpoint exists only for RBAC backward compatibility.
+// CreateTuples creates relationship tuples (DEPRECATED).
+// This endpoint exists only for RBAC backward compatibility.
 func (s *TupleService) CreateTuples(ctx context.Context, req *pb.CreateTuplesRequest) (*pb.CreateTuplesResponse, error) {
-	log.Warn("DEPRECATED: CreateTuples called - this endpoint is for RBAC-only backward compatibility")
-
-	// Convert inventory-api types to relations-api v1beta1 types
-	relReq := &relationspb.CreateTuplesRequest{
-		Upsert: req.GetUpsert(),
-		Tuples: relationshipsToV1beta1(req.GetTuples()),
-	}
-
-	if req.GetFencingCheck() != nil {
-		relReq.FencingCheck = fencingCheckToV1beta1(req.GetFencingCheck())
-	}
-
-	// Call relations-api via authorizer
-	resp, err := s.authz.CreateTuples(ctx, relReq)
+	// Convert proto to domain command
+	cmd, err := toCreateTuplesCommand(req)
 	if err != nil {
 		return nil, err
 	}
 
-	return &pb.CreateTuplesResponse{
-		ConsistencyToken: consistencyTokenFromV1beta1(resp.GetConsistencyToken()),
-	}, nil
+	// Delegate to usecase
+	result, err := s.Ctl.CreateTuples(ctx, cmd)
+	if err != nil {
+		return nil, err
+	}
+
+	// Convert result to proto
+	return fromCreateTuplesResult(result), nil
 }
 
-// DeleteTuples deletes relationship tuples.
-// DEPRECATED: This endpoint exists only for RBAC backward compatibility.
+// DeleteTuples deletes relationship tuples (DEPRECATED).
+// This endpoint exists only for RBAC backward compatibility.
 func (s *TupleService) DeleteTuples(ctx context.Context, req *pb.DeleteTuplesRequest) (*pb.DeleteTuplesResponse, error) {
-	log.Warn("DEPRECATED: DeleteTuples called - this endpoint is for RBAC-only backward compatibility")
-
-	relReq := &relationspb.DeleteTuplesRequest{
-		Filter: tupleFilterToV1beta1(req.GetFilter()),
-	}
-
-	if req.GetFencingCheck() != nil {
-		relReq.FencingCheck = fencingCheckToV1beta1(req.GetFencingCheck())
-	}
-
-	resp, err := s.authz.DeleteTuples(ctx, relReq)
+	cmd, err := toDeleteTuplesCommand(req)
 	if err != nil {
 		return nil, err
 	}
 
-	return &pb.DeleteTuplesResponse{
-		ConsistencyToken: consistencyTokenFromV1beta1(resp.GetConsistencyToken()),
-	}, nil
+	result, err := s.Ctl.DeleteTuples(ctx, cmd)
+	if err != nil {
+		return nil, err
+	}
+
+	return fromDeleteTuplesResult(result), nil
 }
 
-// ReadTuples reads relationship tuples via server-side streaming.
-// DEPRECATED: This endpoint exists only for RBAC backward compatibility.
+// ReadTuples reads relationship tuples via server-side streaming (DEPRECATED).
+// This endpoint exists only for RBAC backward compatibility.
 func (s *TupleService) ReadTuples(req *pb.ReadTuplesRequest, stream pb.KesselTupleService_ReadTuplesServer) error {
-	log.Warn("DEPRECATED: ReadTuples called - this endpoint is for RBAC-only backward compatibility")
-
 	ctx := stream.Context()
 
-	// Convert request to relations-api v1beta1 format
-	relReq := &relationspb.ReadTuplesRequest{
-		Filter: tupleFilterToV1beta1(req.GetFilter()),
+	cmd, err := toReadTuplesCommand(req)
+	if err != nil {
+		return err
 	}
 
-	if req.GetPagination() != nil {
-		relPagination := &relationspb.RequestPagination{
-			Limit: req.GetPagination().GetLimit(),
-		}
-		if req.GetPagination().ContinuationToken != nil {
-			relPagination.ContinuationToken = req.GetPagination().ContinuationToken
-		}
-		relReq.Pagination = relPagination
-	}
-
-	if req.GetConsistency() != nil {
-		relReq.Consistency = consistencyToV1beta1(req.GetConsistency())
-	}
-
-	// Get stream from relations-api via authorizer
-	relStream, err := s.authz.ReadTuples(ctx, relReq)
+	// Get stream from usecase
+	relStream, err := s.Ctl.ReadTuples(ctx, cmd)
 	if err != nil {
 		return err
 	}
@@ -116,11 +84,13 @@ func (s *TupleService) ReadTuples(req *pb.ReadTuplesRequest, stream pb.KesselTup
 			return err
 		}
 
-		// Convert and send response
+		// Convert v1beta1 response to proto
+		tuple := relationshipFromV1beta1ToProto(relResp.GetTuple())
+
 		err = stream.Send(&pb.ReadTuplesResponse{
-			Tuple:            relationshipFromV1beta1(relResp.GetTuple()),
+			Tuple:            tuple,
 			Pagination:       &pb.ResponsePagination{ContinuationToken: relResp.GetPagination().GetContinuationToken()},
-			ConsistencyToken: consistencyTokenFromV1beta1(relResp.GetConsistencyToken()),
+			ConsistencyToken: &pb.ConsistencyToken{Token: relResp.GetConsistencyToken().GetToken()},
 		})
 		if err != nil {
 			return err
@@ -130,213 +100,214 @@ func (s *TupleService) ReadTuples(req *pb.ReadTuplesRequest, stream pb.KesselTup
 	return nil
 }
 
-// AcquireLock acquires a distributed lock.
-// DEPRECATED: This endpoint exists only for RBAC backward compatibility.
+// AcquireLock acquires a distributed lock (DEPRECATED).
+// This endpoint exists only for RBAC backward compatibility.
 func (s *TupleService) AcquireLock(ctx context.Context, req *pb.AcquireLockRequest) (*pb.AcquireLockResponse, error) {
-	log.Warn("DEPRECATED: AcquireLock called - this endpoint is for RBAC-only backward compatibility")
+	cmd := toAcquireLockCommand(req)
 
-	relReq := &relationspb.AcquireLockRequest{
-		LockId: req.GetLockId(),
-	}
-
-	resp, err := s.authz.AcquireLock(ctx, relReq)
+	result, err := s.Ctl.AcquireLock(ctx, cmd)
 	if err != nil {
 		return nil, err
 	}
 
 	return &pb.AcquireLockResponse{
-		LockToken: resp.GetLockToken(),
+		LockToken: result.LockToken,
 	}, nil
 }
 
-// Conversion functions: inventory-api proto → relations-api v1beta1
+// Converter functions (proto → domain command)
 
-// relationshipsToV1beta1 converts an array of inventory relationships to relations-api format.
-func relationshipsToV1beta1(rels []*pb.Relationship) []*relationspb.Relationship {
-	if rels == nil {
-		return nil
-	}
-	result := make([]*relationspb.Relationship, len(rels))
-	for i, rel := range rels {
-		result[i] = relationshipToV1beta1(rel)
-	}
-	return result
-}
-
-// relationshipToV1beta1 converts a single inventory relationship to relations-api format.
-func relationshipToV1beta1(rel *pb.Relationship) *relationspb.Relationship {
-	if rel == nil {
-		return nil
-	}
-	return &relationspb.Relationship{
-		Resource: objectReferenceToV1beta1(rel.GetResource()),
-		Relation: rel.GetRelation(),
-		Subject:  subjectReferenceToV1beta1(rel.GetSubject()),
-	}
-}
-
-// relationshipFromV1beta1 converts a relations-api relationship back to inventory format.
-func relationshipFromV1beta1(rel *relationspb.Relationship) *pb.Relationship {
-	if rel == nil {
-		return nil
-	}
-	return &pb.Relationship{
-		Resource: objectReferenceFromV1beta1(rel.GetResource()),
-		Relation: rel.GetRelation(),
-		Subject:  subjectReferenceFromV1beta1(rel.GetSubject()),
-	}
-}
-
-// objectReferenceToV1beta1 converts inventory object reference to relations-api format.
-func objectReferenceToV1beta1(ref *pb.RelationObjectReference) *relationspb.ObjectReference {
-	if ref == nil {
-		return nil
-	}
-	return &relationspb.ObjectReference{
-		Type: &relationspb.ObjectType{
-			Namespace: ref.GetType().GetNamespace(),
-			Name:      ref.GetType().GetName(),
-		},
-		Id: ref.GetId(),
-	}
-}
-
-// objectReferenceFromV1beta1 converts relations-api object reference back to inventory format.
-func objectReferenceFromV1beta1(ref *relationspb.ObjectReference) *pb.RelationObjectReference {
-	if ref == nil {
-		return nil
-	}
-	return &pb.RelationObjectReference{
-		Type: &pb.RelationObjectType{
-			Namespace: ref.GetType().GetNamespace(),
-			Name:      ref.GetType().GetName(),
-		},
-		Id: ref.GetId(),
-	}
-}
-
-// subjectReferenceToV1beta1 converts inventory subject reference to relations-api format.
-func subjectReferenceToV1beta1(ref *pb.RelationSubjectReference) *relationspb.SubjectReference {
-	if ref == nil {
-		return nil
-	}
-	result := &relationspb.SubjectReference{
-		Subject: objectReferenceToV1beta1(ref.GetSubject()),
-	}
-	if ref.Relation != nil {
-		result.Relation = ref.Relation
-	}
-	return result
-}
-
-// subjectReferenceFromV1beta1 converts relations-api subject reference back to inventory format.
-func subjectReferenceFromV1beta1(ref *relationspb.SubjectReference) *pb.RelationSubjectReference {
-	if ref == nil {
-		return nil
-	}
-	result := &pb.RelationSubjectReference{
-		Subject: objectReferenceFromV1beta1(ref.GetSubject()),
-	}
-	if ref.Relation != nil {
-		result.Relation = ref.Relation
-	}
-	return result
-}
-
-// tupleFilterToV1beta1 converts inventory tuple filter to relations-api format.
-func tupleFilterToV1beta1(filter *pb.RelationTupleFilter) *relationspb.RelationTupleFilter {
-	if filter == nil {
-		return nil
-	}
-	result := &relationspb.RelationTupleFilter{}
-
-	if filter.ResourceNamespace != nil {
-		result.ResourceNamespace = filter.ResourceNamespace
-	}
-	if filter.ResourceType != nil {
-		result.ResourceType = filter.ResourceType
-	}
-	if filter.ResourceId != nil {
-		result.ResourceId = filter.ResourceId
-	}
-	if filter.Relation != nil {
-		result.Relation = filter.Relation
-	}
-	if filter.SubjectFilter != nil {
-		result.SubjectFilter = subjectFilterToV1beta1(filter.SubjectFilter)
+func toCreateTuplesCommand(req *pb.CreateTuplesRequest) (tuplesctl.CreateTuplesCommand, error) {
+	tuples, err := relationshipsToRelationsTuples(req.GetTuples())
+	if err != nil {
+		return tuplesctl.CreateTuplesCommand{}, err
 	}
 
-	return result
-}
-
-// subjectFilterToV1beta1 converts inventory subject filter to relations-api format.
-func subjectFilterToV1beta1(filter *pb.RelationSubjectFilter) *relationspb.SubjectFilter {
-	if filter == nil {
-		return nil
-	}
-	result := &relationspb.SubjectFilter{}
-
-	if filter.SubjectNamespace != nil {
-		result.SubjectNamespace = filter.SubjectNamespace
-	}
-	if filter.SubjectType != nil {
-		result.SubjectType = filter.SubjectType
-	}
-	if filter.SubjectId != nil {
-		result.SubjectId = filter.SubjectId
-	}
-	if filter.Relation != nil {
-		result.Relation = filter.Relation
+	cmd := tuplesctl.CreateTuplesCommand{
+		Tuples: tuples,
+		Upsert: req.GetUpsert(),
 	}
 
-	return result
-}
-
-// fencingCheckToV1beta1 converts inventory fencing check to relations-api format.
-func fencingCheckToV1beta1(fc *pb.RelationFencingCheck) *relationspb.FencingCheck {
-	if fc == nil {
-		return nil
-	}
-	return &relationspb.FencingCheck{
-		LockId:    fc.GetLockId(),
-		LockToken: fc.GetLockToken(),
-	}
-}
-
-// consistencyToV1beta1 converts inventory consistency to relations-api v1beta1 format.
-// Note: Inventory has 3 consistency modes, relations-api has 2.
-// The at_least_as_acknowledged mode is mapped to minimize_latency as a safe downgrade.
-func consistencyToV1beta1(c *pb.Consistency) *relationspb.Consistency {
-	if c == nil {
-		return nil
-	}
-
-	if c.GetMinimizeLatency() {
-		return &relationspb.Consistency{
-			Requirement: &relationspb.Consistency_MinimizeLatency{MinimizeLatency: true},
+	if req.GetFencingCheck() != nil {
+		cmd.FencingCheck = &tuplesctl.FencingCheck{
+			LockId:    req.GetFencingCheck().GetLockId(),
+			LockToken: req.GetFencingCheck().GetLockToken(),
 		}
+	}
+
+	return cmd, nil
+}
+
+func toDeleteTuplesCommand(req *pb.DeleteTuplesRequest) (tuplesctl.DeleteTuplesCommand, error) {
+	cmd := tuplesctl.DeleteTuplesCommand{
+		Filter: tupleFilterFromProto(req.GetFilter()),
+	}
+
+	if req.GetFencingCheck() != nil {
+		cmd.FencingCheck = &tuplesctl.FencingCheck{
+			LockId:    req.GetFencingCheck().GetLockId(),
+			LockToken: req.GetFencingCheck().GetLockToken(),
+		}
+	}
+
+	return cmd, nil
+}
+
+func toReadTuplesCommand(req *pb.ReadTuplesRequest) (tuplesctl.ReadTuplesCommand, error) {
+	return tuplesctl.ReadTuplesCommand{
+		Filter:      tupleFilterFromProto(req.GetFilter()),
+		Pagination:  paginationFromProto(req.GetPagination()),
+		Consistency: consistencyFromProto(req.GetConsistency()),
+	}, nil
+}
+
+func toAcquireLockCommand(req *pb.AcquireLockRequest) tuplesctl.AcquireLockCommand {
+	return tuplesctl.AcquireLockCommand{
+		LockId: req.GetLockId(),
+	}
+}
+
+// Helper converters (proto → domain)
+
+func relationshipsToRelationsTuples(rels []*pb.Relationship) ([]model.RelationsTuple, error) {
+	tuples := make([]model.RelationsTuple, len(rels))
+	for i, rel := range rels {
+		tuple, err := relationshipToRelationsTuple(rel)
+		if err != nil {
+			return nil, fmt.Errorf("invalid relationship at index %d: %w", i, err)
+		}
+		tuples[i] = tuple
+	}
+	return tuples, nil
+}
+
+func relationshipToRelationsTuple(rel *pb.Relationship) (model.RelationsTuple, error) {
+	resourceId, err := model.NewLocalResourceId(rel.GetResource().GetId())
+	if err != nil {
+		return model.RelationsTuple{}, fmt.Errorf("invalid resource ID: %w", err)
+	}
+	resourceType := model.NewRelationsObjectType(
+		rel.GetResource().GetType().GetName(),
+		rel.GetResource().GetType().GetNamespace(),
+	)
+	resource := model.NewRelationsResource(resourceId, resourceType)
+
+	subjectId, err := model.NewLocalResourceId(rel.GetSubject().GetSubject().GetId())
+	if err != nil {
+		return model.RelationsTuple{}, fmt.Errorf("invalid subject ID: %w", err)
+	}
+	subjectType := model.NewRelationsObjectType(
+		rel.GetSubject().GetSubject().GetType().GetName(),
+		rel.GetSubject().GetSubject().GetType().GetNamespace(),
+	)
+	subjectResource := model.NewRelationsResource(subjectId, subjectType)
+
+	var subjectRelation string
+	if rel.GetSubject().Relation != nil {
+		subjectRelation = *rel.GetSubject().Relation
+	}
+	subject := model.NewRelationsSubject(subjectResource, subjectRelation)
+
+	return model.NewRelationsTuple(resource, rel.GetRelation(), subject), nil
+}
+
+func tupleFilterFromProto(pf *pb.RelationTupleFilter) tuplesctl.TupleFilter {
+	if pf == nil {
+		return tuplesctl.TupleFilter{}
+	}
+
+	filter := tuplesctl.TupleFilter{
+		ResourceNamespace: pf.ResourceNamespace,
+		ResourceType:      pf.ResourceType,
+		ResourceId:        pf.ResourceId,
+		Relation:          pf.Relation,
+	}
+
+	if pf.GetSubjectFilter() != nil {
+		filter.SubjectFilter = &tuplesctl.SubjectFilter{
+			SubjectNamespace: pf.GetSubjectFilter().SubjectNamespace,
+			SubjectType:      pf.GetSubjectFilter().SubjectType,
+			SubjectId:        pf.GetSubjectFilter().SubjectId,
+			Relation:         pf.GetSubjectFilter().Relation,
+		}
+	}
+
+	return filter
+}
+
+func paginationFromProto(p *pb.RequestPagination) *model.Pagination {
+	if p == nil {
+		return nil
+	}
+	return &model.Pagination{
+		Limit:        p.Limit,
+		Continuation: p.ContinuationToken,
+	}
+}
+
+func consistencyFromProto(c *pb.Consistency) model.Consistency {
+	if c == nil {
+		return model.NewConsistencyUnspecified()
+	}
+	if c.GetMinimizeLatency() {
+		return model.NewConsistencyMinimizeLatency()
+	}
+	if c.GetAtLeastAsAcknowledged() {
+		return model.NewConsistencyAtLeastAsAcknowledged()
 	}
 	if c.GetAtLeastAsFresh() != nil {
-		return &relationspb.Consistency{
-			Requirement: &relationspb.Consistency_AtLeastAsFresh{
-				AtLeastAsFresh: &relationspb.ConsistencyToken{
-					Token: c.GetAtLeastAsFresh().GetToken(),
-				},
-			},
-		}
+		token := model.DeserializeConsistencyToken(c.GetAtLeastAsFresh().GetToken())
+		return model.NewConsistencyAtLeastAsFresh(token)
 	}
+	return model.NewConsistencyUnspecified()
+}
 
-	// at_least_as_acknowledged not supported in relations-api - default to minimize_latency
-	log.Debug("Mapping at_least_as_acknowledged to minimize_latency (relations-api doesn't support this mode)")
-	return &relationspb.Consistency{
-		Requirement: &relationspb.Consistency_MinimizeLatency{MinimizeLatency: true},
+// Converter functions (domain/v1beta1 → proto)
+
+func fromCreateTuplesResult(result *tuplesctl.CreateTuplesResult) *pb.CreateTuplesResponse {
+	if result.ConsistencyToken == "" {
+		return &pb.CreateTuplesResponse{}
+	}
+	return &pb.CreateTuplesResponse{
+		ConsistencyToken: &pb.ConsistencyToken{Token: result.ConsistencyToken.Serialize()},
 	}
 }
 
-// consistencyTokenFromV1beta1 converts relations-api v1beta1 consistency token back to inventory format.
-func consistencyTokenFromV1beta1(token *relationspb.ConsistencyToken) *pb.ConsistencyToken {
-	if token == nil {
+func fromDeleteTuplesResult(result *tuplesctl.DeleteTuplesResult) *pb.DeleteTuplesResponse {
+	if result.ConsistencyToken == "" {
+		return &pb.DeleteTuplesResponse{}
+	}
+	return &pb.DeleteTuplesResponse{
+		ConsistencyToken: &pb.ConsistencyToken{Token: result.ConsistencyToken.Serialize()},
+	}
+}
+
+func relationshipFromV1beta1ToProto(rel *relationspb.Relationship) *pb.Relationship {
+	if rel == nil {
 		return nil
 	}
-	return &pb.ConsistencyToken{Token: token.GetToken()}
+	result := &pb.Relationship{
+		Resource: &pb.RelationObjectReference{
+			Type: &pb.RelationObjectType{
+				Namespace: rel.GetResource().GetType().GetNamespace(),
+				Name:      rel.GetResource().GetType().GetName(),
+			},
+			Id: rel.GetResource().GetId(),
+		},
+		Relation: rel.GetRelation(),
+		Subject: &pb.RelationSubjectReference{
+			Subject: &pb.RelationObjectReference{
+				Type: &pb.RelationObjectType{
+					Namespace: rel.GetSubject().GetSubject().GetType().GetNamespace(),
+					Name:      rel.GetSubject().GetSubject().GetType().GetName(),
+				},
+				Id: rel.GetSubject().GetSubject().GetId(),
+			},
+		},
+	}
+	// Set subject relation if present
+	if rel.GetSubject().Relation != nil {
+		result.Subject.Relation = rel.GetSubject().Relation
+	}
+	return result
 }

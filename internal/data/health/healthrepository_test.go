@@ -5,8 +5,6 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/project-kessel/inventory-api/internal/mocks"
-
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -32,14 +30,19 @@ func allowAllRelationsConfig() data.RelationsCompletedConfig {
 	return cfg
 }
 
+func unhealthyRelationsRepo() *data.FakeRelationsRepository {
+	repo := data.NewFakeRelationsRepository()
+	repo.HealthFunc = func(_ context.Context) error {
+		return errors.New("RELATIONS-API UNHEALTHY")
+	}
+	return repo
+}
+
 func TestHealthInit(t *testing.T) {
 	db := setupGorm(t)
 	ctx := context.TODO()
 
-	mockRepo := &mocks.MockRelationsRepository{}
-	mockRepo.On("Health", ctx).Return(errors.New("RELATIONS-API UNHEALTHY"))
-
-	healthRepo := New(db, mockRepo, allowAllRelationsConfig())
+	healthRepo := New(db, unhealthyRelationsRepo(), allowAllRelationsConfig())
 	assert.NotNil(t, healthRepo)
 
 	resp, err := healthRepo.IsBackendAvailable(ctx)
@@ -58,10 +61,7 @@ func TestHealthRepo_IsBackendAvailable_AllCases(t *testing.T) {
 	relConfig := allowAllRelationsConfig()
 
 	db := setupGorm(t)
-	unhealthyRepo := &mocks.MockRelationsRepository{}
-	unhealthyRepo.On("Health", ctx).Return(errors.New("RELATIONS-API UNHEALTHY"))
-
-	healthRepo := New(db, unhealthyRepo, relConfig)
+	healthRepo := New(db, unhealthyRelationsRepo(), relConfig)
 	assert.NotNil(t, healthRepo)
 	resp, err := healthRepo.IsBackendAvailable(ctx)
 	assert.Nil(t, err)
@@ -79,22 +79,18 @@ func TestHealthRepo_IsBackendAvailable_AllCases(t *testing.T) {
 	assert.Contains(t, resp.Status, "RELATIONS-API UNHEALTHY")
 
 	db1 := setupGorm(t)
-	healthyRepo1 := &mocks.MockRelationsRepository{}
-	healthyRepo1.On("Health", ctx).Return(nil)
-	healthRepo1 := New(db1, healthyRepo1, relConfig)
+	healthRepo1 := New(db1, data.NewFakeRelationsRepository(), relConfig)
 	resp, err = healthRepo1.IsBackendAvailable(ctx)
 	assert.NoError(t, err)
 	assert.Equal(t, uint32(200), resp.Code)
 	assert.Contains(t, resp.Status, "Storage type sqlite")
 
 	db2 := setupGorm(t)
-	healthyRepo2 := &mocks.MockRelationsRepository{}
-	healthyRepo2.On("Health", ctx).Return(nil)
 	sqlDB2, _ := db2.DB()
 	if err := sqlDB2.Close(); err != nil {
 		t.Logf("Warning: failed to close db: %v", err)
 	}
-	healthRepo2 := New(db2, healthyRepo2, relConfig)
+	healthRepo2 := New(db2, data.NewFakeRelationsRepository(), relConfig)
 	resp, err = healthRepo2.IsBackendAvailable(ctx)
 	assert.NoError(t, err)
 	assert.Equal(t, uint32(500), resp.Code)
@@ -102,9 +98,7 @@ func TestHealthRepo_IsBackendAvailable_AllCases(t *testing.T) {
 	assert.NotContains(t, resp.Status, "RELATIONS-API UNHEALTHY")
 
 	db3 := setupGorm(t)
-	unhealthyRepo3 := &mocks.MockRelationsRepository{}
-	unhealthyRepo3.On("Health", ctx).Return(errors.New("RELATIONS-API UNHEALTHY"))
-	healthRepo3 := New(db3, unhealthyRepo3, relConfig)
+	healthRepo3 := New(db3, unhealthyRelationsRepo(), relConfig)
 	resp, err = healthRepo3.IsBackendAvailable(ctx)
 	assert.NoError(t, err)
 	assert.Equal(t, uint32(500), resp.Code)

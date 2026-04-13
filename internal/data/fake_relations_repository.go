@@ -2,6 +2,7 @@ package data
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"maps"
 	"slices"
@@ -9,6 +10,8 @@ import (
 	"sync"
 
 	"github.com/project-kessel/inventory-api/internal/biz/model"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 // relationsTupleKey represents a unique relationship tuple for lookup.
@@ -39,6 +42,15 @@ type FakeRelationsRepository struct {
 	version   int64
 	tuples    map[relationsTupleKey]bool
 	snapshots map[int64]map[relationsTupleKey]bool
+
+	locks   map[string]string // lockId -> current valid lockToken
+	lockSeq int64             // monotonic counter for generating unique tokens
+
+	// Override functions for simulating infrastructure failures that an
+	// in-memory fake cannot naturally produce.
+	HealthFunc      func(ctx context.Context) error
+	AcquireLockFunc func(ctx context.Context, lockId string) (string, error)
+	CheckBulkFunc   func(ctx context.Context, items []model.CheckItem, consistency model.Consistency) ([]model.CheckBulkResultItem, model.ConsistencyToken, error)
 }
 
 var _ model.RelationsRepository = &FakeRelationsRepository{}
@@ -51,6 +63,7 @@ func NewFakeRelationsRepository() *FakeRelationsRepository {
 		version:   1,
 		tuples:    make(map[relationsTupleKey]bool),
 		snapshots: make(map[int64]map[relationsTupleKey]bool),
+		locks:     make(map[string]string),
 	}
 }
 
@@ -108,6 +121,8 @@ func (f *FakeRelationsRepository) Reset() {
 	defer f.mu.Unlock()
 	f.tuples = make(map[relationsTupleKey]bool)
 	f.snapshots = make(map[int64]map[relationsTupleKey]bool)
+	f.locks = make(map[string]string)
+	f.lockSeq = 0
 	f.version = 1
 }
 
@@ -150,7 +165,10 @@ func hasTupleInMap(tuples map[relationsTupleKey]bool, key relationsTupleKey) boo
 	return tuples[key]
 }
 
-func (f *FakeRelationsRepository) Health(_ context.Context) error {
+func (f *FakeRelationsRepository) Health(ctx context.Context) error {
+	if f.HealthFunc != nil {
+		return f.HealthFunc(ctx)
+	}
 	return nil
 }
 
@@ -202,8 +220,11 @@ func (f *FakeRelationsRepository) CheckForUpdate(_ context.Context, resource mod
 	return hasTupleInMap(f.tuples, key), resultToken, nil
 }
 
-func (f *FakeRelationsRepository) CheckBulk(_ context.Context, items []model.CheckItem,
+func (f *FakeRelationsRepository) CheckBulk(ctx context.Context, items []model.CheckItem,
 	consistency model.Consistency) ([]model.CheckBulkResultItem, model.ConsistencyToken, error) {
+	if f.CheckBulkFunc != nil {
+		return f.CheckBulkFunc(ctx, items, consistency)
+	}
 	f.mu.RLock()
 	defer f.mu.RUnlock()
 
@@ -332,9 +353,13 @@ func (f *FakeRelationsRepository) LookupSubjects(_ context.Context, query model.
 }
 
 func (f *FakeRelationsRepository) CreateTuples(_ context.Context, tuples []model.RelationsTuple, _ bool,
-	_, _ string) (model.ConsistencyToken, error) {
+	lockId, lockToken string) (model.ConsistencyToken, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+
+	if err := f.validateFencingToken(lockId, lockToken); err != nil {
+		return "", err
+	}
 
 	for _, tuple := range tuples {
 		key := relationsTupleKeyFromModel(tuple)
@@ -345,9 +370,13 @@ func (f *FakeRelationsRepository) CreateTuples(_ context.Context, tuples []model
 }
 
 func (f *FakeRelationsRepository) DeleteTuples(_ context.Context, tuples []model.RelationsTuple,
-	_, _ string) (model.ConsistencyToken, error) {
+	lockId, lockToken string) (model.ConsistencyToken, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+
+	if err := f.validateFencingToken(lockId, lockToken); err != nil {
+		return "", err
+	}
 
 	for _, tuple := range tuples {
 		key := relationsTupleKeyFromModel(tuple)
@@ -357,8 +386,27 @@ func (f *FakeRelationsRepository) DeleteTuples(_ context.Context, tuples []model
 	return f.formatToken(), nil
 }
 
-func (f *FakeRelationsRepository) AcquireLock(_ context.Context, _ string) (string, error) {
-	return "fake-lock-token", nil
+func (f *FakeRelationsRepository) AcquireLock(ctx context.Context, lockId string) (string, error) {
+	if f.AcquireLockFunc != nil {
+		return f.AcquireLockFunc(ctx, lockId)
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.lockSeq++
+	token := fmt.Sprintf("fake-lock-token-%d", f.lockSeq)
+	f.locks[lockId] = token
+	return token, nil
+}
+
+func (f *FakeRelationsRepository) validateFencingToken(lockId, lockToken string) error {
+	if lockId == "" {
+		return nil
+	}
+	current, ok := f.locks[lockId]
+	if !ok || current != lockToken {
+		return status.Error(codes.FailedPrecondition, "invalid fencing token")
+	}
+	return nil
 }
 
 func relationsTupleKeyFromModel(tuple model.RelationsTuple) relationsTupleKey {

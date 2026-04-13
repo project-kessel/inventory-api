@@ -17,7 +17,6 @@ import (
 	"github.com/project-kessel/inventory-api/internal/metricscollector"
 	"github.com/project-kessel/inventory-api/internal/testutil"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"gorm.io/gorm"
 
@@ -25,7 +24,6 @@ import (
 	"github.com/project-kessel/inventory-api/internal/biz/model"
 	"github.com/project-kessel/inventory-api/internal/biz/usecase/metaauthorizer"
 	usecase "github.com/project-kessel/inventory-api/internal/biz/usecase/resources"
-	"github.com/project-kessel/inventory-api/internal/mocks"
 	svc "github.com/project-kessel/inventory-api/internal/service/resources"
 	"github.com/project-kessel/inventory-api/internal/subject/selfsubject"
 	"google.golang.org/grpc/codes"
@@ -704,23 +702,19 @@ func TestInventoryService_CheckSelfBulk_ResponseLengthMismatch(t *testing.T) {
 	}
 
 	runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
-		mockRelations := &mocks.MockRelationsRepository{}
-		// Return 2 items when 1 was requested - triggers Internal error for length mismatch
-		mockRelations.
-			On("CheckBulk", mock.Anything, mock.Anything, mock.Anything).
-			Return(
-				[]model.CheckBulkResultItem{{Allowed: true}, {Allowed: true}},
+		fakeRelations := data.NewFakeRelationsRepository()
+		fakeRelations.CheckBulkFunc = func(_ context.Context, _ []model.CheckItem, _ model.Consistency) ([]model.CheckBulkResultItem, model.ConsistencyToken, error) {
+			return []model.CheckBulkResultItem{{Allowed: true}, {Allowed: true}},
 				model.DeserializeConsistencyToken("test-token"),
-				nil,
-			).
-			Once()
+				nil
+		}
 		return TestServerConfig{
-				Usecase:       newTestUsecase(t, testUsecaseConfig{RelationsRepo: mockRelations}),
+				Usecase:       newTestUsecase(t, testUsecaseConfig{RelationsRepo: fakeRelations}),
 				Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
 			}, func(t *testing.T, tr *Transport) {
 				ctx := context.Background()
 				res := tr.Invoke(ctx, withBody(protoReq, CheckSelfBulk, httpEndpoint("POST /api/kessel/v1beta2/checkselfbulk")))
-				Assert(t, res, requireError(codes.Internal).And(func(t *testing.T) { mockRelations.AssertExpectations(t) }))
+				Assert(t, res, requireError(codes.Internal))
 			}
 	})
 }

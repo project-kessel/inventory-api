@@ -25,8 +25,6 @@ import (
 
 	. "github.com/project-kessel/inventory-api/cmd/common"
 	"github.com/project-kessel/inventory-api/internal/pubsub"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 const (
@@ -506,79 +504,65 @@ func TestCommitStoredOffsets(t *testing.T) {
 }
 
 func TestRebalanceCallback_AssignedPartitions(t *testing.T) {
-	tests := []struct {
-		name                  string
-		partitions            []kafka.TopicPartition
-		lockToken             string
-		lockError             error
-		expectedLockId        string
-		expectedLockToken     string
-		expectedError         error
-		expectAcquireLockCall bool
-	}{
-		{
-			name: "successful lock acquisition",
-			partitions: []kafka.TopicPartition{
-				{Partition: 0, Topic: ToPointer("test-topic")},
-			},
-			lockToken:             "test-lock-token-123",
-			lockError:             nil,
-			expectedLockId:        "inventory-consumer/0",
-			expectedLockToken:     "test-lock-token-123",
-			expectedError:         nil,
-			expectAcquireLockCall: true,
-		},
-		{
-			name: "lock acquisition fails",
-			partitions: []kafka.TopicPartition{
-				{Partition: 0, Topic: ToPointer("test-topic")},
-			},
-			lockToken:             "",
-			lockError:             errors.New("lock acquisition failed"),
-			expectedLockId:        "inventory-consumer/0",
-			expectedLockToken:     "",
-			expectedError:         ErrMaxRetries,
-			expectAcquireLockCall: true,
-		},
-		{
-			name:                  "no partitions assigned",
-			partitions:            []kafka.TopicPartition{},
-			lockToken:             "",
-			lockError:             nil,
-			expectedLockId:        "",
-			expectedLockToken:     "",
-			expectedError:         nil,
-			expectAcquireLockCall: false,
-		},
-	}
+	t.Run("successful lock acquisition", func(t *testing.T) {
+		tester := TestCase{}
+		errs := tester.TestSetup(t)
+		assert.Nil(t, errs)
 
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			tester := TestCase{}
-			errs := tester.TestSetup(t)
-			assert.Nil(t, errs)
+		fakeRepo := data.NewFakeRelationsRepository()
+		tester.inv.RelationsRepo = fakeRepo
 
-			mockRepo := &mocks.MockRelationsRepository{}
-			if test.expectAcquireLockCall {
-				mockRepo.On("AcquireLock", mock.Anything, test.expectedLockId).Return(test.lockToken, test.lockError)
-			}
-			tester.inv.RelationsRepo = mockRepo
+		event := kafka.AssignedPartitions{
+			Partitions: []kafka.TopicPartition{{Partition: 0, Topic: ToPointer("test-topic")}},
+		}
 
-			event := kafka.AssignedPartitions{
-				Partitions: test.partitions,
-			}
+		err := tester.inv.RebalanceCallback(nil, event)
 
-			err := tester.inv.RebalanceCallback(nil, event)
+		assert.Nil(t, err)
+		assert.Equal(t, "inventory-consumer/0", tester.inv.lockId)
+		assert.NotEmpty(t, tester.inv.lockToken)
+	})
 
-			assert.Equal(t, test.expectedError, err)
-			assert.Equal(t, test.expectedLockId, tester.inv.lockId)
-			assert.Equal(t, test.expectedLockToken, tester.inv.lockToken)
+	t.Run("lock acquisition fails", func(t *testing.T) {
+		tester := TestCase{}
+		errs := tester.TestSetup(t)
+		assert.Nil(t, errs)
 
-			if test.expectAcquireLockCall {
-				mockRepo.AssertExpectations(t)
-			}
-		})
-	}
+		fakeRepo := data.NewFakeRelationsRepository()
+		fakeRepo.AcquireLockFunc = func(_ context.Context, _ string) (string, error) {
+			return "", errors.New("lock acquisition failed")
+		}
+		tester.inv.RelationsRepo = fakeRepo
+
+		event := kafka.AssignedPartitions{
+			Partitions: []kafka.TopicPartition{{Partition: 0, Topic: ToPointer("test-topic")}},
+		}
+
+		err := tester.inv.RebalanceCallback(nil, event)
+
+		assert.Equal(t, ErrMaxRetries, err)
+		assert.Equal(t, "inventory-consumer/0", tester.inv.lockId)
+		assert.Equal(t, "", tester.inv.lockToken)
+	})
+
+	t.Run("no partitions assigned", func(t *testing.T) {
+		tester := TestCase{}
+		errs := tester.TestSetup(t)
+		assert.Nil(t, errs)
+
+		fakeRepo := data.NewFakeRelationsRepository()
+		tester.inv.RelationsRepo = fakeRepo
+
+		event := kafka.AssignedPartitions{
+			Partitions: []kafka.TopicPartition{},
+		}
+
+		err := tester.inv.RebalanceCallback(nil, event)
+
+		assert.Nil(t, err)
+		assert.Equal(t, "", tester.inv.lockId)
+		assert.Equal(t, "", tester.inv.lockToken)
+	})
 }
 
 func TestRebalanceCallback_RevokedPartitions(t *testing.T) {
@@ -710,22 +694,9 @@ func TestFencingToken_WritingAfterRebalance(t *testing.T) {
 	assert.Nil(t, errsB)
 	testerB.inv.Config.ConsumerGroupID = "test-group"
 
-	mockRepo := &mocks.MockRelationsRepository{}
-
-	consumerAToken := "token-A"
-	consumerBToken := "token-B"
-	lockCall1 := mockRepo.On("AcquireLock", mock.Anything, "test-group/0").Return(consumerAToken, nil).Once()
-	lockCall2 := mockRepo.On("AcquireLock", mock.Anything, "test-group/0").Return(consumerBToken, nil).Once()
-	lockCall2.NotBefore(lockCall1)
-
-	mockRepo.On("CreateTuples", mock.Anything, mock.Anything, true, mock.Anything, consumerBToken).
-		Return(model.DeserializeConsistencyToken("test-token"), nil)
-
-	mockRepo.On("CreateTuples", mock.Anything, mock.Anything, true, mock.Anything, consumerAToken).
-		Return(model.ConsistencyToken(""), errors.New("fencing token is invalid or expired"))
-
-	testerA.inv.RelationsRepo = mockRepo
-	testerB.inv.RelationsRepo = mockRepo
+	fakeRepo := data.NewFakeRelationsRepository()
+	testerA.inv.RelationsRepo = fakeRepo
+	testerB.inv.RelationsRepo = fakeRepo
 
 	assignedPartitions := kafka.AssignedPartitions{
 		Partitions: []kafka.TopicPartition{{Partition: 0, Topic: ToPointer("test-topic")}},
@@ -735,14 +706,14 @@ func TestFencingToken_WritingAfterRebalance(t *testing.T) {
 	err := testerA.inv.RebalanceCallback(nil, assignedPartitions)
 	assert.Nil(t, err)
 	assert.Equal(t, "test-group/0", testerA.inv.lockId)
-	assert.Equal(t, "token-A", testerA.inv.lockToken)
+	assert.NotEmpty(t, testerA.inv.lockToken)
 	staleToken := testerA.inv.lockToken
 
 	// Consumer B acquires the lock, invalidating A's token
 	err = testerB.inv.RebalanceCallback(nil, assignedPartitions)
 	assert.Nil(t, err)
 	assert.Equal(t, "test-group/0", testerB.inv.lockId)
-	assert.Equal(t, "token-B", testerB.inv.lockToken)
+	assert.NotEmpty(t, testerB.inv.lockToken)
 	assert.NotEqual(t, staleToken, testerB.inv.lockToken)
 
 	// Simulate consumer A waking up with the stale token
@@ -763,17 +734,14 @@ func TestFencingToken_WritingAfterRebalance(t *testing.T) {
 	domainTuple := model.NewRelationsTuple(resource, "t_workspace", subject)
 	tuples := &[]model.RelationsTuple{domainTuple}
 
-	// Try to create a tuple with the stale token
+	// Try to create a tuple with the stale token -- fencing rejects it
 	_, err = testerA.inv.CreateTuple(context.Background(), tuples)
 	assert.NotNil(t, err)
-	assert.Contains(t, err.Error(), "fencing token is invalid or expired")
+	assert.Contains(t, err.Error(), "invalid fencing token")
 
 	// Consumer B should be able to create a tuple with the valid token
-	resp, err := testerB.inv.CreateTuple(context.Background(), tuples)
+	_, err = testerB.inv.CreateTuple(context.Background(), tuples)
 	assert.Nil(t, err)
-	assert.Equal(t, "test-token", resp)
-
-	mockRepo.AssertExpectations(t)
 }
 
 func TestInventoryConsumer_CreateTuple_FailedPrecondition(t *testing.T) {
@@ -781,12 +749,10 @@ func TestInventoryConsumer_CreateTuple_FailedPrecondition(t *testing.T) {
 	errs := tester.TestSetup(t)
 	assert.Nil(t, errs)
 
-	mockRepo := &mocks.MockRelationsRepository{}
-	mockRepo.On("CreateTuples", mock.Anything, mock.Anything, true, mock.Anything, mock.Anything).
-		Return(model.ConsistencyToken(""), status.Error(codes.FailedPrecondition, "invalid fencing token"))
-
-	tester.inv.RelationsRepo = mockRepo
-	tester.inv.lockToken = "test-token"
+	fakeRepo := data.NewFakeRelationsRepository()
+	tester.inv.RelationsRepo = fakeRepo
+	tester.inv.lockId = "some-lock"
+	tester.inv.lockToken = "stale-token"
 
 	resourceId, err := model.NewLocalResourceId("4321")
 	assert.Nil(t, err)
@@ -807,8 +773,6 @@ func TestInventoryConsumer_CreateTuple_FailedPrecondition(t *testing.T) {
 	assert.NotNil(t, err)
 	assert.Equal(t, "", resp)
 	assert.Contains(t, err.Error(), "invalid fencing token")
-
-	mockRepo.AssertExpectations(t)
 }
 
 func TestInventoryConsumer_UpdateTuple_FailedPrecondition(t *testing.T) {
@@ -816,12 +780,10 @@ func TestInventoryConsumer_UpdateTuple_FailedPrecondition(t *testing.T) {
 	errs := tester.TestSetup(t)
 	assert.Nil(t, errs)
 
-	mockRepo := &mocks.MockRelationsRepository{}
-	mockRepo.On("CreateTuples", mock.Anything, mock.Anything, true, mock.Anything, mock.Anything).
-		Return(model.ConsistencyToken(""), status.Error(codes.FailedPrecondition, "invalid fencing token"))
-
-	tester.inv.RelationsRepo = mockRepo
-	tester.inv.lockToken = "test-token"
+	fakeRepo := data.NewFakeRelationsRepository()
+	tester.inv.RelationsRepo = fakeRepo
+	tester.inv.lockId = "some-lock"
+	tester.inv.lockToken = "stale-token"
 
 	resourceId, err := model.NewLocalResourceId("4321")
 	assert.Nil(t, err)
@@ -842,8 +804,6 @@ func TestInventoryConsumer_UpdateTuple_FailedPrecondition(t *testing.T) {
 	assert.NotNil(t, err)
 	assert.Equal(t, "", resp)
 	assert.Contains(t, err.Error(), "invalid fencing token")
-
-	mockRepo.AssertExpectations(t)
 }
 
 func TestInventoryConsumer_DeleteTuple_FailedPrecondition(t *testing.T) {
@@ -851,12 +811,10 @@ func TestInventoryConsumer_DeleteTuple_FailedPrecondition(t *testing.T) {
 	errs := tester.TestSetup(t)
 	assert.Nil(t, errs)
 
-	mockRepo := &mocks.MockRelationsRepository{}
-	mockRepo.On("DeleteTuples", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
-		Return(model.ConsistencyToken(""), status.Error(codes.FailedPrecondition, "invalid fencing token"))
-
-	tester.inv.RelationsRepo = mockRepo
-	tester.inv.lockToken = "test-token"
+	fakeRepo := data.NewFakeRelationsRepository()
+	tester.inv.RelationsRepo = fakeRepo
+	tester.inv.lockId = "some-lock"
+	tester.inv.lockToken = "stale-token"
 
 	resourceId, err := model.NewLocalResourceId("4321")
 	assert.Nil(t, err)
@@ -877,8 +835,6 @@ func TestInventoryConsumer_DeleteTuple_FailedPrecondition(t *testing.T) {
 	assert.NotNil(t, err)
 	assert.Equal(t, "", resp)
 	assert.Contains(t, err.Error(), "invalid fencing token")
-
-	mockRepo.AssertExpectations(t)
 }
 
 func TestUpdateConsistencyTokenIfPresent(t *testing.T) {

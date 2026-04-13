@@ -6,7 +6,6 @@ import (
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
 	"github.com/go-kratos/kratos/v2/transport"
 	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1"
-	"github.com/project-kessel/inventory-api/internal/biz/model"
 	"github.com/project-kessel/inventory-api/internal/pubsub"
 
 	"github.com/stretchr/testify/mock"
@@ -31,65 +30,6 @@ func (m *MockHealthRepo) IsRelationsAvailable(ctx context.Context) (*pb.GetReady
 	}
 	return args.Get(0).(*pb.GetReadyzResponse), args.Error(1)
 
-}
-
-type MockRelationsRepository struct {
-	mock.Mock
-}
-
-func (m *MockRelationsRepository) Health(ctx context.Context) error {
-	args := m.Called(ctx)
-	return args.Error(0)
-}
-
-func (m *MockRelationsRepository) Check(ctx context.Context, resource model.ReporterResourceKey, relation model.Relation,
-	subject model.SubjectReference, consistency model.Consistency) (bool, model.ConsistencyToken, error) {
-	args := m.Called(ctx, resource, relation, subject, consistency)
-	return args.Bool(0), args.Get(1).(model.ConsistencyToken), args.Error(2)
-}
-
-func (m *MockRelationsRepository) CheckForUpdate(ctx context.Context, resource model.ReporterResourceKey, relation model.Relation,
-	subject model.SubjectReference) (bool, model.ConsistencyToken, error) {
-	args := m.Called(ctx, resource, relation, subject)
-	return args.Bool(0), args.Get(1).(model.ConsistencyToken), args.Error(2)
-}
-
-func (m *MockRelationsRepository) CheckBulk(ctx context.Context, items []model.CheckItem,
-	consistency model.Consistency) ([]model.CheckBulkResultItem, model.ConsistencyToken, error) {
-	args := m.Called(ctx, items, consistency)
-	return args.Get(0).([]model.CheckBulkResultItem), args.Get(1).(model.ConsistencyToken), args.Error(2)
-}
-
-func (m *MockRelationsRepository) CheckForUpdateBulk(ctx context.Context, items []model.CheckItem) ([]model.CheckBulkResultItem, model.ConsistencyToken, error) {
-	args := m.Called(ctx, items)
-	return args.Get(0).([]model.CheckBulkResultItem), args.Get(1).(model.ConsistencyToken), args.Error(2)
-}
-
-func (m *MockRelationsRepository) LookupResources(ctx context.Context, query model.LookupResourcesQuery) (model.LookupResourcesIterator, error) {
-	args := m.Called(ctx, query)
-	return args.Get(0).(model.LookupResourcesIterator), args.Error(1)
-}
-
-func (m *MockRelationsRepository) LookupSubjects(ctx context.Context, query model.LookupSubjectsQuery) (model.LookupSubjectsIterator, error) {
-	args := m.Called(ctx, query)
-	return args.Get(0).(model.LookupSubjectsIterator), args.Error(1)
-}
-
-func (m *MockRelationsRepository) CreateTuples(ctx context.Context, tuples []model.RelationsTuple, upsert bool,
-	lockId, lockToken string) (model.ConsistencyToken, error) {
-	args := m.Called(ctx, tuples, upsert, lockId, lockToken)
-	return args.Get(0).(model.ConsistencyToken), args.Error(1)
-}
-
-func (m *MockRelationsRepository) DeleteTuples(ctx context.Context, tuples []model.RelationsTuple,
-	lockId, lockToken string) (model.ConsistencyToken, error) {
-	args := m.Called(ctx, tuples, lockId, lockToken)
-	return args.Get(0).(model.ConsistencyToken), args.Error(1)
-}
-
-func (m *MockRelationsRepository) AcquireLock(ctx context.Context, lockId string) (string, error) {
-	args := m.Called(ctx, lockId)
-	return args.String(0), args.Error(1)
 }
 
 type MockConsumer struct {

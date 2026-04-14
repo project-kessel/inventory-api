@@ -15,7 +15,9 @@ import (
 	"github.com/project-kessel/inventory-api/internal/metricscollector"
 	"github.com/project-kessel/inventory-api/internal/pubsub"
 	"github.com/project-kessel/inventory-api/internal/subject/selfsubject"
-	"github.com/sony/gobreaker"
+	kessel "github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
+	"github.com/sony/gobreaker/v2"
+	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"gorm.io/gorm"
@@ -193,7 +195,7 @@ func (uc *Usecase) ReportResource(ctx context.Context, cmd ReportResourceCommand
 		timeoutCtx, cancel := context.WithTimeout(ctx, listenTimeout)
 		defer cancel()
 
-		_, err := uc.waitForNotifBreaker.Execute(func() (interface{}, error) {
+		_, err := uc.waitForNotifBreaker.Execute(func() (any, error) {
 			err = subscription.BlockForNotification(timeoutCtx)
 			if err != nil {
 				// Return error for circuit breaker

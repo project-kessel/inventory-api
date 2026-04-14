@@ -53,11 +53,11 @@ func WithInsecureBearerToken(token string) grpc.CallOption {
 // NewTokenClient creates and returns a new tokenClient client.
 func NewTokenClient(config *kessel.TokenClientConfig) *tokenClient {
 	return &tokenClient{
-		ClientID:       config.ClientId,
-		ClientSecret:   config.ClientSecret,
-		URL:            config.URL,
-		EnableOIDCAuth: config.EnableOIDCAuth,
-		Insecure:       config.Insecure,
+		ClientID:       config.GetClientId(),
+		ClientSecret:   config.GetClientSecret(),
+		URL:            config.GetURL(),
+		EnableOIDCAuth: config.GetEnableOIDCAuth(),
+		Insecure:       config.GetInsecure(),
 		cache:          cache.New(tokenLifeDuration, cacheCleanupInterval),
 	}
 }

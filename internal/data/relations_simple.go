@@ -130,10 +130,12 @@ func (s *SimpleRelationsRepository) getTuplesForToken(token string) map[simpleTu
 	return s.tuples
 }
 
+// simpleFormatConsistencyToken formats a version as a consistency token string.
 func simpleFormatConsistencyToken(version int64) string {
 	return strconv.FormatInt(version, 10)
 }
 
+// simpleParseConsistencyToken parses a consistency token string into a version number.
 func simpleParseConsistencyToken(token string) (int64, error) {
 	return strconv.ParseInt(token, 10, 64)
 }
@@ -165,6 +167,7 @@ func (s *SimpleRelationsRepository) Reset() {
 	s.version = 1
 }
 
+// simpleHasTupleInSnapshot checks if a tuple exists in the given tuple map.
 func simpleHasTupleInSnapshot(tuples map[simpleTupleKey]bool, resourceNamespace, resourceType, resourceID, relation, subjectNamespace, subjectType, subjectID string) bool {
 	key := simpleTupleKey{
 		ResourceNamespace: resourceNamespace,
@@ -198,10 +201,13 @@ func simpleTupleKeyFromRelationship(rel *kessel.Relationship) simpleTupleKey {
 	return key
 }
 
+// Health implements RelationsRepository.
 func (s *SimpleRelationsRepository) Health(_ context.Context) (*kesselv1.GetReadyzResponse, error) {
 	return &kesselv1.GetReadyzResponse{}, nil
 }
 
+// Check implements RelationsRepository.
+// The consistencyToken parameter (third argument) specifies the minimum freshness required.
 func (s *SimpleRelationsRepository) Check(_ context.Context, namespace, permission, consistencyToken, resourceType, localResourceID string, sub *kessel.SubjectReference) (kessel.CheckResponse_Allowed, *kessel.ConsistencyToken, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -226,6 +232,8 @@ func (s *SimpleRelationsRepository) Check(_ context.Context, namespace, permissi
 	return kessel.CheckResponse_ALLOWED_FALSE, &kessel.ConsistencyToken{Token: resultToken}, nil
 }
 
+// CheckForUpdate implements RelationsRepository.
+// Always uses the latest state (no stale reads for update checks).
 func (s *SimpleRelationsRepository) CheckForUpdate(_ context.Context, namespace, permission, resourceType, localResourceID string, sub *kessel.SubjectReference) (kessel.CheckForUpdateResponse_Allowed, *kessel.ConsistencyToken, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -249,6 +257,8 @@ func (s *SimpleRelationsRepository) CheckForUpdate(_ context.Context, namespace,
 	return kessel.CheckForUpdateResponse_ALLOWED_FALSE, &kessel.ConsistencyToken{Token: resultToken}, nil
 }
 
+// CheckBulk implements RelationsRepository.
+// Respects the consistency token in the request if provided.
 func (s *SimpleRelationsRepository) CheckBulk(_ context.Context, req *kessel.CheckBulkRequest) (*kessel.CheckBulkResponse, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -308,6 +318,7 @@ func (s *SimpleRelationsRepository) CheckBulk(_ context.Context, req *kessel.Che
 	}, nil
 }
 
+// CheckForUpdateBulk implements RelationsRepository by checking each item against current tuples.
 func (s *SimpleRelationsRepository) CheckForUpdateBulk(ctx context.Context, req *kessel.CheckForUpdateBulkRequest) (*kessel.CheckForUpdateBulkResponse, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -353,6 +364,9 @@ func (s *SimpleRelationsRepository) CheckForUpdateBulk(ctx context.Context, req 
 	}, nil
 }
 
+// LookupResources implements RelationsRepository.
+// It returns resources where the subject has the specified relation.
+// This is a simple direct-tuple lookup, not a full ReBAC graph traversal.
 func (s *SimpleRelationsRepository) LookupResources(_ context.Context, req *kessel.LookupResourcesRequest) (grpc.ServerStreamingClient[kessel.LookupResourcesResponse], error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -402,6 +416,9 @@ func (s *SimpleRelationsRepository) LookupResources(_ context.Context, req *kess
 	return &simpleLookupResourcesStream{results: results}, nil
 }
 
+// LookupSubjects implements RelationsRepository.
+// It returns subjects that have the specified relation to a resource.
+// This is a simple direct-tuple lookup, not a full ReBAC graph traversal.
 func (s *SimpleRelationsRepository) LookupSubjects(_ context.Context, req *kessel.LookupSubjectsRequest) (grpc.ServerStreamingClient[kessel.LookupSubjectsResponse], error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -453,6 +470,8 @@ func (s *SimpleRelationsRepository) LookupSubjects(_ context.Context, req *kesse
 	return &simpleLookupSubjectsStream{results: results}, nil
 }
 
+// CreateTuples implements RelationsRepository by storing the relationship tuples.
+// This advances the version counter.
 func (s *SimpleRelationsRepository) CreateTuples(_ context.Context, req *kessel.CreateTuplesRequest) (*kessel.CreateTuplesResponse, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -466,6 +485,8 @@ func (s *SimpleRelationsRepository) CreateTuples(_ context.Context, req *kessel.
 	return &kessel.CreateTuplesResponse{}, nil
 }
 
+// DeleteTuples implements RelationsRepository by removing tuples matching the filter.
+// This advances the version counter.
 func (s *SimpleRelationsRepository) DeleteTuples(_ context.Context, req *kessel.DeleteTuplesRequest) (*kessel.DeleteTuplesResponse, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -514,18 +535,23 @@ func simpleMatchesFilter(key simpleTupleKey, filter *kessel.RelationTupleFilter)
 	return true
 }
 
+// AcquireLock implements RelationsRepository.
 func (s *SimpleRelationsRepository) AcquireLock(_ context.Context, _ *kessel.AcquireLockRequest) (*kessel.AcquireLockResponse, error) {
 	return &kessel.AcquireLockResponse{}, nil
 }
 
+// UnsetWorkspace implements RelationsRepository.
 func (s *SimpleRelationsRepository) UnsetWorkspace(_ context.Context, _, _, _ string) (*kessel.DeleteTuplesResponse, error) {
 	return &kessel.DeleteTuplesResponse{}, nil
 }
 
+// SetWorkspace implements RelationsRepository.
 func (s *SimpleRelationsRepository) SetWorkspace(_ context.Context, _, _, _, _ string, _ bool) (*kessel.CreateTuplesResponse, error) {
 	return &kessel.CreateTuplesResponse{}, nil
 }
 
+// simpleLookupResourcesStream implements grpc.ServerStreamingClient for LookupResourcesResponse.
+// It returns pre-computed results in order, then returns io.EOF.
 type simpleLookupResourcesStream struct {
 	results []*kessel.LookupResourcesResponse
 	index   int

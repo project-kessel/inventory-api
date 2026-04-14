@@ -25,8 +25,8 @@ type TokenClientConfig struct {
 }
 
 type completedConfig struct {
-	GRPCConn    *grpc.ClientConn
-	TokenConfig *TokenClientConfig
+	grpcConn    *grpc.ClientConn
+	tokenConfig *TokenClientConfig
 }
 
 type CompletedConfig struct {
@@ -34,11 +34,11 @@ type CompletedConfig struct {
 }
 
 func (c CompletedConfig) GetGRPCConn() *grpc.ClientConn {
-	return c.GRPCConn
+	return c.grpcConn
 }
 
 func (c CompletedConfig) GetTokenConfig() *TokenClientConfig {
-	return c.TokenConfig
+	return c.tokenConfig
 }
 
 func (c *Config) Complete(ctx context.Context) (CompletedConfig, []error) {
@@ -68,5 +68,5 @@ func (c *Config) Complete(ctx context.Context) (CompletedConfig, []error) {
 		Insecure:       c.Insecure,
 	}
 
-	return CompletedConfig{&completedConfig{GRPCConn: conn, TokenConfig: tokenReq}}, nil
+	return CompletedConfig{&completedConfig{grpcConn: conn, tokenConfig: tokenReq}}, nil
 }

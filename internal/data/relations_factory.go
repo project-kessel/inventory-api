@@ -16,6 +16,6 @@ func NewRelationsRepository(ctx context.Context, config relations.CompletedConfi
 	case relations.Kessel:
 		return NewGRPCRelationsRepository(ctx, config.Kessel, logger)
 	default:
-		return nil, fmt.Errorf("unrecognized authz.impl: %s", config.Authz)
+		return nil, fmt.Errorf("unrecognized relations implementation: %s", config.Authz)
 	}
 }

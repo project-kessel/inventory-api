@@ -518,31 +518,41 @@ func (i *InventoryConsumer) CreateTuple(ctx context.Context, tuples *[]model.Rel
 
 		if status.Convert(err).Code() == codes.AlreadyExists {
 			i.Logger.Info("tuple already exists; fetching consistency token")
-			firstTuple := (*tuples)[0]
-			resKey, buildErr := model.NewReporterResourceKey(
-				firstTuple.Resource().Id(),
-				model.DeserializeResourceType(firstTuple.Resource().Type().Name()),
-				model.DeserializeReporterType(firstTuple.Resource().Type().Namespace()),
+			// Use the first relationship for token fetching
+			firstRelationship := (*tuples)[0]
+			namespace := firstRelationship.Resource().Type().Namespace()
+			relation := model.DeserializeRelation(firstRelationship.Relation())
+			subject := firstRelationship.Subject()
+			resourceType := firstRelationship.Resource().Type().Name()
+			reporterResourceId := firstRelationship.Resource().Id()
+
+			resourceKey, err := model.NewReporterResourceKey(
+				reporterResourceId,
+				model.DeserializeResourceType(resourceType),
+				model.DeserializeReporterType(namespace),
 				model.ReporterInstanceId(""),
 			)
-			if buildErr != nil {
-				return "", fmt.Errorf("failed to build resource key: %w", buildErr)
+			if err != nil {
+				return "", fmt.Errorf("failed to build resource key: %w", err)
 			}
-			rel := model.DeserializeRelation(firstTuple.Relation())
-			subId := firstTuple.Subject().Subject().Id()
-			subResType := model.DeserializeResourceType(firstTuple.Subject().Subject().Type().Name())
-			subRepType := model.DeserializeReporterType(firstTuple.Subject().Subject().Type().Namespace())
-			subKey, buildErr := model.NewReporterResourceKey(subId, subResType, subRepType, model.ReporterInstanceId(""))
-			if buildErr != nil {
-				return "", fmt.Errorf("failed to build subject key: %w", buildErr)
-			}
-			sub := model.NewSubjectReferenceWithoutRelation(subKey)
 
-			_, checkToken, checkErr := i.RelationsRepo.Check(ctx, resKey, rel, sub, model.NewConsistencyMinimizeLatency())
-			if checkErr != nil {
-				return "", fmt.Errorf("failed to fetch consistency token: %w", checkErr)
+			subjectResource := subject.Subject()
+			subjectKey, err := model.NewReporterResourceKey(
+				subjectResource.Id(),
+				model.DeserializeResourceType(subjectResource.Type().Name()),
+				model.DeserializeReporterType(subjectResource.Type().Namespace()),
+				model.ReporterInstanceId(""),
+			)
+			if err != nil {
+				return "", fmt.Errorf("failed to build subject key: %w", err)
 			}
-			return checkToken.Serialize(), nil
+			subjectRef := model.NewSubjectReferenceWithoutRelation(subjectKey)
+
+			_, token, err := i.RelationsRepo.Check(ctx, resourceKey, relation, subjectRef, model.NewConsistencyMinimizeLatency())
+			if err != nil {
+				return "", fmt.Errorf("failed to fetch consistency token: %w", err)
+			}
+			return token.Serialize(), nil
 		}
 		return "", fmt.Errorf("error creating tuple: %w", err)
 	}

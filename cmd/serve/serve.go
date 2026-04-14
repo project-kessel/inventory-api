@@ -308,7 +308,7 @@ func NewCommand(
 						// If the consumer cannot process a message, the consumer loop is restarted
 						// This is to ensure we re-read the message and prevent it being dropped and moving to next message.
 						// To re-read the current message, we have to recreate the consumer connection so that the earliest offset is used
-						inventoryConsumer, err = consumer.New(consumerConfig, db, schemaRepository, authzConfig, authorizer, notifier, log.NewHelper(log.With(logger, "subsystem", "inventoryConsumer")), nil)
+						inventoryConsumer, err = consumer.New(consumerConfig, db, schemaRepository, authorizer, notifier, log.NewHelper(log.With(logger, "subsystem", "inventoryConsumer")), nil)
 						if err != nil {
 							shutdown(err)
 						}

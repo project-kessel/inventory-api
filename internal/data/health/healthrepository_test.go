@@ -14,8 +14,8 @@ import (
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 
-	"github.com/project-kessel/inventory-api/internal/authz"
-	"github.com/project-kessel/inventory-api/internal/authz/kessel"
+	"github.com/project-kessel/inventory-api/internal/config/relations"
+	relationskessel "github.com/project-kessel/inventory-api/internal/config/relations/kessel"
 	"github.com/project-kessel/inventory-api/internal/data"
 )
 
@@ -32,9 +32,9 @@ func setupGorm(t *testing.T) *gorm.DB {
 func TestHealthInit(t *testing.T) {
 	db := setupGorm(t)
 	ctx := context.TODO()
-	authConfig, _ := authz.NewConfig(authz.NewOptions()).Complete(ctx)
-	kesselConfig, _ := kessel.NewConfig(kessel.NewOptions()).Complete(ctx)
-	authorizer, _ := kessel.New(ctx, kesselConfig, log.NewHelper(log.DefaultLogger))
+	authConfig, _ := relations.NewConfig(relations.NewOptions()).Complete(ctx)
+	kesselConfig, _ := relationskessel.NewConfig(relationskessel.NewOptions()).Complete(ctx)
+	authorizer, _ := data.NewKesselRelationsRepository(ctx, kesselConfig, log.NewHelper(log.DefaultLogger))
 
 	healthRepo := New(db, authorizer, authConfig)
 	assert.NotNil(t, healthRepo)
@@ -54,9 +54,9 @@ func TestHealthInit(t *testing.T) {
 
 func TestHealthRepo_IsBackendAvailable_AllCases(t *testing.T) {
 	ctx := context.TODO()
-	authConfig, _ := authz.NewConfig(authz.NewOptions()).Complete(ctx)
-	kesselConfig, _ := kessel.NewConfig(kessel.NewOptions()).Complete(ctx)
-	authorizer, _ := kessel.New(ctx, kesselConfig, log.NewHelper(log.DefaultLogger))
+	authConfig, _ := relations.NewConfig(relations.NewOptions()).Complete(ctx)
+	kesselConfig, _ := relationskessel.NewConfig(relationskessel.NewOptions()).Complete(ctx)
+	authorizer, _ := data.NewKesselRelationsRepository(ctx, kesselConfig, log.NewHelper(log.DefaultLogger))
 
 	db := setupGorm(t)
 	healthRepo := New(db, authorizer, authConfig)

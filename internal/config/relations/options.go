@@ -1,14 +1,13 @@
-package authz
+package relations
 
 import (
 	"fmt"
 
 	"github.com/spf13/pflag"
 
-	"github.com/project-kessel/inventory-api/internal/authz/kessel"
+	"github.com/project-kessel/inventory-api/internal/config/relations/kessel"
 )
 
-// TODO: presumably more will go here to authenticate Common Inventory as a service to call Kessel.
 type Options struct {
 	Authz  string          `mapstructure:"impl"`
 	Kessel *kessel.Options `mapstructure:"kessel"`

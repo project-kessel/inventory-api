@@ -8,17 +8,17 @@ import (
 	"gorm.io/gorm"
 
 	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1"
-	"github.com/project-kessel/inventory-api/internal/authz"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
+	"github.com/project-kessel/inventory-api/internal/config/relations"
 )
 
 type healthRepo struct {
 	DB            *gorm.DB
-	Authz         model.Authorizer
-	CompletedAuth authz.CompletedConfig
+	Authz         model.RelationsRepository
+	CompletedAuth relations.CompletedConfig
 }
 
-func New(g *gorm.DB, a model.Authorizer, completedAuth authz.CompletedConfig) *healthRepo {
+func New(g *gorm.DB, a model.RelationsRepository, completedAuth relations.CompletedConfig) *healthRepo {
 	return &healthRepo{
 		DB:            g,
 		Authz:         a,
@@ -48,7 +48,7 @@ func (r *healthRepo) IsBackendAvailable(ctx context.Context) (*pb.GetReadyzRespo
 		log.Errorf("RELATIONS-API UNHEALTHY")
 		return newResponse("RELATIONS-API UNHEALTHY", 500), nil
 	}
-	if authz.CheckAuthorizer(r.CompletedAuth) == "Kessel" {
+	if relations.CheckAuthorizer(r.CompletedAuth) == "Kessel" {
 		if viper.GetBool("log.readyz") {
 			log.Infof("Storage type %s and relations-api %s", storageType, health.GetStatus())
 		}
@@ -64,7 +64,7 @@ func (r *healthRepo) IsRelationsAvailable(ctx context.Context) (*pb.GetReadyzRes
 		log.Errorf("RELATIONS-API UNHEALTHY")
 		return newResponse("RELATIONS-API UNHEALTHY", 500), nil
 	}
-	if authz.CheckAuthorizer(r.CompletedAuth) == "Kessel" {
+	if relations.CheckAuthorizer(r.CompletedAuth) == "Kessel" {
 		if viper.GetBool("log.readyz") {
 			log.Infof("relations-api %s", health.GetStatus())
 		}

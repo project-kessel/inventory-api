@@ -7,14 +7,14 @@ import (
 	"github.com/spf13/viper"
 
 	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1"
-	"github.com/project-kessel/inventory-api/internal/authz"
+	"github.com/project-kessel/inventory-api/internal/config/relations"
 	biz "github.com/project-kessel/inventory-api/internal/biz/health"
 )
 
 type HealthService struct {
 	pb.UnimplementedKesselInventoryHealthServiceServer
 	Ctl    *biz.HealthUsecase
-	Config *authz.CompletedConfig
+	Config *relations.CompletedConfig
 }
 
 var (

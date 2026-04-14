@@ -65,7 +65,7 @@ type Usecase struct {
 	schemaService       *model.SchemaService
 	resourceRepository  model.ResourceRepository
 	waitForNotifBreaker *gobreaker.CircuitBreaker[any]
-	Authz               model.Authorizer
+	Authz               model.RelationsRepository
 	MetaAuthorizer      metaauthorizer.MetaAuthorizer
 	Namespace           string
 	Log                 *log.Helper
@@ -76,7 +76,7 @@ type Usecase struct {
 }
 
 func New(resourceRepository model.ResourceRepository, schemaRepository model.SchemaRepository,
-	authz model.Authorizer, namespace string, logger log.Logger,
+	authz model.RelationsRepository, namespace string, logger log.Logger,
 	listenManager pubsub.ListenManagerImpl, waitForNotifBreaker *gobreaker.CircuitBreaker[any], usecaseConfig *UsecaseConfig, metricsCollector *metricscollector.MetricsCollector, metaAuthorizer metaauthorizer.MetaAuthorizer, selfSubjectStrategy selfsubject.SelfSubjectStrategy) *Usecase {
 	if metaAuthorizer == nil {
 		metaAuthorizer = metaauthorizer.NewSimpleMetaAuthorizer()

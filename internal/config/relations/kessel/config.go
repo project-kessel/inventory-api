@@ -16,21 +16,29 @@ func NewConfig(o *Options) *Config {
 	return &Config{Options: o}
 }
 
-type tokenClientConfig struct {
-	clientId       string
-	clientSecret   string
-	url            string
-	enableOIDCAuth bool
-	insecure       bool
+type TokenClientConfig struct {
+	ClientId       string
+	ClientSecret   string
+	URL            string
+	EnableOIDCAuth bool
+	Insecure       bool
 }
 
 type completedConfig struct {
-	gRPCConn    *grpc.ClientConn
-	tokenConfig *tokenClientConfig
+	GRPCConn    *grpc.ClientConn
+	TokenConfig *TokenClientConfig
 }
 
 type CompletedConfig struct {
 	*completedConfig
+}
+
+func (c CompletedConfig) GetGRPCConn() *grpc.ClientConn {
+	return c.GRPCConn
+}
+
+func (c CompletedConfig) GetTokenConfig() *TokenClientConfig {
+	return c.TokenConfig
 }
 
 func (c *Config) Complete(ctx context.Context) (CompletedConfig, []error) {
@@ -52,13 +60,13 @@ func (c *Config) Complete(ctx context.Context) (CompletedConfig, []error) {
 		return CompletedConfig{}, []error{err}
 	}
 
-	tokenReq := &tokenClientConfig{
-		clientId:       c.ClientId,
-		clientSecret:   c.ClientSecret,
-		url:            c.TokenEndpoint,
-		enableOIDCAuth: c.EnableOidcAuth,
-		insecure:       c.Insecure,
+	tokenReq := &TokenClientConfig{
+		ClientId:       c.ClientId,
+		ClientSecret:   c.ClientSecret,
+		URL:            c.TokenEndpoint,
+		EnableOIDCAuth: c.EnableOidcAuth,
+		Insecure:       c.Insecure,
 	}
 
-	return CompletedConfig{&completedConfig{gRPCConn: conn, tokenConfig: tokenReq}}, nil
+	return CompletedConfig{&completedConfig{GRPCConn: conn, TokenConfig: tokenReq}}, nil
 }

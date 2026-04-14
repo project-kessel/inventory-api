@@ -5,8 +5,8 @@ import (
 	"testing"
 
 	. "github.com/project-kessel/inventory-api/cmd/common"
-	"github.com/project-kessel/inventory-api/internal/authz"
-	"github.com/project-kessel/inventory-api/internal/authz/kessel"
+	"github.com/project-kessel/inventory-api/internal/config/relations"
+	"github.com/project-kessel/inventory-api/internal/config/relations/kessel"
 	"github.com/project-kessel/inventory-api/internal/consumer"
 	"github.com/project-kessel/inventory-api/internal/consumer/auth"
 	"github.com/project-kessel/inventory-api/internal/storage"
@@ -105,7 +105,7 @@ func TestConfigureAuthz(t *testing.T) {
 		appconfig: &clowder.AppConfig{
 			Endpoints: []clowder.DependencyEndpoint{
 				clowder.DependencyEndpoint{
-					App:      authz.RelationsAPI,
+					App:      relations.RelationsAPI,
 					Hostname: "kessel-relations",
 				},
 			},
@@ -224,15 +224,15 @@ func TestInjectClowdAppConfig(t *testing.T) {
 		appconfig: &clowder.AppConfig{
 			Endpoints: []clowder.DependencyEndpoint{
 				clowder.DependencyEndpoint{
-					App:      authz.RelationsAPI,
+					App:      relations.RelationsAPI,
 					Hostname: "kessel-relations",
 				},
 			},
 		},
 		options: NewOptionsConfig(),
 		expected: &OptionsConfig{
-			Authz: &authz.Options{
-				Authz: authz.Kessel,
+			Authz: &relations.Options{
+				Authz: relations.Kessel,
 				Kessel: &kessel.Options{
 					URL: "kessel-relations:9000",
 				},

@@ -31,7 +31,7 @@ import (
 	resourcesvc "github.com/project-kessel/inventory-api/internal/service/resources"
 
 	"github.com/project-kessel/inventory-api/internal/authn"
-	"github.com/project-kessel/inventory-api/internal/authz"
+	"github.com/project-kessel/inventory-api/internal/config/relations"
 	"github.com/project-kessel/inventory-api/internal/errors"
 	"github.com/project-kessel/inventory-api/internal/middleware"
 	"github.com/project-kessel/inventory-api/internal/server"
@@ -52,7 +52,7 @@ func NewCommand(
 	serverOptions *server.Options,
 	storageOptions *storage.Options,
 	authnOptions *authn.Options,
-	authzOptions *authz.Options,
+	authzOptions *relations.Options,
 	consumerOptions *consumer.Options,
 	consistencyOptions *consistency.Options,
 	serviceOptions *service.Options,
@@ -108,7 +108,7 @@ func NewCommand(
 			if errs := authzOptions.Validate(); errs != nil {
 				return errors.NewAggregate(errs)
 			}
-			authzConfig, errs := authz.NewConfig(authzOptions).Complete(ctx)
+			authzConfig, errs := relations.NewConfig(authzOptions).Complete(ctx)
 			if errs != nil {
 				return errors.NewAggregate(errs)
 			}
@@ -216,8 +216,8 @@ func NewCommand(
 				return err
 			}
 
-			// construct authz
-			authorizer, err := authz.New(ctx, authzConfig, log.NewHelper(log.With(logger, "subsystem", "authz")))
+			// construct relations repository
+			authorizer, err := data.NewRelationsRepository(ctx, authzConfig, log.NewHelper(log.With(logger, "subsystem", "relations")))
 			if err != nil {
 				return err
 			}

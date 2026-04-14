@@ -13,8 +13,6 @@ import (
 	"gorm.io/gorm"
 
 	authnapi "github.com/project-kessel/inventory-api/internal/authn/api"
-	"github.com/project-kessel/inventory-api/internal/authz"
-	"github.com/project-kessel/inventory-api/internal/authz/allow"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
 	"github.com/project-kessel/inventory-api/internal/biz/usecase/metaauthorizer"
 	"github.com/project-kessel/inventory-api/internal/data"
@@ -90,7 +88,7 @@ func TestCheckSelf_UsesCheckSelfRelation(t *testing.T) {
 	usecase := New(
 		data.NewFakeResourceRepository(),
 		newFakeSchemaRepository(t),
-		&allow.AllowAllAuthz{},
+		&data.AllowAllRelationsRepository{},
 		"rbac",
 		log.DefaultLogger,
 		nil,
@@ -118,7 +116,7 @@ func TestCheckSelf_DeniedByMetaAuthz(t *testing.T) {
 	usecase := New(
 		data.NewFakeResourceRepository(),
 		newFakeSchemaRepository(t),
-		&allow.AllowAllAuthz{},
+		&data.AllowAllRelationsRepository{},
 		"rbac",
 		log.DefaultLogger,
 		nil,
@@ -142,7 +140,7 @@ func TestCheckSelf_MissingAuthzContext(t *testing.T) {
 	usecase := New(
 		data.NewFakeResourceRepository(),
 		newFakeSchemaRepository(t),
-		&allow.AllowAllAuthz{},
+		&data.AllowAllRelationsRepository{},
 		"rbac",
 		log.DefaultLogger,
 		nil,
@@ -168,7 +166,7 @@ func TestReportResource_UsesReportRelation(t *testing.T) {
 	usecase := New(
 		data.NewFakeResourceRepository(),
 		newFakeSchemaRepository(t),
-		&allow.AllowAllAuthz{},
+		&data.AllowAllRelationsRepository{},
 		"rbac",
 		log.DefaultLogger,
 		nil,
@@ -192,7 +190,7 @@ func TestDelete_UsesDeleteRelation(t *testing.T) {
 	usecase := New(
 		data.NewFakeResourceRepository(),
 		newFakeSchemaRepository(t),
-		&allow.AllowAllAuthz{},
+		&data.AllowAllRelationsRepository{},
 		"rbac",
 		log.DefaultLogger,
 		nil,
@@ -223,7 +221,7 @@ func TestCheck_UsesCheckRelation(t *testing.T) {
 	usecase := New(
 		data.NewFakeResourceRepository(),
 		newFakeSchemaRepository(t),
-		&allow.AllowAllAuthz{},
+		&data.AllowAllRelationsRepository{},
 		"rbac",
 		log.DefaultLogger,
 		nil,
@@ -253,7 +251,7 @@ func TestCheckForUpdate_UsesCheckForUpdateRelation(t *testing.T) {
 	usecase := New(
 		data.NewFakeResourceRepository(),
 		newFakeSchemaRepository(t),
-		&allow.AllowAllAuthz{},
+		&data.AllowAllRelationsRepository{},
 		"rbac",
 		log.DefaultLogger,
 		nil,
@@ -283,7 +281,7 @@ func TestCheckForUpdateBulk_UsesCheckForUpdateBulkRelation(t *testing.T) {
 	usecase := New(
 		data.NewFakeResourceRepository(),
 		newFakeSchemaRepository(t),
-		&allow.AllowAllAuthz{},
+		&data.AllowAllRelationsRepository{},
 		"rbac",
 		log.DefaultLogger,
 		nil,
@@ -320,7 +318,7 @@ func TestCheckForUpdateBulk_MetaAuthzDenied(t *testing.T) {
 	uc := New(
 		data.NewFakeResourceRepository(),
 		newFakeSchemaRepository(t),
-		&allow.AllowAllAuthz{},
+		&data.AllowAllRelationsRepository{},
 		"rbac",
 		log.DefaultLogger,
 		nil,
@@ -350,7 +348,7 @@ func TestCheckForUpdateBulk_MixedResults(t *testing.T) {
 	ctx := testAuthzContext()
 	meta := &recordingMetaAuthorizer{allowed: true}
 
-	simpleAuthz := authz.NewSimpleAuthorizer()
+	simpleAuthz := data.NewSimpleRelationsRepository()
 	simpleAuthz.Grant("user-1", "update", "hbi", "host", "host-1")
 	// No grant for host-2
 
@@ -396,7 +394,7 @@ func TestCheckSelfBulk_UsesCheckSelfRelationForEachItem(t *testing.T) {
 	usecase := New(
 		data.NewFakeResourceRepository(),
 		newFakeSchemaRepository(t),
-		&allow.AllowAllAuthz{},
+		&data.AllowAllRelationsRepository{},
 		"rbac",
 		log.DefaultLogger,
 		nil,
@@ -433,7 +431,7 @@ func TestCheckSelfBulk_MissingAuthzContext(t *testing.T) {
 	usecase := New(
 		data.NewFakeResourceRepository(),
 		newFakeSchemaRepository(t),
-		&allow.AllowAllAuthz{},
+		&data.AllowAllRelationsRepository{},
 		"rbac",
 		log.DefaultLogger,
 		nil,
@@ -466,7 +464,7 @@ func TestCheckBulk_RejectsInventoryManagedConsistency(t *testing.T) {
 	usecase := New(
 		data.NewFakeResourceRepository(),
 		newFakeSchemaRepository(t),
-		&allow.AllowAllAuthz{},
+		&data.AllowAllRelationsRepository{},
 		"rbac",
 		log.DefaultLogger,
 		nil,
@@ -505,7 +503,7 @@ func TestCheckSelfBulk_RejectsInventoryManagedConsistency(t *testing.T) {
 	usecase := New(
 		data.NewFakeResourceRepository(),
 		newFakeSchemaRepository(t),
-		&allow.AllowAllAuthz{},
+		&data.AllowAllRelationsRepository{},
 		"rbac",
 		log.DefaultLogger,
 		nil,
@@ -621,7 +619,7 @@ func TestReportResource(t *testing.T) {
 
 			resourceRepo := data.NewFakeResourceRepository()
 			schemaRepo := newFakeSchemaRepository(t)
-			authorizer := &allow.AllowAllAuthz{}
+			authorizer := &data.AllowAllRelationsRepository{}
 			usecaseConfig := &UsecaseConfig{
 				ReadAfterWriteEnabled: false,
 				ConsumerEnabled:       false,
@@ -701,7 +699,7 @@ func TestReportResourceThenDelete(t *testing.T) {
 
 			resourceRepo := data.NewFakeResourceRepository()
 			schemaRepo := newFakeSchemaRepository(t)
-			authorizer := &allow.AllowAllAuthz{}
+			authorizer := &data.AllowAllRelationsRepository{}
 			usecaseConfig := &UsecaseConfig{
 				ReadAfterWriteEnabled: false,
 				ConsumerEnabled:       false,
@@ -761,7 +759,7 @@ func TestDelete_ResourceNotFound(t *testing.T) {
 
 	resourceRepo := data.NewFakeResourceRepository()
 	schemaRepo := newFakeSchemaRepository(t)
-	authorizer := &allow.AllowAllAuthz{}
+	authorizer := &data.AllowAllRelationsRepository{}
 	usecaseConfig := &UsecaseConfig{
 		ReadAfterWriteEnabled: false,
 		ConsumerEnabled:       false,
@@ -792,7 +790,7 @@ func TestReportFindDeleteFind_TombstoneLifecycle(t *testing.T) {
 
 	resourceRepo := data.NewFakeResourceRepository()
 	schemaRepo := newFakeSchemaRepository(t)
-	authorizer := &allow.AllowAllAuthz{}
+	authorizer := &data.AllowAllRelationsRepository{}
 	usecaseConfig := &UsecaseConfig{
 		ReadAfterWriteEnabled: false,
 		ConsumerEnabled:       false,
@@ -837,7 +835,7 @@ func TestMultipleHostsLifecycle(t *testing.T) {
 
 	resourceRepo := data.NewFakeResourceRepository()
 	schemaRepo := newFakeSchemaRepository(t)
-	authorizer := &allow.AllowAllAuthz{}
+	authorizer := &data.AllowAllRelationsRepository{}
 	usecaseConfig := &UsecaseConfig{
 		ReadAfterWriteEnabled: false,
 		ConsumerEnabled:       false,
@@ -912,7 +910,7 @@ func TestPartialDataScenarios(t *testing.T) {
 
 	resourceRepo := data.NewFakeResourceRepository()
 	schemaRepo := newFakeSchemaRepository(t)
-	authorizer := &allow.AllowAllAuthz{}
+	authorizer := &data.AllowAllRelationsRepository{}
 	usecaseConfig := &UsecaseConfig{
 		ReadAfterWriteEnabled: false,
 		ConsumerEnabled:       false,
@@ -987,7 +985,7 @@ func TestResourceLifecycle_ReportUpdateDeleteReport(t *testing.T) {
 
 		resourceRepo := data.NewFakeResourceRepository()
 		schemaRepo := newFakeSchemaRepository(t)
-		authorizer := &allow.AllowAllAuthz{}
+		authorizer := &data.AllowAllRelationsRepository{}
 		usecaseConfig := &UsecaseConfig{
 			ReadAfterWriteEnabled: false,
 			ConsumerEnabled:       false,
@@ -1084,7 +1082,7 @@ func TestResourceLifecycle_ReportUpdateDeleteReportDelete(t *testing.T) {
 
 		resourceRepo := data.NewFakeResourceRepository()
 		schemaRepo := newFakeSchemaRepository(t)
-		authorizer := &allow.AllowAllAuthz{}
+		authorizer := &data.AllowAllRelationsRepository{}
 		usecaseConfig := &UsecaseConfig{
 			ReadAfterWriteEnabled: false,
 			ConsumerEnabled:       false,
@@ -1158,7 +1156,7 @@ func TestResourceLifecycle_ReportDeleteResubmitDelete(t *testing.T) {
 
 		resourceRepo := data.NewFakeResourceRepository()
 		schemaRepo := newFakeSchemaRepository(t)
-		authorizer := &allow.AllowAllAuthz{}
+		authorizer := &data.AllowAllRelationsRepository{}
 		usecaseConfig := &UsecaseConfig{
 			ReadAfterWriteEnabled: false,
 			ConsumerEnabled:       false,
@@ -1228,7 +1226,7 @@ func TestResourceLifecycle_ReportResubmitDeleteResubmit(t *testing.T) {
 
 		resourceRepo := data.NewFakeResourceRepository()
 		schemaRepo := newFakeSchemaRepository(t)
-		authorizer := &allow.AllowAllAuthz{}
+		authorizer := &data.AllowAllRelationsRepository{}
 		usecaseConfig := &UsecaseConfig{
 			ReadAfterWriteEnabled: false,
 			ConsumerEnabled:       false,
@@ -1311,7 +1309,7 @@ func TestResourceLifecycle_ComplexIdempotency(t *testing.T) {
 
 		resourceRepo := data.NewFakeResourceRepository()
 		schemaRepo := newFakeSchemaRepository(t)
-		authorizer := &allow.AllowAllAuthz{}
+		authorizer := &data.AllowAllRelationsRepository{}
 		usecaseConfig := &UsecaseConfig{
 			ReadAfterWriteEnabled: false,
 			ConsumerEnabled:       false,
@@ -1472,7 +1470,7 @@ func TestTransactionIdIdempotency(t *testing.T) {
 
 	resourceRepo := data.NewFakeResourceRepository()
 	schemaRepo := newFakeSchemaRepository(t)
-	authorizer := &allow.AllowAllAuthz{}
+	authorizer := &data.AllowAllRelationsRepository{}
 	usecaseConfig := &UsecaseConfig{
 		ReadAfterWriteEnabled: false,
 		ConsumerEnabled:       false,
@@ -1692,7 +1690,7 @@ func TestReportResource_ValidationSuccess(t *testing.T) {
 	usecase := New(
 		data.NewFakeResourceRepository(),
 		schemaRepo,
-		&allow.AllowAllAuthz{},
+		&data.AllowAllRelationsRepository{},
 		"test-topic",
 		log.DefaultLogger,
 		nil, nil,
@@ -1723,7 +1721,7 @@ func TestReportResource_ValidationErrors(t *testing.T) {
 	usecase := New(
 		data.NewFakeResourceRepository(),
 		schemaRepo,
-		&allow.AllowAllAuthz{},
+		&data.AllowAllRelationsRepository{},
 		"test-topic",
 		log.DefaultLogger,
 		nil, nil,
@@ -1942,7 +1940,7 @@ func TestReportResource_SchemaValidation(t *testing.T) {
 			usecase := New(
 				data.NewFakeResourceRepository(),
 				schemaRepository,
-				&allow.AllowAllAuthz{},
+				&data.AllowAllRelationsRepository{},
 				"test-topic",
 				log.DefaultLogger,
 				nil, nil,
@@ -1983,7 +1981,7 @@ func TestReportResource_BothRepresentationsNil(t *testing.T) {
 	usecase := New(
 		data.NewFakeResourceRepository(),
 		schemaRepo,
-		&allow.AllowAllAuthz{},
+		&data.AllowAllRelationsRepository{},
 		"test-topic",
 		log.DefaultLogger,
 		nil, nil,
@@ -2023,7 +2021,7 @@ func TestReportResource_ValidationErrorFormat(t *testing.T) {
 	usecase := New(
 		data.NewFakeResourceRepository(),
 		schemaRepo,
-		&allow.AllowAllAuthz{},
+		&data.AllowAllRelationsRepository{},
 		"test-topic",
 		log.DefaultLogger,
 		nil, nil,
@@ -2172,7 +2170,7 @@ func TestResolveConsistencyToken(t *testing.T) {
 
 			resourceRepo := data.NewFakeResourceRepository()
 			schemaRepo := newFakeSchemaRepository(t)
-			authorizer := &allow.AllowAllAuthz{}
+			authorizer := &data.AllowAllRelationsRepository{}
 			usecaseConfig := &UsecaseConfig{
 				ReadAfterWriteEnabled:          false,
 				ConsumerEnabled:                false,
@@ -2264,7 +2262,7 @@ func TestResolveConsistencyToken_OverrideFeatureFlag(t *testing.T) {
 
 			resourceRepo := data.NewFakeResourceRepository()
 			schemaRepo := newFakeSchemaRepository(t)
-			authorizer := &allow.AllowAllAuthz{}
+			authorizer := &data.AllowAllRelationsRepository{}
 			usecaseConfig := &UsecaseConfig{
 				ReadAfterWriteEnabled:          false,
 				ConsumerEnabled:                false,
@@ -2309,7 +2307,7 @@ func TestResolveConsistencyToken_NilConsistencyDefaultsToUnspecified(t *testing.
 
 	resourceRepo := data.NewFakeResourceRepository()
 	schemaRepo := newFakeSchemaRepository(t)
-	authorizer := &allow.AllowAllAuthz{}
+	authorizer := &data.AllowAllRelationsRepository{}
 	usecaseConfig := &UsecaseConfig{
 		ReadAfterWriteEnabled:          false,
 		ConsumerEnabled:                false,
@@ -2346,7 +2344,7 @@ func TestResolveConsistencyToken_OverrideFeatureFlag_LogsBypassWhenEnabled(t *te
 
 	resourceRepo := data.NewFakeResourceRepository()
 	schemaRepo := newFakeSchemaRepository(t)
-	authorizer := &allow.AllowAllAuthz{}
+	authorizer := &data.AllowAllRelationsRepository{}
 	usecaseConfig := &UsecaseConfig{
 		ReadAfterWriteEnabled:          false,
 		ConsumerEnabled:                false,
@@ -2372,7 +2370,7 @@ func TestResolveConsistencyToken_OverrideFeatureFlag_LogsEnabledWhenNotBypassed(
 
 	resourceRepo := data.NewFakeResourceRepository()
 	schemaRepo := newFakeSchemaRepository(t)
-	authorizer := &allow.AllowAllAuthz{}
+	authorizer := &data.AllowAllRelationsRepository{}
 	usecaseConfig := &UsecaseConfig{
 		ReadAfterWriteEnabled:          false,
 		ConsumerEnabled:                false,
@@ -2398,7 +2396,7 @@ func TestResolveConsistencyToken_OverrideFeatureFlag_LogsDisabledWhenFeatureOff(
 
 	resourceRepo := data.NewFakeResourceRepository()
 	schemaRepo := newFakeSchemaRepository(t)
-	authorizer := &allow.AllowAllAuthz{}
+	authorizer := &data.AllowAllRelationsRepository{}
 	usecaseConfig := &UsecaseConfig{
 		ReadAfterWriteEnabled:          false,
 		ConsumerEnabled:                false,

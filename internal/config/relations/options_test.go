@@ -1,9 +1,9 @@
-package authz
+package relations
 
 import (
 	"testing"
 
-	"github.com/project-kessel/inventory-api/internal/authz/kessel"
+	"github.com/project-kessel/inventory-api/internal/config/relations/kessel"
 	"github.com/project-kessel/inventory-api/internal/helpers"
 	"github.com/spf13/pflag"
 	"github.com/stretchr/testify/assert"

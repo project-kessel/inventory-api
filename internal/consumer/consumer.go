@@ -16,14 +16,12 @@ import (
 
 	"github.com/project-kessel/inventory-api/cmd/common"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
+	"github.com/project-kessel/inventory-api/internal/config/relations"
 	"github.com/project-kessel/inventory-api/internal/consumer/auth"
 	"github.com/project-kessel/inventory-api/internal/consumer/retry"
 	"github.com/project-kessel/inventory-api/internal/data"
 	datamodel "github.com/project-kessel/inventory-api/internal/data/model"
 	"github.com/project-kessel/inventory-api/internal/metricscollector"
-
-	"github.com/project-kessel/inventory-api/internal/authz/allow"
-	"github.com/project-kessel/inventory-api/internal/authz/kessel"
 	"github.com/project-kessel/inventory-api/internal/pubsub"
 
 	"github.com/spf13/viper"
@@ -37,7 +35,6 @@ import (
 	"google.golang.org/grpc/status"
 	"gorm.io/gorm"
 
-	"github.com/project-kessel/inventory-api/internal/authz"
 	"go.opentelemetry.io/otel/metric"
 )
 
@@ -62,8 +59,8 @@ type InventoryConsumer struct {
 	OffsetStorage    []kafka.TopicPartition
 	Config           CompletedConfig
 	DB               *gorm.DB
-	AuthzConfig      authz.CompletedConfig
-	Authorizer       model.Authorizer
+	AuthzConfig      relations.CompletedConfig
+	Authorizer       model.RelationsRepository
 	Errors           chan error
 	MetricsCollector *metricscollector.MetricsCollector
 	Logger           *log.Helper
@@ -84,7 +81,7 @@ type InventoryConsumer struct {
 }
 
 // New instantiates a new InventoryConsumer
-func New(config CompletedConfig, db *gorm.DB, schemaRepository model.SchemaRepository, authz authz.CompletedConfig, authorizer model.Authorizer, notifier pubsub.Notifier, logger *log.Helper, consumer Consumer) (InventoryConsumer, error) {
+func New(config CompletedConfig, db *gorm.DB, schemaRepository model.SchemaRepository, authzConfig relations.CompletedConfig, authorizer model.RelationsRepository, notifier pubsub.Notifier, logger *log.Helper, consumer Consumer) (InventoryConsumer, error) {
 	if consumer == nil {
 		logger.Info("Setting up kafka consumer")
 		logger.Debugf("completed kafka config: %+v", config.KafkaConfig)
@@ -135,7 +132,7 @@ func New(config CompletedConfig, db *gorm.DB, schemaRepository model.SchemaRepos
 		Config:             config,
 		DB:                 db,
 		ResourceRepository: resourceRepository,
-		AuthzConfig:        authz,
+		AuthzConfig:        authzConfig,
 		Authorizer:         authorizer,
 		Errors:             errChan,
 		MetricsCollector:   &mc,
@@ -177,9 +174,9 @@ func (i *InventoryConsumer) Consume() error {
 
 	var relationsEnabled bool
 	switch i.Authorizer.(type) {
-	case *kessel.KesselAuthz:
+	case *data.KesselRelationsRepository:
 		relationsEnabled = true
-	case *allow.AllowAllAuthz:
+	case *data.AllowAllRelationsRepository:
 		relationsEnabled = false
 	}
 

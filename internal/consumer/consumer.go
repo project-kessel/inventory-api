@@ -174,7 +174,7 @@ func (i *InventoryConsumer) Consume() error {
 
 	var relationsEnabled bool
 	switch i.Authorizer.(type) {
-	case *data.KesselRelationsRepository:
+	case *data.GRPCRelationsRepository:
 		relationsEnabled = true
 	case *data.AllowAllRelationsRepository:
 		relationsEnabled = false

@@ -8,11 +8,10 @@ import (
 	"strconv"
 	"sync"
 
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/metadata"
-
 	kesselv1 "github.com/project-kessel/relations-api/api/kessel/relations/v1"
 	kessel "github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/metadata"
 )
 
 // simpleTupleKey represents a unique relationship tuple for lookup.
@@ -41,7 +40,7 @@ type simpleTupleKey struct {
 // the oldest retained snapshot that is >= the requested version.
 type SimpleRelationsRepository struct {
 	mu        sync.RWMutex
-	version   int64                            // current version (monotonically increasing)
+	version   int64                             // current version (monotonically increasing)
 	tuples    map[simpleTupleKey]bool           // current/latest tuple state
 	snapshots map[int64]map[simpleTupleKey]bool // retained historical snapshots (version -> tuples)
 }

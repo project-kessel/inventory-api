@@ -34,9 +34,9 @@ func TestHealthInit(t *testing.T) {
 	ctx := context.TODO()
 	authConfig, _ := relations.NewConfig(relations.NewOptions()).Complete(ctx)
 	kesselConfig, _ := relationsGrpc.NewConfig(relationsGrpc.NewOptions()).Complete(ctx)
-	authorizer, _ := data.NewGRPCRelationsRepository(ctx, kesselConfig, log.NewHelper(log.DefaultLogger))
+	relationsRepo, _ := data.NewGRPCRelationsRepository(ctx, kesselConfig, log.NewHelper(log.DefaultLogger))
 
-	healthRepo := New(db, authorizer, authConfig)
+	healthRepo := New(db, relationsRepo, authConfig)
 	assert.NotNil(t, healthRepo)
 
 	// just check default negative case for now when using sqlite db, and empty config
@@ -56,10 +56,10 @@ func TestHealthRepo_IsBackendAvailable_AllCases(t *testing.T) {
 	ctx := context.TODO()
 	authConfig, _ := relations.NewConfig(relations.NewOptions()).Complete(ctx)
 	kesselConfig, _ := relationsGrpc.NewConfig(relationsGrpc.NewOptions()).Complete(ctx)
-	authorizer, _ := data.NewGRPCRelationsRepository(ctx, kesselConfig, log.NewHelper(log.DefaultLogger))
+	relationsRepo, _ := data.NewGRPCRelationsRepository(ctx, kesselConfig, log.NewHelper(log.DefaultLogger))
 
 	db := setupGorm(t)
-	healthRepo := New(db, authorizer, authConfig)
+	healthRepo := New(db, relationsRepo, authConfig)
 	assert.NotNil(t, healthRepo)
 	resp, err := healthRepo.IsBackendAvailable(ctx)
 	assert.Nil(t, err)
@@ -77,7 +77,7 @@ func TestHealthRepo_IsBackendAvailable_AllCases(t *testing.T) {
 	assert.Contains(t, resp.Status, "RELATIONS-API UNHEALTHY")
 
 	db1 := setupGorm(t)
-	mockAuthz1 := &mocks.MockAuthz{}
+	mockAuthz1 := &mocks.MockRelationsRepository{}
 	mockAuthz1.On("Health", ctx).Return(&kesselv1.GetReadyzResponse{Status: "OK"}, nil)
 	healthRepo1 := New(db1, mockAuthz1, authConfig)
 	resp, err = healthRepo1.IsBackendAvailable(ctx)
@@ -86,7 +86,7 @@ func TestHealthRepo_IsBackendAvailable_AllCases(t *testing.T) {
 	assert.Contains(t, resp.Status, "Storage type sqlite")
 
 	db2 := setupGorm(t)
-	mockAuthz2 := &mocks.MockAuthz{}
+	mockAuthz2 := &mocks.MockRelationsRepository{}
 	mockAuthz2.On("Health", ctx).Return(&kesselv1.GetReadyzResponse{Status: "OK"}, nil)
 	sqlDB2, _ := db2.DB()
 	if err := sqlDB2.Close(); err != nil {
@@ -100,7 +100,7 @@ func TestHealthRepo_IsBackendAvailable_AllCases(t *testing.T) {
 	assert.NotContains(t, resp.Status, "RELATIONS-API UNHEALTHY")
 
 	db3 := setupGorm(t)
-	mockAuthz3 := &mocks.MockAuthz{}
+	mockAuthz3 := &mocks.MockRelationsRepository{}
 	mockAuthz3.On("Health", ctx).Return((*kesselv1.GetReadyzResponse)(nil), errors.New("RELATIONS-API UNHEALTHY"))
 	healthRepo3 := New(db3, mockAuthz3, authConfig)
 	resp, err = healthRepo3.IsBackendAvailable(ctx)

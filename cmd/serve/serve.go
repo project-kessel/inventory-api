@@ -217,7 +217,7 @@ func NewCommand(
 			}
 
 			// construct relations repository
-			authorizer, err := data.NewRelationsRepository(ctx, authzConfig, log.NewHelper(log.With(logger, "subsystem", "relations")))
+			relationsRepo, err := data.NewRelationsRepository(ctx, authzConfig, log.NewHelper(log.With(logger, "subsystem", "relations")))
 			if err != nil {
 				return err
 			}
@@ -275,13 +275,13 @@ func NewCommand(
 			//v1beta2
 			// wire together inventory service handling
 			resourceRepo := data.NewResourceRepository(db, transactionManager, data.SetOutboxPublisher(storageConfig.Options.OutboxMode))
-			inventory_controller := resourcesctl.New(resourceRepo, schemaRepository, authorizer, "notifications", log.With(logger, "subsystem", "notificationsintegrations_controller"), listenManager, waitForNotifCircuitBreaker, usecaseConfig, mc, metaauthorizer.NewSimpleMetaAuthorizer(), selfSubjectStrategy)
+			inventory_controller := resourcesctl.New(resourceRepo, schemaRepository, relationsRepo, "notifications", log.With(logger, "subsystem", "notificationsintegrations_controller"), listenManager, waitForNotifCircuitBreaker, usecaseConfig, mc, metaauthorizer.NewSimpleMetaAuthorizer(), selfSubjectStrategy)
 
 			inventory_service := resourcesvc.NewKesselInventoryServiceV1beta2(inventory_controller)
 			pbv1beta2.RegisterKesselInventoryServiceServer(server.GrpcServer, inventory_service)
 			pbv1beta2.RegisterKesselInventoryServiceHTTPServer(server.HttpServer, inventory_service)
 
-			health_repo := healthrepo.New(db, authorizer, authzConfig)
+			health_repo := healthrepo.New(db, relationsRepo, authzConfig)
 			health_controller := healthctl.New(health_repo, log.With(logger, "subsystem", "health_controller"))
 			health_service := healthssvc.New(health_controller)
 			hb.RegisterKesselInventoryHealthServiceServer(server.GrpcServer, health_service)
@@ -308,7 +308,7 @@ func NewCommand(
 						// If the consumer cannot process a message, the consumer loop is restarted
 						// This is to ensure we re-read the message and prevent it being dropped and moving to next message.
 						// To re-read the current message, we have to recreate the consumer connection so that the earliest offset is used
-						inventoryConsumer, err = consumer.New(consumerConfig, db, schemaRepository, authorizer, notifier, log.NewHelper(log.With(logger, "subsystem", "inventoryConsumer")), nil)
+						inventoryConsumer, err = consumer.New(consumerConfig, db, schemaRepository, relationsRepo, notifier, log.NewHelper(log.With(logger, "subsystem", "inventoryConsumer")), nil)
 						if err != nil {
 							shutdown(err)
 						}

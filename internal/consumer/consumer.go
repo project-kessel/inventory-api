@@ -58,7 +58,7 @@ type InventoryConsumer struct {
 	OffsetStorage    []kafka.TopicPartition
 	Config           CompletedConfig
 	DB               *gorm.DB
-	Authorizer       model.RelationsRepository
+	Relations        model.RelationsRepository
 	Errors           chan error
 	MetricsCollector *metricscollector.MetricsCollector
 	Logger           *log.Helper
@@ -79,7 +79,7 @@ type InventoryConsumer struct {
 }
 
 // New instantiates a new InventoryConsumer
-func New(config CompletedConfig, db *gorm.DB, schemaRepository model.SchemaRepository, authorizer model.RelationsRepository, notifier pubsub.Notifier, logger *log.Helper, consumer Consumer) (InventoryConsumer, error) {
+func New(config CompletedConfig, db *gorm.DB, schemaRepository model.SchemaRepository, relations model.RelationsRepository, notifier pubsub.Notifier, logger *log.Helper, consumer Consumer) (InventoryConsumer, error) {
 	if consumer == nil {
 		logger.Info("Setting up kafka consumer")
 		logger.Debugf("completed kafka config: %+v", config.KafkaConfig)
@@ -130,7 +130,7 @@ func New(config CompletedConfig, db *gorm.DB, schemaRepository model.SchemaRepos
 		Config:             config,
 		DB:                 db,
 		ResourceRepository: resourceRepository,
-		Authorizer:         authorizer,
+		Relations:          relations,
 		Errors:             errChan,
 		MetricsCollector:   &mc,
 		Logger:             logger,
@@ -170,7 +170,7 @@ func (i *InventoryConsumer) Consume() error {
 	signal.Notify(sigchan, syscall.SIGINT, syscall.SIGTERM)
 
 	var relationsEnabled bool
-	switch i.Authorizer.(type) {
+	switch i.Relations.(type) {
 	case *data.GRPCRelationsRepository:
 		relationsEnabled = true
 	case *data.AllowAllRelationsRepository:
@@ -518,7 +518,7 @@ func (i *InventoryConsumer) CreateTuple(ctx context.Context, tuples *[]model.Rel
 		return "", fmt.Errorf("failed to convert tuples to relationships: %w", err)
 	}
 
-	resp, err := i.Authorizer.CreateTuples(ctx, &v1beta1.CreateTuplesRequest{
+	resp, err := i.Relations.CreateTuples(ctx, &v1beta1.CreateTuplesRequest{
 		Upsert: true,
 		Tuples: relationships,
 		FencingCheck: &v1beta1.FencingCheck{
@@ -544,7 +544,7 @@ func (i *InventoryConsumer) CreateTuple(ctx context.Context, tuples *[]model.Rel
 			resourceType := firstRelationship.GetResource().GetType().GetName()
 			reporterResourceId := firstRelationship.GetResource().GetId()
 
-			_, token, err := i.Authorizer.Check(ctx, namespace, relation, "", resourceType, reporterResourceId, subject)
+			_, token, err := i.Relations.Check(ctx, namespace, relation, "", resourceType, reporterResourceId, subject)
 			if err != nil {
 				return "", fmt.Errorf("failed to fetch consistency token: %w", err)
 			}
@@ -594,7 +594,7 @@ func (i *InventoryConsumer) DeleteTuple(ctx context.Context, tuples []model.Rela
 			return "", fmt.Errorf("failed to convert tuple to filter: %w", err)
 		}
 
-		resp, err := i.Authorizer.DeleteTuples(ctx, &v1beta1.DeleteTuplesRequest{
+		resp, err := i.Relations.DeleteTuples(ctx, &v1beta1.DeleteTuplesRequest{
 			Filter: filter,
 			FencingCheck: &v1beta1.FencingCheck{
 				LockId:    i.lockId,
@@ -712,7 +712,7 @@ func (i *InventoryConsumer) RebalanceCallback(consumer *kafka.Consumer, event ka
 			i.Logger.Infof("Attempting to acquire lock for lockId: %s", i.lockId)
 
 			lockToken, err := i.Retry(func() (string, error) {
-				resp, err := i.Authorizer.AcquireLock(context.Background(), &v1beta1.AcquireLockRequest{
+				resp, err := i.Relations.AcquireLock(context.Background(), &v1beta1.AcquireLockRequest{
 					LockId: i.lockId,
 				})
 				if err != nil {

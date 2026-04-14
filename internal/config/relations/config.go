@@ -48,7 +48,7 @@ func (c *Config) Complete(ctx context.Context) (CompletedConfig, []error) {
 	return CompletedConfig{cfg}, nil
 }
 
-func CheckAuthorizer(config CompletedConfig) string {
+func CheckRelationsImpl(config CompletedConfig) string {
 	var authType string
 	switch config.Authz {
 	case AllowAll:

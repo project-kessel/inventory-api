@@ -16,7 +16,6 @@ import (
 
 	"github.com/project-kessel/inventory-api/cmd/common"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
-	model_legacy "github.com/project-kessel/inventory-api/internal/biz/model_legacy"
 	"github.com/project-kessel/inventory-api/internal/consumer/auth"
 	"github.com/project-kessel/inventory-api/internal/consumer/retry"
 	"github.com/project-kessel/inventory-api/internal/data"
@@ -122,8 +121,8 @@ func New(config CompletedConfig, db *gorm.DB, schemaRepository model.SchemaRepos
 	var errChan chan error
 
 	maxSerializationRetries := viper.GetInt("storage.max-serialization-retries")
-	noopOutbox := data.OutboxPublisher(func(_ *gorm.DB, _ *model_legacy.OutboxEvent) error { return nil })
-	resourceRepository := data.NewResourceRepository(db, data.NewGormTransactionManager(&mc, maxSerializationRetries), noopOutbox)
+	outboxMode := viper.GetString("storage.outbox-mode")
+	resourceRepository := data.NewResourceRepository(db, data.NewGormTransactionManager(&mc, maxSerializationRetries), data.SetOutboxPublisher(outboxMode))
 	schemaService := model.NewSchemaService(schemaRepository, logger)
 
 	return InventoryConsumer{

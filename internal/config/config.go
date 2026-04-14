@@ -23,7 +23,9 @@ import (
 
 // OptionsConfig contains the settings for each configuration option
 type OptionsConfig struct {
-	Authn               *authn.Options
+	Authn *authn.Options
+	// Authz holds relations configuration. Named "Authz" for backward
+	// compatibility with the --authz.* CLI flags.
 	Authz               *relations.Options
 	Storage             *storage.Options
 	Consumer            *consumer.Options

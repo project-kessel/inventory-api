@@ -9,6 +9,8 @@ import (
 )
 
 type Options struct {
+	// Authz selects the relations implementation ("allow-all" or "kessel").
+	// Named "Authz" for backward compatibility with the --authz.* CLI flags.
 	Authz  string          `mapstructure:"impl"`
 	Kessel *kessel.Options `mapstructure:"kessel"`
 }

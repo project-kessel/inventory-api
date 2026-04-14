@@ -52,7 +52,8 @@ func NewCommand(
 	serverOptions *server.Options,
 	storageOptions *storage.Options,
 	authnOptions *authn.Options,
-	authzOptions *relations.Options,
+	authzOptions *relations.Options, // named "authz" to match the --authz.* CLI flag prefix
+
 	consumerOptions *consumer.Options,
 	consistencyOptions *consistency.Options,
 	serviceOptions *service.Options,

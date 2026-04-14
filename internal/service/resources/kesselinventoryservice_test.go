@@ -488,8 +488,8 @@ func TestInventoryService_CheckSelf_Allowed_XRhIdentity(t *testing.T) {
 	}
 
 	runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
-		mockAuthz := &mocks.MockRelationsRepository{}
-		mockAuthz.
+		mockRelations := &mocks.MockRelationsRepository{}
+		mockRelations.
 			On("Check",
 				mock.Anything,
 				"hbi",
@@ -507,7 +507,7 @@ func TestInventoryService_CheckSelf_Allowed_XRhIdentity(t *testing.T) {
 			Return(relationsV1beta1.CheckResponse_ALLOWED_TRUE, &relationsV1beta1.ConsistencyToken{Token: "test-token"}, nil).
 			Once()
 		return TestServerConfig{
-				Usecase:       newTestUsecase(t, testUsecaseConfig{Relations: mockAuthz}),
+				Usecase:       newTestUsecase(t, testUsecaseConfig{Relations: mockRelations}),
 				Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
 			}, func(t *testing.T, tr *Transport) {
 				ctx := context.Background()
@@ -516,7 +516,7 @@ func TestInventoryService_CheckSelf_Allowed_XRhIdentity(t *testing.T) {
 				assert.Equal(t, pb.Allowed_ALLOWED_TRUE, resp.Allowed)
 				assert.NotNil(t, resp.ConsistencyToken)
 				assert.Equal(t, "test-token", resp.ConsistencyToken.GetToken())
-				mockAuthz.AssertExpectations(t)
+				mockRelations.AssertExpectations(t)
 			}
 	})
 }
@@ -537,8 +537,8 @@ func TestInventoryService_CheckSelf_Allowed_XRhIdentity_SubjectIdMatch(t *testin
 	}
 
 	runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
-		mockAuthz := &mocks.MockRelationsRepository{}
-		mockAuthz.
+		mockRelations := &mocks.MockRelationsRepository{}
+		mockRelations.
 			On("Check",
 				mock.Anything,
 				"hbi",
@@ -555,14 +555,14 @@ func TestInventoryService_CheckSelf_Allowed_XRhIdentity_SubjectIdMatch(t *testin
 			Return(relationsV1beta1.CheckResponse_ALLOWED_TRUE, &relationsV1beta1.ConsistencyToken{}, nil).
 			Once()
 		return TestServerConfig{
-				Usecase:       newTestUsecase(t, testUsecaseConfig{Relations: mockAuthz}),
+				Usecase:       newTestUsecase(t, testUsecaseConfig{Relations: mockRelations}),
 				Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
 			}, func(t *testing.T, tr *Transport) {
 				ctx := context.Background()
 				res := tr.Invoke(ctx, withBody(protoReq, CheckSelf, httpEndpoint("POST /api/kessel/v1beta2/checkself")))
 				resp := Extract(t, res, expectSuccess(func() *pb.CheckSelfResponse { return &pb.CheckSelfResponse{} }))
 				assert.Equal(t, pb.Allowed_ALLOWED_TRUE, resp.Allowed)
-				mockAuthz.AssertExpectations(t)
+				mockRelations.AssertExpectations(t)
 			}
 	})
 }
@@ -583,8 +583,8 @@ func TestInventoryService_CheckSelf_Denied(t *testing.T) {
 	}
 
 	runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
-		mockAuthz := &mocks.MockRelationsRepository{}
-		mockAuthz.
+		mockRelations := &mocks.MockRelationsRepository{}
+		mockRelations.
 			On("Check",
 				mock.Anything,
 				"hbi",
@@ -597,14 +597,14 @@ func TestInventoryService_CheckSelf_Denied(t *testing.T) {
 			Return(relationsV1beta1.CheckResponse_ALLOWED_FALSE, &relationsV1beta1.ConsistencyToken{}, nil).
 			Once()
 		return TestServerConfig{
-				Usecase:       newTestUsecase(t, testUsecaseConfig{Relations: mockAuthz}),
+				Usecase:       newTestUsecase(t, testUsecaseConfig{Relations: mockRelations}),
 				Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
 			}, func(t *testing.T, tr *Transport) {
 				ctx := context.Background()
 				res := tr.Invoke(ctx, withBody(protoReq, CheckSelf, httpEndpoint("POST /api/kessel/v1beta2/checkself")))
 				resp := Extract(t, res, expectSuccess(func() *pb.CheckSelfResponse { return &pb.CheckSelfResponse{} }))
 				assert.Equal(t, pb.Allowed_ALLOWED_FALSE, resp.Allowed)
-				mockAuthz.AssertExpectations(t)
+				mockRelations.AssertExpectations(t)
 			}
 	})
 }
@@ -659,8 +659,8 @@ func TestInventoryService_CheckSelfBulk_Allowed_XRhIdentity(t *testing.T) {
 	}
 
 	runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
-		mockAuthz := &mocks.MockRelationsRepository{}
-		mockAuthz.
+		mockRelations := &mocks.MockRelationsRepository{}
+		mockRelations.
 			On("CheckBulk",
 				mock.Anything,
 				mock.MatchedBy(func(req *relationsV1beta1.CheckBulkRequest) bool {
@@ -712,7 +712,7 @@ func TestInventoryService_CheckSelfBulk_Allowed_XRhIdentity(t *testing.T) {
 			}, nil).
 			Once()
 		return TestServerConfig{
-				Usecase:       newTestUsecase(t, testUsecaseConfig{Relations: mockAuthz}),
+				Usecase:       newTestUsecase(t, testUsecaseConfig{Relations: mockRelations}),
 				Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
 			}, func(t *testing.T, tr *Transport) {
 				ctx := context.Background()
@@ -723,7 +723,7 @@ func TestInventoryService_CheckSelfBulk_Allowed_XRhIdentity(t *testing.T) {
 				assert.Equal(t, pb.Allowed_ALLOWED_TRUE, resp.Pairs[1].GetItem().Allowed)
 				assert.NotNil(t, resp.ConsistencyToken)
 				assert.Equal(t, "test-token", resp.ConsistencyToken.GetToken())
-				mockAuthz.AssertExpectations(t)
+				mockRelations.AssertExpectations(t)
 			}
 	})
 }
@@ -756,8 +756,8 @@ func TestInventoryService_CheckSelfBulk_MixedResults(t *testing.T) {
 	}
 
 	runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
-		mockAuthz := &mocks.MockRelationsRepository{}
-		mockAuthz.
+		mockRelations := &mocks.MockRelationsRepository{}
+		mockRelations.
 			On("CheckBulk", mock.Anything, mock.Anything).
 			Return(&relationsV1beta1.CheckBulkResponse{
 				Pairs: []*relationsV1beta1.CheckBulkResponsePair{
@@ -794,7 +794,7 @@ func TestInventoryService_CheckSelfBulk_MixedResults(t *testing.T) {
 			}, nil).
 			Once()
 		return TestServerConfig{
-				Usecase:       newTestUsecase(t, testUsecaseConfig{Relations: mockAuthz}),
+				Usecase:       newTestUsecase(t, testUsecaseConfig{Relations: mockRelations}),
 				Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
 			}, func(t *testing.T, tr *Transport) {
 				ctx := context.Background()
@@ -807,7 +807,7 @@ func TestInventoryService_CheckSelfBulk_MixedResults(t *testing.T) {
 				assert.Equal(t, "view", resp.Pairs[0].Request.Relation)
 				assert.Equal(t, "resource-2", resp.Pairs[1].Request.Object.ResourceId)
 				assert.Equal(t, "edit", resp.Pairs[1].Request.Relation)
-				mockAuthz.AssertExpectations(t)
+				mockRelations.AssertExpectations(t)
 			}
 	})
 }
@@ -832,8 +832,8 @@ func TestInventoryService_CheckSelfBulk_ResponseLengthMismatch(t *testing.T) {
 	}
 
 	runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
-		mockAuthz := &mocks.MockRelationsRepository{}
-		mockAuthz.
+		mockRelations := &mocks.MockRelationsRepository{}
+		mockRelations.
 			On("CheckBulk", mock.Anything, mock.Anything).
 			Return(&relationsV1beta1.CheckBulkResponse{
 				Pairs: []*relationsV1beta1.CheckBulkResponsePair{
@@ -869,12 +869,12 @@ func TestInventoryService_CheckSelfBulk_ResponseLengthMismatch(t *testing.T) {
 			}, nil).
 			Once()
 		return TestServerConfig{
-				Usecase:       newTestUsecase(t, testUsecaseConfig{Relations: mockAuthz}),
+				Usecase:       newTestUsecase(t, testUsecaseConfig{Relations: mockRelations}),
 				Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
 			}, func(t *testing.T, tr *Transport) {
 				ctx := context.Background()
 				res := tr.Invoke(ctx, withBody(protoReq, CheckSelfBulk, httpEndpoint("POST /api/kessel/v1beta2/checkselfbulk")))
-				Assert(t, res, requireError(codes.Internal).And(func(t *testing.T) { mockAuthz.AssertExpectations(t) }))
+				Assert(t, res, requireError(codes.Internal).And(func(t *testing.T) { mockRelations.AssertExpectations(t) }))
 			}
 	})
 }
@@ -2859,8 +2859,8 @@ func TestInventoryService_CheckForUpdateBulk_AllAllowed(t *testing.T) {
 	}
 
 	runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
-		mockAuthz := &mocks.MockRelationsRepository{}
-		mockAuthz.
+		mockRelations := &mocks.MockRelationsRepository{}
+		mockRelations.
 			On("CheckForUpdateBulk",
 				mock.Anything,
 				mock.MatchedBy(func(req *relationsV1beta1.CheckForUpdateBulkRequest) bool {
@@ -2912,7 +2912,7 @@ func TestInventoryService_CheckForUpdateBulk_AllAllowed(t *testing.T) {
 			}, nil).
 			Once()
 		return TestServerConfig{
-				Usecase:       newTestUsecase(t, testUsecaseConfig{Relations: mockAuthz}),
+				Usecase:       newTestUsecase(t, testUsecaseConfig{Relations: mockRelations}),
 				Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
 			}, func(t *testing.T, tr *Transport) {
 				ctx := context.Background()
@@ -2923,7 +2923,7 @@ func TestInventoryService_CheckForUpdateBulk_AllAllowed(t *testing.T) {
 				assert.Equal(t, pb.Allowed_ALLOWED_TRUE, resp.Pairs[1].GetItem().Allowed)
 				assert.NotNil(t, resp.ConsistencyToken)
 				assert.Equal(t, "update-bulk-token", resp.ConsistencyToken.GetToken())
-				mockAuthz.AssertExpectations(t)
+				mockRelations.AssertExpectations(t)
 			}
 	})
 }
@@ -3186,8 +3186,8 @@ func TestInventoryService_CheckForUpdateBulk_PairError(t *testing.T) {
 	}
 
 	runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
-		mockAuthz := &mocks.MockRelationsRepository{}
-		mockAuthz.
+		mockRelations := &mocks.MockRelationsRepository{}
+		mockRelations.
 			On("CheckForUpdateBulk", mock.Anything, mock.Anything).
 			Return(&relationsV1beta1.CheckForUpdateBulkResponse{
 				Pairs: []*relationsV1beta1.CheckBulkResponsePair{
@@ -3211,7 +3211,7 @@ func TestInventoryService_CheckForUpdateBulk_PairError(t *testing.T) {
 			}, nil).
 			Once()
 		return TestServerConfig{
-				Usecase:       newTestUsecase(t, testUsecaseConfig{Relations: mockAuthz}),
+				Usecase:       newTestUsecase(t, testUsecaseConfig{Relations: mockRelations}),
 				Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
 			}, func(t *testing.T, tr *Transport) {
 				ctx := context.Background()
@@ -3225,7 +3225,7 @@ func TestInventoryService_CheckForUpdateBulk_PairError(t *testing.T) {
 				assert.Contains(t, pairErr.GetMessage(), "denied by policy")
 				require.NotNil(t, resp.ConsistencyToken)
 				assert.Equal(t, "error-token", resp.ConsistencyToken.GetToken())
-				mockAuthz.AssertExpectations(t)
+				mockRelations.AssertExpectations(t)
 			}
 	})
 }

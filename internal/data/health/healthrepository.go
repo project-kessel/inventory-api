@@ -15,14 +15,14 @@ import (
 type healthRepo struct {
 	DB            *gorm.DB
 	Relations     model.RelationsRepository
-	CompletedAuth relations.CompletedConfig
+	RelationsConfig relations.CompletedConfig
 }
 
-func New(g *gorm.DB, a model.RelationsRepository, completedAuth relations.CompletedConfig) *healthRepo {
+func New(g *gorm.DB, a model.RelationsRepository, relationsConfig relations.CompletedConfig) *healthRepo {
 	return &healthRepo{
-		DB:            g,
-		Relations:     a,
-		CompletedAuth: completedAuth,
+		DB:              g,
+		Relations:       a,
+		RelationsConfig: relationsConfig,
 	}
 }
 
@@ -48,7 +48,7 @@ func (r *healthRepo) IsBackendAvailable(ctx context.Context) (*pb.GetReadyzRespo
 		log.Errorf("RELATIONS-API UNHEALTHY")
 		return newResponse("RELATIONS-API UNHEALTHY", 500), nil
 	}
-	if relations.CheckRelationsImpl(r.CompletedAuth) == "Kessel" {
+	if relations.CheckRelationsImpl(r.RelationsConfig) == "Kessel" {
 		if viper.GetBool("log.readyz") {
 			log.Infof("Storage type %s and relations-api %s", storageType, health.GetStatus())
 		}
@@ -64,7 +64,7 @@ func (r *healthRepo) IsRelationsAvailable(ctx context.Context) (*pb.GetReadyzRes
 		log.Errorf("RELATIONS-API UNHEALTHY")
 		return newResponse("RELATIONS-API UNHEALTHY", 500), nil
 	}
-	if relations.CheckRelationsImpl(r.CompletedAuth) == "Kessel" {
+	if relations.CheckRelationsImpl(r.RelationsConfig) == "Kessel" {
 		if viper.GetBool("log.readyz") {
 			log.Infof("relations-api %s", health.GetStatus())
 		}

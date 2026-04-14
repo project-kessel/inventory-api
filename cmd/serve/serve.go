@@ -62,6 +62,7 @@ func NewCommand(
 	loggerOptions common.LoggerOptions,
 	schemaOptions *schema.Options,
 	businessMetricsOptions *metricscollector.Options,
+	metaAuthorizerOptions *metaauthorizer.Options,
 ) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "serve",
@@ -149,6 +150,18 @@ func NewCommand(
 				return errors.NewAggregate(errs)
 			}
 			schemaConfig, errs := schema.NewConfig(schemaOptions).Complete()
+			if errs != nil {
+				return errors.NewAggregate(errs)
+			}
+
+			// configure metaauthorizer
+			if errs := metaAuthorizerOptions.Complete(); errs != nil {
+				return errors.NewAggregate(errs)
+			}
+			if errs := metaAuthorizerOptions.Validate(); errs != nil {
+				return errors.NewAggregate(errs)
+			}
+			metaAuthorizerConfig, errs := metaauthorizer.NewConfig(metaAuthorizerOptions).Complete()
 			if errs != nil {
 				return errors.NewAggregate(errs)
 			}
@@ -286,7 +299,7 @@ func NewCommand(
 			// DEPRECATED: Legacy tuple service for RBAC-only backward compatibility
 			tuple_crud_usecase := tuplesctl.New(
 				authorizer,
-				metaauthorizer.NewSimpleMetaAuthorizer(),
+				metaauthorizer.NewWhitelistMetaAuthorizer(metaAuthorizerConfig.TupleCrudAllowlist),
 				log.With(logger, "subsystem", "tuple_crud_controller"),
 			)
 			tuple_service := tuplesvc.New(tuple_crud_usecase)
@@ -370,6 +383,7 @@ func NewCommand(
 	schemaOptions.AddFlags(cmd.Flags(), "schema")
 	selfSubjectOptions.AddFlags(cmd.Flags(), "selfsubjectstrategy")
 	businessMetricsOptions.AddFlags(cmd.Flags(), "business-metrics")
+	metaAuthorizerOptions.AddFlags(cmd.Flags(), "metaauthorizer")
 
 	return cmd
 }

@@ -319,3 +319,291 @@ func TestAcquireLock_MetaAuthzContextMissing(t *testing.T) {
 	require.Error(t, err)
 	assert.ErrorIs(t, err, metaauthorizer.ErrMetaAuthzContextMissing)
 }
+
+// WhitelistMetaAuthorizer Integration Tests
+//
+// These tests verify the full authorization flow with WhitelistMetaAuthorizer
+// at the usecase layer, testing different authentication scenarios.
+
+func TestWhitelistMetaAuthorizer_Integration_RBACServiceAllowed(t *testing.T) {
+	// Setup: RBAC service is in allowlist
+	allowlist := []string{"rbac-service"}
+	meta := metaauthorizer.NewWhitelistMetaAuthorizer(allowlist)
+	uc := New(&allow.AllowAllAuthz{}, meta, log.DefaultLogger)
+
+	// Create context with RBAC service credentials
+	ctx := createOIDCAuthzContext("rbac-service", "service-account-123", authnapi.ProtocolGRPC)
+
+	// Execute: CreateTuples should succeed
+	cmd := CreateTuplesCommand{
+		Tuples: []model.RelationsTuple{createTestTuple()},
+	}
+
+	result, err := uc.CreateTuples(ctx, cmd)
+
+	// Verify: Allowed
+	require.NoError(t, err, "RBAC service should be allowed")
+	assert.NotNil(t, result)
+}
+
+func TestWhitelistMetaAuthorizer_Integration_UnauthorizedServiceDenied(t *testing.T) {
+	// Setup: Only RBAC service in allowlist
+	allowlist := []string{"rbac-service"}
+	meta := metaauthorizer.NewWhitelistMetaAuthorizer(allowlist)
+	uc := New(&allow.AllowAllAuthz{}, meta, log.DefaultLogger)
+
+	// Create context with different service credentials
+	ctx := createOIDCAuthzContext("unauthorized-service", "service-account-xyz", authnapi.ProtocolGRPC)
+
+	// Execute: CreateTuples should fail
+	cmd := CreateTuplesCommand{
+		Tuples: []model.RelationsTuple{createTestTuple()},
+	}
+
+	_, err := uc.CreateTuples(ctx, cmd)
+
+	// Verify: Denied
+	require.Error(t, err, "unauthorized service should be denied")
+	assert.ErrorIs(t, err, metaauthorizer.ErrMetaAuthorizationDenied)
+}
+
+func TestWhitelistMetaAuthorizer_Integration_WildcardAllowsAll(t *testing.T) {
+	// Setup: Wildcard in allowlist
+	allowlist := []string{"*"}
+	meta := metaauthorizer.NewWhitelistMetaAuthorizer(allowlist)
+	uc := New(&allow.AllowAllAuthz{}, meta, log.DefaultLogger)
+
+	// Create context with any service
+	ctx := createOIDCAuthzContext("any-service", "any-subject", authnapi.ProtocolGRPC)
+
+	// Execute: CreateTuples should succeed
+	cmd := CreateTuplesCommand{
+		Tuples: []model.RelationsTuple{createTestTuple()},
+	}
+
+	result, err := uc.CreateTuples(ctx, cmd)
+
+	// Verify: Allowed
+	require.NoError(t, err, "wildcard should allow all")
+	assert.NotNil(t, result)
+}
+
+func TestWhitelistMetaAuthorizer_Integration_EmptyAllowlistDeniesAll(t *testing.T) {
+	// Setup: Empty allowlist (default secure behavior)
+	allowlist := []string{}
+	meta := metaauthorizer.NewWhitelistMetaAuthorizer(allowlist)
+	uc := New(&allow.AllowAllAuthz{}, meta, log.DefaultLogger)
+
+	// Create context with RBAC service
+	ctx := createOIDCAuthzContext("rbac-service", "service-account-123", authnapi.ProtocolGRPC)
+
+	// Execute: CreateTuples should fail
+	cmd := CreateTuplesCommand{
+		Tuples: []model.RelationsTuple{createTestTuple()},
+	}
+
+	_, err := uc.CreateTuples(ctx, cmd)
+
+	// Verify: Denied (fail-closed)
+	require.Error(t, err, "empty allowlist should deny all")
+	assert.ErrorIs(t, err, metaauthorizer.ErrMetaAuthorizationDenied)
+}
+
+func TestWhitelistMetaAuthorizer_Integration_HTTPProtocolDenied(t *testing.T) {
+	// Setup: Wildcard allowlist
+	allowlist := []string{"*"}
+	meta := metaauthorizer.NewWhitelistMetaAuthorizer(allowlist)
+	uc := New(&allow.AllowAllAuthz{}, meta, log.DefaultLogger)
+
+	// Create context with HTTP protocol (should be rejected)
+	ctx := createOIDCAuthzContext("rbac-service", "service-account-123", authnapi.ProtocolHTTP)
+
+	// Execute: CreateTuples should fail
+	cmd := CreateTuplesCommand{
+		Tuples: []model.RelationsTuple{createTestTuple()},
+	}
+
+	_, err := uc.CreateTuples(ctx, cmd)
+
+	// Verify: Denied (gRPC only)
+	require.Error(t, err, "HTTP protocol should be denied (gRPC only)")
+	assert.ErrorIs(t, err, metaauthorizer.ErrMetaAuthorizationDenied)
+}
+
+func TestWhitelistMetaAuthorizer_Integration_XRhIdentityDenied(t *testing.T) {
+	// Setup: Wildcard allowlist
+	allowlist := []string{"*"}
+	meta := metaauthorizer.NewWhitelistMetaAuthorizer(allowlist)
+	uc := New(&allow.AllowAllAuthz{}, meta, log.DefaultLogger)
+
+	// Create context with x-rh-identity auth (should be rejected)
+	ctx := createXRhIdentityAuthzContext("user@redhat.com")
+
+	// Execute: CreateTuples should fail
+	cmd := CreateTuplesCommand{
+		Tuples: []model.RelationsTuple{createTestTuple()},
+	}
+
+	_, err := uc.CreateTuples(ctx, cmd)
+
+	// Verify: Denied (OIDC only)
+	require.Error(t, err, "x-rh-identity should be denied (OIDC only)")
+	assert.ErrorIs(t, err, metaauthorizer.ErrMetaAuthorizationDenied)
+}
+
+func TestWhitelistMetaAuthorizer_Integration_UnauthenticatedDenied(t *testing.T) {
+	// Setup: Wildcard allowlist
+	allowlist := []string{"*"}
+	meta := metaauthorizer.NewWhitelistMetaAuthorizer(allowlist)
+	uc := New(&allow.AllowAllAuthz{}, meta, log.DefaultLogger)
+
+	// Create context without authentication
+	ctx := createUnauthenticatedAuthzContext()
+
+	// Execute: CreateTuples should fail
+	cmd := CreateTuplesCommand{
+		Tuples: []model.RelationsTuple{createTestTuple()},
+	}
+
+	_, err := uc.CreateTuples(ctx, cmd)
+
+	// Verify: Denied
+	require.Error(t, err, "unauthenticated should be denied")
+	assert.ErrorIs(t, err, metaauthorizer.ErrMetaAuthorizationDenied)
+}
+
+func TestWhitelistMetaAuthorizer_Integration_SubjectIdFallback(t *testing.T) {
+	// Setup: Allowlist with SubjectId
+	allowlist := []string{"service-account-fallback"}
+	meta := metaauthorizer.NewWhitelistMetaAuthorizer(allowlist)
+	uc := New(&allow.AllowAllAuthz{}, meta, log.DefaultLogger)
+
+	// Create context with SubjectId but no ClientID
+	ctx := createOIDCAuthzContextWithoutClientID("service-account-fallback")
+
+	// Execute: CreateTuples should succeed (SubjectId fallback)
+	cmd := CreateTuplesCommand{
+		Tuples: []model.RelationsTuple{createTestTuple()},
+	}
+
+	result, err := uc.CreateTuples(ctx, cmd)
+
+	// Verify: Allowed (fallback to SubjectId)
+	require.NoError(t, err, "should allow via SubjectId fallback")
+	assert.NotNil(t, result)
+}
+
+func TestWhitelistMetaAuthorizer_Integration_AllOperations(t *testing.T) {
+	// Setup: RBAC service in allowlist
+	allowlist := []string{"rbac-service"}
+	meta := metaauthorizer.NewWhitelistMetaAuthorizer(allowlist)
+	uc := New(&allow.AllowAllAuthz{}, meta, log.DefaultLogger)
+
+	// Create context with RBAC service credentials
+	ctx := createOIDCAuthzContext("rbac-service", "service-account-123", authnapi.ProtocolGRPC)
+
+	// Test all tuple operations
+	t.Run("CreateTuples", func(t *testing.T) {
+		cmd := CreateTuplesCommand{Tuples: []model.RelationsTuple{createTestTuple()}}
+		_, err := uc.CreateTuples(ctx, cmd)
+		require.NoError(t, err)
+	})
+
+	t.Run("DeleteTuples", func(t *testing.T) {
+		namespace := "rbac"
+		cmd := DeleteTuplesCommand{Filter: TupleFilter{ResourceNamespace: &namespace}}
+		_, err := uc.DeleteTuples(ctx, cmd)
+		require.NoError(t, err)
+	})
+
+	t.Run("ReadTuples", func(t *testing.T) {
+		cmd := ReadTuplesCommand{
+			Filter:      TupleFilter{},
+			Consistency: model.NewConsistencyMinimizeLatency(),
+		}
+		_, err := uc.ReadTuples(ctx, cmd)
+		require.NoError(t, err)
+	})
+
+	t.Run("AcquireLock", func(t *testing.T) {
+		cmd := AcquireLockCommand{LockId: "lock-123"}
+		_, err := uc.AcquireLock(ctx, cmd)
+		require.NoError(t, err)
+	})
+}
+
+func TestWhitelistMetaAuthorizer_Integration_MultipleServicesAllowlist(t *testing.T) {
+	// Setup: Multiple services in allowlist
+	allowlist := []string{"rbac-service", "another-service", "third-service"}
+	meta := metaauthorizer.NewWhitelistMetaAuthorizer(allowlist)
+	uc := New(&allow.AllowAllAuthz{}, meta, log.DefaultLogger)
+
+	// Test each service is allowed
+	services := []string{"rbac-service", "another-service", "third-service"}
+	for _, service := range services {
+		t.Run(service, func(t *testing.T) {
+			ctx := createOIDCAuthzContext(service, "service-account-"+service, authnapi.ProtocolGRPC)
+			cmd := CreateTuplesCommand{Tuples: []model.RelationsTuple{createTestTuple()}}
+			_, err := uc.CreateTuples(ctx, cmd)
+			require.NoError(t, err, "%s should be allowed", service)
+		})
+	}
+
+	// Test unauthorized service is denied
+	t.Run("unauthorized-service", func(t *testing.T) {
+		ctx := createOIDCAuthzContext("unauthorized-service", "service-account-bad", authnapi.ProtocolGRPC)
+		cmd := CreateTuplesCommand{Tuples: []model.RelationsTuple{createTestTuple()}}
+		_, err := uc.CreateTuples(ctx, cmd)
+		require.Error(t, err, "unauthorized service should be denied")
+		assert.ErrorIs(t, err, metaauthorizer.ErrMetaAuthorizationDenied)
+	})
+}
+
+// Test helper functions for creating different authentication contexts
+
+func createOIDCAuthzContext(clientID, subjectID string, protocol authnapi.Protocol) context.Context {
+	claims := &authnapi.Claims{
+		SubjectId: authnapi.SubjectId(subjectID),
+		ClientID:  authnapi.ClientID(clientID),
+		AuthType:  authnapi.AuthTypeOIDC,
+		Issuer:    authnapi.Issuer("https://sso.redhat.com"),
+	}
+	return authnapi.NewAuthzContext(context.Background(), authnapi.AuthzContext{
+		Protocol: protocol,
+		Subject:  claims,
+	})
+}
+
+func createOIDCAuthzContextWithoutClientID(subjectID string) context.Context {
+	claims := &authnapi.Claims{
+		SubjectId: authnapi.SubjectId(subjectID),
+		ClientID:  "", // No ClientID - tests SubjectId fallback
+		AuthType:  authnapi.AuthTypeOIDC,
+		Issuer:    authnapi.Issuer("https://sso.redhat.com"),
+	}
+	return authnapi.NewAuthzContext(context.Background(), authnapi.AuthzContext{
+		Protocol: authnapi.ProtocolGRPC,
+		Subject:  claims,
+	})
+}
+
+func createXRhIdentityAuthzContext(userID string) context.Context {
+	claims := &authnapi.Claims{
+		SubjectId: authnapi.SubjectId(userID),
+		AuthType:  authnapi.AuthTypeXRhIdentity,
+	}
+	return authnapi.NewAuthzContext(context.Background(), authnapi.AuthzContext{
+		Protocol: authnapi.ProtocolGRPC,
+		Subject:  claims,
+	})
+}
+
+func createUnauthenticatedAuthzContext() context.Context {
+	claims := &authnapi.Claims{
+		AuthType: authnapi.AuthTypeAllowUnauthenticated,
+	}
+	return authnapi.NewAuthzContext(context.Background(), authnapi.AuthzContext{
+		Protocol: authnapi.ProtocolGRPC,
+		Subject:  claims,
+	})
+}

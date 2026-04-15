@@ -1,9 +1,9 @@
-package authz
+package relations
 
 import (
 	"context"
 
-	"github.com/project-kessel/inventory-api/internal/authz/kessel"
+	"github.com/project-kessel/inventory-api/internal/config/relations/kessel"
 )
 
 type Config struct {
@@ -46,4 +46,17 @@ func (c *Config) Complete(ctx context.Context) (CompletedConfig, []error) {
 	}
 
 	return CompletedConfig{cfg}, nil
+}
+
+func CheckRelationsImpl(config CompletedConfig) string {
+	var authType string
+	switch config.Authz {
+	case AllowAll:
+		authType = "AllowAll"
+	case Kessel:
+		authType = "Kessel"
+	default:
+		authType = "Unknown"
+	}
+	return authType
 }

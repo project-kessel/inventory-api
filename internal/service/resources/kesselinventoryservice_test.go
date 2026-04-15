@@ -24,7 +24,6 @@ import (
 	"gorm.io/gorm"
 
 	authnapi "github.com/project-kessel/inventory-api/internal/authn/api"
-	"github.com/project-kessel/inventory-api/internal/authz"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
 	"github.com/project-kessel/inventory-api/internal/biz/usecase/metaauthorizer"
 	usecase "github.com/project-kessel/inventory-api/internal/biz/usecase/resources"
@@ -122,7 +121,7 @@ func newTestServer(t *testing.T, cfg TestServerConfig) pb.KesselInventoryService
 type testUsecaseConfig struct {
 	Repo           model.ResourceRepository
 	SchemaRepo     model.SchemaRepository
-	Authz          model.Authorizer
+	Relations      model.RelationsRepository
 	Namespace      string
 	Config         *usecase.UsecaseConfig
 	MetaAuthorizer metaauthorizer.MetaAuthorizer
@@ -157,10 +156,10 @@ func newTestUsecase(t *testing.T, cfg testUsecaseConfig) *usecase.Usecase {
 		meta = &PermissiveMetaAuthorizer{}
 	}
 
-	// Default to SimpleAuthorizer when Authz is nil
-	authzImpl := cfg.Authz
+	// Default to SimpleRelationsRepository when Relations is nil
+	authzImpl := cfg.Relations
 	if authzImpl == nil {
-		authzImpl = authz.NewSimpleAuthorizer()
+		authzImpl = data.NewSimpleRelationsRepository()
 	}
 
 	return usecase.New(
@@ -489,8 +488,8 @@ func TestInventoryService_CheckSelf_Allowed_XRhIdentity(t *testing.T) {
 	}
 
 	runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
-		mockAuthz := &mocks.MockAuthz{}
-		mockAuthz.
+		mockRelations := &mocks.MockRelationsRepository{}
+		mockRelations.
 			On("Check",
 				mock.Anything,
 				"hbi",
@@ -508,7 +507,7 @@ func TestInventoryService_CheckSelf_Allowed_XRhIdentity(t *testing.T) {
 			Return(relationsV1beta1.CheckResponse_ALLOWED_TRUE, &relationsV1beta1.ConsistencyToken{Token: "test-token"}, nil).
 			Once()
 		return TestServerConfig{
-				Usecase:       newTestUsecase(t, testUsecaseConfig{Authz: mockAuthz}),
+				Usecase:       newTestUsecase(t, testUsecaseConfig{Relations: mockRelations}),
 				Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
 			}, func(t *testing.T, tr *Transport) {
 				ctx := context.Background()
@@ -517,7 +516,7 @@ func TestInventoryService_CheckSelf_Allowed_XRhIdentity(t *testing.T) {
 				assert.Equal(t, pb.Allowed_ALLOWED_TRUE, resp.Allowed)
 				assert.NotNil(t, resp.ConsistencyToken)
 				assert.Equal(t, "test-token", resp.ConsistencyToken.GetToken())
-				mockAuthz.AssertExpectations(t)
+				mockRelations.AssertExpectations(t)
 			}
 	})
 }
@@ -538,8 +537,8 @@ func TestInventoryService_CheckSelf_Allowed_XRhIdentity_SubjectIdMatch(t *testin
 	}
 
 	runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
-		mockAuthz := &mocks.MockAuthz{}
-		mockAuthz.
+		mockRelations := &mocks.MockRelationsRepository{}
+		mockRelations.
 			On("Check",
 				mock.Anything,
 				"hbi",
@@ -556,14 +555,14 @@ func TestInventoryService_CheckSelf_Allowed_XRhIdentity_SubjectIdMatch(t *testin
 			Return(relationsV1beta1.CheckResponse_ALLOWED_TRUE, &relationsV1beta1.ConsistencyToken{}, nil).
 			Once()
 		return TestServerConfig{
-				Usecase:       newTestUsecase(t, testUsecaseConfig{Authz: mockAuthz}),
+				Usecase:       newTestUsecase(t, testUsecaseConfig{Relations: mockRelations}),
 				Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
 			}, func(t *testing.T, tr *Transport) {
 				ctx := context.Background()
 				res := tr.Invoke(ctx, withBody(protoReq, CheckSelf, httpEndpoint("POST /api/kessel/v1beta2/checkself")))
 				resp := Extract(t, res, expectSuccess(func() *pb.CheckSelfResponse { return &pb.CheckSelfResponse{} }))
 				assert.Equal(t, pb.Allowed_ALLOWED_TRUE, resp.Allowed)
-				mockAuthz.AssertExpectations(t)
+				mockRelations.AssertExpectations(t)
 			}
 	})
 }
@@ -584,8 +583,8 @@ func TestInventoryService_CheckSelf_Denied(t *testing.T) {
 	}
 
 	runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
-		mockAuthz := &mocks.MockAuthz{}
-		mockAuthz.
+		mockRelations := &mocks.MockRelationsRepository{}
+		mockRelations.
 			On("Check",
 				mock.Anything,
 				"hbi",
@@ -598,14 +597,14 @@ func TestInventoryService_CheckSelf_Denied(t *testing.T) {
 			Return(relationsV1beta1.CheckResponse_ALLOWED_FALSE, &relationsV1beta1.ConsistencyToken{}, nil).
 			Once()
 		return TestServerConfig{
-				Usecase:       newTestUsecase(t, testUsecaseConfig{Authz: mockAuthz}),
+				Usecase:       newTestUsecase(t, testUsecaseConfig{Relations: mockRelations}),
 				Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
 			}, func(t *testing.T, tr *Transport) {
 				ctx := context.Background()
 				res := tr.Invoke(ctx, withBody(protoReq, CheckSelf, httpEndpoint("POST /api/kessel/v1beta2/checkself")))
 				resp := Extract(t, res, expectSuccess(func() *pb.CheckSelfResponse { return &pb.CheckSelfResponse{} }))
 				assert.Equal(t, pb.Allowed_ALLOWED_FALSE, resp.Allowed)
-				mockAuthz.AssertExpectations(t)
+				mockRelations.AssertExpectations(t)
 			}
 	})
 }
@@ -660,8 +659,8 @@ func TestInventoryService_CheckSelfBulk_Allowed_XRhIdentity(t *testing.T) {
 	}
 
 	runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
-		mockAuthz := &mocks.MockAuthz{}
-		mockAuthz.
+		mockRelations := &mocks.MockRelationsRepository{}
+		mockRelations.
 			On("CheckBulk",
 				mock.Anything,
 				mock.MatchedBy(func(req *relationsV1beta1.CheckBulkRequest) bool {
@@ -713,7 +712,7 @@ func TestInventoryService_CheckSelfBulk_Allowed_XRhIdentity(t *testing.T) {
 			}, nil).
 			Once()
 		return TestServerConfig{
-				Usecase:       newTestUsecase(t, testUsecaseConfig{Authz: mockAuthz}),
+				Usecase:       newTestUsecase(t, testUsecaseConfig{Relations: mockRelations}),
 				Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
 			}, func(t *testing.T, tr *Transport) {
 				ctx := context.Background()
@@ -724,7 +723,7 @@ func TestInventoryService_CheckSelfBulk_Allowed_XRhIdentity(t *testing.T) {
 				assert.Equal(t, pb.Allowed_ALLOWED_TRUE, resp.Pairs[1].GetItem().Allowed)
 				assert.NotNil(t, resp.ConsistencyToken)
 				assert.Equal(t, "test-token", resp.ConsistencyToken.GetToken())
-				mockAuthz.AssertExpectations(t)
+				mockRelations.AssertExpectations(t)
 			}
 	})
 }
@@ -757,8 +756,8 @@ func TestInventoryService_CheckSelfBulk_MixedResults(t *testing.T) {
 	}
 
 	runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
-		mockAuthz := &mocks.MockAuthz{}
-		mockAuthz.
+		mockRelations := &mocks.MockRelationsRepository{}
+		mockRelations.
 			On("CheckBulk", mock.Anything, mock.Anything).
 			Return(&relationsV1beta1.CheckBulkResponse{
 				Pairs: []*relationsV1beta1.CheckBulkResponsePair{
@@ -795,7 +794,7 @@ func TestInventoryService_CheckSelfBulk_MixedResults(t *testing.T) {
 			}, nil).
 			Once()
 		return TestServerConfig{
-				Usecase:       newTestUsecase(t, testUsecaseConfig{Authz: mockAuthz}),
+				Usecase:       newTestUsecase(t, testUsecaseConfig{Relations: mockRelations}),
 				Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
 			}, func(t *testing.T, tr *Transport) {
 				ctx := context.Background()
@@ -808,7 +807,7 @@ func TestInventoryService_CheckSelfBulk_MixedResults(t *testing.T) {
 				assert.Equal(t, "view", resp.Pairs[0].Request.Relation)
 				assert.Equal(t, "resource-2", resp.Pairs[1].Request.Object.ResourceId)
 				assert.Equal(t, "edit", resp.Pairs[1].Request.Relation)
-				mockAuthz.AssertExpectations(t)
+				mockRelations.AssertExpectations(t)
 			}
 	})
 }
@@ -833,8 +832,8 @@ func TestInventoryService_CheckSelfBulk_ResponseLengthMismatch(t *testing.T) {
 	}
 
 	runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
-		mockAuthz := &mocks.MockAuthz{}
-		mockAuthz.
+		mockRelations := &mocks.MockRelationsRepository{}
+		mockRelations.
 			On("CheckBulk", mock.Anything, mock.Anything).
 			Return(&relationsV1beta1.CheckBulkResponse{
 				Pairs: []*relationsV1beta1.CheckBulkResponsePair{
@@ -870,12 +869,12 @@ func TestInventoryService_CheckSelfBulk_ResponseLengthMismatch(t *testing.T) {
 			}, nil).
 			Once()
 		return TestServerConfig{
-				Usecase:       newTestUsecase(t, testUsecaseConfig{Authz: mockAuthz}),
+				Usecase:       newTestUsecase(t, testUsecaseConfig{Relations: mockRelations}),
 				Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
 			}, func(t *testing.T, tr *Transport) {
 				ctx := context.Background()
 				res := tr.Invoke(ctx, withBody(protoReq, CheckSelfBulk, httpEndpoint("POST /api/kessel/v1beta2/checkselfbulk")))
-				Assert(t, res, requireError(codes.Internal).And(func(t *testing.T) { mockAuthz.AssertExpectations(t) }))
+				Assert(t, res, requireError(codes.Internal).And(func(t *testing.T) { mockRelations.AssertExpectations(t) }))
 			}
 	})
 }
@@ -991,10 +990,10 @@ func TestInventoryService_Check_Allowed(t *testing.T) {
 	}
 
 	runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
-		simpleAuthz := authz.NewSimpleAuthorizer()
+		simpleAuthz := data.NewSimpleRelationsRepository()
 		simpleAuthz.Grant("subject-456", "view", "hbi", "host", "resource-abc")
 		return TestServerConfig{
-				Usecase:       newTestUsecase(t, testUsecaseConfig{Authz: simpleAuthz}),
+				Usecase:       newTestUsecase(t, testUsecaseConfig{Relations: simpleAuthz}),
 				Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
 			}, func(t *testing.T, tr *Transport) {
 				ctx := context.Background()
@@ -1101,10 +1100,10 @@ func TestInventoryService_CheckForUpdate_Allowed(t *testing.T) {
 	}
 
 	runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
-		simpleAuthz := authz.NewSimpleAuthorizer()
+		simpleAuthz := data.NewSimpleRelationsRepository()
 		simpleAuthz.Grant("subject-789", "edit", "hbi", "host", "resource-xyz")
 		return TestServerConfig{
-				Usecase:       newTestUsecase(t, testUsecaseConfig{Authz: simpleAuthz}),
+				Usecase:       newTestUsecase(t, testUsecaseConfig{Relations: simpleAuthz}),
 				Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
 			}, func(t *testing.T, tr *Transport) {
 				ctx := context.Background()
@@ -1226,10 +1225,10 @@ func TestInventoryService_CheckBulk_MixedResults(t *testing.T) {
 	}
 
 	runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
-		simpleAuthz := authz.NewSimpleAuthorizer()
+		simpleAuthz := data.NewSimpleRelationsRepository()
 		simpleAuthz.Grant("subject-a", "view", "hbi", "host", "resource-1")
 		return TestServerConfig{
-				Usecase:       newTestUsecase(t, testUsecaseConfig{Authz: simpleAuthz}),
+				Usecase:       newTestUsecase(t, testUsecaseConfig{Relations: simpleAuthz}),
 				Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
 			}, func(t *testing.T, tr *Transport) {
 				ctx := context.Background()
@@ -1375,11 +1374,11 @@ func TestInventoryService_StreamedListObjects_Success(t *testing.T) {
 	}
 
 	// Set up SimpleAuthorizer with tuples that grant subject-xyz view on two hosts
-	simpleAuthz := authz.NewSimpleAuthorizer()
+	simpleAuthz := data.NewSimpleRelationsRepository()
 	simpleAuthz.Grant("subject-xyz", "view", "hbi", "host", "host-1")
 	simpleAuthz.Grant("subject-xyz", "view", "hbi", "host", "host-2")
 
-	uc := newTestUsecase(t, testUsecaseConfig{Authz: simpleAuthz})
+	uc := newTestUsecase(t, testUsecaseConfig{Relations: simpleAuthz})
 	client := newTestServer(t, TestServerConfig{
 		Usecase:       uc,
 		Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
@@ -1658,7 +1657,7 @@ func TestInventoryService_CheckBulk_ConsistencyToken(t *testing.T) {
 			AuthType:  authnapi.AuthTypeXRhIdentity,
 		}
 
-		simpleAuthz := authz.NewSimpleAuthorizer()
+		simpleAuthz := data.NewSimpleRelationsRepository()
 		// Grant both permissions at initial version -> v3
 		simpleAuthz.Grant("subject-a", "view", "hbi", "host", "resource-1")
 		simpleAuthz.Grant("subject-b", "edit", "hbi", "host", "resource-2")
@@ -1688,7 +1687,7 @@ func TestInventoryService_CheckBulk_ConsistencyToken(t *testing.T) {
 		})
 		currentVersion := simpleAuthz.Version()
 
-		uc := newTestUsecase(t, testUsecaseConfig{Authz: simpleAuthz})
+		uc := newTestUsecase(t, testUsecaseConfig{Relations: simpleAuthz})
 		cfg := TestServerConfig{
 			Usecase:       uc,
 			Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
@@ -1845,7 +1844,7 @@ func TestInventoryService_CheckSelfBulk_ConsistencyToken(t *testing.T) {
 			AuthType:  authnapi.AuthTypeXRhIdentity,
 		}
 
-		simpleAuthz := authz.NewSimpleAuthorizer()
+		simpleAuthz := data.NewSimpleRelationsRepository()
 		// Grant permission at initial version -> v3
 		// The self subject strategy maps "subject-a" to rbac/principal/subject-a
 		simpleAuthz.Grant("subject-a", "view", "hbi", "host", "resource-1")
@@ -1876,7 +1875,7 @@ func TestInventoryService_CheckSelfBulk_ConsistencyToken(t *testing.T) {
 		})
 		currentVersion := simpleAuthz.Version()
 
-		uc := newTestUsecase(t, testUsecaseConfig{Authz: simpleAuthz})
+		uc := newTestUsecase(t, testUsecaseConfig{Relations: simpleAuthz})
 		cfg := TestServerConfig{
 			Usecase:       uc,
 			Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
@@ -2134,10 +2133,10 @@ func TestInventoryService_Check_ReporterWithInstanceId(t *testing.T) {
 				},
 			},
 		}
-		simpleAuthz := authz.NewSimpleAuthorizer()
+		simpleAuthz := data.NewSimpleRelationsRepository()
 		simpleAuthz.Grant("subject-456", "view", "hbi", "host", "resource-with-instance")
 		return TestServerConfig{
-				Usecase:       newTestUsecase(t, testUsecaseConfig{Authz: simpleAuthz}),
+				Usecase:       newTestUsecase(t, testUsecaseConfig{Relations: simpleAuthz}),
 				Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
 			}, func(t *testing.T, tr *Transport) {
 				ctx := context.Background()
@@ -2151,10 +2150,10 @@ func TestInventoryService_Check_ReporterWithInstanceId(t *testing.T) {
 // --- StreamedListObjects with NoIdentity ---
 
 func TestInventoryService_StreamedListObjects_NoIdentity(t *testing.T) {
-	simpleAuthz := authz.NewSimpleAuthorizer()
+	simpleAuthz := data.NewSimpleRelationsRepository()
 	simpleAuthz.Grant("subject-xyz", "view", "hbi", "host", "host-1")
 
-	uc := newTestUsecase(t, testUsecaseConfig{Authz: simpleAuthz})
+	uc := newTestUsecase(t, testUsecaseConfig{Relations: simpleAuthz})
 	// Use DenyAuthenticator to simulate unauthenticated streaming request
 	client := newTestServer(t, TestServerConfig{
 		Usecase:       uc,
@@ -2755,11 +2754,11 @@ func TestInventoryService_CheckBulk_MetaAuthzProtocolBehavior(t *testing.T) {
 	}
 
 	runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
-		simpleAuthz := authz.NewSimpleAuthorizer()
+		simpleAuthz := data.NewSimpleRelationsRepository()
 		simpleAuthz.Grant("subject-a", "view", "hbi", "host", "resource-1")
 		return TestServerConfig{
 				Usecase: newTestUsecase(t, testUsecaseConfig{
-					Authz:          simpleAuthz,
+					Relations:      simpleAuthz,
 					MetaAuthorizer: metaauthorizer.NewSimpleMetaAuthorizer(),
 				}),
 				Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
@@ -2860,8 +2859,8 @@ func TestInventoryService_CheckForUpdateBulk_AllAllowed(t *testing.T) {
 	}
 
 	runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
-		mockAuthz := &mocks.MockAuthz{}
-		mockAuthz.
+		mockRelations := &mocks.MockRelationsRepository{}
+		mockRelations.
 			On("CheckForUpdateBulk",
 				mock.Anything,
 				mock.MatchedBy(func(req *relationsV1beta1.CheckForUpdateBulkRequest) bool {
@@ -2913,7 +2912,7 @@ func TestInventoryService_CheckForUpdateBulk_AllAllowed(t *testing.T) {
 			}, nil).
 			Once()
 		return TestServerConfig{
-				Usecase:       newTestUsecase(t, testUsecaseConfig{Authz: mockAuthz}),
+				Usecase:       newTestUsecase(t, testUsecaseConfig{Relations: mockRelations}),
 				Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
 			}, func(t *testing.T, tr *Transport) {
 				ctx := context.Background()
@@ -2924,7 +2923,7 @@ func TestInventoryService_CheckForUpdateBulk_AllAllowed(t *testing.T) {
 				assert.Equal(t, pb.Allowed_ALLOWED_TRUE, resp.Pairs[1].GetItem().Allowed)
 				assert.NotNil(t, resp.ConsistencyToken)
 				assert.Equal(t, "update-bulk-token", resp.ConsistencyToken.GetToken())
-				mockAuthz.AssertExpectations(t)
+				mockRelations.AssertExpectations(t)
 			}
 	})
 }
@@ -2971,10 +2970,10 @@ func TestInventoryService_CheckForUpdateBulk_MixedResults(t *testing.T) {
 	}
 
 	runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
-		simpleAuthz := authz.NewSimpleAuthorizer()
+		simpleAuthz := data.NewSimpleRelationsRepository()
 		simpleAuthz.Grant("subject-a", "update", "hbi", "host", "resource-1")
 		return TestServerConfig{
-				Usecase:       newTestUsecase(t, testUsecaseConfig{Authz: simpleAuthz}),
+				Usecase:       newTestUsecase(t, testUsecaseConfig{Relations: simpleAuthz}),
 				Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
 			}, func(t *testing.T, tr *Transport) {
 				ctx := context.Background()
@@ -3059,11 +3058,11 @@ func TestInventoryService_CheckForUpdateBulk_MetaAuthzProtocolBehavior(t *testin
 	}
 
 	runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
-		simpleAuthz := authz.NewSimpleAuthorizer()
+		simpleAuthz := data.NewSimpleRelationsRepository()
 		simpleAuthz.Grant("subject-a", "update", "hbi", "host", "resource-1")
 		return TestServerConfig{
 				Usecase: newTestUsecase(t, testUsecaseConfig{
-					Authz:          simpleAuthz,
+					Relations:      simpleAuthz,
 					MetaAuthorizer: metaauthorizer.NewSimpleMetaAuthorizer(),
 				}),
 				Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
@@ -3187,8 +3186,8 @@ func TestInventoryService_CheckForUpdateBulk_PairError(t *testing.T) {
 	}
 
 	runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
-		mockAuthz := &mocks.MockAuthz{}
-		mockAuthz.
+		mockRelations := &mocks.MockRelationsRepository{}
+		mockRelations.
 			On("CheckForUpdateBulk", mock.Anything, mock.Anything).
 			Return(&relationsV1beta1.CheckForUpdateBulkResponse{
 				Pairs: []*relationsV1beta1.CheckBulkResponsePair{
@@ -3212,7 +3211,7 @@ func TestInventoryService_CheckForUpdateBulk_PairError(t *testing.T) {
 			}, nil).
 			Once()
 		return TestServerConfig{
-				Usecase:       newTestUsecase(t, testUsecaseConfig{Authz: mockAuthz}),
+				Usecase:       newTestUsecase(t, testUsecaseConfig{Relations: mockRelations}),
 				Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
 			}, func(t *testing.T, tr *Transport) {
 				ctx := context.Background()
@@ -3226,7 +3225,7 @@ func TestInventoryService_CheckForUpdateBulk_PairError(t *testing.T) {
 				assert.Contains(t, pairErr.GetMessage(), "denied by policy")
 				require.NotNil(t, resp.ConsistencyToken)
 				assert.Equal(t, "error-token", resp.ConsistencyToken.GetToken())
-				mockAuthz.AssertExpectations(t)
+				mockRelations.AssertExpectations(t)
 			}
 	})
 }

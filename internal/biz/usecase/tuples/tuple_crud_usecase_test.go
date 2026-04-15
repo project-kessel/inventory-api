@@ -9,9 +9,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	authnapi "github.com/project-kessel/inventory-api/internal/authn/api"
-	"github.com/project-kessel/inventory-api/internal/authz/allow"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
 	"github.com/project-kessel/inventory-api/internal/biz/usecase/metaauthorizer"
+	"github.com/project-kessel/inventory-api/internal/data"
 )
 
 // Test helpers
@@ -60,7 +60,7 @@ func (r *recordingMetaAuthorizer) Check(_ context.Context, _ metaauthorizer.Meta
 func TestCreateTuples_Success(t *testing.T) {
 	ctx := testAuthzContext()
 	meta := &recordingMetaAuthorizer{allowed: true}
-	uc := New(&allow.AllowAllAuthz{}, meta, log.DefaultLogger)
+	uc := New(&data.AllowAllRelationsRepository{}, meta, log.DefaultLogger)
 
 	cmd := CreateTuplesCommand{
 		Tuples: []model.RelationsTuple{createTestTuple()},
@@ -77,7 +77,7 @@ func TestCreateTuples_Success(t *testing.T) {
 func TestCreateTuples_UsesCreateTuplesRelation(t *testing.T) {
 	ctx := testAuthzContext()
 	meta := &recordingMetaAuthorizer{allowed: true}
-	uc := New(&allow.AllowAllAuthz{}, meta, log.DefaultLogger)
+	uc := New(&data.AllowAllRelationsRepository{}, meta, log.DefaultLogger)
 
 	cmd := CreateTuplesCommand{
 		Tuples: []model.RelationsTuple{createTestTuple()},
@@ -92,7 +92,7 @@ func TestCreateTuples_UsesCreateTuplesRelation(t *testing.T) {
 func TestCreateTuples_MetaAuthzDenied(t *testing.T) {
 	ctx := testAuthzContext()
 	meta := &recordingMetaAuthorizer{allowed: false}
-	uc := New(&allow.AllowAllAuthz{}, meta, log.DefaultLogger)
+	uc := New(&data.AllowAllRelationsRepository{}, meta, log.DefaultLogger)
 
 	cmd := CreateTuplesCommand{
 		Tuples: []model.RelationsTuple{createTestTuple()},
@@ -106,7 +106,7 @@ func TestCreateTuples_MetaAuthzDenied(t *testing.T) {
 
 func TestCreateTuples_MetaAuthzContextMissing(t *testing.T) {
 	meta := &recordingMetaAuthorizer{allowed: true}
-	uc := New(&allow.AllowAllAuthz{}, meta, log.DefaultLogger)
+	uc := New(&data.AllowAllRelationsRepository{}, meta, log.DefaultLogger)
 
 	cmd := CreateTuplesCommand{
 		Tuples: []model.RelationsTuple{createTestTuple()},
@@ -123,7 +123,7 @@ func TestCreateTuples_MetaAuthzContextMissing(t *testing.T) {
 func TestDeleteTuples_Success(t *testing.T) {
 	ctx := testAuthzContext()
 	meta := &recordingMetaAuthorizer{allowed: true}
-	uc := New(&allow.AllowAllAuthz{}, meta, log.DefaultLogger)
+	uc := New(&data.AllowAllRelationsRepository{}, meta, log.DefaultLogger)
 
 	namespace := "rbac"
 	cmd := DeleteTuplesCommand{
@@ -142,7 +142,7 @@ func TestDeleteTuples_Success(t *testing.T) {
 func TestDeleteTuples_UsesDeleteTuplesRelation(t *testing.T) {
 	ctx := testAuthzContext()
 	meta := &recordingMetaAuthorizer{allowed: true}
-	uc := New(&allow.AllowAllAuthz{}, meta, log.DefaultLogger)
+	uc := New(&data.AllowAllRelationsRepository{}, meta, log.DefaultLogger)
 
 	namespace := "rbac"
 	cmd := DeleteTuplesCommand{
@@ -160,7 +160,7 @@ func TestDeleteTuples_UsesDeleteTuplesRelation(t *testing.T) {
 func TestDeleteTuples_MetaAuthzDenied(t *testing.T) {
 	ctx := testAuthzContext()
 	meta := &recordingMetaAuthorizer{allowed: false}
-	uc := New(&allow.AllowAllAuthz{}, meta, log.DefaultLogger)
+	uc := New(&data.AllowAllRelationsRepository{}, meta, log.DefaultLogger)
 
 	namespace := "rbac"
 	cmd := DeleteTuplesCommand{
@@ -177,7 +177,7 @@ func TestDeleteTuples_MetaAuthzDenied(t *testing.T) {
 
 func TestDeleteTuples_MetaAuthzContextMissing(t *testing.T) {
 	meta := &recordingMetaAuthorizer{allowed: true}
-	uc := New(&allow.AllowAllAuthz{}, meta, log.DefaultLogger)
+	uc := New(&data.AllowAllRelationsRepository{}, meta, log.DefaultLogger)
 
 	namespace := "rbac"
 	cmd := DeleteTuplesCommand{
@@ -197,7 +197,7 @@ func TestDeleteTuples_MetaAuthzContextMissing(t *testing.T) {
 func TestReadTuples_Success(t *testing.T) {
 	ctx := testAuthzContext()
 	meta := &recordingMetaAuthorizer{allowed: true}
-	uc := New(&allow.AllowAllAuthz{}, meta, log.DefaultLogger)
+	uc := New(&data.AllowAllRelationsRepository{}, meta, log.DefaultLogger)
 
 	cmd := ReadTuplesCommand{
 		Filter:      TupleFilter{},
@@ -214,7 +214,7 @@ func TestReadTuples_Success(t *testing.T) {
 func TestReadTuples_UsesReadTuplesRelation(t *testing.T) {
 	ctx := testAuthzContext()
 	meta := &recordingMetaAuthorizer{allowed: true}
-	uc := New(&allow.AllowAllAuthz{}, meta, log.DefaultLogger)
+	uc := New(&data.AllowAllRelationsRepository{}, meta, log.DefaultLogger)
 
 	cmd := ReadTuplesCommand{
 		Filter:      TupleFilter{},
@@ -230,7 +230,7 @@ func TestReadTuples_UsesReadTuplesRelation(t *testing.T) {
 func TestReadTuples_MetaAuthzDenied(t *testing.T) {
 	ctx := testAuthzContext()
 	meta := &recordingMetaAuthorizer{allowed: false}
-	uc := New(&allow.AllowAllAuthz{}, meta, log.DefaultLogger)
+	uc := New(&data.AllowAllRelationsRepository{}, meta, log.DefaultLogger)
 
 	cmd := ReadTuplesCommand{
 		Filter:      TupleFilter{},
@@ -245,7 +245,7 @@ func TestReadTuples_MetaAuthzDenied(t *testing.T) {
 
 func TestReadTuples_MetaAuthzContextMissing(t *testing.T) {
 	meta := &recordingMetaAuthorizer{allowed: true}
-	uc := New(&allow.AllowAllAuthz{}, meta, log.DefaultLogger)
+	uc := New(&data.AllowAllRelationsRepository{}, meta, log.DefaultLogger)
 
 	cmd := ReadTuplesCommand{
 		Filter:      TupleFilter{},
@@ -263,7 +263,7 @@ func TestReadTuples_MetaAuthzContextMissing(t *testing.T) {
 func TestAcquireLock_Success(t *testing.T) {
 	ctx := testAuthzContext()
 	meta := &recordingMetaAuthorizer{allowed: true}
-	uc := New(&allow.AllowAllAuthz{}, meta, log.DefaultLogger)
+	uc := New(&data.AllowAllRelationsRepository{}, meta, log.DefaultLogger)
 
 	cmd := AcquireLockCommand{
 		LockId: "lock-123",
@@ -279,7 +279,7 @@ func TestAcquireLock_Success(t *testing.T) {
 func TestAcquireLock_UsesAcquireLockRelation(t *testing.T) {
 	ctx := testAuthzContext()
 	meta := &recordingMetaAuthorizer{allowed: true}
-	uc := New(&allow.AllowAllAuthz{}, meta, log.DefaultLogger)
+	uc := New(&data.AllowAllRelationsRepository{}, meta, log.DefaultLogger)
 
 	cmd := AcquireLockCommand{
 		LockId: "lock-123",
@@ -294,7 +294,7 @@ func TestAcquireLock_UsesAcquireLockRelation(t *testing.T) {
 func TestAcquireLock_MetaAuthzDenied(t *testing.T) {
 	ctx := testAuthzContext()
 	meta := &recordingMetaAuthorizer{allowed: false}
-	uc := New(&allow.AllowAllAuthz{}, meta, log.DefaultLogger)
+	uc := New(&data.AllowAllRelationsRepository{}, meta, log.DefaultLogger)
 
 	cmd := AcquireLockCommand{
 		LockId: "lock-123",
@@ -308,7 +308,7 @@ func TestAcquireLock_MetaAuthzDenied(t *testing.T) {
 
 func TestAcquireLock_MetaAuthzContextMissing(t *testing.T) {
 	meta := &recordingMetaAuthorizer{allowed: true}
-	uc := New(&allow.AllowAllAuthz{}, meta, log.DefaultLogger)
+	uc := New(&data.AllowAllRelationsRepository{}, meta, log.DefaultLogger)
 
 	cmd := AcquireLockCommand{
 		LockId: "lock-123",
@@ -329,7 +329,7 @@ func TestWhitelistMetaAuthorizer_Integration_RBACServiceAllowed(t *testing.T) {
 	// Setup: RBAC service is in allowlist
 	allowlist := []string{"rbac-service"}
 	meta := metaauthorizer.NewWhitelistMetaAuthorizer(allowlist)
-	uc := New(&allow.AllowAllAuthz{}, meta, log.DefaultLogger)
+	uc := New(&data.AllowAllRelationsRepository{}, meta, log.DefaultLogger)
 
 	// Create context with RBAC service credentials
 	ctx := createOIDCAuthzContext("rbac-service", "service-account-123", authnapi.ProtocolGRPC)
@@ -350,7 +350,7 @@ func TestWhitelistMetaAuthorizer_Integration_UnauthorizedServiceDenied(t *testin
 	// Setup: Only RBAC service in allowlist
 	allowlist := []string{"rbac-service"}
 	meta := metaauthorizer.NewWhitelistMetaAuthorizer(allowlist)
-	uc := New(&allow.AllowAllAuthz{}, meta, log.DefaultLogger)
+	uc := New(&data.AllowAllRelationsRepository{}, meta, log.DefaultLogger)
 
 	// Create context with different service credentials
 	ctx := createOIDCAuthzContext("unauthorized-service", "service-account-xyz", authnapi.ProtocolGRPC)
@@ -371,7 +371,7 @@ func TestWhitelistMetaAuthorizer_Integration_WildcardAllowsAll(t *testing.T) {
 	// Setup: Wildcard in allowlist
 	allowlist := []string{"*"}
 	meta := metaauthorizer.NewWhitelistMetaAuthorizer(allowlist)
-	uc := New(&allow.AllowAllAuthz{}, meta, log.DefaultLogger)
+	uc := New(&data.AllowAllRelationsRepository{}, meta, log.DefaultLogger)
 
 	// Create context with any service
 	ctx := createOIDCAuthzContext("any-service", "any-subject", authnapi.ProtocolGRPC)
@@ -392,7 +392,7 @@ func TestWhitelistMetaAuthorizer_Integration_EmptyAllowlistDeniesAll(t *testing.
 	// Setup: Empty allowlist (default secure behavior)
 	allowlist := []string{}
 	meta := metaauthorizer.NewWhitelistMetaAuthorizer(allowlist)
-	uc := New(&allow.AllowAllAuthz{}, meta, log.DefaultLogger)
+	uc := New(&data.AllowAllRelationsRepository{}, meta, log.DefaultLogger)
 
 	// Create context with RBAC service
 	ctx := createOIDCAuthzContext("rbac-service", "service-account-123", authnapi.ProtocolGRPC)
@@ -413,7 +413,7 @@ func TestWhitelistMetaAuthorizer_Integration_HTTPProtocolDenied(t *testing.T) {
 	// Setup: Wildcard allowlist
 	allowlist := []string{"*"}
 	meta := metaauthorizer.NewWhitelistMetaAuthorizer(allowlist)
-	uc := New(&allow.AllowAllAuthz{}, meta, log.DefaultLogger)
+	uc := New(&data.AllowAllRelationsRepository{}, meta, log.DefaultLogger)
 
 	// Create context with HTTP protocol (should be rejected)
 	ctx := createOIDCAuthzContext("rbac-service", "service-account-123", authnapi.ProtocolHTTP)
@@ -434,7 +434,7 @@ func TestWhitelistMetaAuthorizer_Integration_XRhIdentityDenied(t *testing.T) {
 	// Setup: Wildcard allowlist
 	allowlist := []string{"*"}
 	meta := metaauthorizer.NewWhitelistMetaAuthorizer(allowlist)
-	uc := New(&allow.AllowAllAuthz{}, meta, log.DefaultLogger)
+	uc := New(&data.AllowAllRelationsRepository{}, meta, log.DefaultLogger)
 
 	// Create context with x-rh-identity auth (should be rejected)
 	ctx := createXRhIdentityAuthzContext("user@redhat.com")
@@ -455,7 +455,7 @@ func TestWhitelistMetaAuthorizer_Integration_UnauthenticatedDenied(t *testing.T)
 	// Setup: Wildcard allowlist
 	allowlist := []string{"*"}
 	meta := metaauthorizer.NewWhitelistMetaAuthorizer(allowlist)
-	uc := New(&allow.AllowAllAuthz{}, meta, log.DefaultLogger)
+	uc := New(&data.AllowAllRelationsRepository{}, meta, log.DefaultLogger)
 
 	// Create context without authentication
 	ctx := createUnauthenticatedAuthzContext()
@@ -476,7 +476,7 @@ func TestWhitelistMetaAuthorizer_Integration_SubjectIdFallback(t *testing.T) {
 	// Setup: Allowlist with SubjectId
 	allowlist := []string{"service-account-fallback"}
 	meta := metaauthorizer.NewWhitelistMetaAuthorizer(allowlist)
-	uc := New(&allow.AllowAllAuthz{}, meta, log.DefaultLogger)
+	uc := New(&data.AllowAllRelationsRepository{}, meta, log.DefaultLogger)
 
 	// Create context with SubjectId but no ClientID
 	ctx := createOIDCAuthzContextWithoutClientID("service-account-fallback")
@@ -497,7 +497,7 @@ func TestWhitelistMetaAuthorizer_Integration_AllOperations(t *testing.T) {
 	// Setup: RBAC service in allowlist
 	allowlist := []string{"rbac-service"}
 	meta := metaauthorizer.NewWhitelistMetaAuthorizer(allowlist)
-	uc := New(&allow.AllowAllAuthz{}, meta, log.DefaultLogger)
+	uc := New(&data.AllowAllRelationsRepository{}, meta, log.DefaultLogger)
 
 	// Create context with RBAC service credentials
 	ctx := createOIDCAuthzContext("rbac-service", "service-account-123", authnapi.ProtocolGRPC)
@@ -536,7 +536,7 @@ func TestWhitelistMetaAuthorizer_Integration_MultipleServicesAllowlist(t *testin
 	// Setup: Multiple services in allowlist
 	allowlist := []string{"rbac-service", "another-service", "third-service"}
 	meta := metaauthorizer.NewWhitelistMetaAuthorizer(allowlist)
-	uc := New(&allow.AllowAllAuthz{}, meta, log.DefaultLogger)
+	uc := New(&data.AllowAllRelationsRepository{}, meta, log.DefaultLogger)
 
 	// Test each service is allowed
 	services := []string{"rbac-service", "another-service", "third-service"}

@@ -10,8 +10,8 @@ import (
 
 	"github.com/project-kessel/inventory-api/internal/authn"
 	authnFactory "github.com/project-kessel/inventory-api/internal/authn/factory"
-	"github.com/project-kessel/inventory-api/internal/authz"
 	"github.com/project-kessel/inventory-api/internal/biz/usecase/metaauthorizer"
+	"github.com/project-kessel/inventory-api/internal/config/relations"
 	"github.com/project-kessel/inventory-api/internal/config/schema"
 	"github.com/project-kessel/inventory-api/internal/consistency"
 	"github.com/project-kessel/inventory-api/internal/consumer"
@@ -24,8 +24,10 @@ import (
 
 // OptionsConfig contains the settings for each configuration option
 type OptionsConfig struct {
-	Authn               *authn.Options
-	Authz               *authz.Options
+	Authn *authn.Options
+	// Authz holds relations configuration. Named "Authz" for backward
+	// compatibility with the --authz.* CLI flags.
+	Authz               *relations.Options
 	Storage             *storage.Options
 	Consumer            *consumer.Options
 	Server              *server.Options
@@ -41,7 +43,7 @@ type OptionsConfig struct {
 func NewOptionsConfig() *OptionsConfig {
 	return &OptionsConfig{
 		Authn:               authn.NewOptions(),
-		Authz:               authz.NewOptions(),
+		Authz:               relations.NewOptions(),
 		Storage:             storage.NewOptions(),
 		Consumer:            consumer.NewOptions(),
 		Server:              server.NewOptions(),
@@ -87,7 +89,7 @@ func LogConfigurationInfo(options *OptionsConfig) {
 		)
 	}
 
-	if options.Authz.Authz == authz.Kessel {
+	if options.Authz.Authz == relations.Kessel {
 		log.Debugf("Authz Configuration: URL: %s, Insecure?: %t, OIDC?: %t",
 			options.Authz.Kessel.URL,
 			options.Authz.Kessel.Insecure,
@@ -122,7 +124,7 @@ func (o *OptionsConfig) InjectClowdAppConfig(appconfig *clowder.AppConfig) error
 	// check for authz config
 	if len(appconfig.Endpoints) > 0 {
 		for _, endpoint := range appconfig.Endpoints {
-			if endpoint.App == authz.RelationsAPI {
+			if endpoint.App == relations.RelationsAPI {
 				o.ConfigureAuthz(endpoint)
 			}
 		}
@@ -143,7 +145,7 @@ func (o *OptionsConfig) InjectClowdAppConfig(appconfig *clowder.AppConfig) error
 
 // ConfigureAuthz updates Authz settings based on ClowdApp AppConfig
 func (o *OptionsConfig) ConfigureAuthz(endpoint clowder.DependencyEndpoint) {
-	o.Authz.Authz = authz.Kessel
+	o.Authz.Authz = relations.Kessel
 	o.Authz.Kessel.URL = fmt.Sprintf("%s:%d", endpoint.Hostname, 9000)
 }
 

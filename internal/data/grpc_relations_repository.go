@@ -1,4 +1,4 @@
-package kessel
+package data
 
 import (
 	"context"
@@ -9,32 +9,32 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/go-kratos/kratos/v2/log"
+	"github.com/project-kessel/inventory-api/internal/biz/model"
+	"github.com/project-kessel/inventory-api/internal/config/relations/kessel"
 	kesselv1 "github.com/project-kessel/relations-api/api/kessel/relations/v1"
-	kessel "github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
+	kesselapi "github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
 	"google.golang.org/grpc"
-
-	"github.com/project-kessel/inventory-api/internal/biz/model"
 )
 
-type KesselAuthz struct {
+type GRPCRelationsRepository struct {
 	HealthService  kesselv1.KesselRelationsHealthServiceClient
-	CheckService   kessel.KesselCheckServiceClient
-	TupleService   kessel.KesselTupleServiceClient
-	LookupService  kessel.KesselLookupServiceClient
+	CheckService   kesselapi.KesselCheckServiceClient
+	TupleService   kesselapi.KesselTupleServiceClient
+	LookupService  kesselapi.KesselLookupServiceClient
 	tokenClient    *tokenClient
 	Logger         *log.Helper
 	successCounter metric.Int64Counter
 	failureCounter metric.Int64Counter
 }
 
-var _ model.Authorizer = &KesselAuthz{}
+var _ model.RelationsRepository = &GRPCRelationsRepository{}
 
-func New(ctx context.Context, config CompletedConfig, logger *log.Helper) (*KesselAuthz, error) {
-	logger.Info("Using authorizer: kessel")
-	tokenCli := NewTokenClient(config.tokenConfig)
+func NewGRPCRelationsRepository(ctx context.Context, config kessel.CompletedConfig, logger *log.Helper) (*GRPCRelationsRepository, error) {
+	logger.Info("Using relations repository: kessel")
+	tokenCli := NewTokenClient(config.GetTokenConfig())
 
 	meter := otel.Meter("github.com/project-kessel/inventory-api/blob/main/internal/server/otel")
 
@@ -48,11 +48,11 @@ func New(ctx context.Context, config CompletedConfig, logger *log.Helper) (*Kess
 		return nil, fmt.Errorf("failed to create failure counter: %w", err)
 	}
 
-	return &KesselAuthz{
-		HealthService:  kesselv1.NewKesselRelationsHealthServiceClient(config.gRPCConn),
-		CheckService:   kessel.NewKesselCheckServiceClient(config.gRPCConn),
-		TupleService:   kessel.NewKesselTupleServiceClient(config.gRPCConn),
-		LookupService:  kessel.NewKesselLookupServiceClient(config.gRPCConn),
+	return &GRPCRelationsRepository{
+		HealthService:  kesselv1.NewKesselRelationsHealthServiceClient(config.GetGRPCConn()),
+		CheckService:   kesselapi.NewKesselCheckServiceClient(config.GetGRPCConn()),
+		TupleService:   kesselapi.NewKesselTupleServiceClient(config.GetGRPCConn()),
+		LookupService:  kesselapi.NewKesselLookupServiceClient(config.GetGRPCConn()),
 		Logger:         logger,
 		tokenClient:    tokenCli,
 		successCounter: successCounter,
@@ -60,17 +60,17 @@ func New(ctx context.Context, config CompletedConfig, logger *log.Helper) (*Kess
 	}, nil
 }
 
-func (a *KesselAuthz) incrFailureCounter(method string) {
+func (a *GRPCRelationsRepository) incrFailureCounter(method string) {
 	a.failureCounter.Add(context.Background(), 1, metric.WithAttributes(
 		attribute.String("method", method),
 	))
 }
 
-func (a *KesselAuthz) incrSuccessCounter(method string) {
+func (a *GRPCRelationsRepository) incrSuccessCounter(method string) {
 	a.successCounter.Add(context.Background(), 1, metric.WithAttributes(attribute.String("method", method)))
 }
 
-func (a *KesselAuthz) Health(ctx context.Context) (*kesselv1.GetReadyzResponse, error) {
+func (a *GRPCRelationsRepository) Health(ctx context.Context) (*kesselv1.GetReadyzResponse, error) {
 	opts, err := a.getCallOptions()
 	if err != nil {
 		a.incrFailureCounter("Health")
@@ -89,7 +89,7 @@ func (a *KesselAuthz) Health(ctx context.Context) (*kesselv1.GetReadyzResponse, 
 	return resp, nil
 }
 
-func (a *KesselAuthz) getCallOptions() ([]grpc.CallOption, error) {
+func (a *GRPCRelationsRepository) getCallOptions() ([]grpc.CallOption, error) {
 	var opts []grpc.CallOption
 	opts = append(opts, grpc.EmptyCallOption{})
 	if a.tokenClient.EnableOIDCAuth {
@@ -106,7 +106,7 @@ func (a *KesselAuthz) getCallOptions() ([]grpc.CallOption, error) {
 	return opts, nil
 }
 
-func (a *KesselAuthz) AcquireLock(ctx context.Context, r *kessel.AcquireLockRequest) (*kessel.AcquireLockResponse, error) {
+func (a *GRPCRelationsRepository) AcquireLock(ctx context.Context, r *kesselapi.AcquireLockRequest) (*kesselapi.AcquireLockResponse, error) {
 	opts, err := a.getCallOptions()
 	if err != nil {
 		a.incrFailureCounter("AcquireLock")
@@ -123,7 +123,7 @@ func (a *KesselAuthz) AcquireLock(ctx context.Context, r *kessel.AcquireLockRequ
 	return resp, nil
 }
 
-func (a *KesselAuthz) CreateTuples(ctx context.Context, r *kessel.CreateTuplesRequest) (*kessel.CreateTuplesResponse, error) {
+func (a *GRPCRelationsRepository) CreateTuples(ctx context.Context, r *kesselapi.CreateTuplesRequest) (*kesselapi.CreateTuplesResponse, error) {
 	log.Infof("Creating tuples : %s", r)
 	opts, err := a.getCallOptions()
 	if err != nil {
@@ -141,7 +141,7 @@ func (a *KesselAuthz) CreateTuples(ctx context.Context, r *kessel.CreateTuplesRe
 	return resp, nil
 }
 
-func (a *KesselAuthz) DeleteTuples(ctx context.Context, r *kessel.DeleteTuplesRequest) (*kessel.DeleteTuplesResponse, error) {
+func (a *GRPCRelationsRepository) DeleteTuples(ctx context.Context, r *kesselapi.DeleteTuplesRequest) (*kesselapi.DeleteTuplesResponse, error) {
 	opts, err := a.getCallOptions()
 	if err != nil {
 		a.incrFailureCounter("DeleteTuples")
@@ -158,7 +158,7 @@ func (a *KesselAuthz) DeleteTuples(ctx context.Context, r *kessel.DeleteTuplesRe
 	return resp, nil
 }
 
-func (a *KesselAuthz) ReadTuples(ctx context.Context, r *kessel.ReadTuplesRequest) (grpc.ServerStreamingClient[kessel.ReadTuplesResponse], error) {
+func (a *GRPCRelationsRepository) ReadTuples(ctx context.Context, r *kesselapi.ReadTuplesRequest) (grpc.ServerStreamingClient[kesselapi.ReadTuplesResponse], error) {
 	opts, err := a.getCallOptions()
 	if err != nil {
 		a.incrFailureCounter("ReadTuples")
@@ -175,7 +175,7 @@ func (a *KesselAuthz) ReadTuples(ctx context.Context, r *kessel.ReadTuplesReques
 	return stream, nil
 }
 
-func (a *KesselAuthz) LookupResources(ctx context.Context, in *kessel.LookupResourcesRequest) (grpc.ServerStreamingClient[kessel.LookupResourcesResponse], error) {
+func (a *GRPCRelationsRepository) LookupResources(ctx context.Context, in *kesselapi.LookupResourcesRequest) (grpc.ServerStreamingClient[kesselapi.LookupResourcesResponse], error) {
 	opts, err := a.getCallOptions()
 	if err != nil {
 		a.incrFailureCounter("LookupResources")
@@ -189,7 +189,7 @@ func (a *KesselAuthz) LookupResources(ctx context.Context, in *kessel.LookupReso
 	return resp, nil
 }
 
-func (a *KesselAuthz) LookupSubjects(ctx context.Context, in *kessel.LookupSubjectsRequest) (grpc.ServerStreamingClient[kessel.LookupSubjectsResponse], error) {
+func (a *GRPCRelationsRepository) LookupSubjects(ctx context.Context, in *kesselapi.LookupSubjectsRequest) (grpc.ServerStreamingClient[kesselapi.LookupSubjectsResponse], error) {
 	opts, err := a.getCallOptions()
 	if err != nil {
 		a.incrFailureCounter("LookupSubjects")
@@ -203,44 +203,44 @@ func (a *KesselAuthz) LookupSubjects(ctx context.Context, in *kessel.LookupSubje
 	return resp, nil
 }
 
-func (a *KesselAuthz) UnsetWorkspace(ctx context.Context, local_resource_id, namespace, name string) (*kessel.DeleteTuplesResponse, error) {
+func (a *GRPCRelationsRepository) UnsetWorkspace(ctx context.Context, local_resource_id, namespace, name string) (*kesselapi.DeleteTuplesResponse, error) {
 
-	req := &kessel.RelationTupleFilter{
+	req := &kesselapi.RelationTupleFilter{
 		ResourceNamespace: proto.String(namespace),
 		ResourceType:      proto.String(name),
 		ResourceId:        proto.String(local_resource_id),
 		Relation:          proto.String("workspace"),
 	}
-	return a.DeleteTuples(ctx, &kessel.DeleteTuplesRequest{
+	return a.DeleteTuples(ctx, &kesselapi.DeleteTuplesRequest{
 		Filter: req,
 	})
 }
 
-func (a *KesselAuthz) Check(ctx context.Context, namespace string, viewPermission string, consistencyToken string, resourceType string, localResourceId string, sub *kessel.SubjectReference) (kessel.CheckResponse_Allowed, *kessel.ConsistencyToken, error) {
+func (a *GRPCRelationsRepository) Check(ctx context.Context, namespace string, viewPermission string, consistencyToken string, resourceType string, localResourceId string, sub *kesselapi.SubjectReference) (kesselapi.CheckResponse_Allowed, *kesselapi.ConsistencyToken, error) {
 	log.Infof("Check: on resourceType=%s, localResourceId=%s, consistencyToken=%s", resourceType, localResourceId, consistencyToken)
 
 	opts, err := a.getCallOptions()
 	if err != nil {
 		a.incrFailureCounter("Check")
-		return kessel.CheckResponse_ALLOWED_UNSPECIFIED, nil, err
+		return kesselapi.CheckResponse_ALLOWED_UNSPECIFIED, nil, err
 	}
 
 	// If resource doesn't exist in inventory DB
 	// default send a minimize_latency check request
-	consistency := &kessel.Consistency{Requirement: &kessel.Consistency_MinimizeLatency{MinimizeLatency: true}}
+	consistency := &kesselapi.Consistency{Requirement: &kesselapi.Consistency_MinimizeLatency{MinimizeLatency: true}}
 
 	if consistencyToken != "" {
 		log.Infof("Check: with Consistency_AtLeastAsFresh as consistencyToken=%s", consistencyToken)
-		consistency = &kessel.Consistency{
-			Requirement: &kessel.Consistency_AtLeastAsFresh{
-				AtLeastAsFresh: &kessel.ConsistencyToken{Token: consistencyToken},
+		consistency = &kesselapi.Consistency{
+			Requirement: &kesselapi.Consistency_AtLeastAsFresh{
+				AtLeastAsFresh: &kesselapi.ConsistencyToken{Token: consistencyToken},
 			},
 		}
 	}
 
-	resp, err := a.CheckService.Check(ctx, &kessel.CheckRequest{
-		Resource: &kessel.ObjectReference{
-			Type: &kessel.ObjectType{
+	resp, err := a.CheckService.Check(ctx, &kesselapi.CheckRequest{
+		Resource: &kesselapi.ObjectReference{
+			Type: &kesselapi.ObjectType{
 				Namespace: namespace,
 				Name:      resourceType,
 			},
@@ -255,23 +255,23 @@ func (a *KesselAuthz) Check(ctx context.Context, namespace string, viewPermissio
 
 	if err != nil {
 		a.incrFailureCounter("Check")
-		return kessel.CheckResponse_ALLOWED_UNSPECIFIED, nil, err
+		return kesselapi.CheckResponse_ALLOWED_UNSPECIFIED, nil, err
 	}
 
 	a.incrSuccessCounter("Check")
 	return resp.GetAllowed(), resp.GetConsistencyToken(), nil
 }
 
-func (a *KesselAuthz) CheckForUpdate(ctx context.Context, namespace string, updatePermission string, resourceType string, localResourceId string, sub *kessel.SubjectReference) (kessel.CheckForUpdateResponse_Allowed, *kessel.ConsistencyToken, error) {
+func (a *GRPCRelationsRepository) CheckForUpdate(ctx context.Context, namespace string, updatePermission string, resourceType string, localResourceId string, sub *kesselapi.SubjectReference) (kesselapi.CheckForUpdateResponse_Allowed, *kesselapi.ConsistencyToken, error) {
 	opts, err := a.getCallOptions()
 	if err != nil {
 		a.incrFailureCounter("CheckForUpdate")
-		return kessel.CheckForUpdateResponse_ALLOWED_UNSPECIFIED, nil, err
+		return kesselapi.CheckForUpdateResponse_ALLOWED_UNSPECIFIED, nil, err
 	}
 
-	resp, err := a.CheckService.CheckForUpdate(ctx, &kessel.CheckForUpdateRequest{
-		Resource: &kessel.ObjectReference{
-			Type: &kessel.ObjectType{
+	resp, err := a.CheckService.CheckForUpdate(ctx, &kesselapi.CheckForUpdateRequest{
+		Resource: &kesselapi.ObjectReference{
+			Type: &kesselapi.ObjectType{
 				Namespace: namespace,
 				Name:      resourceType,
 			},
@@ -283,19 +283,19 @@ func (a *KesselAuthz) CheckForUpdate(ctx context.Context, namespace string, upda
 
 	if err != nil {
 		a.incrFailureCounter("CheckForUpdate")
-		return kessel.CheckForUpdateResponse_ALLOWED_UNSPECIFIED, nil, err
+		return kesselapi.CheckForUpdateResponse_ALLOWED_UNSPECIFIED, nil, err
 	}
 
 	a.incrSuccessCounter("CheckForUpdate")
 	return resp.GetAllowed(), resp.GetConsistencyToken(), nil
 }
 
-func (a *KesselAuthz) CheckBulk(ctx context.Context, req *kessel.CheckBulkRequest) (*kessel.CheckBulkResponse, error) {
+func (a *GRPCRelationsRepository) CheckBulk(ctx context.Context, req *kesselapi.CheckBulkRequest) (*kesselapi.CheckBulkResponse, error) {
 
 	log.Infof("CheckBulk: checking %d items", len(req.GetItems()))
 
 	if req.GetConsistency() == nil {
-		req.Consistency = &kessel.Consistency{Requirement: &kessel.Consistency_MinimizeLatency{MinimizeLatency: true}}
+		req.Consistency = &kesselapi.Consistency{Requirement: &kesselapi.Consistency_MinimizeLatency{MinimizeLatency: true}}
 	}
 
 	opts, err := a.getCallOptions()
@@ -304,7 +304,7 @@ func (a *KesselAuthz) CheckBulk(ctx context.Context, req *kessel.CheckBulkReques
 		return nil, err
 	}
 
-	resp, err := a.CheckService.CheckBulk(ctx, &kessel.CheckBulkRequest{
+	resp, err := a.CheckService.CheckBulk(ctx, &kesselapi.CheckBulkRequest{
 		Items:       req.GetItems(),
 		Consistency: req.GetConsistency(),
 	}, opts...)
@@ -317,7 +317,7 @@ func (a *KesselAuthz) CheckBulk(ctx context.Context, req *kessel.CheckBulkReques
 	return resp, nil
 }
 
-func (a *KesselAuthz) CheckForUpdateBulk(ctx context.Context, req *kessel.CheckForUpdateBulkRequest) (*kessel.CheckForUpdateBulkResponse, error) {
+func (a *GRPCRelationsRepository) CheckForUpdateBulk(ctx context.Context, req *kesselapi.CheckForUpdateBulkRequest) (*kesselapi.CheckForUpdateBulkResponse, error) {
 	log.Infof("CheckForUpdateBulk: checking %d items", len(req.GetItems()))
 	opts, err := a.getCallOptions()
 	if err != nil {
@@ -334,25 +334,24 @@ func (a *KesselAuthz) CheckForUpdateBulk(ctx context.Context, req *kessel.CheckF
 }
 
 // SetWorkspace upsert inserts the relationship in relations if it doesn't exist and otherwise does nothing
-func (a *KesselAuthz) SetWorkspace(ctx context.Context, local_resource_id, workspace, namespace, name string, upsert bool) (*kessel.CreateTuplesResponse, error) {
+func (a *GRPCRelationsRepository) SetWorkspace(ctx context.Context, local_resource_id, workspace, namespace, name string, upsert bool) (*kesselapi.CreateTuplesResponse, error) {
 	if workspace == "" {
 		err := fmt.Errorf("workspace_id is required")
 		a.incrFailureCounter("SetWorkspace")
 		return nil, err
 	}
-	// TODO: remove previous tuple for workspace
-	rels := []*kessel.Relationship{{
-		Resource: &kessel.ObjectReference{
-			Type: &kessel.ObjectType{
+	rels := []*kesselapi.Relationship{{
+		Resource: &kesselapi.ObjectReference{
+			Type: &kesselapi.ObjectType{
 				Name:      name,
 				Namespace: namespace,
 			},
 			Id: local_resource_id,
 		},
 		Relation: "workspace",
-		Subject: &kessel.SubjectReference{
-			Subject: &kessel.ObjectReference{
-				Type: &kessel.ObjectType{
+		Subject: &kesselapi.SubjectReference{
+			Subject: &kesselapi.ObjectReference{
+				Type: &kesselapi.ObjectType{
 					Name:      "workspace",
 					Namespace: "rbac",
 				},
@@ -362,7 +361,7 @@ func (a *KesselAuthz) SetWorkspace(ctx context.Context, local_resource_id, works
 	}}
 
 	a.incrSuccessCounter("SetWorkspace")
-	return a.CreateTuples(ctx, &kessel.CreateTuplesRequest{
+	return a.CreateTuples(ctx, &kesselapi.CreateTuplesRequest{
 		Upsert: upsert,
 		Tuples: rels,
 	})

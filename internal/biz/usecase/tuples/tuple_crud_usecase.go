@@ -13,13 +13,13 @@ import (
 // TupleCrudUseCase handles deprecated tuple-layer operations for RBAC backward compatibility.
 // This usecase exists only for RBAC and should not be extended. All methods are deprecated.
 type TupleCrudUseCase struct {
-	Authz          model.Authorizer // Will move to repository layer soon
+	Authz          model.RelationsRepository
 	MetaAuthorizer metaauthorizer.MetaAuthorizer
 	Log            *log.Helper
 }
 
 // New creates a new TupleCrudUseCase.
-func New(authz model.Authorizer, metaAuthorizer metaauthorizer.MetaAuthorizer, logger log.Logger) *TupleCrudUseCase {
+func New(authz model.RelationsRepository, metaAuthorizer metaauthorizer.MetaAuthorizer, logger log.Logger) *TupleCrudUseCase {
 	return &TupleCrudUseCase{
 		Authz:          authz,
 		MetaAuthorizer: metaAuthorizer,

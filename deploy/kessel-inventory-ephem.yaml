@@ -402,6 +402,8 @@ objects:
           webServices:
             public:
               enabled: true
+              h2cEnabled: true
+              h2cTargetPort: 9000
               apiPath: kessel
       testing:
         iqePlugin: kessel-inventory

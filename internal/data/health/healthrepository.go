@@ -13,8 +13,8 @@ import (
 )
 
 type healthRepo struct {
-	DB            *gorm.DB
-	Relations     model.RelationsRepository
+	DB              *gorm.DB
+	Relations       model.RelationsRepository
 	RelationsConfig relations.CompletedConfig
 }
 

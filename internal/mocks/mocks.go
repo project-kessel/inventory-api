@@ -87,7 +87,7 @@ func (m *MockRelationsRepository) UnsetWorkspace(ctx context.Context, namespace,
 }
 
 func (m *MockRelationsRepository) SetWorkspace(ctx context.Context, local_resource_id, workspace, namespace, name string, upsert bool) (*v1beta1.CreateTuplesResponse, error) {
-	args := m.Called(ctx, local_resource_id, workspace, namespace, name)
+	args := m.Called(ctx, local_resource_id, workspace, namespace, name, upsert)
 	return args.Get(0).(*v1beta1.CreateTuplesResponse), args.Error(1)
 }
 

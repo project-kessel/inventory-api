@@ -322,7 +322,7 @@ func (s *SimpleRelationsRepository) CheckBulk(_ context.Context, req *kessel.Che
 func (s *SimpleRelationsRepository) CheckForUpdateBulk(ctx context.Context, req *kessel.CheckForUpdateBulkRequest) (*kessel.CheckForUpdateBulkResponse, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	tuples := s.getTuplesForToken("")
+	tuples := s.tuples
 	resultToken := simpleFormatConsistencyToken(s.version)
 
 	pairs := make([]*kessel.CheckBulkResponsePair, len(req.GetItems()))

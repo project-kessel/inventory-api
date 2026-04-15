@@ -81,6 +81,11 @@ func (m *MockAuthz) DeleteTuples(ctx context.Context, request *v1beta1.DeleteTup
 	return args.Get(0).(*v1beta1.DeleteTuplesResponse), args.Error(1)
 }
 
+func (m *MockAuthz) ReadTuples(ctx context.Context, request *v1beta1.ReadTuplesRequest) (grpc.ServerStreamingClient[v1beta1.ReadTuplesResponse], error) {
+	args := m.Called(ctx, request)
+	return args.Get(0).(grpc.ServerStreamingClient[v1beta1.ReadTuplesResponse]), args.Error(1)
+}
+
 func (m *MockAuthz) UnsetWorkspace(ctx context.Context, namespace, localResourceId, resourceType string) (*v1beta1.DeleteTuplesResponse, error) {
 	args := m.Called(ctx, namespace, localResourceId, resourceType)
 	return args.Get(0).(*v1beta1.DeleteTuplesResponse), args.Error(1)

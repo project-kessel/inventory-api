@@ -4,3 +4,6 @@ knowledge_base:
   code_guidelines:
     filePatterns:
       - "docs/*-guidelines.md"
+reviews:
+  # disables the cringe
+  poem: false

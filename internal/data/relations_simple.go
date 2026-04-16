@@ -535,6 +535,45 @@ func simpleMatchesFilter(key simpleTupleKey, filter *kessel.RelationTupleFilter)
 	return true
 }
 
+// ReadTuples implements RelationsRepository.
+// It returns tuples matching the filter.
+// This is a simple direct-tuple lookup, not a full ReBAC graph traversal.
+func (s *SimpleRelationsRepository) ReadTuples(_ context.Context, req *kessel.ReadTuplesRequest) (grpc.ServerStreamingClient[kessel.ReadTuplesResponse], error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	filter := req.GetFilter()
+
+	var results []*kessel.ReadTuplesResponse
+	for key := range s.tuples {
+		if filter == nil || simpleMatchesFilter(key, filter) {
+			results = append(results, &kessel.ReadTuplesResponse{
+				Tuple: &kessel.Relationship{
+					Resource: &kessel.ObjectReference{
+						Type: &kessel.ObjectType{
+							Namespace: key.ResourceNamespace,
+							Name:      key.ResourceType,
+						},
+						Id: key.ResourceID,
+					},
+					Relation: key.Relation,
+					Subject: &kessel.SubjectReference{
+						Subject: &kessel.ObjectReference{
+							Type: &kessel.ObjectType{
+								Namespace: key.SubjectNamespace,
+								Name:      key.SubjectType,
+							},
+							Id: key.SubjectID,
+						},
+					},
+				},
+			})
+		}
+	}
+
+	return &simpleReadTuplesStream{results: results}, nil
+}
+
 // AcquireLock implements RelationsRepository.
 func (s *SimpleRelationsRepository) AcquireLock(_ context.Context, _ *kessel.AcquireLockRequest) (*kessel.AcquireLockResponse, error) {
 	return &kessel.AcquireLockResponse{}, nil
@@ -625,5 +664,43 @@ func (s *simpleLookupSubjectsStream) SendMsg(_ interface{}) error {
 }
 
 func (s *simpleLookupSubjectsStream) RecvMsg(_ interface{}) error {
+	return nil
+}
+
+type simpleReadTuplesStream struct {
+	results []*kessel.ReadTuplesResponse
+	index   int
+}
+
+func (s *simpleReadTuplesStream) Recv() (*kessel.ReadTuplesResponse, error) {
+	if s.index >= len(s.results) {
+		return nil, io.EOF
+	}
+	result := s.results[s.index]
+	s.index++
+	return result, nil
+}
+
+func (s *simpleReadTuplesStream) Header() (metadata.MD, error) {
+	return nil, nil
+}
+
+func (s *simpleReadTuplesStream) Trailer() metadata.MD {
+	return nil
+}
+
+func (s *simpleReadTuplesStream) CloseSend() error {
+	return nil
+}
+
+func (s *simpleReadTuplesStream) Context() context.Context {
+	return context.Background()
+}
+
+func (s *simpleReadTuplesStream) SendMsg(_ interface{}) error {
+	return nil
+}
+
+func (s *simpleReadTuplesStream) RecvMsg(_ interface{}) error {
 	return nil
 }

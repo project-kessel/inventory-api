@@ -132,7 +132,7 @@ func TestCheckSelf_DeniedByMetaAuthz(t *testing.T) {
 	require.NoError(t, err)
 
 	_, _, err = usecase.CheckSelf(ctx, relation, key, model.NewConsistencyMinimizeLatency())
-	assert.ErrorIs(t, err, ErrMetaAuthorizationDenied)
+	assert.ErrorIs(t, err, metaauthorizer.ErrMetaAuthorizationDenied)
 }
 
 func TestCheckSelf_MissingAuthzContext(t *testing.T) {
@@ -156,7 +156,7 @@ func TestCheckSelf_MissingAuthzContext(t *testing.T) {
 	require.NoError(t, err)
 
 	_, _, err = usecase.CheckSelf(context.Background(), relation, key, model.NewConsistencyMinimizeLatency())
-	assert.ErrorIs(t, err, ErrMetaAuthzContextMissing)
+	assert.ErrorIs(t, err, metaauthorizer.ErrMetaAuthzContextMissing)
 	assert.Equal(t, 0, meta.calls)
 }
 
@@ -340,7 +340,7 @@ func TestCheckForUpdateBulk_MetaAuthzDenied(t *testing.T) {
 			{Resource: key, Relation: relation, Subject: subject},
 		},
 	})
-	assert.ErrorIs(t, err, ErrMetaAuthorizationDenied)
+	assert.ErrorIs(t, err, metaauthorizer.ErrMetaAuthorizationDenied)
 	assert.Equal(t, 1, meta.calls)
 }
 
@@ -454,7 +454,7 @@ func TestCheckSelfBulk_MissingAuthzContext(t *testing.T) {
 	}
 
 	_, err = usecase.CheckSelfBulk(context.Background(), cmd)
-	assert.ErrorIs(t, err, ErrMetaAuthzContextMissing)
+	assert.ErrorIs(t, err, metaauthorizer.ErrMetaAuthzContextMissing)
 	assert.Equal(t, 0, meta.calls)
 }
 

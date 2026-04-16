@@ -1,0 +1,23 @@
+syntax = "proto3";
+
+package kessel.inventory.v1beta2;
+
+import "buf/validate/validate.proto";
+import "kessel/inventory/v1beta2/relation_object_reference.proto";
+import "kessel/inventory/v1beta2/relation_subject_reference.proto";
+
+option go_package = "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2";
+option java_multiple_files = true;
+option java_package = "org.project_kessel.api.inventory.v1beta2";
+
+// DEPRECATED: Relationship is part of the legacy tuple-layer API.
+// This type exists only for RBAC backward compatibility and will be removed.
+// New code should use ReportResource with relationships instead.
+//
+// A Relationship is the realization of a Relation (a string)
+// between a Resource and a Subject or a Subject Set.
+message Relationship {
+  RelationObjectReference resource = 1 [(buf.validate.field).required = true];
+  string relation = 2 [(buf.validate.field).string.min_len = 1];
+  RelationSubjectReference subject = 3 [(buf.validate.field).required = true];
+}

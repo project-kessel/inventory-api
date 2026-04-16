@@ -158,6 +158,23 @@ func (a *GRPCRelationsRepository) DeleteTuples(ctx context.Context, r *kesselapi
 	return resp, nil
 }
 
+func (a *GRPCRelationsRepository) ReadTuples(ctx context.Context, r *kesselapi.ReadTuplesRequest) (grpc.ServerStreamingClient[kesselapi.ReadTuplesResponse], error) {
+	opts, err := a.getCallOptions()
+	if err != nil {
+		a.incrFailureCounter("ReadTuples")
+		return nil, err
+	}
+
+	stream, err := a.TupleService.ReadTuples(ctx, r, opts...)
+	if err != nil {
+		a.incrFailureCounter("ReadTuples")
+		return nil, err
+	}
+
+	a.incrSuccessCounter("ReadTuples")
+	return stream, nil
+}
+
 func (a *GRPCRelationsRepository) LookupResources(ctx context.Context, in *kesselapi.LookupResourcesRequest) (grpc.ServerStreamingClient[kesselapi.LookupResourcesResponse], error) {
 	opts, err := a.getCallOptions()
 	if err != nil {

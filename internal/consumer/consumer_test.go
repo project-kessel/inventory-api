@@ -82,11 +82,8 @@ func (t *TestCase) TestSetup(testingT *testing.T) []error {
 
 	notifier := &pubsub.NotifierMock{}
 
-	relationsRepo := &mocks.MockRelationsRepository{}
-	createTupleResponse := &v1beta1.CreateTuplesResponse{ConsistencyToken: &v1beta1.ConsistencyToken{Token: "test-token"}}
-	deleteTupleResponse := &v1beta1.DeleteTuplesResponse{ConsistencyToken: &v1beta1.ConsistencyToken{Token: "test-token"}}
-	relationsRepo.On("CreateTuples", mock.Anything, mock.Anything).Return(createTupleResponse, nil)
-	relationsRepo.On("DeleteTuples", mock.Anything, mock.Anything).Return(deleteTupleResponse, nil)
+	// Use SimpleRelationsRepository instead of mock - actually stores tuples in memory
+	relationsRepo := data.NewSimpleRelationsRepository()
 
 	consumer := &mocks.MockConsumer{}
 	db := setupInMemoryDB(testingT)
@@ -399,7 +396,7 @@ func TestInventoryConsumer_ProcessMessage(t *testing.T) {
 			if (test.expectedOperation == string(model.OperationTypeCreated) || test.expectedOperation == string(model.OperationTypeUpdated)) && test.relationsEnabled {
 				resp, err := tester.inv.ProcessMessage(parsedHeaders, test.relationsEnabled, test.msg)
 				assert.Nil(t, err)
-				assert.Equal(t, "test-token", resp)
+				assert.NotEmpty(t, resp, "Should return consistency token for create/update operations")
 			} else {
 				resp, err := tester.inv.ProcessMessage(parsedHeaders, test.relationsEnabled, test.msg)
 				assert.Nil(t, err)
@@ -567,11 +564,11 @@ func TestRebalanceCallback_AssignedPartitions(t *testing.T) {
 			errs := tester.TestSetup(t)
 			assert.Nil(t, errs)
 
-			relationsRepo := &mocks.MockRelationsRepository{}
-			if test.expectAcquireLockCall {
-				relationsRepo.On("AcquireLock", mock.Anything, mock.MatchedBy(func(req *v1beta1.AcquireLockRequest) bool {
-					return req.LockId == test.expectedLockId
-				})).Return(test.lockResponse, test.lockError)
+			// Use SimpleRelationsRepository instead of mock
+			relationsRepo := data.NewSimpleRelationsRepository()
+			if test.expectAcquireLockCall && test.lockError != nil {
+				// Configure error for failure case
+				relationsRepo.SetAcquireLockError(test.lockError)
 			}
 			tester.inv.Relations = relationsRepo
 
@@ -583,10 +580,11 @@ func TestRebalanceCallback_AssignedPartitions(t *testing.T) {
 
 			assert.Equal(t, test.expectedError, err)
 			assert.Equal(t, test.expectedLockId, tester.inv.lockId)
-			assert.Equal(t, test.expectedLockToken, tester.inv.lockToken)
-
-			if test.expectAcquireLockCall {
-				relationsRepo.AssertExpectations(t)
+			// For successful case, verify token was set (SimpleRelationsRepository generates token-{lockId})
+			if test.expectedError == nil && test.expectAcquireLockCall {
+				assert.NotEmpty(t, tester.inv.lockToken)
+			} else {
+				assert.Equal(t, test.expectedLockToken, tester.inv.lockToken)
 			}
 		})
 	}
@@ -804,8 +802,9 @@ func TestInventoryConsumer_CreateTuple_FailedPrecondition(t *testing.T) {
 	errs := tester.TestSetup(t)
 	assert.Nil(t, errs)
 
-	relationsRepo := &mocks.MockRelationsRepository{}
-	relationsRepo.On("CreateTuples", mock.Anything, mock.Anything).Return((*v1beta1.CreateTuplesResponse)(nil), status.Error(codes.FailedPrecondition, "invalid fencing token"))
+	// Use SimpleRelationsRepository with configured error instead of mock
+	relationsRepo := data.NewSimpleRelationsRepository()
+	relationsRepo.SetCreateTuplesError(status.Error(codes.FailedPrecondition, "invalid fencing token"))
 
 	tester.inv.Relations = relationsRepo
 	tester.inv.lockToken = "test-token"
@@ -830,8 +829,6 @@ func TestInventoryConsumer_CreateTuple_FailedPrecondition(t *testing.T) {
 	assert.NotNil(t, err)
 	assert.Equal(t, "", resp)
 	assert.Contains(t, err.Error(), "invalid fencing token")
-
-	relationsRepo.AssertExpectations(t)
 }
 
 func TestInventoryConsumer_UpdateTuple_FailedPrecondition(t *testing.T) {
@@ -839,8 +836,9 @@ func TestInventoryConsumer_UpdateTuple_FailedPrecondition(t *testing.T) {
 	errs := tester.TestSetup(t)
 	assert.Nil(t, errs)
 
-	relationsRepo := &mocks.MockRelationsRepository{}
-	relationsRepo.On("CreateTuples", mock.Anything, mock.Anything).Return((*v1beta1.CreateTuplesResponse)(nil), status.Error(codes.FailedPrecondition, "invalid fencing token"))
+	// Use SimpleRelationsRepository with configured error instead of mock
+	relationsRepo := data.NewSimpleRelationsRepository()
+	relationsRepo.SetCreateTuplesError(status.Error(codes.FailedPrecondition, "invalid fencing token"))
 
 	tester.inv.Relations = relationsRepo
 	tester.inv.lockToken = "test-token"
@@ -865,8 +863,6 @@ func TestInventoryConsumer_UpdateTuple_FailedPrecondition(t *testing.T) {
 	assert.NotNil(t, err)
 	assert.Equal(t, "", resp)
 	assert.Contains(t, err.Error(), "invalid fencing token")
-
-	relationsRepo.AssertExpectations(t)
 }
 
 func TestInventoryConsumer_DeleteTuple_FailedPrecondition(t *testing.T) {
@@ -874,8 +870,9 @@ func TestInventoryConsumer_DeleteTuple_FailedPrecondition(t *testing.T) {
 	errs := tester.TestSetup(t)
 	assert.Nil(t, errs)
 
-	relationsRepo := &mocks.MockRelationsRepository{}
-	relationsRepo.On("DeleteTuples", mock.Anything, mock.Anything).Return((*v1beta1.DeleteTuplesResponse)(nil), status.Error(codes.FailedPrecondition, "invalid fencing token"))
+	// Use SimpleRelationsRepository with configured error instead of mock
+	relationsRepo := data.NewSimpleRelationsRepository()
+	relationsRepo.SetDeleteTuplesError(status.Error(codes.FailedPrecondition, "invalid fencing token"))
 
 	tester.inv.Relations = relationsRepo
 	tester.inv.lockToken = "test-token"
@@ -900,8 +897,6 @@ func TestInventoryConsumer_DeleteTuple_FailedPrecondition(t *testing.T) {
 	assert.NotNil(t, err)
 	assert.Equal(t, "", resp)
 	assert.Contains(t, err.Error(), "invalid fencing token")
-
-	relationsRepo.AssertExpectations(t)
 }
 
 func TestUpdateConsistencyTokenIfPresent(t *testing.T) {

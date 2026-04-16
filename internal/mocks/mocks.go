@@ -38,10 +38,11 @@ func (m *MockHealthRepo) IsRelationsAvailable(ctx context.Context) (*pb.GetReady
 }
 
 // MockRelationsRepository is a minimal mock for RelationsRepository.
-// It only implements CheckBulk and CheckForUpdateBulk, which are needed for
-// edge-case tests that SimpleRelationsRepository cannot produce:
+// It only implements methods needed for edge-case tests that SimpleRelationsRepository cannot produce:
 //   - CheckBulk: for response length mismatches
 //   - CheckForUpdateBulk: for per-pair errors
+//   - AcquireLock: for complex fencing token validation scenarios
+//   - CreateTuples: for complex fencing token validation scenarios
 //
 // All other tests should use SimpleRelationsRepository (a fake) instead.
 type MockRelationsRepository struct {
@@ -56,6 +57,22 @@ func (m *MockRelationsRepository) CheckBulk(ctx context.Context, req *v1beta1.Ch
 func (m *MockRelationsRepository) CheckForUpdateBulk(ctx context.Context, req *v1beta1.CheckForUpdateBulkRequest) (*v1beta1.CheckForUpdateBulkResponse, error) {
 	args := m.Called(ctx, req)
 	return args.Get(0).(*v1beta1.CheckForUpdateBulkResponse), args.Error(1)
+}
+
+func (m *MockRelationsRepository) AcquireLock(ctx context.Context, req *v1beta1.AcquireLockRequest) (*v1beta1.AcquireLockResponse, error) {
+	args := m.Called(ctx, req)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*v1beta1.AcquireLockResponse), args.Error(1)
+}
+
+func (m *MockRelationsRepository) CreateTuples(ctx context.Context, req *v1beta1.CreateTuplesRequest) (*v1beta1.CreateTuplesResponse, error) {
+	args := m.Called(ctx, req)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*v1beta1.CreateTuplesResponse), args.Error(1)
 }
 
 // Stub methods that panic to enforce use of SimpleRelationsRepository for normal test cases.
@@ -81,16 +98,8 @@ func (m *MockRelationsRepository) LookupSubjects(ctx context.Context, in *v1beta
 	panic("MockRelationsRepository.LookupSubjects() is not supported - use SimpleRelationsRepository instead")
 }
 
-func (m *MockRelationsRepository) CreateTuples(ctx context.Context, req *v1beta1.CreateTuplesRequest) (*v1beta1.CreateTuplesResponse, error) {
-	panic("MockRelationsRepository.CreateTuples() is not supported - use SimpleRelationsRepository instead")
-}
-
 func (m *MockRelationsRepository) DeleteTuples(ctx context.Context, req *v1beta1.DeleteTuplesRequest) (*v1beta1.DeleteTuplesResponse, error) {
 	panic("MockRelationsRepository.DeleteTuples() is not supported - use SimpleRelationsRepository instead")
-}
-
-func (m *MockRelationsRepository) AcquireLock(ctx context.Context, req *v1beta1.AcquireLockRequest) (*v1beta1.AcquireLockResponse, error) {
-	panic("MockRelationsRepository.AcquireLock() is not supported - use SimpleRelationsRepository instead")
 }
 
 func (m *MockRelationsRepository) UnsetWorkspace(ctx context.Context, namespace string, resourceType string, localResourceId string) (*v1beta1.DeleteTuplesResponse, error) {

@@ -5,9 +5,6 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/project-kessel/inventory-api/internal/mocks"
-	kesselv1 "github.com/project-kessel/relations-api/api/kessel/relations/v1"
-
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -77,22 +74,22 @@ func TestHealthRepo_IsBackendAvailable_AllCases(t *testing.T) {
 	assert.Contains(t, resp.Status, "RELATIONS-API UNHEALTHY")
 
 	db1 := setupGorm(t)
-	mockRelations1 := &mocks.MockRelationsRepository{}
-	mockRelations1.On("Health", ctx).Return(&kesselv1.GetReadyzResponse{Status: "OK"}, nil)
-	healthRepo1 := New(db1, mockRelations1, relationsConfig)
+	simpleRelations1 := data.NewSimpleRelationsRepository()
+	// Healthy relations (default state)
+	healthRepo1 := New(db1, simpleRelations1, relationsConfig)
 	resp, err = healthRepo1.IsBackendAvailable(ctx)
 	assert.NoError(t, err)
 	assert.Equal(t, uint32(200), resp.Code)
 	assert.Contains(t, resp.Status, "Storage type sqlite")
 
 	db2 := setupGorm(t)
-	mockRelations2 := &mocks.MockRelationsRepository{}
-	mockRelations2.On("Health", ctx).Return(&kesselv1.GetReadyzResponse{Status: "OK"}, nil)
+	simpleRelations2 := data.NewSimpleRelationsRepository()
+	// Healthy relations, but DB closed
 	sqlDB2, _ := db2.DB()
 	if err := sqlDB2.Close(); err != nil {
 		t.Logf("Warning: failed to close db: %v", err)
 	}
-	healthRepo2 := New(db2, mockRelations2, relationsConfig)
+	healthRepo2 := New(db2, simpleRelations2, relationsConfig)
 	resp, err = healthRepo2.IsBackendAvailable(ctx)
 	assert.NoError(t, err)
 	assert.Equal(t, uint32(500), resp.Code)
@@ -100,9 +97,9 @@ func TestHealthRepo_IsBackendAvailable_AllCases(t *testing.T) {
 	assert.NotContains(t, resp.Status, "RELATIONS-API UNHEALTHY")
 
 	db3 := setupGorm(t)
-	mockRelations3 := &mocks.MockRelationsRepository{}
-	mockRelations3.On("Health", ctx).Return((*kesselv1.GetReadyzResponse)(nil), errors.New("RELATIONS-API UNHEALTHY"))
-	healthRepo3 := New(db3, mockRelations3, relationsConfig)
+	simpleRelations3 := data.NewSimpleRelationsRepository()
+	simpleRelations3.SetHealthError(errors.New("RELATIONS-API UNHEALTHY"))
+	healthRepo3 := New(db3, simpleRelations3, relationsConfig)
 	resp, err = healthRepo3.IsBackendAvailable(ctx)
 	assert.NoError(t, err)
 	assert.Equal(t, uint32(500), resp.Code)

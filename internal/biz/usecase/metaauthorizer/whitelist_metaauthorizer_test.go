@@ -42,21 +42,21 @@ func TestWhitelistMetaAuthorizer_ClientID_Denied(t *testing.T) {
 	assert.False(t, allowed)
 }
 
-func TestWhitelistMetaAuthorizer_SubjectId_Fallback(t *testing.T) {
+func TestWhitelistMetaAuthorizer_EmptyClientID_Denies(t *testing.T) {
 	authorizer := NewWhitelistMetaAuthorizer([]string{"service-account-fallback"})
 	ctx := context.Background()
 	authzCtx := authnapi.AuthzContext{
 		Protocol: authnapi.ProtocolGRPC,
 		Subject: &authnapi.Claims{
 			SubjectId: "service-account-fallback",
-			ClientID:  "", // No ClientID
+			ClientID:  "", // Empty ClientID should be denied
 			AuthType:  authnapi.AuthTypeOIDC,
 		},
 	}
 
 	allowed, err := authorizer.Check(ctx, NewTupleSystem(), RelationCreateTuples, authzCtx)
 	assert.NoError(t, err)
-	assert.True(t, allowed)
+	assert.False(t, allowed) // Empty ClientID is denied
 }
 
 func TestWhitelistMetaAuthorizer_Wildcard(t *testing.T) {

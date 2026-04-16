@@ -472,8 +472,8 @@ func TestWhitelistMetaAuthorizer_Integration_UnauthenticatedDenied(t *testing.T)
 	assert.ErrorIs(t, err, metaauthorizer.ErrMetaAuthorizationDenied)
 }
 
-func TestWhitelistMetaAuthorizer_Integration_SubjectIdFallback(t *testing.T) {
-	// Setup: Allowlist with SubjectId
+func TestWhitelistMetaAuthorizer_Integration_EmptyClientID_Denies(t *testing.T) {
+	// Setup: Allowlist with service name
 	allowlist := []string{"service-account-fallback"}
 	meta := metaauthorizer.NewWhitelistMetaAuthorizer(allowlist)
 	uc := New(&data.AllowAllRelationsRepository{}, meta, log.DefaultLogger)
@@ -481,16 +481,17 @@ func TestWhitelistMetaAuthorizer_Integration_SubjectIdFallback(t *testing.T) {
 	// Create context with SubjectId but no ClientID
 	ctx := createOIDCAuthzContextWithoutClientID("service-account-fallback")
 
-	// Execute: CreateTuples should succeed (SubjectId fallback)
+	// Execute: CreateTuples should fail (empty ClientID is denied)
 	cmd := CreateTuplesCommand{
 		Tuples: []model.RelationsTuple{createTestTuple()},
 	}
 
 	result, err := uc.CreateTuples(ctx, cmd)
 
-	// Verify: Allowed (fallback to SubjectId)
-	require.NoError(t, err, "should allow via SubjectId fallback")
-	assert.NotNil(t, result)
+	// Verify: Denied (empty ClientID is not allowed)
+	require.Error(t, err, "should deny when ClientID is empty")
+	assert.Nil(t, result)
+	assert.Contains(t, err.Error(), "meta authorization denied")
 }
 
 func TestWhitelistMetaAuthorizer_Integration_AllOperations(t *testing.T) {

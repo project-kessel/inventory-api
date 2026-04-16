@@ -7,15 +7,15 @@ import (
 )
 
 // WhitelistMetaAuthorizer implements a whitelist-based authorization check.
-// It matches against ClientID (primary) or SubjectId (fallback) from the claims.
+// It matches against ClientID from OIDC claims.
 // Designed for restricting deprecated tuple CRUD endpoints to specific services.
-// Only allows gRPC connections with OIDC authentication.
+// Only allows gRPC connections with OIDC authentication and valid ClientID.
 type WhitelistMetaAuthorizer struct {
 	allowlist []string
 }
 
 // NewWhitelistMetaAuthorizer creates a new whitelist-based meta authorizer.
-// allowlist: list of ClientIDs or SubjectIds permitted to access the operation
+// allowlist: list of ClientIDs permitted to access the operation
 // Empty allowlist denies all requests (fail-closed).
 // "*" wildcard permits all requests (for testing/development only).
 func NewWhitelistMetaAuthorizer(allowlist []string) *WhitelistMetaAuthorizer {
@@ -44,20 +44,21 @@ func (w *WhitelistMetaAuthorizer) Check(_ context.Context, _ MetaObject, _ Relat
 	return isInAllowlist(authzCtx.Subject, w.allowlist), nil
 }
 
-// isInAllowlist checks if the caller's ClientID or SubjectId is in the allowlist.
-// Matches ClientID first (OIDC client_id claim), then falls back to SubjectId.
+// isInAllowlist checks if the caller's ClientID is in the allowlist.
+// Requires non-empty ClientID from OIDC claims.
 // Supports "*" wildcard to allow all.
 func isInAllowlist(claims *authnapi.Claims, allowlist []string) bool {
+	// Deny if ClientID is empty (OIDC service-to-service auth requires client_id)
+	if string(claims.ClientID) == "" {
+		return false
+	}
+
 	for _, allowed := range allowlist {
 		if allowed == "*" {
 			return true
 		}
-		// Primary: match on ClientID (stable service identifier)
-		if string(claims.ClientID) != "" && allowed == string(claims.ClientID) {
-			return true
-		}
-		// Fallback: match on SubjectId (for flexibility)
-		if allowed == string(claims.SubjectId) {
+		// Match on ClientID (stable service identifier from OIDC client_id claim)
+		if allowed == string(claims.ClientID) {
 			return true
 		}
 	}

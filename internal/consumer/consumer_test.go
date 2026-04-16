@@ -994,7 +994,8 @@ func TestInventoryConsumer_UpdateWithSameWorkspace_NoOp(t *testing.T) {
 
 	tester.inv.ResourceRepository = fakeRepo
 
-	relationsRepo := &mocks.MockRelationsRepository{}
+	// Use SimpleRelationsRepository to verify no operations occur
+	relationsRepo := data.NewSimpleRelationsRepository()
 	tester.inv.Relations = relationsRepo
 	msg := &kafka.Message{
 		Key:   []byte(testMessageKey),
@@ -1009,6 +1010,6 @@ func TestInventoryConsumer_UpdateWithSameWorkspace_NoOp(t *testing.T) {
 
 	assert.Nil(t, err)
 	assert.Equal(t, "", resp)
-	relationsRepo.AssertNumberOfCalls(t, "CreateTuples", 0)
-	relationsRepo.AssertNumberOfCalls(t, "DeleteTuples", 0)
+	// Verify no relations operations occurred - version should still be 1 (initial)
+	assert.Equal(t, int64(1), relationsRepo.Version(), "No relations operations should occur when workspace doesn't change")
 }

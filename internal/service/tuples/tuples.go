@@ -87,11 +87,22 @@ func (s *TupleService) ReadTuples(req *pb.ReadTuplesRequest, stream pb.KesselTup
 		// Convert v1beta1 response to proto
 		tuple := relationshipFromV1beta1ToProto(relResp.GetTuple())
 
-		err = stream.Send(&pb.ReadTuplesResponse{
-			Tuple:            tuple,
-			Pagination:       &pb.ResponsePagination{ContinuationToken: relResp.GetPagination().GetContinuationToken()},
-			ConsistencyToken: &pb.ConsistencyToken{Token: relResp.GetConsistencyToken().GetToken()},
-		})
+		// Build response, preserving nil semantics
+		resp := &pb.ReadTuplesResponse{
+			Tuple: tuple,
+		}
+
+		// Only include pagination if continuation token is present
+		if continuationToken := relResp.GetPagination().GetContinuationToken(); continuationToken != "" {
+			resp.Pagination = &pb.ResponsePagination{ContinuationToken: continuationToken}
+		}
+
+		// Only include consistency token if token is present (avoid empty token which violates min_len validation)
+		if token := relResp.GetConsistencyToken().GetToken(); token != "" {
+			resp.ConsistencyToken = &pb.ConsistencyToken{Token: token}
+		}
+
+		err = stream.Send(resp)
 		if err != nil {
 			return err
 		}

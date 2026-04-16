@@ -83,7 +83,11 @@ func (m *MockRelationsRepository) DeleteTuples(ctx context.Context, request *v1b
 
 func (m *MockRelationsRepository) ReadTuples(ctx context.Context, request *v1beta1.ReadTuplesRequest) (grpc.ServerStreamingClient[v1beta1.ReadTuplesResponse], error) {
 	args := m.Called(ctx, request)
-	return args.Get(0).(grpc.ServerStreamingClient[v1beta1.ReadTuplesResponse]), args.Error(1)
+	val := args.Get(0)
+	if val == nil {
+		return nil, args.Error(1)
+	}
+	return val.(grpc.ServerStreamingClient[v1beta1.ReadTuplesResponse]), args.Error(1)
 }
 
 func (m *MockRelationsRepository) UnsetWorkspace(ctx context.Context, namespace, localResourceId, resourceType string) (*v1beta1.DeleteTuplesResponse, error) {
@@ -99,12 +103,20 @@ func (m *MockRelationsRepository) SetWorkspace(ctx context.Context, local_resour
 // Update the MockRelationsRepository LookupResources method to match the exact signature
 func (m *MockRelationsRepository) LookupResources(ctx context.Context, request *v1beta1.LookupResourcesRequest) (grpc.ServerStreamingClient[v1beta1.LookupResourcesResponse], error) {
 	args := m.Called(ctx, request)
-	return args.Get(0).(grpc.ServerStreamingClient[v1beta1.LookupResourcesResponse]), args.Error(1)
+	val := args.Get(0)
+	if val == nil {
+		return nil, args.Error(1)
+	}
+	return val.(grpc.ServerStreamingClient[v1beta1.LookupResourcesResponse]), args.Error(1)
 }
 
 func (m *MockRelationsRepository) LookupSubjects(ctx context.Context, request *v1beta1.LookupSubjectsRequest) (grpc.ServerStreamingClient[v1beta1.LookupSubjectsResponse], error) {
 	args := m.Called(ctx, request)
-	return args.Get(0).(grpc.ServerStreamingClient[v1beta1.LookupSubjectsResponse]), args.Error(1)
+	val := args.Get(0)
+	if val == nil {
+		return nil, args.Error(1)
+	}
+	return val.(grpc.ServerStreamingClient[v1beta1.LookupSubjectsResponse]), args.Error(1)
 }
 
 type MockConsumer struct {

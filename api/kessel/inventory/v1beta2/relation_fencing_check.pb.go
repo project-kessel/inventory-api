@@ -25,9 +25,11 @@ const (
 // DEPRECATED: RelationFencingCheck is part of the legacy tuple-layer API.
 // This type exists only for RBAC backward compatibility and will be removed.
 type RelationFencingCheck struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	LockId        string                 `protobuf:"bytes,1,opt,name=lock_id,json=lockId,proto3" json:"lock_id,omitempty"`
-	LockToken     string                 `protobuf:"bytes,2,opt,name=lock_token,json=lockToken,proto3" json:"lock_token,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Note: Relations-api uses .required = true, but that doesn't enforce non-empty
+	// on proto3 strings. In relations-api, empty value would fail internally anyway.
+	LockId        string `protobuf:"bytes,1,opt,name=lock_id,json=lockId,proto3" json:"lock_id,omitempty"`
+	LockToken     string `protobuf:"bytes,2,opt,name=lock_token,json=lockToken,proto3" json:"lock_token,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -80,11 +82,11 @@ var File_kessel_inventory_v1beta2_relation_fencing_check_proto protoreflect.File
 
 const file_kessel_inventory_v1beta2_relation_fencing_check_proto_rawDesc = "" +
 	"\n" +
-	"5kessel/inventory/v1beta2/relation_fencing_check.proto\x12\x18kessel.inventory.v1beta2\x1a\x1bbuf/validate/validate.proto\"^\n" +
-	"\x14RelationFencingCheck\x12\x1f\n" +
-	"\alock_id\x18\x01 \x01(\tB\x06\xbaH\x03\xc8\x01\x01R\x06lockId\x12%\n" +
+	"5kessel/inventory/v1beta2/relation_fencing_check.proto\x12\x18kessel.inventory.v1beta2\x1a\x1bbuf/validate/validate.proto\"`\n" +
+	"\x14RelationFencingCheck\x12 \n" +
+	"\alock_id\x18\x01 \x01(\tB\a\xbaH\x04r\x02\x10\x01R\x06lockId\x12&\n" +
 	"\n" +
-	"lock_token\x18\x02 \x01(\tB\x06\xbaH\x03\xc8\x01\x01R\tlockTokenBr\n" +
+	"lock_token\x18\x02 \x01(\tB\a\xbaH\x04r\x02\x10\x01R\tlockTokenBr\n" +
 	"(org.project_kessel.api.inventory.v1beta2P\x01ZDgithub.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2b\x06proto3"
 
 var (

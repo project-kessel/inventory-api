@@ -43,7 +43,7 @@ When working in this codebase, AI agents should:
 2. **Maintain consistency** - Use established patterns for error handling, validation, and testing
 3. **Security awareness** - Never bypass authentication/authorization; follow security guidelines
 4. **Performance consideration** - Use appropriate transaction patterns and avoid blocking operations
-5. **Test completeness** - Write tests for all new functionality following established patterns
+5. **Test-driven development** - Prefer writing tests first (TDD). When adding features or fixing bugs, start with a failing test, then implement the code to pass it. Follow the no-mocks philosophy in [Testing Guidelines](docs/testing-guidelines.md).
 
 ### Common Operations
 - **Adding new resource types**: Update protobuf definitions, regenerate code, add schema validation

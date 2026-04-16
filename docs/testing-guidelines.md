@@ -1,5 +1,23 @@
 # Testing Guidelines for Inventory API
 
+## Testing Philosophy
+
+**Prefer test-driven development (TDD).** Write tests first to define the expected behavior, then write the implementation to make them pass. TDD produces cleaner interfaces, better coverage, and catches design problems early. When adding a new feature or fixing a bug, start by writing a failing test that captures the requirement, then implement the minimum code to pass it.
+
+We follow a **no-mocks** approach to testing. This means no "method-verifying" mocks (e.g., testify/mock `On(...).Return(...)` patterns that assert how methods are called). This is not to be confused with dummies or stubs, which can be perfectly fine in moderation.
+
+The preference order for test doubles is:
+
+1. **Use the real instance.** If an object is not coupled to external I/O, there is no reason not to reuse it. It is the least work and the best coverage.
+2. **Use a fake.** In-memory fakes are a useful feature of the application ("Kessel in a box"), so the investment pays for itself quickly. When implementing fakes (or any second implementation of an interface), define a set of **contract tests** at the interface layer first.
+3. **Use stubs or dummies** judiciously when the interaction is trivial.
+
+### Hermetic Testing
+
+When external dependencies are needed, leverage testcontainers to download and run them locally. This should only be for when it is essential. For example, we can't test a `PostgresStore` without a Postgres — writing a "fake" Postgres is absurd. But if you need to test business logic that involves a repository, using a real Postgres is overkill. Just use the in-memory fake (e.g., a custom in-memory implementation, or SQLite with an in-memory database).
+
+For further reading on the principles behind this approach, see: [The secret world of testing without mocking](https://www.alechenninger.com/2020/11/the-secret-world-of-testing-without.html) by Alec Henninger.
+
 ## Test Organization & File Structure
 
 ### Test File Naming
@@ -22,13 +40,25 @@ make test-coverage
 
 ## Core Testing Infrastructure
 
-### Database Testing
-- **In-memory SQLite**: Use `testutil.NewSQLiteTestDB(t, cfg)` for unit tests
-- **Unique databases**: Each test gets isolated DB via test name + timestamp
-- **Migrations**: Run `data.Migrate(db, nil)` after DB creation for consistent schema
-- **Pattern**: `db := setupInMemoryDB(t)` helper in most test files
+### Test Double Strategy
 
-### Repository Testing Patterns
+**Prefer real instances and fakes over mocks.** The codebase provides a rich set of in-memory fakes that serve as both test infrastructure and a feature of the application itself:
+
+| Implementation | Location | Purpose |
+|----------------|----------|---------|
+| `NewFakeResourceRepository()` | `internal/data/fake_resource_repository.go` | Full in-memory resource storage with mutex and transaction ID tracking |
+| `NewFakeTransactionManager()` | `internal/data/fake_transaction_manager.go` | No-op transaction handling for tests that don't need real DB transactions |
+| `NewFakeMetricsCollector()` | `internal/metricscollector/fake_metricscollector.go` | No-op OTEL counters for tests that need a `MetricsCollector` shape |
+| `NewSimpleRelationsRepository()` | `internal/data/relations_simple.go` | In-process Relations API behavior (tuples, checks, snapshots) |
+
+Note: `NewInMemorySchemaRepository()` (`internal/data/schema_inmemory.go`) is the **production** schema store, not a fake. It is used directly in tests as a real instance — a good example of preferring the real thing when no external I/O is involved.
+
+These fakes are not throw-away test code — they are **reusable, evolvable implementations** that encode domain knowledge and can be used to run the service with zero external dependencies.
+
+### Contract Testing
+
+When implementing a fake, define contract tests that run against both the real and fake implementations. This ensures the fake faithfully implements the interface contract.
+
 ```go
 // Contract testing - test both real and fake implementations
 implementations := []struct {
@@ -38,7 +68,22 @@ implementations := []struct {
     {"Real Repository", func() { return NewResourceRepository(db, tm, publisher) }},
     {"Fake Repository", func() { return NewFakeResourceRepository() }},
 }
+
+for _, impl := range implementations {
+    t.Run(impl.name, func(t *testing.T) {
+        testRepositoryContract(t, impl.repo())
+    })
+}
 ```
+
+See `internal/data/resource_repository_test.go` for the canonical example of this pattern.
+
+### Database Testing
+- **In-memory SQLite**: Use `testutil.NewSQLiteTestDB(t, cfg)` for tests that need real SQL behavior
+- **Unique databases**: Each test gets isolated DB via test name + timestamp
+- **Migrations**: Run `data.Migrate(db, nil)` after DB creation for consistent schema
+- **Pattern**: `db := setupInMemoryDB(t)` helper in most test files
+- **When to use SQLite vs fake**: Use the fake repo for business logic tests. Use SQLite when the test specifically needs SQL/GORM behavior (e.g., testing query construction, migration logic, or constraint handling).
 
 ### Dual Protocol Service Testing
 - **Framework**: `testframework_test.go` enables testing both gRPC and HTTP
@@ -46,14 +91,6 @@ implementations := []struct {
 - **Request building**: `withBody(req, Check, httpEndpoint("POST /path"))`
 - **Assertions**: `Assert(t, res, requireError(codes.InvalidArgument))`
 - **Response extraction**: `resp := Extract(t, res, expectSuccess(func() *pb.Response{}))`
-
-### Mock Management
-- **Central location**: `internal/mocks/mocks.go` contains all mock types
-- **Testify/mock**: Preferred mocking framework with expectation verification
-- **Fake implementations**: 
-  - `NewFakeResourceRepository()` - in-memory resource storage
-  - `NewFakeTransactionManager()` - no-op transaction handling
-  - `NewFakeMetricsCollector()` - metrics capture for assertions
 
 ## Test Data & Fixtures
 
@@ -91,14 +128,15 @@ auth := &DenyAuthenticator{}
 ```
 
 ### Authorization Testing
-- **Simple authorizer**: `authz.NewSimpleAuthorizer()` for grant-based testing
-- **Allow all**: `&allow.AllowAllAuthz{}` to bypass authz in logic tests
-- **Mock authorizer**: `mocks.MockAuthz` with expectations
 
-### Meta-Authorization
-- **Permissive**: `PermissiveMetaAuthorizer{}` allows all operations
-- **Recording**: Custom authorizers that track which relations were checked
-- **Denying**: `DenyingMetaAuthorizer{}` to test denial paths
+**Relations Repository** (for resource-level authorization):
+- **Simple relations repo**: `data.NewSimpleRelationsRepository()` - in-memory implementation with real tuple storage and authorization logic
+- **Allow all**: `&data.AllowAllRelationsRepository{}` - bypasses all authorization checks for logic tests
+
+**Meta-Authorization** (for endpoint/CRUD-level authorization):
+- **Permissive**: `&PermissiveMetaAuthorizer{}` - allows all operations for golden-path testing
+- **Denying**: `&DenyingMetaAuthorizer{}` - denies all operations to test denial paths
+- **Simple**: `metaauthorizer.NewSimpleMetaAuthorizer()` - service-based meta authorization with configurable rules
 
 ## Test Structure & Organization
 
@@ -157,8 +195,8 @@ usecaseConfig := &UsecaseConfig{
 
 ### Consumer Testing
 - **Race condition tests**: `race_condition_test.go` patterns
-- **Mock Kafka**: Use `mocks.MockConsumer` for message simulation
 - **Database state**: Verify concurrent operations don't corrupt data
+- **Kafka events**: Simulate Kafka messages using a fake consumer (see `internal/consumer/*_test.go` for examples)
 
 ### Test Execution
 - **Race detection**: All tests run with `-race` flag in CI
@@ -188,17 +226,19 @@ KAFKA_BOOTSTRAP_SERVERS
 
 ## Common Anti-Patterns to Avoid
 
-1. **Database sharing**: Each test should get isolated database
-2. **Global state**: Avoid package-level variables that leak between tests
-3. **Time dependencies**: Use mocked time where possible
-4. **External dependencies**: Mock all external services in unit tests
-5. **Transaction leakage**: Ensure transactions are properly committed/rolled back
+1. **Method-verifying mocks**: Do not use `testify/mock` with `On(...).Return(...)` to verify how methods are called. Use a real instance or a fake instead.
+2. **Database sharing**: Each test should get isolated database
+3. **Global state**: Avoid package-level variables that leak between tests
+4. **Time dependencies**: Use mocked time where possible
+5. **Reaching for a real DB when a fake suffices**: If you're testing business logic, use the in-memory fake. Reserve SQLite/Postgres for tests that specifically exercise data layer behavior.
+6. **Faking what shouldn't be faked**: Don't write a fake for something that inherently requires the real thing (e.g., Postgres SQL semantics). Use testcontainers or in-memory SQLite instead.
+7. **Transaction leakage**: Ensure transactions are properly committed/rolled back
 
 ## Coverage Targets & Metrics
 
 - **Unit test coverage**: Reported automatically via `make test`
 - **Integration coverage**: E2E tests validate full request flows  
-- **Mock verification**: Call `mock.AssertExpectations(t)` in teardown when using mocks
+- **Contract test coverage**: Ensure fakes are validated against real implementations via shared contract tests
 - **Metrics verification**: Use `metricscollector.Get*Count()` for event tracking
 
 This repository prioritizes thorough lifecycle testing, dual-protocol validation, and comprehensive authorization testing over simple unit test coverage numbers.

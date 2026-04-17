@@ -51,11 +51,17 @@ type MockRelationsRepository struct {
 
 func (m *MockRelationsRepository) CheckBulk(ctx context.Context, req *v1beta1.CheckBulkRequest) (*v1beta1.CheckBulkResponse, error) {
 	args := m.Called(ctx, req)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
 	return args.Get(0).(*v1beta1.CheckBulkResponse), args.Error(1)
 }
 
 func (m *MockRelationsRepository) CheckForUpdateBulk(ctx context.Context, req *v1beta1.CheckForUpdateBulkRequest) (*v1beta1.CheckForUpdateBulkResponse, error) {
 	args := m.Called(ctx, req)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
 	return args.Get(0).(*v1beta1.CheckForUpdateBulkResponse), args.Error(1)
 }
 

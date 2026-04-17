@@ -521,9 +521,8 @@ func (s *SimpleRelationsRepository) LookupSubjects(_ context.Context, req *kesse
 	return &simpleLookupSubjectsStream{results: results}, nil
 }
 
-// CreateTuples implements RelationsRepository by storing the relationship tuples.
-// This advances the version counter.
 // CreateTuples implements RelationsRepository by storing the given tuples.
+// This advances the version counter.
 // Returns the configured error if set via SetCreateTuplesError.
 func (s *SimpleRelationsRepository) CreateTuples(_ context.Context, req *kessel.CreateTuplesRequest) (*kessel.CreateTuplesResponse, error) {
 	s.mu.Lock()
@@ -611,7 +610,6 @@ func simpleMatchesFilter(key simpleTupleKey, filter *kessel.RelationTupleFilter)
 	return true
 }
 
-// AcquireLock implements RelationsRepository.
 // AcquireLock implements RelationsRepository by simulating lock acquisition.
 // Returns the configured error if set via SetAcquireLockError, otherwise generates
 // a lock token based on the lock ID and stores it.

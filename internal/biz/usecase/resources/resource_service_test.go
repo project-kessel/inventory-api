@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io"
+	"slices"
 	"strings"
 	"testing"
 
@@ -2562,4 +2564,308 @@ func TestLookupSubjectsCommandToV1beta1_UsesAtLeastAsFreshWhenSpecified(t *testi
 	atLeastAsFresh, ok := req.Consistency.Requirement.(*kessel.Consistency_AtLeastAsFresh)
 	assert.True(t, ok, "at_least_as_fresh consistency should be preserved")
 	assert.Equal(t, "test-subjects-token", atLeastAsFresh.AtLeastAsFresh.Token)
+}
+
+func TestCheck_AuthzDecisions(t *testing.T) {
+	tests := []struct {
+		name           string
+		grantSubjectID string
+		wantAllowed    bool
+	}{
+		{"denied - no grants", "", false},
+		{"allowed - grant exists", "user-1", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := testAuthzContext()
+			meta := &recordingMetaAuthorizer{allowed: true}
+
+			simpleAuthz := data.NewSimpleRelationsRepository()
+			if tt.grantSubjectID != "" {
+				simpleAuthz.Grant(tt.grantSubjectID, "view", "hbi", "host", "host-1")
+			}
+
+			uc := New(
+				data.NewFakeResourceRepository(),
+				newFakeSchemaRepository(t),
+				simpleAuthz,
+				"rbac",
+				log.DefaultLogger,
+				nil,
+				nil,
+				&UsecaseConfig{},
+				metricscollector.NewFakeMetricsCollector(),
+				meta,
+				newTestSelfSubjectStrategy(),
+			)
+
+			subject, err := buildTestSubjectReference("user-1")
+			require.NoError(t, err)
+			key := createReporterResourceKey(t, "host-1", "host", "hbi", "instance-1")
+			relation, err := model.NewRelation("view")
+			require.NoError(t, err)
+
+			allowed, token, err := uc.Check(ctx, relation, subject, key, model.NewConsistencyUnspecified())
+			require.NoError(t, err)
+			assert.Equal(t, tt.wantAllowed, allowed)
+			assert.NotEmpty(t, token)
+			assert.Equal(t, 1, meta.calls)
+		})
+	}
+}
+
+func TestCheckForUpdate_AuthzDecisions(t *testing.T) {
+	tests := []struct {
+		name           string
+		grantSubjectID string
+		wantAllowed    bool
+	}{
+		{"denied - no grants", "", false},
+		{"allowed - grant exists", "user-1", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := testAuthzContext()
+			meta := &recordingMetaAuthorizer{allowed: true}
+
+			simpleAuthz := data.NewSimpleRelationsRepository()
+			if tt.grantSubjectID != "" {
+				simpleAuthz.Grant(tt.grantSubjectID, "update", "hbi", "host", "host-1")
+			}
+
+			uc := New(
+				data.NewFakeResourceRepository(),
+				newFakeSchemaRepository(t),
+				simpleAuthz,
+				"rbac",
+				log.DefaultLogger,
+				nil,
+				nil,
+				&UsecaseConfig{},
+				metricscollector.NewFakeMetricsCollector(),
+				meta,
+				newTestSelfSubjectStrategy(),
+			)
+
+			subject, err := buildTestSubjectReference("user-1")
+			require.NoError(t, err)
+			key := createReporterResourceKey(t, "host-1", "host", "hbi", "instance-1")
+			relation, err := model.NewRelation("update")
+			require.NoError(t, err)
+
+			allowed, token, err := uc.CheckForUpdate(ctx, relation, subject, key)
+			require.NoError(t, err)
+			assert.Equal(t, tt.wantAllowed, allowed)
+			assert.NotEmpty(t, token)
+			assert.Equal(t, 1, meta.calls)
+		})
+	}
+}
+
+// TestCheckBulk_RelationsMixedResults verifies that CheckBulk returns per-item allowed/denied results.
+func TestCheckBulk_RelationsMixedResults(t *testing.T) {
+	ctx := testAuthzContext()
+	meta := &recordingMetaAuthorizer{allowed: true}
+
+	simpleAuthz := data.NewSimpleRelationsRepository()
+	simpleAuthz.Grant("user-1", "view", "hbi", "host", "host-1")
+	// No grant for host-2
+
+	uc := New(
+		data.NewFakeResourceRepository(),
+		newFakeSchemaRepository(t),
+		simpleAuthz,
+		"rbac",
+		log.DefaultLogger,
+		nil,
+		nil,
+		&UsecaseConfig{},
+		metricscollector.NewFakeMetricsCollector(),
+		meta,
+		newTestSelfSubjectStrategy(),
+	)
+
+	subject, err := buildTestSubjectReference("user-1")
+	require.NoError(t, err)
+	key1 := createReporterResourceKey(t, "host-1", "host", "hbi", "instance-1")
+	key2 := createReporterResourceKey(t, "host-2", "host", "hbi", "instance-1")
+	relation, err := model.NewRelation("view")
+	require.NoError(t, err)
+
+	result, err := uc.CheckBulk(ctx, CheckBulkCommand{
+		Items: []CheckBulkItem{
+			{Resource: key1, Relation: relation, Subject: subject},
+			{Resource: key2, Relation: relation, Subject: subject},
+		},
+		Consistency: model.NewConsistencyUnspecified(),
+	})
+	require.NoError(t, err)
+	require.Len(t, result.Pairs, 2)
+	assert.True(t, result.Pairs[0].Result.Allowed, "host-1 should be allowed")
+	assert.Nil(t, result.Pairs[0].Result.Error)
+	assert.False(t, result.Pairs[1].Result.Allowed, "host-2 should be denied")
+	assert.Nil(t, result.Pairs[1].Result.Error)
+	assert.Equal(t, 2, meta.calls)
+}
+
+func TestLookupResources_StreamResults(t *testing.T) {
+	type grant struct {
+		subjectID, resourceID string
+	}
+	tests := []struct {
+		name    string
+		grants  []grant
+		wantIDs []string
+	}{
+		{
+			"returns granted resources",
+			[]grant{{"user-1", "host-1"}, {"user-1", "host-2"}},
+			[]string{"host-1", "host-2"},
+		},
+		{
+			"empty - no grants",
+			nil,
+			nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := testAuthzContext()
+			meta := &recordingMetaAuthorizer{allowed: true}
+
+			simpleAuthz := data.NewSimpleRelationsRepository()
+			for _, g := range tt.grants {
+				simpleAuthz.Grant(g.subjectID, "view", "hbi", "host", g.resourceID)
+			}
+
+			uc := New(
+				data.NewFakeResourceRepository(),
+				newFakeSchemaRepository(t),
+				simpleAuthz,
+				"rbac",
+				log.DefaultLogger,
+				nil,
+				nil,
+				&UsecaseConfig{},
+				metricscollector.NewFakeMetricsCollector(),
+				meta,
+				newTestSelfSubjectStrategy(),
+			)
+
+			subject, err := buildTestSubjectReference("user-1")
+			require.NoError(t, err)
+			resourceType, err := model.NewResourceType("host")
+			require.NoError(t, err)
+			reporterType, err := model.NewReporterType("hbi")
+			require.NoError(t, err)
+			relation, err := model.NewRelation("view")
+			require.NoError(t, err)
+
+			stream, err := uc.LookupResources(ctx, LookupResourcesCommand{
+				ResourceType: resourceType,
+				ReporterType: reporterType,
+				Relation:     relation,
+				Subject:      subject,
+				Consistency:  model.NewConsistencyUnspecified(),
+			})
+			require.NoError(t, err)
+
+			var resourceIds []string
+			for {
+				resp, err := stream.Recv()
+				if err == io.EOF {
+					break
+				}
+				require.NoError(t, err)
+				resourceIds = append(resourceIds, resp.Resource.Id)
+			}
+
+			slices.Sort(resourceIds)
+			wantSorted := slices.Clone(tt.wantIDs)
+			slices.Sort(wantSorted)
+			assert.Equal(t, wantSorted, resourceIds)
+			assert.Equal(t, 1, meta.calls)
+		})
+	}
+}
+
+func TestLookupSubjects_StreamResults(t *testing.T) {
+	tests := []struct {
+		name            string
+		grantSubjectIDs []string
+		wantIDs         []string
+	}{
+		{
+			"returns granted subjects",
+			[]string{"user-1", "user-2"},
+			[]string{"user-1", "user-2"},
+		},
+		{
+			"empty - no grants",
+			nil,
+			nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := testAuthzContext()
+			meta := &recordingMetaAuthorizer{allowed: true}
+
+			simpleAuthz := data.NewSimpleRelationsRepository()
+			for _, subjectID := range tt.grantSubjectIDs {
+				simpleAuthz.Grant(subjectID, "view", "hbi", "host", "host-1")
+			}
+
+			uc := New(
+				data.NewFakeResourceRepository(),
+				newFakeSchemaRepository(t),
+				simpleAuthz,
+				"rbac",
+				log.DefaultLogger,
+				nil,
+				nil,
+				&UsecaseConfig{},
+				metricscollector.NewFakeMetricsCollector(),
+				meta,
+				newTestSelfSubjectStrategy(),
+			)
+
+			key := createReporterResourceKey(t, "host-1", "host", "hbi", "instance-1")
+			relation, err := model.NewRelation("view")
+			require.NoError(t, err)
+			subjectType, err := model.NewResourceType("principal")
+			require.NoError(t, err)
+			subjectReporter, err := model.NewReporterType("rbac")
+			require.NoError(t, err)
+
+			stream, err := uc.LookupSubjects(ctx, LookupSubjectsCommand{
+				Resource:        key,
+				Relation:        relation,
+				SubjectType:     subjectType,
+				SubjectReporter: subjectReporter,
+				Consistency:     model.NewConsistencyUnspecified(),
+			})
+			require.NoError(t, err)
+
+			var subjectIds []string
+			for {
+				resp, err := stream.Recv()
+				if err == io.EOF {
+					break
+				}
+				require.NoError(t, err)
+				subjectIds = append(subjectIds, resp.Subject.Subject.Id)
+			}
+
+			slices.Sort(subjectIds)
+			wantSorted := slices.Clone(tt.wantIDs)
+			slices.Sort(wantSorted)
+			assert.Equal(t, wantSorted, subjectIds)
+			assert.Equal(t, 1, meta.calls)
+		})
+	}
 }

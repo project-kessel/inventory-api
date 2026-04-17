@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"slices"
 	"strings"
 	"testing"
 
@@ -2565,144 +2566,102 @@ func TestLookupSubjectsCommandToV1beta1_UsesAtLeastAsFreshWhenSpecified(t *testi
 	assert.Equal(t, "test-subjects-token", atLeastAsFresh.AtLeastAsFresh.Token)
 }
 
-// TestCheck_RelationsDenied verifies that Check returns ALLOWED_FALSE when no tuples are granted.
-func TestCheck_RelationsDenied(t *testing.T) {
-	ctx := testAuthzContext()
-	meta := &recordingMetaAuthorizer{allowed: true}
+func TestCheck_AuthzDecisions(t *testing.T) {
+	tests := []struct {
+		name           string
+		grantSubjectID string
+		wantAllowed    bool
+	}{
+		{"denied - no grants", "", false},
+		{"allowed - grant exists", "user-1", true},
+	}
 
-	simpleAuthz := data.NewSimpleRelationsRepository()
-	// No grants - should deny
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := testAuthzContext()
+			meta := &recordingMetaAuthorizer{allowed: true}
 
-	uc := New(
-		data.NewFakeResourceRepository(),
-		newFakeSchemaRepository(t),
-		simpleAuthz,
-		"rbac",
-		log.DefaultLogger,
-		nil,
-		nil,
-		&UsecaseConfig{},
-		metricscollector.NewFakeMetricsCollector(),
-		meta,
-		newTestSelfSubjectStrategy(),
-	)
+			simpleAuthz := data.NewSimpleRelationsRepository()
+			if tt.grantSubjectID != "" {
+				simpleAuthz.Grant(tt.grantSubjectID, "view", "hbi", "host", "host-1")
+			}
 
-	subject, err := buildTestSubjectReference("user-1")
-	require.NoError(t, err)
-	key := createReporterResourceKey(t, "host-1", "host", "hbi", "instance-1")
-	relation, err := model.NewRelation("view")
-	require.NoError(t, err)
+			uc := New(
+				data.NewFakeResourceRepository(),
+				newFakeSchemaRepository(t),
+				simpleAuthz,
+				"rbac",
+				log.DefaultLogger,
+				nil,
+				nil,
+				&UsecaseConfig{},
+				metricscollector.NewFakeMetricsCollector(),
+				meta,
+				newTestSelfSubjectStrategy(),
+			)
 
-	allowed, _, err := uc.Check(ctx, relation, subject, key, model.NewConsistencyUnspecified())
-	require.NoError(t, err)
-	assert.False(t, allowed, "Check should return ALLOWED_FALSE when no tuples granted")
-	assert.Equal(t, 1, meta.calls)
+			subject, err := buildTestSubjectReference("user-1")
+			require.NoError(t, err)
+			key := createReporterResourceKey(t, "host-1", "host", "hbi", "instance-1")
+			relation, err := model.NewRelation("view")
+			require.NoError(t, err)
+
+			allowed, token, err := uc.Check(ctx, relation, subject, key, model.NewConsistencyUnspecified())
+			require.NoError(t, err)
+			assert.Equal(t, tt.wantAllowed, allowed)
+			assert.NotEmpty(t, token)
+			assert.Equal(t, 1, meta.calls)
+		})
+	}
 }
 
-// TestCheck_RelationsAllowed verifies that Check returns ALLOWED_TRUE and a consistency token when a tuple is granted.
-func TestCheck_RelationsAllowed(t *testing.T) {
-	ctx := testAuthzContext()
-	meta := &recordingMetaAuthorizer{allowed: true}
+func TestCheckForUpdate_AuthzDecisions(t *testing.T) {
+	tests := []struct {
+		name           string
+		grantSubjectID string
+		wantAllowed    bool
+	}{
+		{"denied - no grants", "", false},
+		{"allowed - grant exists", "user-1", true},
+	}
 
-	simpleAuthz := data.NewSimpleRelationsRepository()
-	simpleAuthz.Grant("user-1", "view", "hbi", "host", "host-1")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := testAuthzContext()
+			meta := &recordingMetaAuthorizer{allowed: true}
 
-	uc := New(
-		data.NewFakeResourceRepository(),
-		newFakeSchemaRepository(t),
-		simpleAuthz,
-		"rbac",
-		log.DefaultLogger,
-		nil,
-		nil,
-		&UsecaseConfig{},
-		metricscollector.NewFakeMetricsCollector(),
-		meta,
-		newTestSelfSubjectStrategy(),
-	)
+			simpleAuthz := data.NewSimpleRelationsRepository()
+			if tt.grantSubjectID != "" {
+				simpleAuthz.Grant(tt.grantSubjectID, "update", "hbi", "host", "host-1")
+			}
 
-	subject, err := buildTestSubjectReference("user-1")
-	require.NoError(t, err)
-	key := createReporterResourceKey(t, "host-1", "host", "hbi", "instance-1")
-	relation, err := model.NewRelation("view")
-	require.NoError(t, err)
+			uc := New(
+				data.NewFakeResourceRepository(),
+				newFakeSchemaRepository(t),
+				simpleAuthz,
+				"rbac",
+				log.DefaultLogger,
+				nil,
+				nil,
+				&UsecaseConfig{},
+				metricscollector.NewFakeMetricsCollector(),
+				meta,
+				newTestSelfSubjectStrategy(),
+			)
 
-	allowed, token, err := uc.Check(ctx, relation, subject, key, model.NewConsistencyUnspecified())
-	require.NoError(t, err)
-	assert.True(t, allowed, "Check should return ALLOWED_TRUE when tuple is granted")
-	assert.NotNil(t, token, "consistency token should be non-nil")
-	assert.NotEmpty(t, token, "consistency token should be non-empty")
-	assert.Equal(t, 1, meta.calls)
-}
+			subject, err := buildTestSubjectReference("user-1")
+			require.NoError(t, err)
+			key := createReporterResourceKey(t, "host-1", "host", "hbi", "instance-1")
+			relation, err := model.NewRelation("update")
+			require.NoError(t, err)
 
-// TestCheckForUpdate_RelationsDenied verifies that CheckForUpdate returns ALLOWED_FALSE when no tuples are granted.
-func TestCheckForUpdate_RelationsDenied(t *testing.T) {
-	ctx := testAuthzContext()
-	meta := &recordingMetaAuthorizer{allowed: true}
-
-	simpleAuthz := data.NewSimpleRelationsRepository()
-	// No grants - should deny
-
-	uc := New(
-		data.NewFakeResourceRepository(),
-		newFakeSchemaRepository(t),
-		simpleAuthz,
-		"rbac",
-		log.DefaultLogger,
-		nil,
-		nil,
-		&UsecaseConfig{},
-		metricscollector.NewFakeMetricsCollector(),
-		meta,
-		newTestSelfSubjectStrategy(),
-	)
-
-	subject, err := buildTestSubjectReference("user-1")
-	require.NoError(t, err)
-	key := createReporterResourceKey(t, "host-1", "host", "hbi", "instance-1")
-	relation, err := model.NewRelation("update")
-	require.NoError(t, err)
-
-	allowed, _, err := uc.CheckForUpdate(ctx, relation, subject, key)
-	require.NoError(t, err)
-	assert.False(t, allowed, "CheckForUpdate should return ALLOWED_FALSE when no tuples granted")
-	assert.Equal(t, 1, meta.calls)
-}
-
-// TestCheckForUpdate_RelationsAllowed verifies that CheckForUpdate returns ALLOWED_TRUE when a tuple is granted.
-func TestCheckForUpdate_RelationsAllowed(t *testing.T) {
-	ctx := testAuthzContext()
-	meta := &recordingMetaAuthorizer{allowed: true}
-
-	simpleAuthz := data.NewSimpleRelationsRepository()
-	simpleAuthz.Grant("user-1", "update", "hbi", "host", "host-1")
-
-	uc := New(
-		data.NewFakeResourceRepository(),
-		newFakeSchemaRepository(t),
-		simpleAuthz,
-		"rbac",
-		log.DefaultLogger,
-		nil,
-		nil,
-		&UsecaseConfig{},
-		metricscollector.NewFakeMetricsCollector(),
-		meta,
-		newTestSelfSubjectStrategy(),
-	)
-
-	subject, err := buildTestSubjectReference("user-1")
-	require.NoError(t, err)
-	key := createReporterResourceKey(t, "host-1", "host", "hbi", "instance-1")
-	relation, err := model.NewRelation("update")
-	require.NoError(t, err)
-
-	allowed, token, err := uc.CheckForUpdate(ctx, relation, subject, key)
-	require.NoError(t, err)
-	assert.True(t, allowed, "CheckForUpdate should return ALLOWED_TRUE when tuple is granted")
-	assert.NotNil(t, token, "consistency token should be non-nil")
-	assert.NotEmpty(t, token, "consistency token should be non-empty")
-	assert.Equal(t, 1, meta.calls)
+			allowed, token, err := uc.CheckForUpdate(ctx, relation, subject, key)
+			require.NoError(t, err)
+			assert.Equal(t, tt.wantAllowed, allowed)
+			assert.NotEmpty(t, token)
+			assert.Equal(t, 1, meta.calls)
+		})
+	}
 }
 
 // TestCheckBulk_RelationsMixedResults verifies that CheckBulk returns per-item allowed/denied results.
@@ -2751,206 +2710,162 @@ func TestCheckBulk_RelationsMixedResults(t *testing.T) {
 	assert.Equal(t, 2, meta.calls)
 }
 
-// TestLookupResources_EndToEnd verifies that LookupResources returns granted resources via stream.
-func TestLookupResources_EndToEnd(t *testing.T) {
-	ctx := testAuthzContext()
-	meta := &recordingMetaAuthorizer{allowed: true}
-
-	simpleAuthz := data.NewSimpleRelationsRepository()
-	simpleAuthz.Grant("user-1", "view", "hbi", "host", "host-1")
-	simpleAuthz.Grant("user-1", "view", "hbi", "host", "host-2")
-
-	uc := New(
-		data.NewFakeResourceRepository(),
-		newFakeSchemaRepository(t),
-		simpleAuthz,
-		"rbac",
-		log.DefaultLogger,
-		nil,
-		nil,
-		&UsecaseConfig{},
-		metricscollector.NewFakeMetricsCollector(),
-		meta,
-		newTestSelfSubjectStrategy(),
-	)
-
-	subject, err := buildTestSubjectReference("user-1")
-	require.NoError(t, err)
-	resourceType, err := model.NewResourceType("host")
-	require.NoError(t, err)
-	reporterType, err := model.NewReporterType("hbi")
-	require.NoError(t, err)
-	relation, err := model.NewRelation("view")
-	require.NoError(t, err)
-
-	stream, err := uc.LookupResources(ctx, LookupResourcesCommand{
-		ResourceType: resourceType,
-		ReporterType: reporterType,
-		Relation:     relation,
-		Subject:      subject,
-		Consistency:  model.NewConsistencyUnspecified(),
-	})
-	require.NoError(t, err)
-
-	var resourceIds []string
-	for {
-		resp, err := stream.Recv()
-		if err == io.EOF {
-			break
-		}
-		require.NoError(t, err)
-		resourceIds = append(resourceIds, resp.Resource.Id)
+func TestLookupResources_StreamResults(t *testing.T) {
+	type grant struct {
+		subjectID, resourceID string
+	}
+	tests := []struct {
+		name    string
+		grants  []grant
+		wantIDs []string
+	}{
+		{
+			"returns granted resources",
+			[]grant{{"user-1", "host-1"}, {"user-1", "host-2"}},
+			[]string{"host-1", "host-2"},
+		},
+		{
+			"empty - no grants",
+			nil,
+			nil,
+		},
 	}
 
-	assert.Len(t, resourceIds, 2, "should return 2 granted resources")
-	assert.Contains(t, resourceIds, "host-1")
-	assert.Contains(t, resourceIds, "host-2")
-	assert.Equal(t, 1, meta.calls, "meta-authz should be called once for the resource type")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := testAuthzContext()
+			meta := &recordingMetaAuthorizer{allowed: true}
+
+			simpleAuthz := data.NewSimpleRelationsRepository()
+			for _, g := range tt.grants {
+				simpleAuthz.Grant(g.subjectID, "view", "hbi", "host", g.resourceID)
+			}
+
+			uc := New(
+				data.NewFakeResourceRepository(),
+				newFakeSchemaRepository(t),
+				simpleAuthz,
+				"rbac",
+				log.DefaultLogger,
+				nil,
+				nil,
+				&UsecaseConfig{},
+				metricscollector.NewFakeMetricsCollector(),
+				meta,
+				newTestSelfSubjectStrategy(),
+			)
+
+			subject, err := buildTestSubjectReference("user-1")
+			require.NoError(t, err)
+			resourceType, err := model.NewResourceType("host")
+			require.NoError(t, err)
+			reporterType, err := model.NewReporterType("hbi")
+			require.NoError(t, err)
+			relation, err := model.NewRelation("view")
+			require.NoError(t, err)
+
+			stream, err := uc.LookupResources(ctx, LookupResourcesCommand{
+				ResourceType: resourceType,
+				ReporterType: reporterType,
+				Relation:     relation,
+				Subject:      subject,
+				Consistency:  model.NewConsistencyUnspecified(),
+			})
+			require.NoError(t, err)
+
+			var resourceIds []string
+			for {
+				resp, err := stream.Recv()
+				if err == io.EOF {
+					break
+				}
+				require.NoError(t, err)
+				resourceIds = append(resourceIds, resp.Resource.Id)
+			}
+
+			slices.Sort(resourceIds)
+			wantSorted := slices.Clone(tt.wantIDs)
+			slices.Sort(wantSorted)
+			assert.Equal(t, wantSorted, resourceIds)
+			assert.Equal(t, 1, meta.calls)
+		})
+	}
 }
 
-// TestLookupResources_Empty verifies that LookupResources returns EOF immediately when no tuples are granted.
-func TestLookupResources_Empty(t *testing.T) {
-	ctx := testAuthzContext()
-	meta := &recordingMetaAuthorizer{allowed: true}
-
-	simpleAuthz := data.NewSimpleRelationsRepository()
-	// No grants
-
-	uc := New(
-		data.NewFakeResourceRepository(),
-		newFakeSchemaRepository(t),
-		simpleAuthz,
-		"rbac",
-		log.DefaultLogger,
-		nil,
-		nil,
-		&UsecaseConfig{},
-		metricscollector.NewFakeMetricsCollector(),
-		meta,
-		newTestSelfSubjectStrategy(),
-	)
-
-	subject, err := buildTestSubjectReference("user-1")
-	require.NoError(t, err)
-	resourceType, err := model.NewResourceType("host")
-	require.NoError(t, err)
-	reporterType, err := model.NewReporterType("hbi")
-	require.NoError(t, err)
-	relation, err := model.NewRelation("view")
-	require.NoError(t, err)
-
-	stream, err := uc.LookupResources(ctx, LookupResourcesCommand{
-		ResourceType: resourceType,
-		ReporterType: reporterType,
-		Relation:     relation,
-		Subject:      subject,
-		Consistency:  model.NewConsistencyUnspecified(),
-	})
-	require.NoError(t, err)
-
-	// First Recv should return EOF
-	_, err = stream.Recv()
-	assert.Equal(t, io.EOF, err, "empty stream should return EOF immediately")
-	assert.Equal(t, 1, meta.calls)
-}
-
-// TestLookupSubjects_EndToEnd verifies that LookupSubjects returns granted subjects via stream.
-func TestLookupSubjects_EndToEnd(t *testing.T) {
-	ctx := testAuthzContext()
-	meta := &recordingMetaAuthorizer{allowed: true}
-
-	simpleAuthz := data.NewSimpleRelationsRepository()
-	simpleAuthz.Grant("user-1", "view", "hbi", "host", "host-1")
-	simpleAuthz.Grant("user-2", "view", "hbi", "host", "host-1")
-
-	uc := New(
-		data.NewFakeResourceRepository(),
-		newFakeSchemaRepository(t),
-		simpleAuthz,
-		"rbac",
-		log.DefaultLogger,
-		nil,
-		nil,
-		&UsecaseConfig{},
-		metricscollector.NewFakeMetricsCollector(),
-		meta,
-		newTestSelfSubjectStrategy(),
-	)
-
-	key := createReporterResourceKey(t, "host-1", "host", "hbi", "instance-1")
-	relation, err := model.NewRelation("view")
-	require.NoError(t, err)
-	subjectType, err := model.NewResourceType("principal")
-	require.NoError(t, err)
-	subjectReporter, err := model.NewReporterType("rbac")
-	require.NoError(t, err)
-
-	stream, err := uc.LookupSubjects(ctx, LookupSubjectsCommand{
-		Resource:        key,
-		Relation:        relation,
-		SubjectType:     subjectType,
-		SubjectReporter: subjectReporter,
-		Consistency:     model.NewConsistencyUnspecified(),
-	})
-	require.NoError(t, err)
-
-	var subjectIds []string
-	for {
-		resp, err := stream.Recv()
-		if err == io.EOF {
-			break
-		}
-		require.NoError(t, err)
-		subjectIds = append(subjectIds, resp.Subject.Subject.Id)
+func TestLookupSubjects_StreamResults(t *testing.T) {
+	tests := []struct {
+		name            string
+		grantSubjectIDs []string
+		wantIDs         []string
+	}{
+		{
+			"returns granted subjects",
+			[]string{"user-1", "user-2"},
+			[]string{"user-1", "user-2"},
+		},
+		{
+			"empty - no grants",
+			nil,
+			nil,
+		},
 	}
 
-	assert.Len(t, subjectIds, 2, "should return 2 granted subjects")
-	assert.Contains(t, subjectIds, "user-1")
-	assert.Contains(t, subjectIds, "user-2")
-	assert.Equal(t, 1, meta.calls, "meta-authz should be called once for the resource")
-}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := testAuthzContext()
+			meta := &recordingMetaAuthorizer{allowed: true}
 
-// TestLookupSubjects_Empty verifies that LookupSubjects returns EOF immediately when no tuples are granted.
-func TestLookupSubjects_Empty(t *testing.T) {
-	ctx := testAuthzContext()
-	meta := &recordingMetaAuthorizer{allowed: true}
+			simpleAuthz := data.NewSimpleRelationsRepository()
+			for _, subjectID := range tt.grantSubjectIDs {
+				simpleAuthz.Grant(subjectID, "view", "hbi", "host", "host-1")
+			}
 
-	simpleAuthz := data.NewSimpleRelationsRepository()
-	// No grants
+			uc := New(
+				data.NewFakeResourceRepository(),
+				newFakeSchemaRepository(t),
+				simpleAuthz,
+				"rbac",
+				log.DefaultLogger,
+				nil,
+				nil,
+				&UsecaseConfig{},
+				metricscollector.NewFakeMetricsCollector(),
+				meta,
+				newTestSelfSubjectStrategy(),
+			)
 
-	uc := New(
-		data.NewFakeResourceRepository(),
-		newFakeSchemaRepository(t),
-		simpleAuthz,
-		"rbac",
-		log.DefaultLogger,
-		nil,
-		nil,
-		&UsecaseConfig{},
-		metricscollector.NewFakeMetricsCollector(),
-		meta,
-		newTestSelfSubjectStrategy(),
-	)
+			key := createReporterResourceKey(t, "host-1", "host", "hbi", "instance-1")
+			relation, err := model.NewRelation("view")
+			require.NoError(t, err)
+			subjectType, err := model.NewResourceType("principal")
+			require.NoError(t, err)
+			subjectReporter, err := model.NewReporterType("rbac")
+			require.NoError(t, err)
 
-	key := createReporterResourceKey(t, "host-1", "host", "hbi", "instance-1")
-	relation, err := model.NewRelation("view")
-	require.NoError(t, err)
-	subjectType, err := model.NewResourceType("principal")
-	require.NoError(t, err)
-	subjectReporter, err := model.NewReporterType("rbac")
-	require.NoError(t, err)
+			stream, err := uc.LookupSubjects(ctx, LookupSubjectsCommand{
+				Resource:        key,
+				Relation:        relation,
+				SubjectType:     subjectType,
+				SubjectReporter: subjectReporter,
+				Consistency:     model.NewConsistencyUnspecified(),
+			})
+			require.NoError(t, err)
 
-	stream, err := uc.LookupSubjects(ctx, LookupSubjectsCommand{
-		Resource:        key,
-		Relation:        relation,
-		SubjectType:     subjectType,
-		SubjectReporter: subjectReporter,
-		Consistency:     model.NewConsistencyUnspecified(),
-	})
-	require.NoError(t, err)
+			var subjectIds []string
+			for {
+				resp, err := stream.Recv()
+				if err == io.EOF {
+					break
+				}
+				require.NoError(t, err)
+				subjectIds = append(subjectIds, resp.Subject.Subject.Id)
+			}
 
-	// First Recv should return EOF
-	_, err = stream.Recv()
-	assert.Equal(t, io.EOF, err, "empty stream should return EOF immediately")
-	assert.Equal(t, 1, meta.calls)
+			slices.Sort(subjectIds)
+			wantSorted := slices.Clone(tt.wantIDs)
+			slices.Sort(wantSorted)
+			assert.Equal(t, wantSorted, subjectIds)
+			assert.Equal(t, 1, meta.calls)
+		})
+	}
 }

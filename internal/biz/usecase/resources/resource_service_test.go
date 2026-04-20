@@ -583,7 +583,7 @@ func TestReportResourceThenDelete(t *testing.T) {
 			require.NoError(t, err)
 			require.NotNil(t, deleteFoundResource)
 
-			err = h.usecase.Delete(h.ctx, key)
+			err = h.usecase.Delete(h.ctx, deleteKey)
 			require.NoError(t, err)
 
 			assert.Equal(t, 2, metricscollector.GetOutboxEventWriteCount())

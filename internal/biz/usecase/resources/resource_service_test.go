@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io"
+	"slices"
 	"strings"
 	"testing"
 
@@ -22,6 +24,97 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
+
+// --- Test harness: reduces boilerplate across all test cases ---
+
+type testHarness struct {
+	usecase      *Usecase
+	resourceRepo model.ResourceRepository
+	meta         *recordingMetaAuthorizer
+	ctx          context.Context
+}
+
+type harnessOption func(*harnessConfig)
+
+type harnessConfig struct {
+	relationsRepo model.RelationsRepository
+	meta          *recordingMetaAuthorizer
+	usecaseConfig *UsecaseConfig
+	logger        log.Logger
+	namespace     string
+}
+
+func newTestHarness(t *testing.T, opts ...harnessOption) *testHarness {
+	t.Helper()
+	cfg := &harnessConfig{
+		relationsRepo: &data.AllowAllRelationsRepository{},
+		usecaseConfig: &UsecaseConfig{},
+		logger:        log.DefaultLogger,
+		namespace:     "rbac",
+	}
+	for _, o := range opts {
+		o(cfg)
+	}
+
+	resourceRepo := data.NewFakeResourceRepository()
+	mc := metricscollector.NewFakeMetricsCollector()
+	var metaAuth metaauthorizer.MetaAuthorizer
+	if cfg.meta != nil {
+		metaAuth = cfg.meta
+	}
+
+	uc := New(
+		resourceRepo,
+		newFakeSchemaRepository(t),
+		cfg.relationsRepo,
+		cfg.namespace,
+		cfg.logger,
+		nil, nil,
+		cfg.usecaseConfig,
+		mc,
+		metaAuth,
+		newTestSelfSubjectStrategy(),
+	)
+
+	return &testHarness{
+		usecase:      uc,
+		resourceRepo: resourceRepo,
+		meta:         cfg.meta,
+		ctx:          testAuthzContext(),
+	}
+}
+
+func withMeta(allowed bool) harnessOption {
+	return func(c *harnessConfig) {
+		c.meta = &recordingMetaAuthorizer{allowed: allowed}
+	}
+}
+
+func withRelations(repo model.RelationsRepository) harnessOption {
+	return func(c *harnessConfig) { c.relationsRepo = repo }
+}
+
+func withUsecaseConfig(cfg *UsecaseConfig) harnessOption {
+	return func(c *harnessConfig) { c.usecaseConfig = cfg }
+}
+
+func withNamespace(ns string) harnessOption {
+	return func(c *harnessConfig) { c.namespace = ns }
+}
+
+func withLogger(l log.Logger) harnessOption {
+	return func(c *harnessConfig) { c.logger = l }
+}
+
+// resetMeta clears recorded meta-authorizer state (useful after setup calls).
+func (h *testHarness) resetMeta() {
+	if h.meta != nil {
+		h.meta.calls = 0
+		h.meta.relations = nil
+	}
+}
+
+// --- Test helpers ---
 
 func testAuthzContext() context.Context {
 	claims := &authnapi.Claims{
@@ -44,7 +137,6 @@ func (testSelfSubjectStrategy) SubjectFromAuthorizationContext(authzContext auth
 	return buildTestSubjectReference(subjectID)
 }
 
-// buildTestSubjectReference creates a model.SubjectReference for testing.
 func buildTestSubjectReference(subjectID string) (model.SubjectReference, error) {
 	localResourceId, err := model.NewLocalResourceId(subjectID)
 	if err != nil {
@@ -83,154 +175,70 @@ func (r *recordingMetaAuthorizer) Check(_ context.Context, _ metaauthorizer.Meta
 }
 
 func TestCheckSelf_UsesCheckSelfRelation(t *testing.T) {
-	ctx := testAuthzContext()
-	meta := &recordingMetaAuthorizer{allowed: true}
-	usecase := New(
-		data.NewFakeResourceRepository(),
-		newFakeSchemaRepository(t),
-		&data.AllowAllRelationsRepository{},
-		"rbac",
-		log.DefaultLogger,
-		nil,
-		nil,
-		&UsecaseConfig{},
-		metricscollector.NewFakeMetricsCollector(),
-		meta,
-		newTestSelfSubjectStrategy(),
-	)
+	h := newTestHarness(t, withMeta(true))
 
 	key := createReporterResourceKey(t, "host-1", "host", "hbi", "instance-1")
 	relation, err := model.NewRelation("view")
 	require.NoError(t, err)
 
-	allowed, _, err := usecase.CheckSelf(ctx, relation, key, model.NewConsistencyMinimizeLatency())
+	allowed, _, err := h.usecase.CheckSelf(h.ctx, relation, key, model.NewConsistencyMinimizeLatency())
 	require.NoError(t, err)
 	assert.True(t, allowed)
-	assert.Equal(t, 1, meta.calls)
-	assert.Equal(t, []metaauthorizer.Relation{metaauthorizer.RelationCheckSelf}, meta.relations)
+	assert.Equal(t, 1, h.meta.calls)
+	assert.Equal(t, []metaauthorizer.Relation{metaauthorizer.RelationCheckSelf}, h.meta.relations)
 }
 
 func TestCheckSelf_DeniedByMetaAuthz(t *testing.T) {
-	ctx := testAuthzContext()
-	meta := &recordingMetaAuthorizer{allowed: false}
-	usecase := New(
-		data.NewFakeResourceRepository(),
-		newFakeSchemaRepository(t),
-		&data.AllowAllRelationsRepository{},
-		"rbac",
-		log.DefaultLogger,
-		nil,
-		nil,
-		&UsecaseConfig{},
-		metricscollector.NewFakeMetricsCollector(),
-		meta,
-		newTestSelfSubjectStrategy(),
-	)
+	h := newTestHarness(t, withMeta(false))
 
 	key := createReporterResourceKey(t, "host-1", "host", "hbi", "instance-1")
 	relation, err := model.NewRelation("view")
 	require.NoError(t, err)
 
-	_, _, err = usecase.CheckSelf(ctx, relation, key, model.NewConsistencyMinimizeLatency())
+	_, _, err = h.usecase.CheckSelf(h.ctx, relation, key, model.NewConsistencyMinimizeLatency())
 	assert.ErrorIs(t, err, ErrMetaAuthorizationDenied)
 }
 
 func TestCheckSelf_MissingAuthzContext(t *testing.T) {
-	meta := &recordingMetaAuthorizer{allowed: true}
-	usecase := New(
-		data.NewFakeResourceRepository(),
-		newFakeSchemaRepository(t),
-		&data.AllowAllRelationsRepository{},
-		"rbac",
-		log.DefaultLogger,
-		nil,
-		nil,
-		&UsecaseConfig{},
-		metricscollector.NewFakeMetricsCollector(),
-		meta,
-		newTestSelfSubjectStrategy(),
-	)
+	h := newTestHarness(t, withMeta(true))
 
 	key := createReporterResourceKey(t, "host-1", "host", "hbi", "instance-1")
 	relation, err := model.NewRelation("view")
 	require.NoError(t, err)
 
-	_, _, err = usecase.CheckSelf(context.Background(), relation, key, model.NewConsistencyMinimizeLatency())
+	_, _, err = h.usecase.CheckSelf(context.Background(), relation, key, model.NewConsistencyMinimizeLatency())
 	assert.ErrorIs(t, err, ErrMetaAuthzContextMissing)
-	assert.Equal(t, 0, meta.calls)
+	assert.Equal(t, 0, h.meta.calls)
 }
 
 func TestReportResource_UsesReportRelation(t *testing.T) {
-	ctx := testAuthzContext()
-	meta := &recordingMetaAuthorizer{allowed: true}
-	usecase := New(
-		data.NewFakeResourceRepository(),
-		newFakeSchemaRepository(t),
-		&data.AllowAllRelationsRepository{},
-		"rbac",
-		log.DefaultLogger,
-		nil,
-		nil,
-		&UsecaseConfig{},
-		metricscollector.NewFakeMetricsCollector(),
-		meta,
-		newTestSelfSubjectStrategy(),
-	)
+	h := newTestHarness(t, withMeta(true))
 
 	cmd := fixture(t).Basic("host", "hbi", "instance-1", "host-1", "workspace-1")
-	err := usecase.ReportResource(ctx, cmd)
+	err := h.usecase.ReportResource(h.ctx, cmd)
 	require.NoError(t, err)
-	assert.Equal(t, 1, meta.calls)
-	assert.Equal(t, []metaauthorizer.Relation{metaauthorizer.RelationReportResource}, meta.relations)
+	assert.Equal(t, 1, h.meta.calls)
+	assert.Equal(t, []metaauthorizer.Relation{metaauthorizer.RelationReportResource}, h.meta.relations)
 }
 
 func TestDelete_UsesDeleteRelation(t *testing.T) {
-	ctx := testAuthzContext()
-	meta := &recordingMetaAuthorizer{allowed: true}
-	usecase := New(
-		data.NewFakeResourceRepository(),
-		newFakeSchemaRepository(t),
-		&data.AllowAllRelationsRepository{},
-		"rbac",
-		log.DefaultLogger,
-		nil,
-		nil,
-		&UsecaseConfig{},
-		metricscollector.NewFakeMetricsCollector(),
-		meta,
-		newTestSelfSubjectStrategy(),
-	)
+	h := newTestHarness(t, withMeta(true))
 
 	cmd := fixture(t).Basic("host", "hbi", "instance-1", "host-1", "workspace-1")
-	err := usecase.ReportResource(ctx, cmd)
+	err := h.usecase.ReportResource(h.ctx, cmd)
 	require.NoError(t, err)
 
-	meta.calls = 0
-	meta.relations = nil
+	h.resetMeta()
 
 	key := createReporterResourceKey(t, "host-1", "host", "hbi", "instance-1")
-	err = usecase.Delete(ctx, key)
+	err = h.usecase.Delete(h.ctx, key)
 	require.NoError(t, err)
-	assert.Equal(t, 1, meta.calls)
-	assert.Equal(t, []metaauthorizer.Relation{metaauthorizer.RelationDeleteResource}, meta.relations)
+	assert.Equal(t, 1, h.meta.calls)
+	assert.Equal(t, []metaauthorizer.Relation{metaauthorizer.RelationDeleteResource}, h.meta.relations)
 }
 
 func TestCheck_UsesCheckRelation(t *testing.T) {
-	ctx := testAuthzContext()
-	meta := &recordingMetaAuthorizer{allowed: true}
-	usecase := New(
-		data.NewFakeResourceRepository(),
-		newFakeSchemaRepository(t),
-		&data.AllowAllRelationsRepository{},
-		"rbac",
-		log.DefaultLogger,
-		nil,
-		nil,
-		&UsecaseConfig{},
-		metricscollector.NewFakeMetricsCollector(),
-		meta,
-		newTestSelfSubjectStrategy(),
-	)
+	h := newTestHarness(t, withMeta(true))
 
 	subject, err := buildTestSubjectReference("user-1")
 	require.NoError(t, err)
@@ -238,29 +246,15 @@ func TestCheck_UsesCheckRelation(t *testing.T) {
 	relation, err := model.NewRelation("view")
 	require.NoError(t, err)
 
-	allowed, _, err := usecase.Check(ctx, relation, subject, key, model.NewConsistencyUnspecified())
+	allowed, _, err := h.usecase.Check(h.ctx, relation, subject, key, model.NewConsistencyUnspecified())
 	require.NoError(t, err)
 	assert.True(t, allowed)
-	assert.Equal(t, 1, meta.calls)
-	assert.Equal(t, []metaauthorizer.Relation{metaauthorizer.RelationCheck}, meta.relations)
+	assert.Equal(t, 1, h.meta.calls)
+	assert.Equal(t, []metaauthorizer.Relation{metaauthorizer.RelationCheck}, h.meta.relations)
 }
 
 func TestCheckForUpdate_UsesCheckForUpdateRelation(t *testing.T) {
-	ctx := testAuthzContext()
-	meta := &recordingMetaAuthorizer{allowed: true}
-	usecase := New(
-		data.NewFakeResourceRepository(),
-		newFakeSchemaRepository(t),
-		&data.AllowAllRelationsRepository{},
-		"rbac",
-		log.DefaultLogger,
-		nil,
-		nil,
-		&UsecaseConfig{},
-		metricscollector.NewFakeMetricsCollector(),
-		meta,
-		newTestSelfSubjectStrategy(),
-	)
+	h := newTestHarness(t, withMeta(true))
 
 	subject, err := buildTestSubjectReference("user-1")
 	require.NoError(t, err)
@@ -268,29 +262,15 @@ func TestCheckForUpdate_UsesCheckForUpdateRelation(t *testing.T) {
 	relation, err := model.NewRelation("view")
 	require.NoError(t, err)
 
-	allowed, _, err := usecase.CheckForUpdate(ctx, relation, subject, key)
+	allowed, _, err := h.usecase.CheckForUpdate(h.ctx, relation, subject, key)
 	require.NoError(t, err)
 	assert.True(t, allowed)
-	assert.Equal(t, 1, meta.calls)
-	assert.Equal(t, []metaauthorizer.Relation{metaauthorizer.RelationCheckForUpdate}, meta.relations)
+	assert.Equal(t, 1, h.meta.calls)
+	assert.Equal(t, []metaauthorizer.Relation{metaauthorizer.RelationCheckForUpdate}, h.meta.relations)
 }
 
 func TestCheckForUpdateBulk_UsesCheckForUpdateBulkRelation(t *testing.T) {
-	ctx := testAuthzContext()
-	meta := &recordingMetaAuthorizer{allowed: true}
-	usecase := New(
-		data.NewFakeResourceRepository(),
-		newFakeSchemaRepository(t),
-		&data.AllowAllRelationsRepository{},
-		"rbac",
-		log.DefaultLogger,
-		nil,
-		nil,
-		&UsecaseConfig{},
-		metricscollector.NewFakeMetricsCollector(),
-		meta,
-		newTestSelfSubjectStrategy(),
-	)
+	h := newTestHarness(t, withMeta(true))
 
 	subject, err := buildTestSubjectReference("user-1")
 	require.NoError(t, err)
@@ -303,31 +283,16 @@ func TestCheckForUpdateBulk_UsesCheckForUpdateBulkRelation(t *testing.T) {
 			{Resource: key, Relation: relation, Subject: subject},
 		},
 	}
-	result, err := usecase.CheckForUpdateBulk(ctx, cmd)
+	result, err := h.usecase.CheckForUpdateBulk(h.ctx, cmd)
 	require.NoError(t, err)
 	require.Len(t, result.Pairs, 1)
 	assert.True(t, result.Pairs[0].Result.Allowed)
-	// One meta-authz per item (check_for_update_bulk); Relations.CheckForUpdateBulk called once.
-	assert.Equal(t, 1, meta.calls)
-	assert.Equal(t, []metaauthorizer.Relation{metaauthorizer.RelationCheckForUpdateBulk}, meta.relations)
+	assert.Equal(t, 1, h.meta.calls)
+	assert.Equal(t, []metaauthorizer.Relation{metaauthorizer.RelationCheckForUpdateBulk}, h.meta.relations)
 }
 
 func TestCheckForUpdateBulk_MetaAuthzDenied(t *testing.T) {
-	ctx := testAuthzContext()
-	meta := &recordingMetaAuthorizer{allowed: false}
-	uc := New(
-		data.NewFakeResourceRepository(),
-		newFakeSchemaRepository(t),
-		&data.AllowAllRelationsRepository{},
-		"rbac",
-		log.DefaultLogger,
-		nil,
-		nil,
-		&UsecaseConfig{},
-		metricscollector.NewFakeMetricsCollector(),
-		meta,
-		newTestSelfSubjectStrategy(),
-	)
+	h := newTestHarness(t, withMeta(false))
 
 	subject, err := buildTestSubjectReference("user-1")
 	require.NoError(t, err)
@@ -335,36 +300,20 @@ func TestCheckForUpdateBulk_MetaAuthzDenied(t *testing.T) {
 	relation, err := model.NewRelation("update")
 	require.NoError(t, err)
 
-	_, err = uc.CheckForUpdateBulk(ctx, CheckForUpdateBulkCommand{
+	_, err = h.usecase.CheckForUpdateBulk(h.ctx, CheckForUpdateBulkCommand{
 		Items: []CheckBulkItem{
 			{Resource: key, Relation: relation, Subject: subject},
 		},
 	})
 	assert.ErrorIs(t, err, ErrMetaAuthorizationDenied)
-	assert.Equal(t, 1, meta.calls)
+	assert.Equal(t, 1, h.meta.calls)
 }
 
 func TestCheckForUpdateBulk_MixedResults(t *testing.T) {
-	ctx := testAuthzContext()
-	meta := &recordingMetaAuthorizer{allowed: true}
-
 	simpleAuthz := data.NewSimpleRelationsRepository()
 	simpleAuthz.Grant("user-1", "update", "hbi", "host", "host-1")
-	// No grant for host-2
 
-	uc := New(
-		data.NewFakeResourceRepository(),
-		newFakeSchemaRepository(t),
-		simpleAuthz,
-		"rbac",
-		log.DefaultLogger,
-		nil,
-		nil,
-		&UsecaseConfig{},
-		metricscollector.NewFakeMetricsCollector(),
-		meta,
-		newTestSelfSubjectStrategy(),
-	)
+	h := newTestHarness(t, withMeta(true), withRelations(simpleAuthz))
 
 	subject, err := buildTestSubjectReference("user-1")
 	require.NoError(t, err)
@@ -373,7 +322,7 @@ func TestCheckForUpdateBulk_MixedResults(t *testing.T) {
 	relation, err := model.NewRelation("update")
 	require.NoError(t, err)
 
-	result, err := uc.CheckForUpdateBulk(ctx, CheckForUpdateBulkCommand{
+	result, err := h.usecase.CheckForUpdateBulk(h.ctx, CheckForUpdateBulkCommand{
 		Items: []CheckBulkItem{
 			{Resource: key1, Relation: relation, Subject: subject},
 			{Resource: key2, Relation: relation, Subject: subject},
@@ -385,25 +334,11 @@ func TestCheckForUpdateBulk_MixedResults(t *testing.T) {
 	assert.Nil(t, result.Pairs[0].Result.Error)
 	assert.False(t, result.Pairs[1].Result.Allowed)
 	assert.Nil(t, result.Pairs[1].Result.Error)
-	assert.Equal(t, 2, meta.calls)
+	assert.Equal(t, 2, h.meta.calls)
 }
 
 func TestCheckSelfBulk_UsesCheckSelfRelationForEachItem(t *testing.T) {
-	ctx := testAuthzContext()
-	meta := &recordingMetaAuthorizer{allowed: true}
-	usecase := New(
-		data.NewFakeResourceRepository(),
-		newFakeSchemaRepository(t),
-		&data.AllowAllRelationsRepository{},
-		"rbac",
-		log.DefaultLogger,
-		nil,
-		nil,
-		&UsecaseConfig{},
-		metricscollector.NewFakeMetricsCollector(),
-		meta,
-		newTestSelfSubjectStrategy(),
-	)
+	h := newTestHarness(t, withMeta(true))
 
 	key1 := createReporterResourceKey(t, "host-1", "host", "hbi", "instance-1")
 	key2 := createReporterResourceKey(t, "host-2", "host", "hbi", "instance-1")
@@ -420,27 +355,14 @@ func TestCheckSelfBulk_UsesCheckSelfRelationForEachItem(t *testing.T) {
 		Consistency: model.NewConsistencyMinimizeLatency(),
 	}
 
-	resp, err := usecase.CheckSelfBulk(ctx, cmd)
+	resp, err := h.usecase.CheckSelfBulk(h.ctx, cmd)
 	require.NoError(t, err)
 	require.Len(t, resp.Pairs, 2)
-	assert.Equal(t, []metaauthorizer.Relation{metaauthorizer.RelationCheckSelf, metaauthorizer.RelationCheckSelf}, meta.relations)
+	assert.Equal(t, []metaauthorizer.Relation{metaauthorizer.RelationCheckSelf, metaauthorizer.RelationCheckSelf}, h.meta.relations)
 }
 
 func TestCheckSelfBulk_MissingAuthzContext(t *testing.T) {
-	meta := &recordingMetaAuthorizer{allowed: true}
-	usecase := New(
-		data.NewFakeResourceRepository(),
-		newFakeSchemaRepository(t),
-		&data.AllowAllRelationsRepository{},
-		"rbac",
-		log.DefaultLogger,
-		nil,
-		nil,
-		&UsecaseConfig{},
-		metricscollector.NewFakeMetricsCollector(),
-		meta,
-		newTestSelfSubjectStrategy(),
-	)
+	h := newTestHarness(t, withMeta(true))
 
 	key := createReporterResourceKey(t, "host-1", "host", "hbi", "instance-1")
 	viewRelation, err := model.NewRelation("view")
@@ -453,27 +375,13 @@ func TestCheckSelfBulk_MissingAuthzContext(t *testing.T) {
 		Consistency: model.NewConsistencyMinimizeLatency(),
 	}
 
-	_, err = usecase.CheckSelfBulk(context.Background(), cmd)
+	_, err = h.usecase.CheckSelfBulk(context.Background(), cmd)
 	assert.ErrorIs(t, err, ErrMetaAuthzContextMissing)
-	assert.Equal(t, 0, meta.calls)
+	assert.Equal(t, 0, h.meta.calls)
 }
 
 func TestCheckBulk_RejectsInventoryManagedConsistency(t *testing.T) {
-	ctx := testAuthzContext()
-	meta := &recordingMetaAuthorizer{allowed: true}
-	usecase := New(
-		data.NewFakeResourceRepository(),
-		newFakeSchemaRepository(t),
-		&data.AllowAllRelationsRepository{},
-		"rbac",
-		log.DefaultLogger,
-		nil,
-		nil,
-		&UsecaseConfig{},
-		metricscollector.NewFakeMetricsCollector(),
-		meta,
-		newTestSelfSubjectStrategy(),
-	)
+	h := newTestHarness(t, withMeta(true))
 
 	subject, err := buildTestSubjectReference("user-1")
 	require.NoError(t, err)
@@ -481,7 +389,7 @@ func TestCheckBulk_RejectsInventoryManagedConsistency(t *testing.T) {
 	require.NoError(t, err)
 	key := createReporterResourceKey(t, "host-1", "host", "hbi", "instance-1")
 
-	_, err = usecase.CheckBulk(ctx, CheckBulkCommand{
+	_, err = h.usecase.CheckBulk(h.ctx, CheckBulkCommand{
 		Items: []CheckBulkItem{
 			{
 				Resource: key,
@@ -494,31 +402,17 @@ func TestCheckBulk_RejectsInventoryManagedConsistency(t *testing.T) {
 	require.Error(t, err)
 	assert.Equal(t, codes.InvalidArgument, status.Code(err))
 	assert.Contains(t, err.Error(), "inventory-managed consistency tokens aren't available")
-	assert.Equal(t, 0, meta.calls)
+	assert.Equal(t, 0, h.meta.calls)
 }
 
 func TestCheckSelfBulk_RejectsInventoryManagedConsistency(t *testing.T) {
-	ctx := testAuthzContext()
-	meta := &recordingMetaAuthorizer{allowed: true}
-	usecase := New(
-		data.NewFakeResourceRepository(),
-		newFakeSchemaRepository(t),
-		&data.AllowAllRelationsRepository{},
-		"rbac",
-		log.DefaultLogger,
-		nil,
-		nil,
-		&UsecaseConfig{},
-		metricscollector.NewFakeMetricsCollector(),
-		meta,
-		newTestSelfSubjectStrategy(),
-	)
+	h := newTestHarness(t, withMeta(true))
 
 	viewRelation, err := model.NewRelation("view")
 	require.NoError(t, err)
 	key := createReporterResourceKey(t, "host-1", "host", "hbi", "instance-1")
 
-	_, err = usecase.CheckSelfBulk(ctx, CheckSelfBulkCommand{
+	_, err = h.usecase.CheckSelfBulk(h.ctx, CheckSelfBulkCommand{
 		Items: []CheckSelfBulkItem{
 			{
 				Resource: key,
@@ -530,7 +424,7 @@ func TestCheckSelfBulk_RejectsInventoryManagedConsistency(t *testing.T) {
 	require.Error(t, err)
 	assert.Equal(t, codes.InvalidArgument, status.Code(err))
 	assert.Contains(t, err.Error(), "inventory-managed consistency tokens aren't available")
-	assert.Equal(t, 0, meta.calls)
+	assert.Equal(t, 0, h.meta.calls)
 }
 
 func newFakeSchemaRepository(t *testing.T) model.SchemaRepository {
@@ -614,21 +508,10 @@ func TestReportResource(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctx := testAuthzContext()
-			logger := log.DefaultLogger
-
-			resourceRepo := data.NewFakeResourceRepository()
-			schemaRepo := newFakeSchemaRepository(t)
-			relationsRepo := &data.AllowAllRelationsRepository{}
-			usecaseConfig := &UsecaseConfig{
-				ReadAfterWriteEnabled: false,
-				ConsumerEnabled:       false,
-			}
-			mc := metricscollector.NewFakeMetricsCollector()
-			usecase := New(resourceRepo, schemaRepo, relationsRepo, "test-topic", logger, nil, nil, usecaseConfig, mc, nil, newTestSelfSubjectStrategy())
+			h := newTestHarness(t, withNamespace("test-topic"))
 
 			cmd := fixture(t).Basic(tt.resourceType, tt.reporterType, tt.reporterInstance, tt.localResourceId, tt.workspaceId)
-			err := usecase.ReportResource(ctx, cmd)
+			err := h.usecase.ReportResource(h.ctx, cmd)
 
 			if tt.expectError {
 				require.Error(t, err)
@@ -637,23 +520,11 @@ func TestReportResource(t *testing.T) {
 
 			require.NoError(t, err)
 
-			localResourceId, err := model.NewLocalResourceId(tt.localResourceId)
-			require.NoError(t, err)
-			resourceType, err := model.NewResourceType(tt.resourceType)
-			require.NoError(t, err)
-			reporterType, err := model.NewReporterType(tt.reporterType)
-			require.NoError(t, err)
-			reporterInstanceId, err := model.NewReporterInstanceId(tt.reporterInstance)
-			require.NoError(t, err)
-
-			key, err := model.NewReporterResourceKey(localResourceId, resourceType, reporterType, reporterInstanceId)
-			require.NoError(t, err)
-
-			foundResource, err := resourceRepo.FindResourceByKeys(nil, key)
+			key := createReporterResourceKey(t, tt.localResourceId, tt.resourceType, tt.reporterType, tt.reporterInstance)
+			foundResource, err := h.resourceRepo.FindResourceByKeys(nil, key)
 			require.NoError(t, err)
 			require.NotNil(t, foundResource)
 
-			// Report should trigger a single outbox event write
 			assert.Equal(t, 1, metricscollector.GetOutboxEventWriteCount())
 		})
 	}
@@ -694,285 +565,165 @@ func TestReportResourceThenDelete(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctx := testAuthzContext()
-			logger := log.DefaultLogger
-
-			resourceRepo := data.NewFakeResourceRepository()
-			schemaRepo := newFakeSchemaRepository(t)
-			relationsRepo := &data.AllowAllRelationsRepository{}
-			usecaseConfig := &UsecaseConfig{
-				ReadAfterWriteEnabled: false,
-				ConsumerEnabled:       false,
-			}
-			mc := metricscollector.NewFakeMetricsCollector()
-			usecase := New(resourceRepo, schemaRepo, relationsRepo, "test-topic", logger, nil, nil, usecaseConfig, mc, nil, newTestSelfSubjectStrategy())
+			h := newTestHarness(t, withNamespace("test-topic"))
 
 			cmd := fixture(t).Basic(tt.resourceType, tt.reporterType, tt.reporterInstanceId, tt.localResourceId, tt.workspaceId)
-			err := usecase.ReportResource(ctx, cmd)
+			err := h.usecase.ReportResource(h.ctx, cmd)
 			require.NoError(t, err)
 
-			localResourceId, err := model.NewLocalResourceId(tt.localResourceId)
-			require.NoError(t, err)
-			resourceType, err := model.NewResourceType(tt.resourceType)
-			require.NoError(t, err)
-			reporterType, err := model.NewReporterType(tt.reporterType)
-			require.NoError(t, err)
-			reporterInstanceId, err := model.NewReporterInstanceId(tt.reporterInstanceId)
-			require.NoError(t, err)
-
-			key, err := model.NewReporterResourceKey(localResourceId, resourceType, reporterType, reporterInstanceId)
-			require.NoError(t, err)
-
-			foundResource, err := resourceRepo.FindResourceByKeys(nil, key)
+			key := createReporterResourceKey(t, tt.localResourceId, tt.resourceType, tt.reporterType, tt.reporterInstanceId)
+			foundResource, err := h.resourceRepo.FindResourceByKeys(nil, key)
 			require.NoError(t, err)
 			require.NotNil(t, foundResource)
 
-			// Report should trigger a single outbox event write
 			assert.Equal(t, 1, metricscollector.GetOutboxEventWriteCount())
 
-			var deleteReporterInstanceId model.ReporterInstanceId
-			if tt.deleteReporterInstanceId != "" {
-				deleteReporterInstanceId, err = model.NewReporterInstanceId(tt.deleteReporterInstanceId)
-				require.NoError(t, err)
-			} else {
-				deleteReporterInstanceId = model.ReporterInstanceId("")
-			}
-
-			deleteKey, err := model.NewReporterResourceKey(localResourceId, resourceType, reporterType, deleteReporterInstanceId)
-			require.NoError(t, err)
-
-			deleteFoundResource, err := resourceRepo.FindResourceByKeys(nil, deleteKey)
+			deleteKey := createReporterResourceKeyAllowEmptyInstance(t, tt.localResourceId, tt.resourceType, tt.reporterType, tt.deleteReporterInstanceId)
+			deleteFoundResource, err := h.resourceRepo.FindResourceByKeys(nil, deleteKey)
 			require.NoError(t, err)
 			require.NotNil(t, deleteFoundResource)
 
-			err = usecase.Delete(ctx, key)
+			err = h.usecase.Delete(h.ctx, deleteKey)
 			require.NoError(t, err)
 
-			// Delete should trigger another outbox event write
 			assert.Equal(t, 2, metricscollector.GetOutboxEventWriteCount())
 		})
 	}
 }
 
 func TestDelete_ResourceNotFound(t *testing.T) {
-	logger := log.DefaultLogger
+	h := newTestHarness(t, withNamespace("test-topic"))
 
-	resourceRepo := data.NewFakeResourceRepository()
-	schemaRepo := newFakeSchemaRepository(t)
-	relationsRepo := &data.AllowAllRelationsRepository{}
-	usecaseConfig := &UsecaseConfig{
-		ReadAfterWriteEnabled: false,
-		ConsumerEnabled:       false,
-	}
-
-	mc := metricscollector.NewFakeMetricsCollector()
-	usecase := New(resourceRepo, schemaRepo, relationsRepo, "test-topic", logger, nil, nil, usecaseConfig, mc, nil, newTestSelfSubjectStrategy())
-
-	localResourceId, err := model.NewLocalResourceId("non-existent-resource")
-	require.NoError(t, err)
-	resourceType, err := model.NewResourceType("k8s_cluster")
-	require.NoError(t, err)
-	reporterType, err := model.NewReporterType("ocm")
-	require.NoError(t, err)
-	reporterInstanceId, err := model.NewReporterInstanceId("test-instance")
-	require.NoError(t, err)
-
-	key, err := model.NewReporterResourceKey(localResourceId, resourceType, reporterType, reporterInstanceId)
-	require.NoError(t, err)
-
-	err = usecase.Delete(testAuthzContext(), key)
+	key := createReporterResourceKey(t, "non-existent-resource", "k8s_cluster", "ocm", "test-instance")
+	err := h.usecase.Delete(h.ctx, key)
 	require.Error(t, err)
 }
 
 func TestReportFindDeleteFind_TombstoneLifecycle(t *testing.T) {
-	ctx := testAuthzContext()
-	logger := log.DefaultLogger
-
-	resourceRepo := data.NewFakeResourceRepository()
-	schemaRepo := newFakeSchemaRepository(t)
-	relationsRepo := &data.AllowAllRelationsRepository{}
-	usecaseConfig := &UsecaseConfig{
-		ReadAfterWriteEnabled: false,
-		ConsumerEnabled:       false,
-	}
-
-	mc := metricscollector.NewFakeMetricsCollector()
-	usecase := New(resourceRepo, schemaRepo, relationsRepo, "test-topic", logger, nil, nil, usecaseConfig, mc, nil, newTestSelfSubjectStrategy())
+	h := newTestHarness(t, withNamespace("test-topic"))
 
 	cmd := fixture(t).Basic("k8s_cluster", "ocm", "lifecycle-instance", "lifecycle-resource", "lifecycle-workspace")
-	err := usecase.ReportResource(ctx, cmd)
+	err := h.usecase.ReportResource(h.ctx, cmd)
 	require.NoError(t, err)
 
-	localResourceId, err := model.NewLocalResourceId("lifecycle-resource")
-	require.NoError(t, err)
-	resourceType, err := model.NewResourceType("k8s_cluster")
-	require.NoError(t, err)
-	reporterType, err := model.NewReporterType("ocm")
-	require.NoError(t, err)
-	reporterInstanceId, err := model.NewReporterInstanceId("lifecycle-instance")
-	require.NoError(t, err)
+	key := createReporterResourceKey(t, "lifecycle-resource", "k8s_cluster", "ocm", "lifecycle-instance")
 
-	key, err := model.NewReporterResourceKey(localResourceId, resourceType, reporterType, reporterInstanceId)
-	require.NoError(t, err)
-
-	foundResource, err := resourceRepo.FindResourceByKeys(nil, key)
+	foundResource, err := h.resourceRepo.FindResourceByKeys(nil, key)
 	require.NoError(t, err)
 	require.NotNil(t, foundResource)
 
-	err = usecase.Delete(ctx, key)
+	err = h.usecase.Delete(h.ctx, key)
 	require.NoError(t, err)
 
-	foundResource, err = resourceRepo.FindResourceByKeys(nil, key)
-	// With tombstone filter removed, we should find the tombstoned resource
+	foundResource, err = h.resourceRepo.FindResourceByKeys(nil, key)
 	require.NoError(t, err)
 	require.NotNil(t, foundResource)
 	assert.True(t, foundResource.ReporterResources()[0].Serialize().Tombstone, "Resource should be tombstoned")
 }
 
 func TestMultipleHostsLifecycle(t *testing.T) {
-	ctx := testAuthzContext()
-	logger := log.DefaultLogger
+	h := newTestHarness(t, withNamespace("test-topic"))
 
-	resourceRepo := data.NewFakeResourceRepository()
-	schemaRepo := newFakeSchemaRepository(t)
-	relationsRepo := &data.AllowAllRelationsRepository{}
-	usecaseConfig := &UsecaseConfig{
-		ReadAfterWriteEnabled: false,
-		ConsumerEnabled:       false,
-	}
-
-	mc := metricscollector.NewFakeMetricsCollector()
-	usecase := New(resourceRepo, schemaRepo, relationsRepo, "test-topic", logger, nil, nil, usecaseConfig, mc, nil, newTestSelfSubjectStrategy())
-
-	// Create 2 hosts
 	cmd := fixture(t).Basic("host", "hbi", "hbi-instance-1", "host-1", "workspace-1")
-	err := usecase.ReportResource(ctx, cmd)
+	err := h.usecase.ReportResource(h.ctx, cmd)
 	require.NoError(t, err, "Should create host1")
 
 	cmd = fixture(t).Basic("host", "hbi", "hbi-instance-1", "host-2", "workspace-1")
-	err = usecase.ReportResource(ctx, cmd)
+	err = h.usecase.ReportResource(h.ctx, cmd)
 	require.NoError(t, err, "Should create host2")
 
-	// Verify both hosts can be found
-	key1, err := model.NewReporterResourceKey("host-1", "host", "hbi", "hbi-instance-1")
-	require.NoError(t, err)
-	key2, err := model.NewReporterResourceKey("host-2", "host", "hbi", "hbi-instance-1")
-	require.NoError(t, err)
+	key1 := createReporterResourceKey(t, "host-1", "host", "hbi", "hbi-instance-1")
+	key2 := createReporterResourceKey(t, "host-2", "host", "hbi", "hbi-instance-1")
 
-	foundHost1, err := resourceRepo.FindResourceByKeys(nil, key1)
+	foundHost1, err := h.resourceRepo.FindResourceByKeys(nil, key1)
 	require.NoError(t, err, "Should find host1 after creation")
 	require.NotNil(t, foundHost1)
 
-	foundHost2, err := resourceRepo.FindResourceByKeys(nil, key2)
+	foundHost2, err := h.resourceRepo.FindResourceByKeys(nil, key2)
 	require.NoError(t, err, "Should find host2 after creation")
 	require.NotNil(t, foundHost2)
 
-	// Update both hosts by reporting them again with updated data
 	cmd = fixture(t).Updated("host", "hbi", "hbi-instance-1", "host-1", "workspace-1")
-	err = usecase.ReportResource(ctx, cmd)
+	err = h.usecase.ReportResource(h.ctx, cmd)
 	require.NoError(t, err, "Should update host1")
 
 	cmd = fixture(t).Updated("host", "hbi", "hbi-instance-1", "host-2", "workspace-1")
-	err = usecase.ReportResource(ctx, cmd)
+	err = h.usecase.ReportResource(h.ctx, cmd)
 	require.NoError(t, err, "Should update host2")
 
-	// Verify both updated hosts can still be found
-	updatedHost1, err := resourceRepo.FindResourceByKeys(nil, key1)
+	updatedHost1, err := h.resourceRepo.FindResourceByKeys(nil, key1)
 	require.NoError(t, err, "Should find host1 after update")
 	require.NotNil(t, updatedHost1)
 
-	updatedHost2, err := resourceRepo.FindResourceByKeys(nil, key2)
+	updatedHost2, err := h.resourceRepo.FindResourceByKeys(nil, key2)
 	require.NoError(t, err, "Should find host2 after update")
 	require.NotNil(t, updatedHost2)
 
-	// Delete both hosts
-	err = usecase.Delete(ctx, key1)
+	err = h.usecase.Delete(h.ctx, key1)
 	require.NoError(t, err, "Should delete host1")
 
-	err = usecase.Delete(ctx, key2)
+	err = h.usecase.Delete(h.ctx, key2)
 	require.NoError(t, err, "Should delete host2")
 
-	// Verify both hosts can be found (tombstoned) with tombstone filter removed
-	foundHost1, err = resourceRepo.FindResourceByKeys(nil, key1)
+	foundHost1, err = h.resourceRepo.FindResourceByKeys(nil, key1)
 	require.NoError(t, err, "Should find tombstoned host1")
 	require.NotNil(t, foundHost1)
 	assert.True(t, foundHost1.ReporterResources()[0].Serialize().Tombstone, "Host1 should be tombstoned")
 
-	foundHost2, err = resourceRepo.FindResourceByKeys(nil, key2)
+	foundHost2, err = h.resourceRepo.FindResourceByKeys(nil, key2)
 	require.NoError(t, err, "Should find tombstoned host2")
 	require.NotNil(t, foundHost2)
 	assert.True(t, foundHost2.ReporterResources()[0].Serialize().Tombstone, "Host2 should be tombstoned")
 }
 
 func TestPartialDataScenarios(t *testing.T) {
-	ctx := testAuthzContext()
-	logger := log.DefaultLogger
-
-	resourceRepo := data.NewFakeResourceRepository()
-	schemaRepo := newFakeSchemaRepository(t)
-	relationsRepo := &data.AllowAllRelationsRepository{}
-	usecaseConfig := &UsecaseConfig{
-		ReadAfterWriteEnabled: false,
-		ConsumerEnabled:       false,
-	}
-
-	mc := metricscollector.NewFakeMetricsCollector()
-	usecase := New(resourceRepo, schemaRepo, relationsRepo, "test-topic", logger, nil, nil, usecaseConfig, mc, nil, newTestSelfSubjectStrategy())
+	h := newTestHarness(t, withNamespace("test-topic"))
 
 	t.Run("Report resource with rich reporter data and minimal common data", func(t *testing.T) {
 		cmd := fixture(t).ReporterRich("k8s_cluster", "ocm", "ocm-instance-1", "reporter-rich-resource", "minimal-workspace")
-		err := usecase.ReportResource(ctx, cmd)
+		err := h.usecase.ReportResource(h.ctx, cmd)
 		require.NoError(t, err, "Should create resource with rich reporter data")
 
-		key, err := model.NewReporterResourceKey("reporter-rich-resource", "k8s_cluster", "ocm", "ocm-instance-1")
-		require.NoError(t, err)
-
-		foundResource, err := resourceRepo.FindResourceByKeys(nil, key)
+		key := createReporterResourceKey(t, "reporter-rich-resource", "k8s_cluster", "ocm", "ocm-instance-1")
+		foundResource, err := h.resourceRepo.FindResourceByKeys(nil, key)
 		require.NoError(t, err, "Should find resource with rich reporter data")
 		require.NotNil(t, foundResource)
 	})
 
 	t.Run("Report resource with minimal reporter data and rich common data", func(t *testing.T) {
 		cmd := fixture(t).CommonRich("k8s_cluster", "ocm", "ocm-instance-1", "common-rich-resource", "rich-workspace")
-		err := usecase.ReportResource(ctx, cmd)
+		err := h.usecase.ReportResource(h.ctx, cmd)
 		require.NoError(t, err, "Should create resource with rich common data")
 
-		key, err := model.NewReporterResourceKey("common-rich-resource", "k8s_cluster", "ocm", "ocm-instance-1")
-		require.NoError(t, err)
-
-		foundResource, err := resourceRepo.FindResourceByKeys(nil, key)
+		key := createReporterResourceKey(t, "common-rich-resource", "k8s_cluster", "ocm", "ocm-instance-1")
+		foundResource, err := h.resourceRepo.FindResourceByKeys(nil, key)
 		require.NoError(t, err, "Should find resource with rich common data")
 		require.NotNil(t, foundResource)
 	})
 
 	t.Run("Report resource with both data, then reporter-focused update, then common-focused update", func(t *testing.T) {
-		// 1. Initial report with both reporter and common data
 		cmd := fixture(t).Basic("k8s_cluster", "ocm", "ocm-instance-1", "progressive-resource", "initial-workspace")
-		err := usecase.ReportResource(ctx, cmd)
+		err := h.usecase.ReportResource(h.ctx, cmd)
 		require.NoError(t, err, "Should create resource with both data types")
 
-		key, err := model.NewReporterResourceKey("progressive-resource", "k8s_cluster", "ocm", "ocm-instance-1")
-		require.NoError(t, err)
-
-		foundResource, err := resourceRepo.FindResourceByKeys(nil, key)
+		key := createReporterResourceKey(t, "progressive-resource", "k8s_cluster", "ocm", "ocm-instance-1")
+		foundResource, err := h.resourceRepo.FindResourceByKeys(nil, key)
 		require.NoError(t, err, "Should find resource after initial creation")
 		require.NotNil(t, foundResource)
 
-		// 2. Reporter-focused update
 		cmd = fixture(t).ReporterRich("k8s_cluster", "ocm", "ocm-instance-1", "progressive-resource", "initial-workspace")
-		err = usecase.ReportResource(ctx, cmd)
+		err = h.usecase.ReportResource(h.ctx, cmd)
 		require.NoError(t, err, "Should update resource with reporter-focused data")
 
-		foundResource, err = resourceRepo.FindResourceByKeys(nil, key)
+		foundResource, err = h.resourceRepo.FindResourceByKeys(nil, key)
 		require.NoError(t, err, "Should find resource after reporter-focused update")
 		require.NotNil(t, foundResource)
 
-		// 3. Common-focused update
 		cmd = fixture(t).CommonRich("k8s_cluster", "ocm", "ocm-instance-1", "progressive-resource", "updated-workspace")
-		err = usecase.ReportResource(ctx, cmd)
+		err = h.usecase.ReportResource(h.ctx, cmd)
 		require.NoError(t, err, "Should update resource with common-focused data")
 
-		finalResource, err := resourceRepo.FindResourceByKeys(nil, key)
+		finalResource, err := h.resourceRepo.FindResourceByKeys(nil, key)
 		require.NoError(t, err, "Should find resource after all updates")
 		require.NotNil(t, finalResource)
 	})
@@ -980,19 +731,7 @@ func TestPartialDataScenarios(t *testing.T) {
 
 func TestResourceLifecycle_ReportUpdateDeleteReport(t *testing.T) {
 	t.Run("report new -> update -> delete -> report new", func(t *testing.T) {
-		ctx := testAuthzContext()
-		logger := log.DefaultLogger
-
-		resourceRepo := data.NewFakeResourceRepository()
-		schemaRepo := newFakeSchemaRepository(t)
-		relationsRepo := &data.AllowAllRelationsRepository{}
-		usecaseConfig := &UsecaseConfig{
-			ReadAfterWriteEnabled: false,
-			ConsumerEnabled:       false,
-		}
-
-		mc := metricscollector.NewFakeMetricsCollector()
-		usecase := New(resourceRepo, schemaRepo, relationsRepo, "test-topic", logger, nil, nil, usecaseConfig, mc, nil, newTestSelfSubjectStrategy())
+		h := newTestHarness(t, withNamespace("test-topic"))
 
 		resourceType := "host"
 		reporterType := "hbi"
@@ -1003,93 +742,59 @@ func TestResourceLifecycle_ReportUpdateDeleteReport(t *testing.T) {
 		// 1. REPORT NEW: Initial resource creation
 		log.Info("Report New ---------------------")
 		cmd := fixture(t).Basic(resourceType, reporterType, reporterInstance, localResourceId, workspaceId)
-		err := usecase.ReportResource(ctx, cmd)
+		err := h.usecase.ReportResource(h.ctx, cmd)
 		require.NoError(t, err, "Initial report should succeed")
 
 		key := createReporterResourceKey(t, localResourceId, resourceType, reporterType, reporterInstance)
 
-		// Verify initial state: generation = 0, representationVersion = 0
-		afterCreate, err := resourceRepo.FindResourceByKeys(nil, key)
+		afterCreate, err := h.resourceRepo.FindResourceByKeys(nil, key)
 		require.NoError(t, err, "Should find resource after creation")
 		require.NotNil(t, afterCreate)
 		initialSnapshot := afterCreate.ReporterResources()[0].Serialize()
-		initialGeneration := initialSnapshot.Generation
-		initialRepVersion := initialSnapshot.RepresentationVersion
-		initialTombstone := initialSnapshot.Tombstone
-		assert.Equal(t, uint(0), initialGeneration, "Initial generation should be 0")
-		assert.Equal(t, uint(0), initialRepVersion, "Initial representationVersion should be 0")
-		assert.False(t, initialTombstone, "Initial tombstone should be false")
+		assert.Equal(t, uint(0), initialSnapshot.Generation, "Initial generation should be 0")
+		assert.Equal(t, uint(0), initialSnapshot.RepresentationVersion, "Initial representationVersion should be 0")
+		assert.False(t, initialSnapshot.Tombstone, "Initial tombstone should be false")
 
-		log.Info("Update 1 ---------------------")
-		// 2. UPDATE: Update the resource
 		cmd = fixture(t).Updated(resourceType, reporterType, reporterInstance, localResourceId, workspaceId)
-		err = usecase.ReportResource(ctx, cmd)
+		err = h.usecase.ReportResource(h.ctx, cmd)
 		require.NoError(t, err, "Update should succeed")
 
-		// Verify state after update: representationVersion incremented, generation unchanged
-		afterUpdate, err := resourceRepo.FindResourceByKeys(nil, key)
+		afterUpdate, err := h.resourceRepo.FindResourceByKeys(nil, key)
 		require.NoError(t, err, "Should find resource after update")
 		require.NotNil(t, afterUpdate)
 		updateSnapshot := afterUpdate.ReporterResources()[0].Serialize()
-		updateGeneration := updateSnapshot.Generation
-		updateRepVersion := updateSnapshot.RepresentationVersion
-		updateTombstone := updateSnapshot.Tombstone
-		assert.Equal(t, uint(0), updateGeneration, "Generation should remain 0 after update (tombstone=false)")
-		assert.Equal(t, uint(1), updateRepVersion, "RepresentationVersion should increment to 1 after update")
-		assert.False(t, updateTombstone, "Tombstone should remain false after update")
+		assert.Equal(t, uint(0), updateSnapshot.Generation, "Generation should remain 0 after update (tombstone=false)")
+		assert.Equal(t, uint(1), updateSnapshot.RepresentationVersion, "RepresentationVersion should increment to 1 after update")
+		assert.False(t, updateSnapshot.Tombstone, "Tombstone should remain false after update")
 
-		// 3. DELETE: Delete the resource
-		log.Info("Delete ---------------------")
-		err = usecase.Delete(ctx, key)
+		err = h.usecase.Delete(h.ctx, key)
 		require.NoError(t, err, "Delete should succeed")
 
-		// Verify state after delete: representationVersion incremented, generation unchanged, tombstoned
-		afterDelete, err := resourceRepo.FindResourceByKeys(nil, key)
+		afterDelete, err := h.resourceRepo.FindResourceByKeys(nil, key)
 		require.NoError(t, err, "Should find tombstoned resource after delete")
 		require.NotNil(t, afterDelete)
 		deleteSnapshot := afterDelete.ReporterResources()[0].Serialize()
-		deleteGeneration := deleteSnapshot.Generation
-		deleteRepVersion := deleteSnapshot.RepresentationVersion
-		deleteTombstone := deleteSnapshot.Tombstone
-		assert.Equal(t, uint(0), deleteGeneration, "Generation should remain 0 after delete")
-		assert.Equal(t, uint(2), deleteRepVersion, "RepresentationVersion should increment to 2 after delete")
-		assert.True(t, deleteTombstone, "Resource should be tombstoned after delete")
+		assert.Equal(t, uint(0), deleteSnapshot.Generation, "Generation should remain 0 after delete")
+		assert.Equal(t, uint(2), deleteSnapshot.RepresentationVersion, "RepresentationVersion should increment to 2 after delete")
+		assert.True(t, deleteSnapshot.Tombstone, "Resource should be tombstoned after delete")
 
-		// 4. REPORT NEW: Report the same resource again after deletion (this should be an update)
-		log.Info("Revive again ---------------------")
 		cmd = fixture(t).Updated(resourceType, reporterType, reporterInstance, localResourceId, workspaceId)
-		err = usecase.ReportResource(ctx, cmd)
+		err = h.usecase.ReportResource(h.ctx, cmd)
 		require.NoError(t, err, "Report after delete should succeed")
 
-		// Verify final state after update on tombstoned resource
-		afterRevive, err := resourceRepo.FindResourceByKeys(nil, key)
+		afterRevive, err := h.resourceRepo.FindResourceByKeys(nil, key)
 		require.NoError(t, err, "Should find resource after revival")
 		require.NotNil(t, afterRevive)
 		reviveSnapshot := afterRevive.ReporterResources()[0].Serialize()
-		reviveGeneration := reviveSnapshot.Generation
-		reviveRepVersion := reviveSnapshot.RepresentationVersion
-		reviveTombstone := reviveSnapshot.Tombstone
-		assert.Equal(t, uint(1), reviveGeneration, "Generation should increment to 1 after update on tombstoned resource")
-		assert.Equal(t, uint(0), reviveRepVersion, "RepresentationVersion should start fresh at 0 for revival (new generation)")
-		assert.False(t, reviveTombstone, "Resource should no longer be tombstoned after revival update")
+		assert.Equal(t, uint(1), reviveSnapshot.Generation, "Generation should increment to 1 after update on tombstoned resource")
+		assert.Equal(t, uint(0), reviveSnapshot.RepresentationVersion, "RepresentationVersion should start fresh at 0 for revival (new generation)")
+		assert.False(t, reviveSnapshot.Tombstone, "Resource should no longer be tombstoned after revival update")
 	})
 }
 
 func TestResourceLifecycle_ReportUpdateDeleteReportDelete(t *testing.T) {
 	t.Run("report new -> update -> delete -> report new -> delete", func(t *testing.T) {
-		ctx := testAuthzContext()
-		logger := log.DefaultLogger
-
-		resourceRepo := data.NewFakeResourceRepository()
-		schemaRepo := newFakeSchemaRepository(t)
-		relationsRepo := &data.AllowAllRelationsRepository{}
-		usecaseConfig := &UsecaseConfig{
-			ReadAfterWriteEnabled: false,
-			ConsumerEnabled:       false,
-		}
-
-		mc := metricscollector.NewFakeMetricsCollector()
-		usecase := New(resourceRepo, schemaRepo, relationsRepo, "test-topic", logger, nil, nil, usecaseConfig, mc, nil, newTestSelfSubjectStrategy())
+		h := newTestHarness(t, withNamespace("test-topic"))
 
 		resourceType := "k8s_cluster"
 		reporterType := "ocm"
@@ -1097,37 +802,29 @@ func TestResourceLifecycle_ReportUpdateDeleteReportDelete(t *testing.T) {
 		localResourceId := "lifecycle-test-cluster"
 		workspaceId := "test-workspace-2"
 
-		// 1. REPORT NEW: Initial resource creation
 		cmd := fixture(t).Basic(resourceType, reporterType, reporterInstance, localResourceId, workspaceId)
-		err := usecase.ReportResource(ctx, cmd)
+		err := h.usecase.ReportResource(h.ctx, cmd)
 		require.NoError(t, err, "Initial report should succeed")
 
-		// 2. UPDATE: Update the resource
 		cmd = fixture(t).Updated(resourceType, reporterType, reporterInstance, localResourceId, workspaceId)
-		err = usecase.ReportResource(ctx, cmd)
+		err = h.usecase.ReportResource(h.ctx, cmd)
 		require.NoError(t, err, "Update should succeed")
 
-		// 3. DELETE: Delete the resource
 		key := createReporterResourceKey(t, localResourceId, resourceType, reporterType, reporterInstance)
-		err = usecase.Delete(ctx, key)
+		err = h.usecase.Delete(h.ctx, key)
 		require.NoError(t, err, "First delete should succeed")
 
-		// 4. REPORT NEW: Report the same resource again after deletion
 		cmd = fixture(t).Updated(resourceType, reporterType, reporterInstance, localResourceId, workspaceId)
-		err = usecase.ReportResource(ctx, cmd)
+		err = h.usecase.ReportResource(h.ctx, cmd)
 		require.NoError(t, err, "Report after delete should succeed")
 
-		// 5. DELETE: Delete the recreated resource
-		err = usecase.Delete(ctx, key)
+		err = h.usecase.Delete(h.ctx, key)
 		require.NoError(t, err, "Second delete should succeed")
 
-		// Verify final state - resource should be tombstoned
-		finalResource, err := resourceRepo.FindResourceByKeys(nil, key)
+		finalResource, err := h.resourceRepo.FindResourceByKeys(nil, key)
 		if err == gorm.ErrRecordNotFound {
-			// This is expected with current tombstone filtering
 			assert.Nil(t, finalResource, "Resource should not be found if tombstone filter is active")
 		} else {
-			// If tombstone filter is removed, we should find the resource
 			require.NoError(t, err, "Should find tombstoned resource if filter is removed")
 			require.NotNil(t, finalResource)
 		}
@@ -1135,6 +832,7 @@ func TestResourceLifecycle_ReportUpdateDeleteReportDelete(t *testing.T) {
 }
 
 func createReporterResourceKey(t *testing.T, localResourceId, resourceType, reporterType, reporterInstance string) model.ReporterResourceKey {
+	t.Helper()
 	localResourceIdType, err := model.NewLocalResourceId(localResourceId)
 	require.NoError(t, err)
 	resourceTypeType, err := model.NewResourceType(resourceType)
@@ -1149,21 +847,33 @@ func createReporterResourceKey(t *testing.T, localResourceId, resourceType, repo
 	return key
 }
 
+// createReporterResourceKeyAllowEmptyInstance is like createReporterResourceKey but
+// allows an empty reporterInstance (bypassing validation) for delete-without-instance tests.
+func createReporterResourceKeyAllowEmptyInstance(t *testing.T, localResourceId, resourceType, reporterType, reporterInstance string) model.ReporterResourceKey {
+	t.Helper()
+	localResourceIdType, err := model.NewLocalResourceId(localResourceId)
+	require.NoError(t, err)
+	resourceTypeType, err := model.NewResourceType(resourceType)
+	require.NoError(t, err)
+	reporterTypeType, err := model.NewReporterType(reporterType)
+	require.NoError(t, err)
+
+	var reporterInstanceIdType model.ReporterInstanceId
+	if reporterInstance != "" {
+		reporterInstanceIdType, err = model.NewReporterInstanceId(reporterInstance)
+		require.NoError(t, err)
+	} else {
+		reporterInstanceIdType = model.ReporterInstanceId("")
+	}
+
+	key, err := model.NewReporterResourceKey(localResourceIdType, resourceTypeType, reporterTypeType, reporterInstanceIdType)
+	require.NoError(t, err)
+	return key
+}
+
 func TestResourceLifecycle_ReportDeleteResubmitDelete(t *testing.T) {
 	t.Run("report -> delete -> resubmit same delete", func(t *testing.T) {
-		ctx := testAuthzContext()
-		logger := log.DefaultLogger
-
-		resourceRepo := data.NewFakeResourceRepository()
-		schemaRepo := newFakeSchemaRepository(t)
-		relationsRepo := &data.AllowAllRelationsRepository{}
-		usecaseConfig := &UsecaseConfig{
-			ReadAfterWriteEnabled: false,
-			ConsumerEnabled:       false,
-		}
-
-		mc := metricscollector.NewFakeMetricsCollector()
-		usecase := New(resourceRepo, schemaRepo, relationsRepo, "test-topic", logger, nil, nil, usecaseConfig, mc, nil, newTestSelfSubjectStrategy())
+		h := newTestHarness(t, withNamespace("test-topic"))
 
 		resourceType := "k8s_cluster"
 		reporterType := "ocm"
@@ -1171,16 +881,13 @@ func TestResourceLifecycle_ReportDeleteResubmitDelete(t *testing.T) {
 		localResourceId := "idempotent-test-resource"
 		workspaceId := "idempotent-workspace"
 
-		// 1. REPORT: Initial resource creation
-		log.Info("1. Initial Report ---------------------")
 		cmd := fixture(t).Basic(resourceType, reporterType, reporterInstance, localResourceId, workspaceId)
-		err := usecase.ReportResource(ctx, cmd)
+		err := h.usecase.ReportResource(h.ctx, cmd)
 		require.NoError(t, err, "Initial report should succeed")
 
 		key := createReporterResourceKey(t, localResourceId, resourceType, reporterType, reporterInstance)
 
-		// Verify initial state
-		afterReport1, err := resourceRepo.FindResourceByKeys(nil, key)
+		afterReport1, err := h.resourceRepo.FindResourceByKeys(nil, key)
 		require.NoError(t, err, "Should find resource after initial report")
 		require.NotNil(t, afterReport1)
 		initialState := afterReport1.ReporterResources()[0].Serialize()
@@ -1188,13 +895,10 @@ func TestResourceLifecycle_ReportDeleteResubmitDelete(t *testing.T) {
 		assert.Equal(t, uint(0), initialState.Generation, "Initial generation should be 0")
 		assert.False(t, initialState.Tombstone, "Initial tombstone should be false")
 
-		// 2. DELETE: Delete the resource
-		log.Info("2. Delete ---------------------")
-		err = usecase.Delete(ctx, key)
+		err = h.usecase.Delete(h.ctx, key)
 		require.NoError(t, err, "Delete should succeed")
 
-		// Verify delete state
-		afterDelete1, err := resourceRepo.FindResourceByKeys(nil, key)
+		afterDelete1, err := h.resourceRepo.FindResourceByKeys(nil, key)
 		require.NoError(t, err, "Should find tombstoned resource after delete")
 		require.NotNil(t, afterDelete1)
 		deleteState1 := afterDelete1.ReporterResources()[0].Serialize()
@@ -1202,38 +906,23 @@ func TestResourceLifecycle_ReportDeleteResubmitDelete(t *testing.T) {
 		assert.Equal(t, uint(0), deleteState1.Generation, "Generation should remain 0 after delete")
 		assert.True(t, deleteState1.Tombstone, "Resource should be tombstoned")
 
-		// 3. RESUBMIT SAME DELETE: Should be idempotent
-		log.Info("3. Resubmit Delete ---------------------")
-		err = usecase.Delete(ctx, key)
+		err = h.usecase.Delete(h.ctx, key)
 		require.NoError(t, err, "Resubmitted delete should succeed (idempotent)")
 
-		// Verify state after duplicate delete (operations are idempotent - no changes for tombstoned resources)
-		afterDelete2, err := resourceRepo.FindResourceByKeys(nil, key)
+		afterDelete2, err := h.resourceRepo.FindResourceByKeys(nil, key)
 		require.NoError(t, err, "Should still find tombstoned resource")
 		require.NotNil(t, afterDelete2)
 		deleteState2 := afterDelete2.ReporterResources()[0].Serialize()
 		assert.Equal(t, deleteState1.RepresentationVersion, deleteState2.RepresentationVersion, "RepresentationVersion should remain unchanged for duplicate delete on tombstoned resource")
 		assert.Equal(t, deleteState1.Generation, deleteState2.Generation, "Generation should be unchanged by duplicate delete")
 		assert.True(t, deleteState2.Tombstone, "Resource should still be tombstoned")
-
 	})
 }
 
 func TestResourceLifecycle_ReportResubmitDeleteResubmit(t *testing.T) {
 	t.Run("report -> resubmit same report -> delete -> resubmit same delete", func(t *testing.T) {
-		ctx := testAuthzContext()
-		logger := log.DefaultLogger
+		h := newTestHarness(t, withNamespace("test-topic"))
 
-		resourceRepo := data.NewFakeResourceRepository()
-		schemaRepo := newFakeSchemaRepository(t)
-		relationsRepo := &data.AllowAllRelationsRepository{}
-		usecaseConfig := &UsecaseConfig{
-			ReadAfterWriteEnabled: false,
-			ConsumerEnabled:       false,
-		}
-
-		mc := metricscollector.NewFakeMetricsCollector()
-		usecase := New(resourceRepo, schemaRepo, relationsRepo, "test-topic", logger, nil, nil, usecaseConfig, mc, nil, newTestSelfSubjectStrategy())
 		resourceType := "host"
 		reporterType := "hbi"
 		reporterInstance := "idempotent-instance-2"
@@ -1243,13 +932,12 @@ func TestResourceLifecycle_ReportResubmitDeleteResubmit(t *testing.T) {
 		// 1. REPORT: Initial resource creation
 		log.Info("1. Initial Report ---------------------")
 		cmd := fixture(t).Basic(resourceType, reporterType, reporterInstance, localResourceId, workspaceId)
-		err := usecase.ReportResource(ctx, cmd)
+		err := h.usecase.ReportResource(h.ctx, cmd)
 		require.NoError(t, err, "Initial report should succeed")
 
 		key := createReporterResourceKey(t, localResourceId, resourceType, reporterType, reporterInstance)
 
-		// Verify initial state
-		afterReport1, err := resourceRepo.FindResourceByKeys(nil, key)
+		afterReport1, err := h.resourceRepo.FindResourceByKeys(nil, key)
 		require.NoError(t, err, "Should find resource after initial report")
 		require.NotNil(t, afterReport1)
 		initialState := afterReport1.ReporterResources()[0].Serialize()
@@ -1257,14 +945,11 @@ func TestResourceLifecycle_ReportResubmitDeleteResubmit(t *testing.T) {
 		assert.Equal(t, uint(0), initialState.Generation, "Initial generation should be 0")
 		assert.False(t, initialState.Tombstone, "Initial tombstone should be false")
 
-		// 2. RESUBMIT SAME REPORT: Should be idempotent
-		log.Info("2. Resubmit Same Report ---------------------")
 		cmd = fixture(t).Basic(resourceType, reporterType, reporterInstance, localResourceId, workspaceId)
-		err = usecase.ReportResource(ctx, cmd)
+		err = h.usecase.ReportResource(h.ctx, cmd)
 		require.NoError(t, err, "Resubmitted report should succeed (idempotent)")
 
-		// Verify state after duplicate report (should increment representation version)
-		afterReport2, err := resourceRepo.FindResourceByKeys(nil, key)
+		afterReport2, err := h.resourceRepo.FindResourceByKeys(nil, key)
 		require.NoError(t, err, "Should find resource after duplicate report")
 		require.NotNil(t, afterReport2)
 		duplicateState := afterReport2.ReporterResources()[0].Serialize()
@@ -1272,13 +957,10 @@ func TestResourceLifecycle_ReportResubmitDeleteResubmit(t *testing.T) {
 		assert.Equal(t, uint(0), duplicateState.Generation, "Generation should remain 0")
 		assert.False(t, duplicateState.Tombstone, "Resource should remain active")
 
-		// 3. DELETE: Delete the resource
-		log.Info("3. Delete ---------------------")
-		err = usecase.Delete(ctx, key)
+		err = h.usecase.Delete(h.ctx, key)
 		require.NoError(t, err, "Delete should succeed")
 
-		// Verify delete state
-		afterDelete1, err := resourceRepo.FindResourceByKeys(nil, key)
+		afterDelete1, err := h.resourceRepo.FindResourceByKeys(nil, key)
 		require.NoError(t, err, "Should find tombstoned resource after delete")
 		require.NotNil(t, afterDelete1)
 		deleteState1 := afterDelete1.ReporterResources()[0].Serialize()
@@ -1286,13 +968,10 @@ func TestResourceLifecycle_ReportResubmitDeleteResubmit(t *testing.T) {
 		assert.Equal(t, uint(0), deleteState1.Generation, "Generation should remain 0 after delete")
 		assert.True(t, deleteState1.Tombstone, "Resource should be tombstoned")
 
-		// 4. RESUBMIT SAME DELETE: Should be idempotent
-		log.Info("4. Resubmit Delete ---------------------")
-		err = usecase.Delete(ctx, key)
+		err = h.usecase.Delete(h.ctx, key)
 		require.NoError(t, err, "Resubmitted delete should succeed (idempotent)")
 
-		// Verify final state after duplicate delete (operations are idempotent - no changes for tombstoned resources)
-		afterDelete2, err := resourceRepo.FindResourceByKeys(nil, key)
+		afterDelete2, err := h.resourceRepo.FindResourceByKeys(nil, key)
 		require.NoError(t, err, "Should still find tombstoned resource")
 		require.NotNil(t, afterDelete2)
 		finalDeleteState := afterDelete2.ReporterResources()[0].Serialize()
@@ -1304,19 +983,7 @@ func TestResourceLifecycle_ReportResubmitDeleteResubmit(t *testing.T) {
 
 func TestResourceLifecycle_ComplexIdempotency(t *testing.T) {
 	t.Run("3 cycles of create+update+delete for same resource", func(t *testing.T) {
-		ctx := testAuthzContext()
-		logger := log.DefaultLogger
-
-		resourceRepo := data.NewFakeResourceRepository()
-		schemaRepo := newFakeSchemaRepository(t)
-		relationsRepo := &data.AllowAllRelationsRepository{}
-		usecaseConfig := &UsecaseConfig{
-			ReadAfterWriteEnabled: false,
-			ConsumerEnabled:       false,
-		}
-
-		mc := metricscollector.NewFakeMetricsCollector()
-		usecase := New(resourceRepo, schemaRepo, relationsRepo, "test-topic", logger, nil, nil, usecaseConfig, mc, nil, newTestSelfSubjectStrategy())
+		h := newTestHarness(t, withNamespace("test-topic"))
 
 		resourceType := "k8s_cluster"
 		reporterType := "ocm"
@@ -1326,35 +993,28 @@ func TestResourceLifecycle_ComplexIdempotency(t *testing.T) {
 
 		key := createReporterResourceKey(t, localResourceId, resourceType, reporterType, reporterInstance)
 
-		// Run 3 cycles of create+update+delete
 		for cycle := 0; cycle < 3; cycle++ {
 			t.Logf("=== Cycle %d: Create+Update+Delete ===", cycle)
 
-			// 1. REPORT (CREATE or UPDATE): Should find existing or create new
-			log.Infof("Cycle %d: Report Resource", cycle)
 			cmd := fixture(t).WithCycleData(resourceType, reporterType, reporterInstance, localResourceId, workspaceId, cycle)
-			err := usecase.ReportResource(ctx, cmd)
+			err := h.usecase.ReportResource(h.ctx, cmd)
 			require.NoError(t, err, "Report should succeed in cycle %d", cycle)
 
-			// Verify state after report
-			afterReport, err := resourceRepo.FindResourceByKeys(nil, key)
+			afterReport, err := h.resourceRepo.FindResourceByKeys(nil, key)
 			require.NoError(t, err, "Should find resource after report in cycle %d", cycle)
 			require.NotNil(t, afterReport)
 			reportState := afterReport.ReporterResources()[0].Serialize()
 
-			expectedGeneration := uint(cycle) // Generation should be 0, 1, 2 for cycles 0, 1, 2
+			expectedGeneration := uint(cycle)
 			assert.Equal(t, expectedGeneration, reportState.Generation, "Generation should be %d in cycle %d", expectedGeneration, cycle)
 			assert.Equal(t, uint(0), reportState.RepresentationVersion, "RepresentationVersion should reset to 0 for new generation in cycle %d", cycle)
 			assert.False(t, reportState.Tombstone, "Resource should be active after report in cycle %d", cycle)
 
-			// 2. UPDATE: Update the resource
-			log.Infof("Cycle %d: Update Resource", cycle)
 			cmd = fixture(t).Updated(resourceType, reporterType, reporterInstance, localResourceId, workspaceId)
-			err = usecase.ReportResource(ctx, cmd)
+			err = h.usecase.ReportResource(h.ctx, cmd)
 			require.NoError(t, err, "Update should succeed in cycle %d", cycle)
 
-			// Verify state after update
-			afterUpdate, err := resourceRepo.FindResourceByKeys(nil, key)
+			afterUpdate, err := h.resourceRepo.FindResourceByKeys(nil, key)
 			require.NoError(t, err, "Should find resource after update in cycle %d", cycle)
 			require.NotNil(t, afterUpdate)
 			updateState := afterUpdate.ReporterResources()[0].Serialize()
@@ -1362,13 +1022,10 @@ func TestResourceLifecycle_ComplexIdempotency(t *testing.T) {
 			assert.Equal(t, uint(1), updateState.RepresentationVersion, "RepresentationVersion should increment to 1 after update in cycle %d", cycle)
 			assert.False(t, updateState.Tombstone, "Resource should remain active after update in cycle %d", cycle)
 
-			// 3. DELETE: Delete the resource
-			log.Infof("Cycle %d: Delete Resource", cycle)
-			err = usecase.Delete(ctx, key)
+			err = h.usecase.Delete(h.ctx, key)
 			require.NoError(t, err, "Delete should succeed in cycle %d", cycle)
 
-			// Verify state after delete
-			afterDelete, err := resourceRepo.FindResourceByKeys(nil, key)
+			afterDelete, err := h.resourceRepo.FindResourceByKeys(nil, key)
 			require.NoError(t, err, "Should find tombstoned resource after delete in cycle %d", cycle)
 			require.NotNil(t, afterDelete)
 			deleteState := afterDelete.ReporterResources()[0].Serialize()
@@ -1380,8 +1037,7 @@ func TestResourceLifecycle_ComplexIdempotency(t *testing.T) {
 				cycle, deleteState.Generation, deleteState.RepresentationVersion, deleteState.Tombstone)
 		}
 
-		// Final verification: Resource should be in generation 2 after 3 cycles
-		finalResource, err := resourceRepo.FindResourceByKeys(nil, key)
+		finalResource, err := h.resourceRepo.FindResourceByKeys(nil, key)
 		require.NoError(t, err, "Should find final resource")
 		require.NotNil(t, finalResource)
 		finalState := finalResource.ReporterResources()[0].Serialize()
@@ -1465,160 +1121,97 @@ func createTestRep(t *testing.T, version uint, data map[string]interface{}) *mod
 }
 
 func TestTransactionIdIdempotency(t *testing.T) {
-	ctx := testAuthzContext()
-	logger := log.DefaultLogger
+	h := newTestHarness(t, withNamespace("test-topic"))
 
-	resourceRepo := data.NewFakeResourceRepository()
-	schemaRepo := newFakeSchemaRepository(t)
-	relationsRepo := &data.AllowAllRelationsRepository{}
-	usecaseConfig := &UsecaseConfig{
-		ReadAfterWriteEnabled: false,
-		ConsumerEnabled:       false,
-	}
-
-	mc := metricscollector.NewFakeMetricsCollector()
-	usecase := New(resourceRepo, schemaRepo, relationsRepo, "test-topic", logger, nil, nil, usecaseConfig, mc, nil, newTestSelfSubjectStrategy())
-
-	// When TransactionId is nil, resolveOptionalFields returns nil; domain generates a new transaction ID.
-	// ReportResource should still succeed.
 	t.Run("Nil TransactionId in command resolves to generated ID and create succeeds", func(t *testing.T) {
 		cmd := fixture(t).Basic("host", "hbi", "nil-tx-instance", "local-nil-tx", "ws-nil-tx")
 		require.Nil(t, cmd.TransactionId, "fixture Basic leaves TransactionId nil")
-		err := usecase.ReportResource(ctx, cmd)
+		err := h.usecase.ReportResource(h.ctx, cmd)
 		require.NoError(t, err, "ReportResource with nil TransactionId should succeed (ID generated)")
 		key := createReporterResourceKey(t, "local-nil-tx", "host", "hbi", "nil-tx-instance")
-		found, err := resourceRepo.FindResourceByKeys(nil, key)
+		found, err := h.resourceRepo.FindResourceByKeys(nil, key)
 		require.NoError(t, err)
 		require.NotNil(t, found, "Resource should exist after create with nil TransactionId")
 	})
 
 	t.Run("Same transaction ID should be idempotent - no changes to representation tables", func(t *testing.T) {
-		resourceType := "host"
-		reporterType := "hbi"
-		reporterInstance := "test-instance"
-		localResourceId := "test-resource"
-		workspaceId := "test-workspace"
-		transactionId := "test-transaction-123"
-
-		// 1. First report with transaction ID
-		cmd := fixture(t).WithTransactionId(resourceType, reporterType, reporterInstance, localResourceId, workspaceId, transactionId)
-		err := usecase.ReportResource(ctx, cmd)
+		cmd := fixture(t).WithTransactionId("host", "hbi", "test-instance", "test-resource", "test-workspace", "test-transaction-123")
+		err := h.usecase.ReportResource(h.ctx, cmd)
 		require.NoError(t, err, "First report should succeed")
 
-		// Get the resource key for verification
-		key := createReporterResourceKey(t, localResourceId, resourceType, reporterType, reporterInstance)
-
-		// Verify initial state
-		afterFirst, err := resourceRepo.FindResourceByKeys(nil, key)
+		key := createReporterResourceKey(t, "test-resource", "host", "hbi", "test-instance")
+		afterFirst, err := h.resourceRepo.FindResourceByKeys(nil, key)
 		require.NoError(t, err, "Should find resource after first report")
 		require.NotNil(t, afterFirst)
 		firstState := afterFirst.ReporterResources()[0].Serialize()
-		initialRepVersion := firstState.RepresentationVersion
-		initialGeneration := firstState.Generation
 
-		// 2. Second report with SAME transaction ID - should be idempotent
-		cmd = fixture(t).WithTransactionId(resourceType, reporterType, reporterInstance, localResourceId, workspaceId, transactionId)
-		err = usecase.ReportResource(ctx, cmd)
+		cmd = fixture(t).WithTransactionId("host", "hbi", "test-instance", "test-resource", "test-workspace", "test-transaction-123")
+		err = h.usecase.ReportResource(h.ctx, cmd)
 		require.NoError(t, err, "Second report with same transaction ID should succeed (idempotent)")
 
-		// Verify no changes were made to representation tables
-		afterSecond, err := resourceRepo.FindResourceByKeys(nil, key)
+		afterSecond, err := h.resourceRepo.FindResourceByKeys(nil, key)
 		require.NoError(t, err, "Should find resource after second report")
 		require.NotNil(t, afterSecond)
 		secondState := afterSecond.ReporterResources()[0].Serialize()
 
-		assert.Equal(t, initialRepVersion, secondState.RepresentationVersion, "RepresentationVersion should not change for idempotent request")
-		assert.Equal(t, initialGeneration, secondState.Generation, "Generation should not change for idempotent request")
+		assert.Equal(t, firstState.RepresentationVersion, secondState.RepresentationVersion, "RepresentationVersion should not change for idempotent request")
+		assert.Equal(t, firstState.Generation, secondState.Generation, "Generation should not change for idempotent request")
 	})
 
 	t.Run("Different transaction ID should update representations", func(t *testing.T) {
-		resourceType := "host"
-		reporterType := "hbi"
-		reporterInstance := "test-instance-2"
-		localResourceId := "test-resource-2"
-		workspaceId := "test-workspace-2"
-		transactionId1 := "test-transaction-456"
-		transactionId2 := "test-transaction-789"
-
-		// 1. First report with transaction ID
-		cmd := fixture(t).WithTransactionId(resourceType, reporterType, reporterInstance, localResourceId, workspaceId, transactionId1)
-		err := usecase.ReportResource(ctx, cmd)
+		cmd := fixture(t).WithTransactionId("host", "hbi", "test-instance-2", "test-resource-2", "test-workspace-2", "test-transaction-456")
+		err := h.usecase.ReportResource(h.ctx, cmd)
 		require.NoError(t, err, "First report should succeed")
 
-		// Get the resource key for verification
-		key := createReporterResourceKey(t, localResourceId, resourceType, reporterType, reporterInstance)
-
-		// Verify initial state
-		afterFirst, err := resourceRepo.FindResourceByKeys(nil, key)
+		key := createReporterResourceKey(t, "test-resource-2", "host", "hbi", "test-instance-2")
+		afterFirst, err := h.resourceRepo.FindResourceByKeys(nil, key)
 		require.NoError(t, err, "Should find resource after first report")
 		require.NotNil(t, afterFirst)
 		firstState := afterFirst.ReporterResources()[0].Serialize()
-		initialRepVersion := firstState.RepresentationVersion
-		initialGeneration := firstState.Generation
 
-		// 2. Second report with DIFFERENT transaction ID - should update representations
-		cmd = fixture(t).UpdatedWithTransactionId(resourceType, reporterType, reporterInstance, localResourceId, workspaceId, transactionId2)
-		err = usecase.ReportResource(ctx, cmd)
+		cmd = fixture(t).UpdatedWithTransactionId("host", "hbi", "test-instance-2", "test-resource-2", "test-workspace-2", "test-transaction-789")
+		err = h.usecase.ReportResource(h.ctx, cmd)
 		require.NoError(t, err, "Second report with different transaction ID should succeed")
 
-		// Verify representations were updated
-		afterSecond, err := resourceRepo.FindResourceByKeys(nil, key)
+		afterSecond, err := h.resourceRepo.FindResourceByKeys(nil, key)
 		require.NoError(t, err, "Should find resource after second report")
 		require.NotNil(t, afterSecond)
 		secondState := afterSecond.ReporterResources()[0].Serialize()
 
-		assert.Equal(t, initialRepVersion+1, secondState.RepresentationVersion, "RepresentationVersion should increment for different transaction ID")
-		assert.Equal(t, initialGeneration, secondState.Generation, "Generation should remain the same for update")
+		assert.Equal(t, firstState.RepresentationVersion+1, secondState.RepresentationVersion, "RepresentationVersion should increment for different transaction ID")
+		assert.Equal(t, firstState.Generation, secondState.Generation, "Generation should remain the same for update")
 	})
 
 	t.Run("Report with transaction ID -> Update with new transaction ID -> Delete should update representations", func(t *testing.T) {
-		resourceType := "host"
-		reporterType := "hbi"
-		reporterInstance := "test-instance-3"
-		localResourceId := "test-resource-3"
-		workspaceId := "test-workspace-3"
-		transactionId1 := "test-transaction-111"
-		transactionId2 := "test-transaction-222"
-
-		// 1. First report with transaction ID
-		cmd := fixture(t).WithTransactionId(resourceType, reporterType, reporterInstance, localResourceId, workspaceId, transactionId1)
-		err := usecase.ReportResource(ctx, cmd)
+		cmd := fixture(t).WithTransactionId("host", "hbi", "test-instance-3", "test-resource-3", "test-workspace-3", "test-transaction-111")
+		err := h.usecase.ReportResource(h.ctx, cmd)
 		require.NoError(t, err, "First report should succeed")
 
-		// Get the resource key for verification
-		key := createReporterResourceKey(t, localResourceId, resourceType, reporterType, reporterInstance)
-
-		// Verify initial state
-		afterFirst, err := resourceRepo.FindResourceByKeys(nil, key)
+		key := createReporterResourceKey(t, "test-resource-3", "host", "hbi", "test-instance-3")
+		afterFirst, err := h.resourceRepo.FindResourceByKeys(nil, key)
 		require.NoError(t, err, "Should find resource after first report")
 		require.NotNil(t, afterFirst)
 		firstState := afterFirst.ReporterResources()[0].Serialize()
-		initialRepVersion := firstState.RepresentationVersion
-		initialGeneration := firstState.Generation
-		assert.Equal(t, uint(0), initialRepVersion, "Initial representationVersion should be 0")
-		assert.Equal(t, uint(0), initialGeneration, "Initial generation should be 0")
+		assert.Equal(t, uint(0), firstState.RepresentationVersion, "Initial representationVersion should be 0")
+		assert.Equal(t, uint(0), firstState.Generation, "Initial generation should be 0")
 		assert.False(t, firstState.Tombstone, "Initial tombstone should be false")
 
-		// 2. Update with DIFFERENT transaction ID - should update representations
-		cmd = fixture(t).UpdatedWithTransactionId(resourceType, reporterType, reporterInstance, localResourceId, workspaceId, transactionId2)
-		err = usecase.ReportResource(ctx, cmd)
+		cmd = fixture(t).UpdatedWithTransactionId("host", "hbi", "test-instance-3", "test-resource-3", "test-workspace-3", "test-transaction-222")
+		err = h.usecase.ReportResource(h.ctx, cmd)
 		require.NoError(t, err, "Update with different transaction ID should succeed")
 
-		// Verify state after update
-		afterUpdate, err := resourceRepo.FindResourceByKeys(nil, key)
+		afterUpdate, err := h.resourceRepo.FindResourceByKeys(nil, key)
 		require.NoError(t, err, "Should find resource after update")
 		require.NotNil(t, afterUpdate)
 		updateState := afterUpdate.ReporterResources()[0].Serialize()
-		assert.Equal(t, initialRepVersion+1, updateState.RepresentationVersion, "RepresentationVersion should increment after update")
-		assert.Equal(t, initialGeneration, updateState.Generation, "Generation should remain the same after update")
+		assert.Equal(t, firstState.RepresentationVersion+1, updateState.RepresentationVersion, "RepresentationVersion should increment after update")
+		assert.Equal(t, firstState.Generation, updateState.Generation, "Generation should remain the same after update")
 		assert.False(t, updateState.Tombstone, "Resource should remain active after update")
 
-		// 3. Delete resource (no transaction ID) - should update representations
-		err = usecase.Delete(ctx, key)
+		err = h.usecase.Delete(h.ctx, key)
 		require.NoError(t, err, "Delete should succeed")
 
-		// Verify state after delete
-		afterDelete, err := resourceRepo.FindResourceByKeys(nil, key)
+		afterDelete, err := h.resourceRepo.FindResourceByKeys(nil, key)
 		require.NoError(t, err, "Should find tombstoned resource after delete")
 		require.NotNil(t, afterDelete)
 		deleteState := afterDelete.ReporterResources()[0].Serialize()
@@ -1628,52 +1221,35 @@ func TestTransactionIdIdempotency(t *testing.T) {
 	})
 
 	t.Run("Report with transaction ID -> Report with same transaction ID -> Delete should update representations", func(t *testing.T) {
-		resourceType := "host"
-		reporterType := "hbi"
-		reporterInstance := "test-instance-4"
-		localResourceId := "test-resource-4"
-		workspaceId := "test-workspace-4"
-		transactionId := "test-transaction-333"
-
-		// 1. First report with transaction ID
-		cmd := fixture(t).WithTransactionId(resourceType, reporterType, reporterInstance, localResourceId, workspaceId, transactionId)
-		err := usecase.ReportResource(ctx, cmd)
+		cmd := fixture(t).WithTransactionId("host", "hbi", "test-instance-4", "test-resource-4", "test-workspace-4", "test-transaction-333")
+		err := h.usecase.ReportResource(h.ctx, cmd)
 		require.NoError(t, err, "First report should succeed")
 
-		// Get the resource key for verification
-		key := createReporterResourceKey(t, localResourceId, resourceType, reporterType, reporterInstance)
-
-		// Verify initial state
-		afterFirst, err := resourceRepo.FindResourceByKeys(nil, key)
+		key := createReporterResourceKey(t, "test-resource-4", "host", "hbi", "test-instance-4")
+		afterFirst, err := h.resourceRepo.FindResourceByKeys(nil, key)
 		require.NoError(t, err, "Should find resource after first report")
 		require.NotNil(t, afterFirst)
 		firstState := afterFirst.ReporterResources()[0].Serialize()
-		initialRepVersion := firstState.RepresentationVersion
-		initialGeneration := firstState.Generation
-		assert.Equal(t, uint(0), initialRepVersion, "Initial representationVersion should be 0")
-		assert.Equal(t, uint(0), initialGeneration, "Initial generation should be 0")
+		assert.Equal(t, uint(0), firstState.RepresentationVersion, "Initial representationVersion should be 0")
+		assert.Equal(t, uint(0), firstState.Generation, "Initial generation should be 0")
 		assert.False(t, firstState.Tombstone, "Initial tombstone should be false")
 
-		// 2. Second report with SAME transaction ID - should be idempotent
-		cmd = fixture(t).WithTransactionId(resourceType, reporterType, reporterInstance, localResourceId, workspaceId, transactionId)
-		err = usecase.ReportResource(ctx, cmd)
+		cmd = fixture(t).WithTransactionId("host", "hbi", "test-instance-4", "test-resource-4", "test-workspace-4", "test-transaction-333")
+		err = h.usecase.ReportResource(h.ctx, cmd)
 		require.NoError(t, err, "Second report with same transaction ID should succeed (idempotent)")
 
-		// Verify state hasn't changed (idempotent)
-		afterSecond, err := resourceRepo.FindResourceByKeys(nil, key)
+		afterSecond, err := h.resourceRepo.FindResourceByKeys(nil, key)
 		require.NoError(t, err, "Should find resource after second report")
 		require.NotNil(t, afterSecond)
 		secondState := afterSecond.ReporterResources()[0].Serialize()
-		assert.Equal(t, initialRepVersion, secondState.RepresentationVersion, "RepresentationVersion should not change for idempotent request")
-		assert.Equal(t, initialGeneration, secondState.Generation, "Generation should not change for idempotent request")
+		assert.Equal(t, firstState.RepresentationVersion, secondState.RepresentationVersion, "RepresentationVersion should not change for idempotent request")
+		assert.Equal(t, firstState.Generation, secondState.Generation, "Generation should not change for idempotent request")
 		assert.False(t, secondState.Tombstone, "Resource should remain active")
 
-		// 3. Delete resource (no transaction ID) - should update representations
-		err = usecase.Delete(ctx, key)
+		err = h.usecase.Delete(h.ctx, key)
 		require.NoError(t, err, "Delete should succeed")
 
-		// Verify state after delete
-		afterDelete, err := resourceRepo.FindResourceByKeys(nil, key)
+		afterDelete, err := h.resourceRepo.FindResourceByKeys(nil, key)
 		require.NoError(t, err, "Should find tombstoned resource after delete")
 		require.NotNil(t, afterDelete)
 		deleteState := afterDelete.ReporterResources()[0].Serialize()
@@ -1683,22 +1259,8 @@ func TestTransactionIdIdempotency(t *testing.T) {
 	})
 }
 
-// TestReportResource_ValidationSuccess tests that a valid request passes validation.
 func TestReportResource_ValidationSuccess(t *testing.T) {
-	ctx := testAuthzContext()
-	schemaRepo := newFakeSchemaRepository(t)
-	usecase := New(
-		data.NewFakeResourceRepository(),
-		schemaRepo,
-		&data.AllowAllRelationsRepository{},
-		"test-topic",
-		log.DefaultLogger,
-		nil, nil,
-		&UsecaseConfig{},
-		metricscollector.NewFakeMetricsCollector(),
-		nil,
-		newTestSelfSubjectStrategy(),
-	)
+	h := newTestHarness(t, withNamespace("test-topic"))
 
 	cmd := fixture(t).WithData("host", "hbi", "instance-1", "test-host",
 		map[string]interface{}{
@@ -1710,26 +1272,12 @@ func TestReportResource_ValidationSuccess(t *testing.T) {
 		},
 	)
 
-	err := usecase.ReportResource(ctx, cmd)
+	err := h.usecase.ReportResource(h.ctx, cmd)
 	require.NoError(t, err)
 }
 
-// TestReportResource_ValidationErrors tests field validation errors.
 func TestReportResource_ValidationErrors(t *testing.T) {
-	ctx := testAuthzContext()
-	schemaRepo := newFakeSchemaRepository(t)
-	usecase := New(
-		data.NewFakeResourceRepository(),
-		schemaRepo,
-		&data.AllowAllRelationsRepository{},
-		"test-topic",
-		log.DefaultLogger,
-		nil, nil,
-		&UsecaseConfig{},
-		metricscollector.NewFakeMetricsCollector(),
-		nil,
-		newTestSelfSubjectStrategy(),
-	)
+	h := newTestHarness(t, withNamespace("test-topic"))
 
 	tests := []struct {
 		name        string
@@ -1740,7 +1288,7 @@ func TestReportResource_ValidationErrors(t *testing.T) {
 			name: "missing type",
 			cmd: func() ReportResourceCommand {
 				cmd := fixture(t).Basic("host", "hbi", "instance-1", "test-host", "ws-123")
-				cmd.ResourceType = "" // empty type
+				cmd.ResourceType = ""
 				return cmd
 			}(),
 			expectError: "missing 'type' field",
@@ -1749,7 +1297,7 @@ func TestReportResource_ValidationErrors(t *testing.T) {
 			name: "missing reporterType",
 			cmd: func() ReportResourceCommand {
 				cmd := fixture(t).Basic("host", "hbi", "instance-1", "test-host", "ws-123")
-				cmd.ReporterType = "" // empty reporter type
+				cmd.ReporterType = ""
 				return cmd
 			}(),
 			expectError: "missing 'reporterType' field",
@@ -1773,7 +1321,7 @@ func TestReportResource_ValidationErrors(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			err := usecase.ReportResource(ctx, tc.cmd)
+			err := h.usecase.ReportResource(h.ctx, tc.cmd)
 			if tc.expectError != "" {
 				assert.Error(t, err)
 				assert.Contains(t, err.Error(), tc.expectError)
@@ -1972,24 +1520,8 @@ func TestReportResource_SchemaValidation(t *testing.T) {
 // These tests verify the exact error message format returned by the usecase layer.
 // They serve as a contract and must be updated if error formats change.
 
-// TestReportResource_RepresentationRequiredError tests that nil representations
-// TestReportResource_BothRepresentationsNil tests that when both representations
-// are nil, the domain rejects the request.
 func TestReportResource_BothRepresentationsNil(t *testing.T) {
-	ctx := testAuthzContext()
-	schemaRepo := newFakeSchemaRepository(t)
-	usecase := New(
-		data.NewFakeResourceRepository(),
-		schemaRepo,
-		&data.AllowAllRelationsRepository{},
-		"test-topic",
-		log.DefaultLogger,
-		nil, nil,
-		&UsecaseConfig{},
-		metricscollector.NewFakeMetricsCollector(),
-		nil,
-		newTestSelfSubjectStrategy(),
-	)
+	h := newTestHarness(t, withNamespace("test-topic"))
 
 	localResId, _ := model.NewLocalResourceId("test-host")
 	resType, _ := model.NewResourceType("host")
@@ -2008,28 +1540,13 @@ func TestReportResource_BothRepresentationsNil(t *testing.T) {
 		WriteVisibility:        WriteVisibilityMinimizeLatency,
 	}
 
-	err := usecase.ReportResource(ctx, cmd)
+	err := h.usecase.ReportResource(h.ctx, cmd)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "at least one of reporterRepresentation or commonRepresentation must be provided")
 }
 
-// TestReportResource_ValidationErrorFormat tests that validation failures
-// return errors with the expected message format.
 func TestReportResource_ValidationErrorFormat(t *testing.T) {
-	ctx := testAuthzContext()
-	schemaRepo := newFakeSchemaRepository(t)
-	usecase := New(
-		data.NewFakeResourceRepository(),
-		schemaRepo,
-		&data.AllowAllRelationsRepository{},
-		"test-topic",
-		log.DefaultLogger,
-		nil, nil,
-		&UsecaseConfig{},
-		metricscollector.NewFakeMetricsCollector(),
-		nil,
-		newTestSelfSubjectStrategy(),
-	)
+	h := newTestHarness(t, withNamespace("test-topic"))
 
 	tests := []struct {
 		name           string
@@ -2063,7 +1580,7 @@ func TestReportResource_ValidationErrorFormat(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			err := usecase.ReportResource(ctx, tc.cmd)
+			err := h.usecase.ReportResource(h.ctx, tc.cmd)
 			assert.Error(t, err)
 			assert.Contains(t, err.Error(), tc.expectErrorMsg)
 		})
@@ -2164,43 +1681,19 @@ func TestResolveConsistencyToken(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Use testAuthzContext so ReportResource (when resourceExists) can pass meta-authz
-			ctx := testAuthzContext()
-			logger := log.DefaultLogger
-
-			resourceRepo := data.NewFakeResourceRepository()
-			schemaRepo := newFakeSchemaRepository(t)
-			relationsRepo := &data.AllowAllRelationsRepository{}
-			usecaseConfig := &UsecaseConfig{
-				ReadAfterWriteEnabled:          false,
-				ConsumerEnabled:                false,
+			h := newTestHarness(t, withNamespace("test-topic"), withUsecaseConfig(&UsecaseConfig{
 				DefaultToAtLeastAsAcknowledged: tt.featureFlagEnabled,
-			}
-			mc := metricscollector.NewFakeMetricsCollector()
-			uc := New(resourceRepo, schemaRepo, relationsRepo, "test-topic", logger, nil, nil, usecaseConfig, mc, nil, newTestSelfSubjectStrategy())
+			}))
 
-			// Create test reporter resource key
-			localResourceId, err := model.NewLocalResourceId("test-resource-123")
-			require.NoError(t, err)
-			resourceType, err := model.NewResourceType("host")
-			require.NoError(t, err)
-			reporterType, err := model.NewReporterType("hbi")
-			require.NoError(t, err)
-			reporterInstanceId, err := model.NewReporterInstanceId("test-instance")
-			require.NoError(t, err)
+			reporterResourceKey := createReporterResourceKey(t, "test-resource-123", "host", "hbi", "test-instance")
 
-			reporterResourceKey, err := model.NewReporterResourceKey(localResourceId, resourceType, reporterType, reporterInstanceId)
-			require.NoError(t, err)
-
-			// If resource should exist, create it first
 			if tt.resourceExists {
 				cmd := fixture(t).Basic("host", "hbi", "test-instance", "test-resource-123", "test-workspace")
-				err := uc.ReportResource(ctx, cmd)
+				err := h.usecase.ReportResource(h.ctx, cmd)
 				require.NoError(t, err)
 			}
 
-			// Call the function under test
-			token, err := uc.resolveConsistencyToken(ctx, tt.consistency, reporterResourceKey, false)
+			token, err := h.usecase.resolveConsistencyToken(h.ctx, tt.consistency, reporterResourceKey, false)
 
 			if tt.expectedError {
 				assert.Error(t, err)
@@ -2257,39 +1750,19 @@ func TestResolveConsistencyToken_OverrideFeatureFlag(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctx := testAuthzContext()
-			logger := log.DefaultLogger
-
-			resourceRepo := data.NewFakeResourceRepository()
-			schemaRepo := newFakeSchemaRepository(t)
-			relationsRepo := &data.AllowAllRelationsRepository{}
-			usecaseConfig := &UsecaseConfig{
-				ReadAfterWriteEnabled:          false,
-				ConsumerEnabled:                false,
+			h := newTestHarness(t, withNamespace("test-topic"), withUsecaseConfig(&UsecaseConfig{
 				DefaultToAtLeastAsAcknowledged: tt.featureFlagEnabled,
-			}
-			mc := metricscollector.NewFakeMetricsCollector()
-			uc := New(resourceRepo, schemaRepo, relationsRepo, "test-topic", logger, nil, nil, usecaseConfig, mc, nil, newTestSelfSubjectStrategy())
+			}))
 
-			localResourceId, err := model.NewLocalResourceId("test-resource-override")
-			require.NoError(t, err)
-			resourceType, err := model.NewResourceType("host")
-			require.NoError(t, err)
-			reporterType, err := model.NewReporterType("hbi")
-			require.NoError(t, err)
-			reporterInstanceId, err := model.NewReporterInstanceId("test-instance")
-			require.NoError(t, err)
-
-			reporterResourceKey, err := model.NewReporterResourceKey(localResourceId, resourceType, reporterType, reporterInstanceId)
-			require.NoError(t, err)
+			reporterResourceKey := createReporterResourceKey(t, "test-resource-override", "host", "hbi", "test-instance")
 
 			if tt.resourceExists {
 				cmd := fixture(t).Basic("host", "hbi", "test-instance", "test-resource-override", "test-workspace")
-				err := uc.ReportResource(ctx, cmd)
+				err := h.usecase.ReportResource(h.ctx, cmd)
 				require.NoError(t, err)
 			}
 
-			token, err := uc.resolveConsistencyToken(ctx, tt.consistency, reporterResourceKey, true)
+			token, err := h.usecase.resolveConsistencyToken(h.ctx, tt.consistency, reporterResourceKey, true)
 			if tt.expectedError {
 				assert.Error(t, err)
 			} else {
@@ -2301,114 +1774,55 @@ func TestResolveConsistencyToken_OverrideFeatureFlag(t *testing.T) {
 }
 
 func TestResolveConsistencyToken_NilConsistencyDefaultsToUnspecified(t *testing.T) {
-	// Nil consistency should behave like unspecified for backward compatibility.
-	ctx := testAuthzContext()
-	logger := log.DefaultLogger
+	h := newTestHarness(t, withNamespace("test-topic"))
 
-	resourceRepo := data.NewFakeResourceRepository()
-	schemaRepo := newFakeSchemaRepository(t)
-	relationsRepo := &data.AllowAllRelationsRepository{}
-	usecaseConfig := &UsecaseConfig{
-		ReadAfterWriteEnabled:          false,
-		ConsumerEnabled:                false,
-		DefaultToAtLeastAsAcknowledged: false,
-	}
-
-	mc := metricscollector.NewFakeMetricsCollector()
-	uc := New(resourceRepo, schemaRepo, relationsRepo, "test-topic", logger, nil, nil, usecaseConfig, mc, nil, newTestSelfSubjectStrategy())
-
-	// Create test reporter resource key
-	localResourceId, err := model.NewLocalResourceId("test-resource-456")
-	require.NoError(t, err)
-	resourceType, err := model.NewResourceType("host")
-	require.NoError(t, err)
-	reporterType, err := model.NewReporterType("hbi")
-	require.NoError(t, err)
-	reporterInstanceId, err := model.NewReporterInstanceId("test-instance")
-	require.NoError(t, err)
-
-	reporterResourceKey, err := model.NewReporterResourceKey(localResourceId, resourceType, reporterType, reporterInstanceId)
-	require.NoError(t, err)
-
-	token, err := uc.resolveConsistencyToken(ctx, nil, reporterResourceKey, false)
+	reporterResourceKey := createReporterResourceKey(t, "test-resource-456", "host", "hbi", "test-instance")
+	token, err := h.usecase.resolveConsistencyToken(h.ctx, nil, reporterResourceKey, false)
 
 	assert.NoError(t, err)
 	assert.Equal(t, "", token)
 }
 
 func TestResolveConsistencyToken_OverrideFeatureFlag_LogsBypassWhenEnabled(t *testing.T) {
-	ctx := testAuthzContext()
-
 	var logBuf bytes.Buffer
-	logger := log.NewStdLogger(&logBuf)
-
-	resourceRepo := data.NewFakeResourceRepository()
-	schemaRepo := newFakeSchemaRepository(t)
-	relationsRepo := &data.AllowAllRelationsRepository{}
-	usecaseConfig := &UsecaseConfig{
-		ReadAfterWriteEnabled:          false,
-		ConsumerEnabled:                false,
-		DefaultToAtLeastAsAcknowledged: true,
-	}
-
-	mc := metricscollector.NewFakeMetricsCollector()
-	uc := New(resourceRepo, schemaRepo, relationsRepo, "test-topic", logger, nil, nil, usecaseConfig, mc, nil, newTestSelfSubjectStrategy())
+	h := newTestHarness(t,
+		withNamespace("test-topic"),
+		withLogger(log.NewStdLogger(&logBuf)),
+		withUsecaseConfig(&UsecaseConfig{DefaultToAtLeastAsAcknowledged: true}),
+	)
 
 	reporterResourceKey := createReporterResourceKey(t, "host-123", "host", "hbi", "instance-1")
-
-	token, err := uc.resolveConsistencyToken(ctx, model.NewConsistencyUnspecified(), reporterResourceKey, true)
+	token, err := h.usecase.resolveConsistencyToken(h.ctx, model.NewConsistencyUnspecified(), reporterResourceKey, true)
 	require.NoError(t, err)
 	assert.Equal(t, "", token)
 	assert.Contains(t, strings.ToLower(logBuf.String()), "enabled but bypassed for this call")
 }
 
 func TestResolveConsistencyToken_OverrideFeatureFlag_LogsEnabledWhenNotBypassed(t *testing.T) {
-	ctx := testAuthzContext()
-
 	var logBuf bytes.Buffer
-	logger := log.NewStdLogger(&logBuf)
-
-	resourceRepo := data.NewFakeResourceRepository()
-	schemaRepo := newFakeSchemaRepository(t)
-	relationsRepo := &data.AllowAllRelationsRepository{}
-	usecaseConfig := &UsecaseConfig{
-		ReadAfterWriteEnabled:          false,
-		ConsumerEnabled:                false,
-		DefaultToAtLeastAsAcknowledged: true,
-	}
-
-	mc := metricscollector.NewFakeMetricsCollector()
-	uc := New(resourceRepo, schemaRepo, relationsRepo, "test-topic", logger, nil, nil, usecaseConfig, mc, nil, newTestSelfSubjectStrategy())
+	h := newTestHarness(t,
+		withNamespace("test-topic"),
+		withLogger(log.NewStdLogger(&logBuf)),
+		withUsecaseConfig(&UsecaseConfig{DefaultToAtLeastAsAcknowledged: true}),
+	)
 
 	reporterResourceKey := createReporterResourceKey(t, "host-456", "host", "hbi", "instance-1")
-
-	token, err := uc.resolveConsistencyToken(ctx, model.NewConsistencyUnspecified(), reporterResourceKey, false)
+	token, err := h.usecase.resolveConsistencyToken(h.ctx, model.NewConsistencyUnspecified(), reporterResourceKey, false)
 	require.NoError(t, err)
 	assert.Equal(t, "", token)
 	assert.Contains(t, strings.ToLower(logBuf.String()), "feature flag default-to-at-least-as-acknowledged is enabled")
 }
 
 func TestResolveConsistencyToken_OverrideFeatureFlag_LogsDisabledWhenFeatureOff(t *testing.T) {
-	ctx := testAuthzContext()
-
 	var logBuf bytes.Buffer
-	logger := log.NewStdLogger(&logBuf)
-
-	resourceRepo := data.NewFakeResourceRepository()
-	schemaRepo := newFakeSchemaRepository(t)
-	relationsRepo := &data.AllowAllRelationsRepository{}
-	usecaseConfig := &UsecaseConfig{
-		ReadAfterWriteEnabled:          false,
-		ConsumerEnabled:                false,
-		DefaultToAtLeastAsAcknowledged: false,
-	}
-
-	mc := metricscollector.NewFakeMetricsCollector()
-	uc := New(resourceRepo, schemaRepo, relationsRepo, "test-topic", logger, nil, nil, usecaseConfig, mc, nil, newTestSelfSubjectStrategy())
+	h := newTestHarness(t,
+		withNamespace("test-topic"),
+		withLogger(log.NewStdLogger(&logBuf)),
+		withUsecaseConfig(&UsecaseConfig{DefaultToAtLeastAsAcknowledged: false}),
+	)
 
 	reporterResourceKey := createReporterResourceKey(t, "host-789", "host", "hbi", "instance-1")
-
-	token, err := uc.resolveConsistencyToken(ctx, model.NewConsistencyUnspecified(), reporterResourceKey, true)
+	token, err := h.usecase.resolveConsistencyToken(h.ctx, model.NewConsistencyUnspecified(), reporterResourceKey, true)
 	require.NoError(t, err)
 	assert.Equal(t, "", token)
 	assert.Contains(t, strings.ToLower(logBuf.String()), "feature flag default-to-at-least-as-acknowledged is disabled")
@@ -2562,4 +1976,227 @@ func TestLookupSubjectsCommandToV1beta1_UsesAtLeastAsFreshWhenSpecified(t *testi
 	atLeastAsFresh, ok := req.Consistency.Requirement.(*kessel.Consistency_AtLeastAsFresh)
 	assert.True(t, ok, "at_least_as_fresh consistency should be preserved")
 	assert.Equal(t, "test-subjects-token", atLeastAsFresh.AtLeastAsFresh.Token)
+}
+
+func TestCheck_AuthzDecisions(t *testing.T) {
+	tests := []struct {
+		name           string
+		grantSubjectID string
+		wantAllowed    bool
+	}{
+		{"denied - no grants", "", false},
+		{"allowed - grant exists", "user-1", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			simpleAuthz := data.NewSimpleRelationsRepository()
+			if tt.grantSubjectID != "" {
+				simpleAuthz.Grant(tt.grantSubjectID, "view", "hbi", "host", "host-1")
+			}
+			h := newTestHarness(t, withMeta(true), withRelations(simpleAuthz))
+
+			subject, err := buildTestSubjectReference("user-1")
+			require.NoError(t, err)
+			key := createReporterResourceKey(t, "host-1", "host", "hbi", "instance-1")
+			relation, err := model.NewRelation("view")
+			require.NoError(t, err)
+
+			allowed, token, err := h.usecase.Check(h.ctx, relation, subject, key, model.NewConsistencyUnspecified())
+			require.NoError(t, err)
+			assert.Equal(t, tt.wantAllowed, allowed)
+			assert.NotEmpty(t, token)
+			assert.Equal(t, 1, h.meta.calls)
+		})
+	}
+}
+
+func TestCheckForUpdate_AuthzDecisions(t *testing.T) {
+	tests := []struct {
+		name           string
+		grantSubjectID string
+		wantAllowed    bool
+	}{
+		{"denied - no grants", "", false},
+		{"allowed - grant exists", "user-1", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			simpleAuthz := data.NewSimpleRelationsRepository()
+			if tt.grantSubjectID != "" {
+				simpleAuthz.Grant(tt.grantSubjectID, "update", "hbi", "host", "host-1")
+			}
+			h := newTestHarness(t, withMeta(true), withRelations(simpleAuthz))
+
+			subject, err := buildTestSubjectReference("user-1")
+			require.NoError(t, err)
+			key := createReporterResourceKey(t, "host-1", "host", "hbi", "instance-1")
+			relation, err := model.NewRelation("update")
+			require.NoError(t, err)
+
+			allowed, token, err := h.usecase.CheckForUpdate(h.ctx, relation, subject, key)
+			require.NoError(t, err)
+			assert.Equal(t, tt.wantAllowed, allowed)
+			assert.NotEmpty(t, token)
+			assert.Equal(t, 1, h.meta.calls)
+		})
+	}
+}
+
+func TestCheckBulk_RelationsMixedResults(t *testing.T) {
+	simpleAuthz := data.NewSimpleRelationsRepository()
+	simpleAuthz.Grant("user-1", "view", "hbi", "host", "host-1")
+
+	h := newTestHarness(t, withMeta(true), withRelations(simpleAuthz))
+
+	subject, err := buildTestSubjectReference("user-1")
+	require.NoError(t, err)
+	key1 := createReporterResourceKey(t, "host-1", "host", "hbi", "instance-1")
+	key2 := createReporterResourceKey(t, "host-2", "host", "hbi", "instance-1")
+	relation, err := model.NewRelation("view")
+	require.NoError(t, err)
+
+	result, err := h.usecase.CheckBulk(h.ctx, CheckBulkCommand{
+		Items: []CheckBulkItem{
+			{Resource: key1, Relation: relation, Subject: subject},
+			{Resource: key2, Relation: relation, Subject: subject},
+		},
+		Consistency: model.NewConsistencyUnspecified(),
+	})
+	require.NoError(t, err)
+	require.Len(t, result.Pairs, 2)
+	assert.True(t, result.Pairs[0].Result.Allowed, "host-1 should be allowed")
+	assert.Nil(t, result.Pairs[0].Result.Error)
+	assert.False(t, result.Pairs[1].Result.Allowed, "host-2 should be denied")
+	assert.Nil(t, result.Pairs[1].Result.Error)
+	assert.Equal(t, 2, h.meta.calls)
+}
+
+func TestLookupResources_StreamResults(t *testing.T) {
+	type grant struct {
+		subjectID, resourceID string
+	}
+	tests := []struct {
+		name    string
+		grants  []grant
+		wantIDs []string
+	}{
+		{
+			"returns granted resources",
+			[]grant{{"user-1", "host-1"}, {"user-1", "host-2"}},
+			[]string{"host-1", "host-2"},
+		},
+		{
+			"empty - no grants",
+			nil,
+			nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			simpleAuthz := data.NewSimpleRelationsRepository()
+			for _, g := range tt.grants {
+				simpleAuthz.Grant(g.subjectID, "view", "hbi", "host", g.resourceID)
+			}
+			h := newTestHarness(t, withMeta(true), withRelations(simpleAuthz))
+
+			subject, err := buildTestSubjectReference("user-1")
+			require.NoError(t, err)
+			resourceType, err := model.NewResourceType("host")
+			require.NoError(t, err)
+			reporterType, err := model.NewReporterType("hbi")
+			require.NoError(t, err)
+			relation, err := model.NewRelation("view")
+			require.NoError(t, err)
+
+			stream, err := h.usecase.LookupResources(h.ctx, LookupResourcesCommand{
+				ResourceType: resourceType,
+				ReporterType: reporterType,
+				Relation:     relation,
+				Subject:      subject,
+				Consistency:  model.NewConsistencyUnspecified(),
+			})
+			require.NoError(t, err)
+
+			var resourceIds []string
+			for {
+				resp, err := stream.Recv()
+				if err == io.EOF {
+					break
+				}
+				require.NoError(t, err)
+				resourceIds = append(resourceIds, resp.Resource.Id)
+			}
+
+			slices.Sort(resourceIds)
+			wantSorted := slices.Clone(tt.wantIDs)
+			slices.Sort(wantSorted)
+			assert.Equal(t, wantSorted, resourceIds)
+			assert.Equal(t, 1, h.meta.calls)
+		})
+	}
+}
+
+func TestLookupSubjects_StreamResults(t *testing.T) {
+	tests := []struct {
+		name            string
+		grantSubjectIDs []string
+		wantIDs         []string
+	}{
+		{
+			"returns granted subjects",
+			[]string{"user-1", "user-2"},
+			[]string{"user-1", "user-2"},
+		},
+		{
+			"empty - no grants",
+			nil,
+			nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			simpleAuthz := data.NewSimpleRelationsRepository()
+			for _, subjectID := range tt.grantSubjectIDs {
+				simpleAuthz.Grant(subjectID, "view", "hbi", "host", "host-1")
+			}
+			h := newTestHarness(t, withMeta(true), withRelations(simpleAuthz))
+
+			key := createReporterResourceKey(t, "host-1", "host", "hbi", "instance-1")
+			relation, err := model.NewRelation("view")
+			require.NoError(t, err)
+			subjectType, err := model.NewResourceType("principal")
+			require.NoError(t, err)
+			subjectReporter, err := model.NewReporterType("rbac")
+			require.NoError(t, err)
+
+			stream, err := h.usecase.LookupSubjects(h.ctx, LookupSubjectsCommand{
+				Resource:        key,
+				Relation:        relation,
+				SubjectType:     subjectType,
+				SubjectReporter: subjectReporter,
+				Consistency:     model.NewConsistencyUnspecified(),
+			})
+			require.NoError(t, err)
+
+			var subjectIds []string
+			for {
+				resp, err := stream.Recv()
+				if err == io.EOF {
+					break
+				}
+				require.NoError(t, err)
+				subjectIds = append(subjectIds, resp.Subject.Subject.Id)
+			}
+
+			slices.Sort(subjectIds)
+			wantSorted := slices.Clone(tt.wantIDs)
+			slices.Sort(wantSorted)
+			assert.Equal(t, wantSorted, subjectIds)
+			assert.Equal(t, 1, h.meta.calls)
+		})
+	}
 }

@@ -169,13 +169,18 @@ func (s *SimpleRelationsRepository) Grant(subjectID, relation, namespace, resour
 	s.advanceVersion()
 }
 
-// Reset clears all tuples and snapshots, resetting version to 1.
+// Reset restores the repository to its initial state (equivalent to NewSimpleRelationsRepository).
 func (s *SimpleRelationsRepository) Reset() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.tuples = make(map[simpleTupleKey]bool)
 	s.snapshots = make(map[int64]map[simpleTupleKey]bool)
+	s.locks = make(map[string]string)
 	s.version = 1
+	s.healthError = nil
+	s.createTuplesError = nil
+	s.deleteTuplesError = nil
+	s.acquireLockError = nil
 }
 
 // simpleHasTupleInSnapshot checks if a tuple exists in the given tuple map.

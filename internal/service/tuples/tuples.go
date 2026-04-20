@@ -8,7 +8,6 @@ import (
 	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
 	tuplesctl "github.com/project-kessel/inventory-api/internal/biz/usecase/tuples"
-	relationspb "github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
 )
 
 // TupleService implements the deprecated KesselTupleService.
@@ -26,19 +25,16 @@ func New(uc *tuplesctl.TupleCrudUseCase) *TupleService {
 // CreateTuples creates relationship tuples (DEPRECATED).
 // This endpoint exists only for RBAC backward compatibility.
 func (s *TupleService) CreateTuples(ctx context.Context, req *pb.CreateTuplesRequest) (*pb.CreateTuplesResponse, error) {
-	// Convert proto to domain command
 	cmd, err := toCreateTuplesCommand(req)
 	if err != nil {
 		return nil, err
 	}
 
-	// Delegate to usecase
 	result, err := s.Ctl.CreateTuples(ctx, cmd)
 	if err != nil {
 		return nil, err
 	}
 
-	// Convert result to proto
 	return fromCreateTuplesResult(result), nil
 }
 
@@ -68,15 +64,13 @@ func (s *TupleService) ReadTuples(req *pb.ReadTuplesRequest, stream pb.KesselTup
 		return err
 	}
 
-	// Get stream from usecase
-	relStream, err := s.Ctl.ReadTuples(ctx, cmd)
+	modelStream, err := s.Ctl.ReadTuples(ctx, cmd)
 	if err != nil {
 		return err
 	}
 
-	// Stream responses, converting each message
 	for {
-		relResp, err := relStream.Recv()
+		item, err := modelStream.Recv()
 		if err == io.EOF {
 			break
 		}
@@ -84,26 +78,8 @@ func (s *TupleService) ReadTuples(req *pb.ReadTuplesRequest, stream pb.KesselTup
 			return err
 		}
 
-		// Convert v1beta1 response to proto
-		tuple := relationshipFromV1beta1ToProto(relResp.GetTuple())
-
-		// Build response, preserving nil semantics
-		resp := &pb.ReadTuplesResponse{
-			Tuple: tuple,
-		}
-
-		// Only include pagination if continuation token is present
-		if continuationToken := relResp.GetPagination().GetContinuationToken(); continuationToken != "" {
-			resp.Pagination = &pb.ResponsePagination{ContinuationToken: continuationToken}
-		}
-
-		// Only include consistency token if token is present (avoid empty token which violates min_len validation)
-		if token := relResp.GetConsistencyToken().GetToken(); token != "" {
-			resp.ConsistencyToken = &pb.ConsistencyToken{Token: token}
-		}
-
-		err = stream.Send(resp)
-		if err != nil {
+		resp := readTuplesItemToProto(item)
+		if err := stream.Send(resp); err != nil {
 			return err
 		}
 	}
@@ -126,7 +102,7 @@ func (s *TupleService) AcquireLock(ctx context.Context, req *pb.AcquireLockReque
 	}, nil
 }
 
-// Converter functions (proto → domain command)
+// --- proto → domain command converters ---
 
 func toCreateTuplesCommand(req *pb.CreateTuplesRequest) (tuplesctl.CreateTuplesCommand, error) {
 	tuples, err := relationshipsToRelationsTuples(req.GetTuples())
@@ -178,7 +154,7 @@ func toAcquireLockCommand(req *pb.AcquireLockRequest) tuplesctl.AcquireLockComma
 	}
 }
 
-// Helper converters (proto → domain)
+// --- proto → domain helpers ---
 
 func relationshipsToRelationsTuples(rels []*pb.Relationship) ([]model.RelationsTuple, error) {
 	tuples := make([]model.RelationsTuple, len(rels))
@@ -222,12 +198,12 @@ func relationshipToRelationsTuple(rel *pb.Relationship) (model.RelationsTuple, e
 	return model.NewRelationsTuple(resource, rel.GetRelation(), subject), nil
 }
 
-func tupleFilterFromProto(pf *pb.RelationTupleFilter) tuplesctl.TupleFilter {
+func tupleFilterFromProto(pf *pb.RelationTupleFilter) model.TupleFilter {
 	if pf == nil {
-		return tuplesctl.TupleFilter{}
+		return model.TupleFilter{}
 	}
 
-	filter := tuplesctl.TupleFilter{
+	filter := model.TupleFilter{
 		ResourceNamespace: pf.ResourceNamespace,
 		ResourceType:      pf.ResourceType,
 		ResourceId:        pf.ResourceId,
@@ -235,7 +211,7 @@ func tupleFilterFromProto(pf *pb.RelationTupleFilter) tuplesctl.TupleFilter {
 	}
 
 	if pf.GetSubjectFilter() != nil {
-		filter.SubjectFilter = &tuplesctl.SubjectFilter{
+		filter.SubjectFilter = &model.TupleSubjectFilter{
 			SubjectNamespace: pf.GetSubjectFilter().SubjectNamespace,
 			SubjectType:      pf.GetSubjectFilter().SubjectType,
 			SubjectId:        pf.GetSubjectFilter().SubjectId,
@@ -273,7 +249,7 @@ func consistencyFromProto(c *pb.Consistency) model.Consistency {
 	return model.NewConsistencyUnspecified()
 }
 
-// Converter functions (domain/v1beta1 → proto)
+// --- domain → proto converters ---
 
 func fromCreateTuplesResult(result *tuplesctl.CreateTuplesResult) *pb.CreateTuplesResponse {
 	if result.ConsistencyToken == "" {
@@ -293,32 +269,41 @@ func fromDeleteTuplesResult(result *tuplesctl.DeleteTuplesResult) *pb.DeleteTupl
 	}
 }
 
-func relationshipFromV1beta1ToProto(rel *relationspb.Relationship) *pb.Relationship {
-	if rel == nil {
-		return nil
-	}
-	result := &pb.Relationship{
+func readTuplesItemToProto(item model.ReadTuplesItem) *pb.ReadTuplesResponse {
+	tuple := &pb.Relationship{
 		Resource: &pb.RelationObjectReference{
 			Type: &pb.RelationObjectType{
-				Namespace: rel.GetResource().GetType().GetNamespace(),
-				Name:      rel.GetResource().GetType().GetName(),
+				Namespace: item.ResourceNamespace,
+				Name:      item.ResourceType,
 			},
-			Id: rel.GetResource().GetId(),
+			Id: item.ResourceId,
 		},
-		Relation: rel.GetRelation(),
+		Relation: item.Relation,
 		Subject: &pb.RelationSubjectReference{
 			Subject: &pb.RelationObjectReference{
 				Type: &pb.RelationObjectType{
-					Namespace: rel.GetSubject().GetSubject().GetType().GetNamespace(),
-					Name:      rel.GetSubject().GetSubject().GetType().GetName(),
+					Namespace: item.SubjectNamespace,
+					Name:      item.SubjectType,
 				},
-				Id: rel.GetSubject().GetSubject().GetId(),
+				Id: item.SubjectId,
 			},
 		},
 	}
-	// Set subject relation if present
-	if rel.GetSubject().Relation != nil {
-		result.Subject.Relation = rel.GetSubject().Relation
+	if item.SubjectRelation != nil {
+		tuple.Subject.Relation = item.SubjectRelation
 	}
-	return result
+
+	resp := &pb.ReadTuplesResponse{
+		Tuple: tuple,
+	}
+
+	if item.ContinuationToken != "" {
+		resp.Pagination = &pb.ResponsePagination{ContinuationToken: item.ContinuationToken}
+	}
+
+	if item.ConsistencyToken != "" {
+		resp.ConsistencyToken = &pb.ConsistencyToken{Token: item.ConsistencyToken.Serialize()}
+	}
+
+	return resp
 }

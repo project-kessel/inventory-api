@@ -94,21 +94,11 @@ type CheckSelfBulkCommand struct {
 // LookupResourcesCommand contains the request for looking up resources.
 type LookupResourcesCommand struct {
 	ResourceType model.ResourceType
-	ReporterType model.ReporterType // maps to ObjectType.Namespace in v1beta1
+	ReporterType model.ReporterType
 	Relation     model.Relation
 	Subject      model.SubjectReference
 	Pagination   *model.Pagination
 	Consistency  model.Consistency
-}
-
-// LookupResourcesResultItem represents a single resource from lookup.
-// NOTE: This type is currently unused. Streaming APIs (e.g., LookupResources) return
-// grpc.ServerStreamingClient directly from the usecase layer, bypassing domain-layer result types.
-// This differs from non-streaming APIs (Check, CheckBulk) which return domain types
-// (CheckBulkResult, etc.). This inconsistency should be addressed in future refactoring.
-type LookupResourcesResultItem struct {
-	Resource          model.ReporterResourceKey
-	ContinuationToken string
 }
 
 // LookupSubjectsCommand contains the request for looking up subjects.

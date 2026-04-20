@@ -6,7 +6,6 @@ import (
 	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
 	tuplesctl "github.com/project-kessel/inventory-api/internal/biz/usecase/tuples"
-	relationspb "github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -435,69 +434,67 @@ func TestFromDeleteTuplesResult(t *testing.T) {
 	})
 }
 
-func TestRelationshipFromV1beta1ToProto(t *testing.T) {
-	t.Run("nil relationship", func(t *testing.T) {
-		result := relationshipFromV1beta1ToProto(nil)
-		assert.Nil(t, result)
-	})
-
-	t.Run("valid relationship", func(t *testing.T) {
-		rel := &relationspb.Relationship{
-			Resource: &relationspb.ObjectReference{
-				Type: &relationspb.ObjectType{
-					Namespace: "rbac",
-					Name:      "workspace",
-				},
-				Id: "ws-1",
-			},
-			Relation: "member",
-			Subject: &relationspb.SubjectReference{
-				Subject: &relationspb.ObjectReference{
-					Type: &relationspb.ObjectType{
-						Namespace: "rbac",
-						Name:      "principal",
-					},
-					Id: "user-1",
-				},
-			},
+func TestReadTuplesItemToProto(t *testing.T) {
+	t.Run("basic item", func(t *testing.T) {
+		item := model.ReadTuplesItem{
+			ResourceNamespace: "rbac",
+			ResourceType:      "workspace",
+			ResourceId:        "ws-1",
+			Relation:          "member",
+			SubjectNamespace:  "rbac",
+			SubjectType:       "principal",
+			SubjectId:         "user-1",
 		}
 
-		result := relationshipFromV1beta1ToProto(rel)
+		result := readTuplesItemToProto(item)
 
-		require.NotNil(t, result)
-		assert.Equal(t, "rbac", result.Resource.Type.Namespace)
-		assert.Equal(t, "workspace", result.Resource.Type.Name)
-		assert.Equal(t, "ws-1", result.Resource.Id)
-		assert.Equal(t, "member", result.Relation)
-		assert.Equal(t, "user-1", result.Subject.Subject.Id)
+		require.NotNil(t, result.Tuple)
+		assert.Equal(t, "rbac", result.Tuple.Resource.Type.Namespace)
+		assert.Equal(t, "workspace", result.Tuple.Resource.Type.Name)
+		assert.Equal(t, "ws-1", result.Tuple.Resource.Id)
+		assert.Equal(t, "member", result.Tuple.Relation)
+		assert.Equal(t, "user-1", result.Tuple.Subject.Subject.Id)
+		assert.Nil(t, result.Pagination)
+		assert.Nil(t, result.ConsistencyToken)
 	})
 
 	t.Run("with subject relation", func(t *testing.T) {
 		subjectRelation := "members"
-		rel := &relationspb.Relationship{
-			Resource: &relationspb.ObjectReference{
-				Type: &relationspb.ObjectType{
-					Namespace: "rbac",
-					Name:      "workspace",
-				},
-				Id: "ws-1",
-			},
-			Relation: "member",
-			Subject: &relationspb.SubjectReference{
-				Relation: &subjectRelation,
-				Subject: &relationspb.ObjectReference{
-					Type: &relationspb.ObjectType{
-						Namespace: "rbac",
-						Name:      "group",
-					},
-					Id: "group-1",
-				},
-			},
+		item := model.ReadTuplesItem{
+			ResourceNamespace: "rbac",
+			ResourceType:      "workspace",
+			ResourceId:        "ws-1",
+			Relation:          "member",
+			SubjectNamespace:  "rbac",
+			SubjectType:       "group",
+			SubjectId:         "group-1",
+			SubjectRelation:   &subjectRelation,
 		}
 
-		result := relationshipFromV1beta1ToProto(rel)
+		result := readTuplesItemToProto(item)
 
-		require.NotNil(t, result.Subject.Relation)
-		assert.Equal(t, "members", *result.Subject.Relation)
+		require.NotNil(t, result.Tuple.Subject.Relation)
+		assert.Equal(t, "members", *result.Tuple.Subject.Relation)
+	})
+
+	t.Run("with pagination and consistency token", func(t *testing.T) {
+		item := model.ReadTuplesItem{
+			ResourceNamespace: "rbac",
+			ResourceType:      "workspace",
+			ResourceId:        "ws-1",
+			Relation:          "member",
+			SubjectNamespace:  "rbac",
+			SubjectType:       "principal",
+			SubjectId:         "user-1",
+			ContinuationToken: "page-token-abc",
+			ConsistencyToken:  model.DeserializeConsistencyToken("ct-123"),
+		}
+
+		result := readTuplesItemToProto(item)
+
+		require.NotNil(t, result.Pagination)
+		assert.Equal(t, "page-token-abc", result.Pagination.ContinuationToken)
+		require.NotNil(t, result.ConsistencyToken)
+		assert.Equal(t, "ct-123", result.ConsistencyToken.Token)
 	})
 }

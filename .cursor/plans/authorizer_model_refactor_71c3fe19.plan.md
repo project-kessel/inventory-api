@@ -4,37 +4,37 @@ overview: Refactor the RelationsRepository (Authorizer) interface to eliminate p
 todos:
   - id: define-model-types
     content: Define new result and parameter types in internal/biz/model/ (CheckResult, CheckBulkItem, CheckBulkResult, TuplesResult, AcquireLockResult, HealthResult, LookupResourcesItem, LookupSubjectsItem, FencingCheck, ResultStream[T])
-    status: pending
+    status: completed
   - id: redefine-interface
     content: Rewrite RelationsRepository interface in relations_repository.go to use model-only types, remove protobuf imports
-    status: pending
+    status: completed
   - id: update-grpc-impl
     content: Update GRPCRelationsRepository to implement new interface, move all protobuf conversion into this layer
-    status: pending
+    status: completed
   - id: update-allow-all
     content: Update AllowAllRelationsRepository to implement new interface using model types
-    status: pending
+    status: completed
   - id: update-simple-repo
     content: Update SimpleRelationsRepository (test double) to implement new interface
-    status: pending
+    status: completed
   - id: update-usecase-layer
     content: "Simplify resource_service.go: remove v1beta1 conversion helpers, call Relations methods with model-typed parameters directly"
-    status: pending
+    status: completed
   - id: update-consumer
     content: "Update consumer.go: call Relations methods with model-typed parameters instead of protobuf requests, remove convertTuplesToRelationships/convertTupleToFilter"
-    status: pending
+    status: completed
   - id: update-health-repo
     content: Update healthrepository.go to use model.HealthResult instead of protobuf GetReadyzResponse
-    status: pending
+    status: completed
   - id: update-service-layer
     content: "Update kesselinventoryservice.go: handle ResultStream for lookups instead of grpc.ServerStreamingClient, update ToLookupResourceResponse/ToLookupSubjectsResponse"
-    status: pending
+    status: completed
   - id: update-mocks-tests
     content: Update MockRelationsRepository, all test files (resource_service_test.go, kesselinventoryservice_test.go, consumer_test.go) to use new model types
-    status: pending
+    status: completed
   - id: verify-compilation
     content: Ensure the project compiles and all tests pass after the refactoring
-    status: pending
+    status: completed
 isProject: false
 ---
 
@@ -211,7 +211,7 @@ All implementation files stay in `internal/data/` where they already live. `Rela
 - `internal/data/grpc_relations_repository.go` -- absorbs all protobuf conversion (currently in use case and consumer layers)
 - `internal/data/relations_allow_all.go` -- updated to return model types
 - `internal/data/relations_simple.go` -- updated to return model types (test double)
-- `internal/data/relations_factory.go` -- unchanged (already returns `model.RelationsRepository`)
+- `internal/data/relations_factory.go` -- renamed to `relations_repository_factory.go` for consistency (already returns `model.RelationsRepository`)
 
 Config stays in `internal/config/relations/` and `internal/config/relations/kessel/` as-is.
 

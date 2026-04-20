@@ -127,7 +127,7 @@ func TestDeleteTuples_Success(t *testing.T) {
 
 	namespace := "rbac"
 	cmd := DeleteTuplesCommand{
-		Filter: TupleFilter{
+		Filter: model.TupleFilter{
 			ResourceNamespace: &namespace,
 		},
 	}
@@ -146,7 +146,7 @@ func TestDeleteTuples_UsesDeleteTuplesRelation(t *testing.T) {
 
 	namespace := "rbac"
 	cmd := DeleteTuplesCommand{
-		Filter: TupleFilter{
+		Filter: model.TupleFilter{
 			ResourceNamespace: &namespace,
 		},
 	}
@@ -164,7 +164,7 @@ func TestDeleteTuples_MetaAuthzDenied(t *testing.T) {
 
 	namespace := "rbac"
 	cmd := DeleteTuplesCommand{
-		Filter: TupleFilter{
+		Filter: model.TupleFilter{
 			ResourceNamespace: &namespace,
 		},
 	}
@@ -181,7 +181,7 @@ func TestDeleteTuples_MetaAuthzContextMissing(t *testing.T) {
 
 	namespace := "rbac"
 	cmd := DeleteTuplesCommand{
-		Filter: TupleFilter{
+		Filter: model.TupleFilter{
 			ResourceNamespace: &namespace,
 		},
 	}
@@ -200,7 +200,7 @@ func TestReadTuples_Success(t *testing.T) {
 	uc := New(&data.AllowAllRelationsRepository{}, meta, log.DefaultLogger)
 
 	cmd := ReadTuplesCommand{
-		Filter:      TupleFilter{},
+		Filter:      model.TupleFilter{},
 		Consistency: model.NewConsistencyMinimizeLatency(),
 	}
 
@@ -217,7 +217,7 @@ func TestReadTuples_UsesReadTuplesRelation(t *testing.T) {
 	uc := New(&data.AllowAllRelationsRepository{}, meta, log.DefaultLogger)
 
 	cmd := ReadTuplesCommand{
-		Filter:      TupleFilter{},
+		Filter:      model.TupleFilter{},
 		Consistency: model.NewConsistencyMinimizeLatency(),
 	}
 
@@ -233,7 +233,7 @@ func TestReadTuples_MetaAuthzDenied(t *testing.T) {
 	uc := New(&data.AllowAllRelationsRepository{}, meta, log.DefaultLogger)
 
 	cmd := ReadTuplesCommand{
-		Filter:      TupleFilter{},
+		Filter:      model.TupleFilter{},
 		Consistency: model.NewConsistencyMinimizeLatency(),
 	}
 
@@ -248,7 +248,7 @@ func TestReadTuples_MetaAuthzContextMissing(t *testing.T) {
 	uc := New(&data.AllowAllRelationsRepository{}, meta, log.DefaultLogger)
 
 	cmd := ReadTuplesCommand{
-		Filter:      TupleFilter{},
+		Filter:      model.TupleFilter{},
 		Consistency: model.NewConsistencyMinimizeLatency(),
 	}
 
@@ -512,14 +512,14 @@ func TestWhitelistMetaAuthorizer_Integration_AllOperations(t *testing.T) {
 
 	t.Run("DeleteTuples", func(t *testing.T) {
 		namespace := "rbac"
-		cmd := DeleteTuplesCommand{Filter: TupleFilter{ResourceNamespace: &namespace}}
+		cmd := DeleteTuplesCommand{Filter: model.TupleFilter{ResourceNamespace: &namespace}}
 		_, err := uc.DeleteTuples(ctx, cmd)
 		require.NoError(t, err)
 	})
 
 	t.Run("ReadTuples", func(t *testing.T) {
 		cmd := ReadTuplesCommand{
-			Filter:      TupleFilter{},
+			Filter:      model.TupleFilter{},
 			Consistency: model.NewConsistencyMinimizeLatency(),
 		}
 		_, err := uc.ReadTuples(ctx, cmd)

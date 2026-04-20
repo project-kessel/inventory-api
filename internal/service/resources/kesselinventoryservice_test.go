@@ -2,6 +2,7 @@ package resources_test
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"regexp"
@@ -12,8 +13,6 @@ import (
 	kratosTransport "github.com/go-kratos/kratos/v2/transport"
 	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2"
 	"github.com/project-kessel/inventory-api/internal/biz/model_legacy"
-	relationsV1beta1 "github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
-	statuspb "google.golang.org/genproto/googleapis/rpc/status"
 	"google.golang.org/protobuf/types/known/structpb"
 
 	"github.com/project-kessel/inventory-api/internal/data"
@@ -35,6 +34,15 @@ import (
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
 )
+
+func testHelperTuple(namespace, resourceType, resourceID, relation, subjectNamespace, subjectType, subjectID string) model.RelationsTuple {
+	resourceObjType := model.NewRelationsObjectType(resourceType, namespace)
+	resource := model.NewRelationsResource(model.DeserializeLocalResourceId(resourceID), resourceObjType)
+	subjectObjType := model.NewRelationsObjectType(subjectType, subjectNamespace)
+	subjectResource := model.NewRelationsResource(model.DeserializeLocalResourceId(subjectID), subjectObjType)
+	subject := model.NewRelationsSubject(subjectResource, "")
+	return model.NewRelationsTuple(resource, relation, subject)
+}
 
 type testSelfSubjectStrategy struct{}
 
@@ -443,17 +451,11 @@ func IsValidType(val string) bool {
 }
 
 func TestToLookupResourceResponse(t *testing.T) {
-	input := &relationsV1beta1.LookupResourcesResponse{
-		Resource: &relationsV1beta1.ObjectReference{
-			Type: &relationsV1beta1.ObjectType{
-				Namespace: "reporter-x",
-				Name:      "type-y",
-			},
-			Id: "abc123",
-		},
-		Pagination: &relationsV1beta1.ResponsePagination{
-			ContinuationToken: "next-page-token",
-		},
+	input := model.LookupResourcesItem{
+		ResourceId:        model.DeserializeLocalResourceId("abc123"),
+		ResourceType:      model.DeserializeResourceType("type-y"),
+		ReporterType:      model.DeserializeReporterType("reporter-x"),
+		ContinuationToken: "next-page-token",
 	}
 
 	expected := &pb.StreamedListObjectsResponse{
@@ -656,37 +658,30 @@ func TestInventoryService_CheckSelfBulk_ResponseLengthMismatch(t *testing.T) {
 		// Edge case: CheckBulk returns more responses than requests (2 responses for 1 request)
 		// This should cause an Internal error since response length doesn't match request length
 		mockRelations := &mocks.MockRelationsRepository{}
+
+		key1, _ := model.NewReporterResourceKey(
+			model.DeserializeLocalResourceId("resource-1"),
+			model.DeserializeResourceType("host"),
+			model.DeserializeReporterType("hbi"),
+			model.DeserializeReporterInstanceId(""),
+		)
+		key2, _ := model.NewReporterResourceKey(
+			model.DeserializeLocalResourceId("resource-2"),
+			model.DeserializeResourceType("host"),
+			model.DeserializeReporterType("hbi"),
+			model.DeserializeReporterInstanceId(""),
+		)
 		mockRelations.
-			On("CheckBulk", mock.Anything, mock.Anything).
-			Return(&relationsV1beta1.CheckBulkResponse{
-				Pairs: []*relationsV1beta1.CheckBulkResponsePair{
+			On("CheckBulk", mock.Anything, mock.Anything, mock.Anything).
+			Return(model.CheckBulkResult{
+				Pairs: []model.CheckBulkResultPair{
 					{
-						Request: &relationsV1beta1.CheckBulkRequestItem{
-							Resource: &relationsV1beta1.ObjectReference{
-								Type: &relationsV1beta1.ObjectType{Namespace: "hbi", Name: "host"},
-								Id:   "resource-1",
-							},
-							Relation: "view",
-						},
-						Response: &relationsV1beta1.CheckBulkResponsePair_Item{
-							Item: &relationsV1beta1.CheckBulkResponseItem{
-								Allowed: relationsV1beta1.CheckBulkResponseItem_ALLOWED_TRUE,
-							},
-						},
+						Request: model.CheckBulkItem{Resource: key1, Relation: model.DeserializeRelation("view")},
+						Result:  model.CheckBulkResultItem{Allowed: true},
 					},
 					{
-						Request: &relationsV1beta1.CheckBulkRequestItem{
-							Resource: &relationsV1beta1.ObjectReference{
-								Type: &relationsV1beta1.ObjectType{Namespace: "hbi", Name: "host"},
-								Id:   "resource-2",
-							},
-							Relation: "view",
-						},
-						Response: &relationsV1beta1.CheckBulkResponsePair_Item{
-							Item: &relationsV1beta1.CheckBulkResponseItem{
-								Allowed: relationsV1beta1.CheckBulkResponseItem_ALLOWED_TRUE,
-							},
-						},
+						Request: model.CheckBulkItem{Resource: key2, Relation: model.DeserializeRelation("view")},
+						Result:  model.CheckBulkResultItem{Allowed: true},
 					},
 				},
 			}, nil).
@@ -1511,27 +1506,8 @@ func TestInventoryService_CheckBulk_ConsistencyToken(t *testing.T) {
 		snapshotVersion := simpleAuthz.RetainCurrentSnapshot() // Retain at v3
 
 		// Remove one permission -> v4
-		namespace := "hbi"
-		resourceType := "host"
-		resourceID := "resource-1"
-		relation := "view"
-		subjectNamespace := "rbac"
-		subjectType := "principal"
-		subjectID := "subject-a"
-
-		_, _ = simpleAuthz.DeleteTuples(context.Background(), &relationsV1beta1.DeleteTuplesRequest{
-			Filter: &relationsV1beta1.RelationTupleFilter{
-				ResourceNamespace: &namespace,
-				ResourceType:      &resourceType,
-				ResourceId:        &resourceID,
-				Relation:          &relation,
-				SubjectFilter: &relationsV1beta1.SubjectFilter{
-					SubjectNamespace: &subjectNamespace,
-					SubjectType:      &subjectType,
-					SubjectId:        &subjectID,
-				},
-			},
-		})
+		deleteTuple := testHelperTuple("hbi", "host", "resource-1", "view", "rbac", "principal", "subject-a")
+		_, _ = simpleAuthz.DeleteTuples(context.Background(), []model.RelationsTuple{deleteTuple}, nil)
 		currentVersion := simpleAuthz.Version()
 
 		uc := newTestUsecase(t, testUsecaseConfig{Relations: simpleAuthz})
@@ -1699,27 +1675,8 @@ func TestInventoryService_CheckSelfBulk_ConsistencyToken(t *testing.T) {
 		snapshotVersion := simpleAuthz.RetainCurrentSnapshot() // Retain at v3
 
 		// Remove one permission -> v4
-		namespace := "hbi"
-		resourceType := "host"
-		resourceID := "resource-1"
-		relation := "view"
-		subjectNamespace := "rbac"
-		subjectType := "principal"
-		subjectID := "subject-a"
-
-		_, _ = simpleAuthz.DeleteTuples(context.Background(), &relationsV1beta1.DeleteTuplesRequest{
-			Filter: &relationsV1beta1.RelationTupleFilter{
-				ResourceNamespace: &namespace,
-				ResourceType:      &resourceType,
-				ResourceId:        &resourceID,
-				Relation:          &relation,
-				SubjectFilter: &relationsV1beta1.SubjectFilter{
-					SubjectNamespace: &subjectNamespace,
-					SubjectType:      &subjectType,
-					SubjectId:        &subjectID,
-				},
-			},
-		})
+		deleteTuple := testHelperTuple("hbi", "host", "resource-1", "view", "rbac", "principal", "subject-a")
+		_, _ = simpleAuthz.DeleteTuples(context.Background(), []model.RelationsTuple{deleteTuple}, nil)
 		currentVersion := simpleAuthz.Version()
 
 		uc := newTestUsecase(t, testUsecaseConfig{Relations: simpleAuthz})
@@ -2709,55 +2666,48 @@ func TestInventoryService_CheckForUpdateBulk_AllAllowed(t *testing.T) {
 		// Edge case: Testing consistency token handling in CheckForUpdateBulk
 		// SimpleRelationsRepository doesn't support consistency tokens, so we mock CheckForUpdateBulk
 		mockRelations := &mocks.MockRelationsRepository{}
+
+		key1, _ := model.NewReporterResourceKey(
+			model.DeserializeLocalResourceId("resource-1"),
+			model.DeserializeResourceType("host"),
+			model.DeserializeReporterType("hbi"),
+			model.DeserializeReporterInstanceId(""),
+		)
+		key2, _ := model.NewReporterResourceKey(
+			model.DeserializeLocalResourceId("resource-2"),
+			model.DeserializeResourceType("host"),
+			model.DeserializeReporterType("hbi"),
+			model.DeserializeReporterInstanceId(""),
+		)
 		mockRelations.
 			On("CheckForUpdateBulk",
 				mock.Anything,
-				mock.MatchedBy(func(req *relationsV1beta1.CheckForUpdateBulkRequest) bool {
-					if len(req.Items) != 2 {
+				mock.MatchedBy(func(items []model.CheckBulkItem) bool {
+					if len(items) != 2 {
 						return false
 					}
-					s1 := req.Items[0].Subject
-					s2 := req.Items[1].Subject
-					return s1.Subject.Id == "subject-a" &&
-						s1.Subject.Type.Name == "principal" &&
-						s1.Subject.Type.Namespace == "rbac" &&
-						s2.Subject.Id == "subject-b" &&
-						s2.Subject.Type.Name == "principal" &&
-						s2.Subject.Type.Namespace == "rbac"
+					s1 := items[0].Subject.Subject()
+					s2 := items[1].Subject.Subject()
+					return string(s1.LocalResourceId()) == "subject-a" &&
+						string(s1.ResourceType()) == "principal" &&
+						string(s1.ReporterType()) == "rbac" &&
+						string(s2.LocalResourceId()) == "subject-b" &&
+						string(s2.ResourceType()) == "principal" &&
+						string(s2.ReporterType()) == "rbac"
 				}),
 			).
-			Return(&relationsV1beta1.CheckForUpdateBulkResponse{
-				Pairs: []*relationsV1beta1.CheckBulkResponsePair{
+			Return(model.CheckBulkResult{
+				Pairs: []model.CheckBulkResultPair{
 					{
-						Request: &relationsV1beta1.CheckBulkRequestItem{
-							Resource: &relationsV1beta1.ObjectReference{
-								Type: &relationsV1beta1.ObjectType{Namespace: "hbi", Name: "host"},
-								Id:   "resource-1",
-							},
-							Relation: "update",
-						},
-						Response: &relationsV1beta1.CheckBulkResponsePair_Item{
-							Item: &relationsV1beta1.CheckBulkResponseItem{
-								Allowed: relationsV1beta1.CheckBulkResponseItem_ALLOWED_TRUE,
-							},
-						},
+						Request: model.CheckBulkItem{Resource: key1, Relation: model.DeserializeRelation("update")},
+						Result:  model.CheckBulkResultItem{Allowed: true},
 					},
 					{
-						Request: &relationsV1beta1.CheckBulkRequestItem{
-							Resource: &relationsV1beta1.ObjectReference{
-								Type: &relationsV1beta1.ObjectType{Namespace: "hbi", Name: "host"},
-								Id:   "resource-2",
-							},
-							Relation: "update",
-						},
-						Response: &relationsV1beta1.CheckBulkResponsePair_Item{
-							Item: &relationsV1beta1.CheckBulkResponseItem{
-								Allowed: relationsV1beta1.CheckBulkResponseItem_ALLOWED_TRUE,
-							},
-						},
+						Request: model.CheckBulkItem{Resource: key2, Relation: model.DeserializeRelation("update")},
+						Result:  model.CheckBulkResultItem{Allowed: true},
 					},
 				},
-				ConsistencyToken: &relationsV1beta1.ConsistencyToken{Token: "update-bulk-token"},
+				ConsistencyToken: model.DeserializeConsistencyToken("update-bulk-token"),
 			}, nil).
 			Once()
 
@@ -3037,27 +2987,27 @@ func TestInventoryService_CheckForUpdateBulk_PairError(t *testing.T) {
 
 	runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
 		mockRelations := &mocks.MockRelationsRepository{}
+
+		key1, _ := model.NewReporterResourceKey(
+			model.DeserializeLocalResourceId("resource-1"),
+			model.DeserializeResourceType("host"),
+			model.DeserializeReporterType("hbi"),
+			model.DeserializeReporterInstanceId(""),
+		)
 		mockRelations.
 			On("CheckForUpdateBulk", mock.Anything, mock.Anything).
-			Return(&relationsV1beta1.CheckForUpdateBulkResponse{
-				Pairs: []*relationsV1beta1.CheckBulkResponsePair{
+			Return(model.CheckBulkResult{
+				Pairs: []model.CheckBulkResultPair{
 					{
-						Request: &relationsV1beta1.CheckBulkRequestItem{
-							Resource: &relationsV1beta1.ObjectReference{
-								Type: &relationsV1beta1.ObjectType{Namespace: "hbi", Name: "host"},
-								Id:   "resource-1",
-							},
-							Relation: "update",
-						},
-						Response: &relationsV1beta1.CheckBulkResponsePair_Error{
-							Error: &statuspb.Status{
-								Code:    int32(codes.PermissionDenied),
-								Message: "denied by policy",
-							},
+						Request: model.CheckBulkItem{Resource: key1, Relation: model.DeserializeRelation("update")},
+						Result: model.CheckBulkResultItem{
+							Allowed:   false,
+							Error:     errors.New("denied by policy"),
+							ErrorCode: int32(codes.PermissionDenied),
 						},
 					},
 				},
-				ConsistencyToken: &relationsV1beta1.ConsistencyToken{Token: "error-token"},
+				ConsistencyToken: model.DeserializeConsistencyToken("error-token"),
 			}, nil).
 			Once()
 		return TestServerConfig{

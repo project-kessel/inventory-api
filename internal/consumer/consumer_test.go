@@ -21,7 +21,6 @@ import (
 	"github.com/project-kessel/inventory-api/internal/testutil"
 
 	"github.com/go-kratos/kratos/v2/log"
-	"github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
 	"github.com/stretchr/testify/assert"
 
 	. "github.com/project-kessel/inventory-api/cmd/common"
@@ -513,7 +512,7 @@ func TestRebalanceCallback_AssignedPartitions(t *testing.T) {
 	tests := []struct {
 		name                  string
 		partitions            []kafka.TopicPartition
-		lockResponse          *v1beta1.AcquireLockResponse
+		lockResponse          *model.AcquireLockResult
 		lockError             error
 		expectedLockId        string
 		expectedLockToken     string
@@ -525,7 +524,7 @@ func TestRebalanceCallback_AssignedPartitions(t *testing.T) {
 			partitions: []kafka.TopicPartition{
 				{Partition: 0, Topic: ToPointer("test-topic")},
 			},
-			lockResponse: &v1beta1.AcquireLockResponse{
+			lockResponse: &model.AcquireLockResult{
 				LockToken: "test-lock-token-123",
 			},
 			lockError:             nil,
@@ -721,29 +720,23 @@ func TestFencingToken_WritingAfterRebalance(t *testing.T) {
 	testerB.inv.Config.ConsumerGroupID = "test-group"
 
 	relationsRepo := &mocks.MockRelationsRepository{}
-	createSuccessResponse := &v1beta1.CreateTuplesResponse{ConsistencyToken: &v1beta1.ConsistencyToken{Token: "test-token"}}
+	createSuccessResponse := model.TuplesResult{ConsistencyToken: model.DeserializeConsistencyToken("test-token")}
 
 	consumerAToken := "token-A"
 	consumerBToken := "token-B"
-	lockCall1 := relationsRepo.On("AcquireLock", mock.Anything, mock.MatchedBy(func(req *v1beta1.AcquireLockRequest) bool {
-		return req.LockId == "test-group/0"
-	})).Return(&v1beta1.AcquireLockResponse{LockToken: consumerAToken}, nil).Once()
+	lockCall1 := relationsRepo.On("AcquireLock", mock.Anything, "test-group/0").Return(model.AcquireLockResult{LockToken: consumerAToken}, nil).Once()
 
-	lockCall2 := relationsRepo.On("AcquireLock", mock.Anything, mock.MatchedBy(func(req *v1beta1.AcquireLockRequest) bool {
-		return req.LockId == "test-group/0"
-	})).Return(&v1beta1.AcquireLockResponse{LockToken: consumerBToken}, nil).Once()
+	lockCall2 := relationsRepo.On("AcquireLock", mock.Anything, "test-group/0").Return(model.AcquireLockResult{LockToken: consumerBToken}, nil).Once()
 
-	// Ensure the calls happen in the right order
 	lockCall2.NotBefore(lockCall1)
 
-	// Mock the CreateTuples calls to only accept consumer B's token
-	relationsRepo.On("CreateTuples", mock.Anything, mock.MatchedBy(func(req *v1beta1.CreateTuplesRequest) bool {
-		return req.FencingCheck != nil && req.FencingCheck.LockToken == consumerBToken
+	relationsRepo.On("CreateTuples", mock.Anything, mock.Anything, mock.Anything, mock.MatchedBy(func(fencing *model.FencingCheck) bool {
+		return fencing != nil && fencing.LockToken == consumerBToken
 	})).Return(createSuccessResponse, nil)
 
-	relationsRepo.On("CreateTuples", mock.Anything, mock.MatchedBy(func(req *v1beta1.CreateTuplesRequest) bool {
-		return req.FencingCheck != nil && req.FencingCheck.LockToken == consumerAToken
-	})).Return((*v1beta1.CreateTuplesResponse)(nil), errors.New("fencing token is invalid or expired"))
+	relationsRepo.On("CreateTuples", mock.Anything, mock.Anything, mock.Anything, mock.MatchedBy(func(fencing *model.FencingCheck) bool {
+		return fencing != nil && fencing.LockToken == consumerAToken
+	})).Return(model.TuplesResult{}, errors.New("fencing token is invalid or expired"))
 
 	testerA.inv.Relations = relationsRepo
 	testerB.inv.Relations = relationsRepo

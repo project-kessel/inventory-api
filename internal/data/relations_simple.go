@@ -38,11 +38,21 @@ type simpleTupleKey struct {
 // Tests can retain old snapshots via RetainCurrentSnapshot() to test consistency
 // token behavior. Check operations with an "at least as fresh" token will use
 // the oldest retained snapshot that is >= the requested version.
+//
+// # Failure Simulation
+//
+// Tests can configure failure modes via SetHealthError(), SetCreateTuplesError(),
+// SetDeleteTuplesError(), and SetAcquireLockError() to simulate Relations API failures.
 type SimpleRelationsRepository struct {
-	mu        sync.RWMutex
-	version   int64                             // current version (monotonically increasing)
-	tuples    map[simpleTupleKey]bool           // current/latest tuple state
-	snapshots map[int64]map[simpleTupleKey]bool // retained historical snapshots (version -> tuples)
+	mu                sync.RWMutex
+	version           int64                             // current version (monotonically increasing)
+	tuples            map[simpleTupleKey]bool           // current/latest tuple state
+	snapshots         map[int64]map[simpleTupleKey]bool // retained historical snapshots (version -> tuples)
+	healthError       error                             // if set, Health() returns this error
+	createTuplesError error                             // if set, CreateTuples() returns this error
+	deleteTuplesError error                             // if set, DeleteTuples() returns this error
+	acquireLockError  error                             // if set, AcquireLock() returns this error
+	locks             map[string]string                 // lockId -> token
 }
 
 // NewSimpleRelationsRepository creates a SimpleRelationsRepository with no tuples at version 1.
@@ -51,6 +61,7 @@ func NewSimpleRelationsRepository() *SimpleRelationsRepository {
 		version:   1,
 		tuples:    make(map[simpleTupleKey]bool),
 		snapshots: make(map[int64]map[simpleTupleKey]bool),
+		locks:     make(map[string]string),
 	}
 }
 
@@ -158,13 +169,18 @@ func (s *SimpleRelationsRepository) Grant(subjectID, relation, namespace, resour
 	s.advanceVersion()
 }
 
-// Reset clears all tuples and snapshots, resetting version to 1.
+// Reset restores the repository to its initial state (equivalent to NewSimpleRelationsRepository).
 func (s *SimpleRelationsRepository) Reset() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.tuples = make(map[simpleTupleKey]bool)
 	s.snapshots = make(map[int64]map[simpleTupleKey]bool)
+	s.locks = make(map[string]string)
 	s.version = 1
+	s.healthError = nil
+	s.createTuplesError = nil
+	s.deleteTuplesError = nil
+	s.acquireLockError = nil
 }
 
 // simpleHasTupleInSnapshot checks if a tuple exists in the given tuple map.
@@ -201,9 +217,49 @@ func simpleTupleKeyFromRelationship(rel *kessel.Relationship) simpleTupleKey {
 	return key
 }
 
+// SetHealthError configures the error returned by Health().
+// Pass nil to simulate healthy state (default).
+// This allows tests to simulate Relations API failures.
+func (s *SimpleRelationsRepository) SetHealthError(err error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.healthError = err
+}
+
+// SetCreateTuplesError configures the error that CreateTuples() will return.
+// This allows tests to simulate CreateTuples failures.
+func (s *SimpleRelationsRepository) SetCreateTuplesError(err error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.createTuplesError = err
+}
+
+// SetDeleteTuplesError configures the error that DeleteTuples() will return.
+// This allows tests to simulate DeleteTuples failures.
+func (s *SimpleRelationsRepository) SetDeleteTuplesError(err error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.deleteTuplesError = err
+}
+
+// SetAcquireLockError configures the error that AcquireLock() will return.
+// This allows tests to simulate AcquireLock failures.
+func (s *SimpleRelationsRepository) SetAcquireLockError(err error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.acquireLockError = err
+}
+
 // Health implements RelationsRepository.
+// Returns the configured health error if set via SetHealthError, otherwise returns healthy response.
 func (s *SimpleRelationsRepository) Health(_ context.Context) (*kesselv1.GetReadyzResponse, error) {
-	return &kesselv1.GetReadyzResponse{}, nil
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	if s.healthError != nil {
+		return nil, s.healthError
+	}
+	return &kesselv1.GetReadyzResponse{Status: "OK"}, nil
 }
 
 // Check implements RelationsRepository.
@@ -470,11 +526,17 @@ func (s *SimpleRelationsRepository) LookupSubjects(_ context.Context, req *kesse
 	return &simpleLookupSubjectsStream{results: results}, nil
 }
 
-// CreateTuples implements RelationsRepository by storing the relationship tuples.
+// CreateTuples implements RelationsRepository by storing the given tuples.
 // This advances the version counter.
+// Returns the configured error if set via SetCreateTuplesError.
 func (s *SimpleRelationsRepository) CreateTuples(_ context.Context, req *kessel.CreateTuplesRequest) (*kessel.CreateTuplesResponse, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
+	// Return configured error if set
+	if s.createTuplesError != nil {
+		return nil, s.createTuplesError
+	}
 
 	for _, rel := range req.GetTuples() {
 		key := simpleTupleKeyFromRelationship(rel)
@@ -482,19 +544,33 @@ func (s *SimpleRelationsRepository) CreateTuples(_ context.Context, req *kessel.
 	}
 	s.advanceVersion()
 
-	return &kessel.CreateTuplesResponse{}, nil
+	return &kessel.CreateTuplesResponse{
+		ConsistencyToken: &kessel.ConsistencyToken{
+			Token: strconv.FormatInt(s.version, 10),
+		},
+	}, nil
 }
 
 // DeleteTuples implements RelationsRepository by removing tuples matching the filter.
 // This advances the version counter.
+// Returns the configured error if set via SetDeleteTuplesError.
 func (s *SimpleRelationsRepository) DeleteTuples(_ context.Context, req *kessel.DeleteTuplesRequest) (*kessel.DeleteTuplesResponse, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	// Return configured error if set
+	if s.deleteTuplesError != nil {
+		return nil, s.deleteTuplesError
+	}
+
 	filter := req.GetFilter()
 	if filter == nil {
 		s.advanceVersion()
-		return &kessel.DeleteTuplesResponse{}, nil
+		return &kessel.DeleteTuplesResponse{
+			ConsistencyToken: &kessel.ConsistencyToken{
+				Token: strconv.FormatInt(s.version, 10),
+			},
+		}, nil
 	}
 
 	for key := range s.tuples {
@@ -504,7 +580,11 @@ func (s *SimpleRelationsRepository) DeleteTuples(_ context.Context, req *kessel.
 	}
 	s.advanceVersion()
 
-	return &kessel.DeleteTuplesResponse{}, nil
+	return &kessel.DeleteTuplesResponse{
+		ConsistencyToken: &kessel.ConsistencyToken{
+			Token: strconv.FormatInt(s.version, 10),
+		},
+	}, nil
 }
 
 func simpleMatchesFilter(key simpleTupleKey, filter *kessel.RelationTupleFilter) bool {
@@ -574,9 +654,26 @@ func (s *SimpleRelationsRepository) ReadTuples(_ context.Context, req *kessel.Re
 	return &simpleReadTuplesStream{results: results}, nil
 }
 
-// AcquireLock implements RelationsRepository.
-func (s *SimpleRelationsRepository) AcquireLock(_ context.Context, _ *kessel.AcquireLockRequest) (*kessel.AcquireLockResponse, error) {
-	return &kessel.AcquireLockResponse{}, nil
+// AcquireLock implements RelationsRepository by simulating lock acquisition.
+// Returns the configured error if set via SetAcquireLockError, otherwise generates
+// a lock token based on the lock ID and stores it.
+func (s *SimpleRelationsRepository) AcquireLock(_ context.Context, req *kessel.AcquireLockRequest) (*kessel.AcquireLockResponse, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	// Return configured error if set
+	if s.acquireLockError != nil {
+		return nil, s.acquireLockError
+	}
+
+	// Generate lock token from lock ID (simplified - just use the lock ID as the token)
+	lockId := req.GetLockId()
+	token := "token-" + lockId
+	s.locks[lockId] = token
+
+	return &kessel.AcquireLockResponse{
+		LockToken: token,
+	}, nil
 }
 
 // UnsetWorkspace implements RelationsRepository.

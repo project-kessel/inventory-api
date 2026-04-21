@@ -59,9 +59,9 @@ make docker-build-push
 
 **Status**: Active - Currently in Phase 2
 
-**Context File**: [`CLAUDE_initiatives/MERGE-RELATIONS-API.md`](./CLAUDE_initiatives/MERGE-RELATIONS-API.md)
+**Context File**: [`AGENT_initiatives/MERGE-RELATIONS-API.md`](./AGENT_initiatives/MERGE-RELATIONS-API.md)
 
-**IMPORTANT**: When working on this initiative, **ALWAYS read `CLAUDE_initiatives/MERGE-RELATIONS-API.md`** first. That file contains:
+**IMPORTANT**: When working on this initiative, **ALWAYS read `AGENT_initiatives/MERGE-RELATIONS-API.md`** first. That file contains:
 - Complete initiative plan and phase details
 - Current objectives and work in progress
 - Jira issue configuration and conventions

@@ -72,8 +72,9 @@ When reading this file:
 3. Review for any changes to objectives, phases, or requirements
 4. Prompt the user to update this file and related context if changes are found
 5. Update the "Last initiative plan read" date to today's date
-6. Read Jira comments for all issues listed in "Currently Active Work":
-   - Check for new comments from team members since the last context refresh
+6. Check Jira issues for all items listed in "Currently Active Work":
+   - Read new comments from team members since the last context refresh
+   - Check assignee - flag to user if it has changed, especially if it's now unassigned or assigned to someone else
    - Flag to the user any important observations, questions, approach concerns, or discussion points
 
 ### Updating Jira Status
@@ -84,7 +85,8 @@ When instructed to update Jira issue status or transitions:
 2. Update the "Currently Active Work" section of this file:
    - Add issues that are moved to active statuses ("In Progress", "Code Review", etc.)
    - Remove issues that are moved to completed or blocked status
-   - Include the current status in parentheses for clarity (e.g., "(Code Review)")
+   - Include assignee and status in parentheses (e.g., "(Mark McLaughlin, Code Review)")
+   - Use "Unassigned" if no assignee is set
    - Keep this section as a simple list of what's currently being worked on
 
 ### Adding Jira Comments
@@ -105,7 +107,7 @@ When instructed to add a comment to a Jira issue:
 
 ## Currently Active Work
 
-- **RHCLOUD-46020** - Phase 2: Update client sdks to incorporate all new inventory-api endpoints (In Progress)
+- **RHCLOUD-46020** - Phase 2: Update client sdks to incorporate all new inventory-api endpoints (Jonathan Marcantonio, In Progress)
 
 **Note**: For all issues related to this initiative, query Jira using parent epic [RHCLOUD-44628](https://issues.redhat.com/browse/RHCLOUD-44628).
 

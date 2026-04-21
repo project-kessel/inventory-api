@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+package kessel.inventory.v1beta2;
+
+import "buf/validate/validate.proto";
+
+option go_package = "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2";
+option java_multiple_files = true;
+option java_package = "org.project_kessel.api.inventory.v1beta2";
+
+// DEPRECATED: AcquireLockRequest is part of the legacy tuple-layer API.
+// This type exists only for RBAC backward compatibility and will be removed.
+message AcquireLockRequest {
+  // Note: Relations-api uses .required = true, but that doesn't enforce non-empty
+  // on proto3 strings. In relations-api, empty value would fail internally anyway.
+  string lock_id = 1 [(buf.validate.field).string.min_len = 1];
+}

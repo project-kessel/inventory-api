@@ -11,6 +11,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/project-kessel/inventory-api/internal/biz/model"
+	"github.com/project-kessel/inventory-api/internal/biz/usecase/metaauthorizer"
 	"github.com/project-kessel/inventory-api/internal/biz/usecase/resources"
 )
 
@@ -24,7 +25,7 @@ func TestMapError(t *testing.T) {
 		// Application-layer errors (from usecase)
 		{
 			name:         "ErrMetaAuthzContextMissing maps to Unauthenticated",
-			err:          resources.ErrMetaAuthzContextMissing,
+			err:          metaauthorizer.ErrMetaAuthzContextMissing,
 			expectedCode: codes.Unauthenticated,
 			expectedMsg:  "authz context missing",
 		},
@@ -36,13 +37,13 @@ func TestMapError(t *testing.T) {
 		},
 		{
 			name:         "ErrMetaAuthorizerUnavailable maps to Internal",
-			err:          resources.ErrMetaAuthorizerUnavailable,
+			err:          metaauthorizer.ErrMetaAuthorizerUnavailable,
 			expectedCode: codes.Internal,
 			expectedMsg:  "meta authorizer unavailable",
 		},
 		{
 			name:         "ErrMetaAuthorizationDenied maps to PermissionDenied",
-			err:          resources.ErrMetaAuthorizationDenied,
+			err:          metaauthorizer.ErrMetaAuthorizationDenied,
 			expectedCode: codes.PermissionDenied,
 			expectedMsg:  "meta authorization denied",
 		},
@@ -147,7 +148,7 @@ func TestMapError_WrappedErrors(t *testing.T) {
 		},
 		{
 			name:         "wrapped ErrMetaAuthorizationDenied maps to PermissionDenied",
-			err:          fmt.Errorf("authorization check failed: %w", resources.ErrMetaAuthorizationDenied),
+			err:          fmt.Errorf("authorization check failed: %w", metaauthorizer.ErrMetaAuthorizationDenied),
 			expectedCode: codes.PermissionDenied,
 		},
 		{

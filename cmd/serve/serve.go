@@ -20,6 +20,7 @@ import (
 	"github.com/project-kessel/inventory-api/cmd/common"
 	"github.com/project-kessel/inventory-api/internal/biz/usecase/metaauthorizer"
 	resourcesctl "github.com/project-kessel/inventory-api/internal/biz/usecase/resources"
+	tuplesctl "github.com/project-kessel/inventory-api/internal/biz/usecase/tuples"
 	"github.com/project-kessel/inventory-api/internal/config/schema"
 	"github.com/project-kessel/inventory-api/internal/consistency"
 	"github.com/project-kessel/inventory-api/internal/consumer"
@@ -29,6 +30,7 @@ import (
 
 	//v1beta2
 	resourcesvc "github.com/project-kessel/inventory-api/internal/service/resources"
+	tuplesvc "github.com/project-kessel/inventory-api/internal/service/tuples"
 
 	"github.com/project-kessel/inventory-api/internal/authn"
 	"github.com/project-kessel/inventory-api/internal/config/relations"
@@ -61,6 +63,7 @@ func NewCommand(
 	loggerOptions common.LoggerOptions,
 	schemaOptions *schema.Options,
 	businessMetricsOptions *metricscollector.Options,
+	metaAuthorizerOptions *metaauthorizer.Options,
 ) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "serve",
@@ -148,6 +151,18 @@ func NewCommand(
 				return errors.NewAggregate(errs)
 			}
 			schemaConfig, errs := schema.NewConfig(schemaOptions).Complete()
+			if errs != nil {
+				return errors.NewAggregate(errs)
+			}
+
+			// configure metaauthorizer
+			if errs := metaAuthorizerOptions.Complete(); errs != nil {
+				return errors.NewAggregate(errs)
+			}
+			if errs := metaAuthorizerOptions.Validate(); errs != nil {
+				return errors.NewAggregate(errs)
+			}
+			metaAuthorizerConfig, errs := metaauthorizer.NewConfig(metaAuthorizerOptions).Complete()
 			if errs != nil {
 				return errors.NewAggregate(errs)
 			}
@@ -282,6 +297,15 @@ func NewCommand(
 			pbv1beta2.RegisterKesselInventoryServiceServer(server.GrpcServer, inventory_service)
 			pbv1beta2.RegisterKesselInventoryServiceHTTPServer(server.HttpServer, inventory_service)
 
+			// DEPRECATED: Legacy tuple service for RBAC-only backward compatibility
+			tuple_crud_usecase := tuplesctl.New(
+				relationsRepo,
+				metaauthorizer.NewWhitelistMetaAuthorizer(metaAuthorizerConfig.TupleCrudAllowlist),
+				log.With(logger, "subsystem", "tuple_crud_controller"),
+			)
+			tuple_service := tuplesvc.New(tuple_crud_usecase)
+			pbv1beta2.RegisterKesselTupleServiceServer(server.GrpcServer, tuple_service)
+
 			health_repo := healthrepo.New(db, relationsRepo, authzConfig)
 			health_controller := healthctl.New(health_repo, log.With(logger, "subsystem", "health_controller"))
 			health_service := healthssvc.New(health_controller)
@@ -360,6 +384,7 @@ func NewCommand(
 	schemaOptions.AddFlags(cmd.Flags(), "schema")
 	selfSubjectOptions.AddFlags(cmd.Flags(), "selfsubjectstrategy")
 	businessMetricsOptions.AddFlags(cmd.Flags(), "business-metrics")
+	metaAuthorizerOptions.AddFlags(cmd.Flags(), "metaauthorizer")
 
 	return cmd
 }

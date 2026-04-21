@@ -38,6 +38,7 @@ bin/
 # Develop tools
 .vscode/
 .idea/
+.cursor/
 *.swp
 .docker
 

@@ -20,6 +20,12 @@ const RelationCheckSelfBulk Relation = "check_self_bulk"
 const RelationCheckForUpdateBulk Relation = "check_for_update_bulk"
 const RelationCheckForUpdateSelfBulk Relation = "check_for_update_self_bulk"
 
+// Tuple-layer relations (DEPRECATED - for RBAC backward compatibility only)
+const RelationCreateTuples Relation = "create_tuples"
+const RelationDeleteTuples Relation = "delete_tuples"
+const RelationReadTuples Relation = "read_tuples"
+const RelationAcquireLock Relation = "acquire_lock"
+
 // SimpleMetaAuthorizer implements the current decision rules:
 // - HTTP + x-rh-identity: allow only if relation == "check_self"
 // - gRPC: deny if relation == "check_self", allow otherwise

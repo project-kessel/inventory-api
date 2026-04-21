@@ -150,6 +150,42 @@ func (a *AllowAllRelationsRepository) DeleteTuples(ctx context.Context, r *v1bet
 	return &v1beta1.DeleteTuplesResponse{}, nil
 }
 
+type allowAllReadTuplesClient struct {
+	ctx context.Context
+}
+
+func (m *allowAllReadTuplesClient) Recv() (*v1beta1.ReadTuplesResponse, error) {
+	return nil, io.EOF
+}
+
+func (m *allowAllReadTuplesClient) Header() (metadata.MD, error) {
+	return nil, nil
+}
+
+func (m *allowAllReadTuplesClient) Trailer() metadata.MD {
+	return nil
+}
+
+func (m *allowAllReadTuplesClient) CloseSend() error {
+	return nil
+}
+
+func (m *allowAllReadTuplesClient) Context() context.Context {
+	return m.ctx
+}
+
+func (m *allowAllReadTuplesClient) SendMsg(msg interface{}) error {
+	return nil
+}
+
+func (m *allowAllReadTuplesClient) RecvMsg(msg interface{}) error {
+	return nil
+}
+
+func (a *AllowAllRelationsRepository) ReadTuples(ctx context.Context, r *v1beta1.ReadTuplesRequest) (grpc.ServerStreamingClient[v1beta1.ReadTuplesResponse], error) {
+	return &allowAllReadTuplesClient{ctx: ctx}, nil
+}
+
 func (a *AllowAllRelationsRepository) UnsetWorkspace(ctx context.Context, local_resource_id, name, namespace string) (*v1beta1.DeleteTuplesResponse, error) {
 	return &v1beta1.DeleteTuplesResponse{}, nil
 }

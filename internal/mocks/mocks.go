@@ -44,7 +44,7 @@ func (m *MockHealthRepo) IsRelationsAvailable(ctx context.Context) (*pb.GetReady
 //   - AcquireLock: for complex fencing token validation scenarios
 //   - CreateTuples: for complex fencing token validation scenarios
 //
-// All other tests should use SimpleRelationsRepository (a fake) instead.
+// All other methods panic to enforce use of SimpleRelationsRepository (a fake) for normal test cases.
 type MockRelationsRepository struct {
 	mock.Mock
 }
@@ -86,6 +86,10 @@ func (m *MockRelationsRepository) CreateTuples(ctx context.Context, req *v1beta1
 
 func (m *MockRelationsRepository) Health(ctx context.Context) (*kesselv1.GetReadyzResponse, error) {
 	panic("MockRelationsRepository.Health() is not supported - use SimpleRelationsRepository instead")
+}
+
+func (m *MockRelationsRepository) ReadTuples(ctx context.Context, request *v1beta1.ReadTuplesRequest) (grpc.ServerStreamingClient[v1beta1.ReadTuplesResponse], error) {
+	panic("MockRelationsRepository.ReadTuples() is not supported - use SimpleRelationsRepository instead")
 }
 
 func (m *MockRelationsRepository) Check(ctx context.Context, namespace string, permission string, consistencyToken string, resourceType string, localResourceId string, sub *v1beta1.SubjectReference) (v1beta1.CheckResponse_Allowed, *v1beta1.ConsistencyToken, error) {

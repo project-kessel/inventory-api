@@ -6,7 +6,6 @@ import (
 	"github.com/spf13/pflag"
 )
 
-// TODO: presumably more will go here to authenticate Common Inventory as a service to call Kessel.
 type Options struct {
 	URL            string `mapstructure:"url"`
 	Insecure       bool   `mapstructure:"insecure-client"`

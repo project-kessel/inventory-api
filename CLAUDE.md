@@ -1,6 +1,57 @@
-# Inventory-API Codebase Context
+# Kessel Inventory API - Claude Code Configuration
 
-This is the inventory-api codebase for the Kessel project at Red Hat.
+## Project Context
+
+This is the Kessel Inventory API, a Go-based microservice for resource inventory management using:
+- **gRPC and HTTP APIs** with protobuf definitions and Kratos framework
+- **PostgreSQL/SQLite** with GORM ORM and serializable transactions  
+- **Kafka integration** for event processing via Debezium CDC
+- **Relations API** integration for authorization
+- **Multi-protocol authentication** (OIDC, X-RH-Identity, development modes)
+
+## Build and Test Commands
+
+```bash
+# Build the project
+make local-build
+
+# Run tests
+make test
+
+# Run with coverage
+make test-coverage
+
+# Setup local database
+make db/setup
+
+# Run migrations
+make migrate
+
+# Start development server
+make run
+
+# Generate API code from protobuf
+make api
+
+# Build container images
+make docker-build-push
+```
+
+## Development Guidelines
+
+- Follow the domain-specific guidelines in `docs/` for consistent patterns
+- Use `buf.build` toolchain for protobuf development and breaking change detection
+- All database operations should use the transaction manager with serializable isolation
+- Write comprehensive tests following the established patterns in `testframework_test.go`
+- Security-first approach: never bypass authentication/authorization
+- Performance-conscious: use streaming for large datasets, avoid blocking operations
+
+## Architecture Notes
+
+- **Clean Architecture**: `internal/biz` (business), `internal/data` (persistence), `internal/service` (API)
+- **Event Sourcing**: Outbox pattern with WAL/table modes for reliable event publishing
+- **CQRS**: Read-after-write consistency with Relations API integration
+- **Hexagonal**: Port abstractions for external dependencies
 
 ## Ongoing Initiatives
 
@@ -22,8 +73,4 @@ This is the inventory-api codebase for the Kessel project at Red Hat.
 - Initiative Plan: [Google Doc](https://docs.google.com/document/d/1_VZvitlp7Db2AQbXqoe5KnqR3o35ekXsAgJDhi1ALk4/edit)
 - Customer Analysis: [Google Sheet](https://docs.google.com/spreadsheets/d/1SrhiWuJYvsYwzYRrUq52htpEE1ft2zAq-8WdDbBV8Ak/edit?usp=sharing)
 
-## Codebase Information
-
-- **Language**: Go
-- **Repository**: github.com/project-kessel/inventory-api
-- **Main Services**: Inventory API, (soon to include embedded Relations functionality)
+@AGENTS.md

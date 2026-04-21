@@ -1,4 +1,4 @@
-package kessel
+package data
 
 import (
 	"bytes"
@@ -12,6 +12,7 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/patrickmn/go-cache"
+	"github.com/project-kessel/inventory-api/internal/config/relations/kessel"
 	"google.golang.org/grpc"
 )
 
@@ -50,13 +51,13 @@ func WithInsecureBearerToken(token string) grpc.CallOption {
 }
 
 // NewTokenClient creates and returns a new tokenClient client.
-func NewTokenClient(config *tokenClientConfig) *tokenClient {
+func NewTokenClient(config *kessel.TokenClientConfig) *tokenClient {
 	return &tokenClient{
-		ClientID:       config.clientId,
-		ClientSecret:   config.clientSecret,
-		URL:            config.url,
-		EnableOIDCAuth: config.enableOIDCAuth,
-		Insecure:       config.insecure,
+		ClientID:       config.GetClientId(),
+		ClientSecret:   config.GetClientSecret(),
+		URL:            config.GetURL(),
+		EnableOIDCAuth: config.GetEnableOIDCAuth(),
+		Insecure:       config.GetInsecure(),
 		cache:          cache.New(tokenLifeDuration, cacheCleanupInterval),
 	}
 }

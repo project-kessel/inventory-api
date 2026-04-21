@@ -8,10 +8,10 @@ import (
 	"github.com/go-kratos/kratos/v2/transport"
 	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1"
 	"github.com/project-kessel/inventory-api/internal/pubsub"
-	kesselv1 "github.com/project-kessel/relations-api/api/kessel/relations/v1"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 
+	kesselv1 "github.com/project-kessel/relations-api/api/kessel/relations/v1"
 	"github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
 	"github.com/stretchr/testify/mock"
 )
@@ -37,69 +37,83 @@ func (m *MockHealthRepo) IsRelationsAvailable(ctx context.Context) (*pb.GetReady
 
 }
 
-type MockAuthz struct {
+// MockRelationsRepository is a minimal mock for RelationsRepository.
+// It only implements methods needed for edge-case tests that SimpleRelationsRepository cannot produce:
+//   - CheckBulk: for response length mismatches
+//   - CheckForUpdateBulk: for per-pair errors
+//   - AcquireLock: for complex fencing token validation scenarios
+//   - CreateTuples: for complex fencing token validation scenarios
+//
+// All other tests should use SimpleRelationsRepository (a fake) instead.
+type MockRelationsRepository struct {
 	mock.Mock
 }
 
-func (m *MockAuthz) Health(ctx context.Context) (*kesselv1.GetReadyzResponse, error) {
-	args := m.Called(ctx)
-	return args.Get(0).(*kesselv1.GetReadyzResponse), args.Error(1)
-}
-
-func (m *MockAuthz) Check(ctx context.Context, namespace string, permission string, consistencyToken string, resourceType string, localResourceId string, sub *v1beta1.SubjectReference) (v1beta1.CheckResponse_Allowed, *v1beta1.ConsistencyToken, error) {
-	args := m.Called(ctx, namespace, permission, consistencyToken, resourceType, localResourceId, sub)
-	return args.Get(0).(v1beta1.CheckResponse_Allowed), args.Get(1).(*v1beta1.ConsistencyToken), args.Error(2)
-}
-
-func (m *MockAuthz) CheckForUpdate(ctx context.Context, namespace string, permission string, resourceType string, localResourceId string, sub *v1beta1.SubjectReference) (v1beta1.CheckForUpdateResponse_Allowed, *v1beta1.ConsistencyToken, error) {
-	args := m.Called(ctx, namespace, permission, resourceType, localResourceId, sub)
-	return args.Get(0).(v1beta1.CheckForUpdateResponse_Allowed), args.Get(1).(*v1beta1.ConsistencyToken), args.Error(2)
-}
-
-func (m *MockAuthz) CheckBulk(ctx context.Context, req *v1beta1.CheckBulkRequest) (*v1beta1.CheckBulkResponse, error) {
+func (m *MockRelationsRepository) CheckBulk(ctx context.Context, req *v1beta1.CheckBulkRequest) (*v1beta1.CheckBulkResponse, error) {
 	args := m.Called(ctx, req)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
 	return args.Get(0).(*v1beta1.CheckBulkResponse), args.Error(1)
 }
 
-func (m *MockAuthz) CheckForUpdateBulk(ctx context.Context, req *v1beta1.CheckForUpdateBulkRequest) (*v1beta1.CheckForUpdateBulkResponse, error) {
+func (m *MockRelationsRepository) CheckForUpdateBulk(ctx context.Context, req *v1beta1.CheckForUpdateBulkRequest) (*v1beta1.CheckForUpdateBulkResponse, error) {
 	args := m.Called(ctx, req)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
 	return args.Get(0).(*v1beta1.CheckForUpdateBulkResponse), args.Error(1)
 }
 
-func (m *MockAuthz) AcquireLock(ctx context.Context, req *v1beta1.AcquireLockRequest) (*v1beta1.AcquireLockResponse, error) {
+func (m *MockRelationsRepository) AcquireLock(ctx context.Context, req *v1beta1.AcquireLockRequest) (*v1beta1.AcquireLockResponse, error) {
 	args := m.Called(ctx, req)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
 	return args.Get(0).(*v1beta1.AcquireLockResponse), args.Error(1)
 }
 
-func (m *MockAuthz) CreateTuples(ctx context.Context, req *v1beta1.CreateTuplesRequest) (*v1beta1.CreateTuplesResponse, error) {
+func (m *MockRelationsRepository) CreateTuples(ctx context.Context, req *v1beta1.CreateTuplesRequest) (*v1beta1.CreateTuplesResponse, error) {
 	args := m.Called(ctx, req)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
 	return args.Get(0).(*v1beta1.CreateTuplesResponse), args.Error(1)
 }
 
-func (m *MockAuthz) DeleteTuples(ctx context.Context, request *v1beta1.DeleteTuplesRequest) (*v1beta1.DeleteTuplesResponse, error) {
-	args := m.Called(ctx, request)
-	return args.Get(0).(*v1beta1.DeleteTuplesResponse), args.Error(1)
+// Stub methods that panic to enforce use of SimpleRelationsRepository for normal test cases.
+// MockRelationsRepository should only be used for edge cases that cannot be produced by SimpleRelationsRepository.
+
+func (m *MockRelationsRepository) Health(ctx context.Context) (*kesselv1.GetReadyzResponse, error) {
+	panic("MockRelationsRepository.Health() is not supported - use SimpleRelationsRepository instead")
 }
 
-func (m *MockAuthz) UnsetWorkspace(ctx context.Context, namespace, localResourceId, resourceType string) (*v1beta1.DeleteTuplesResponse, error) {
-	args := m.Called(ctx, namespace, localResourceId, resourceType)
-	return args.Get(0).(*v1beta1.DeleteTuplesResponse), args.Error(1)
+func (m *MockRelationsRepository) Check(ctx context.Context, namespace string, permission string, consistencyToken string, resourceType string, localResourceId string, sub *v1beta1.SubjectReference) (v1beta1.CheckResponse_Allowed, *v1beta1.ConsistencyToken, error) {
+	panic("MockRelationsRepository.Check() is not supported - use SimpleRelationsRepository instead")
 }
 
-func (m *MockAuthz) SetWorkspace(ctx context.Context, local_resource_id, workspace, namespace, name string, upsert bool) (*v1beta1.CreateTuplesResponse, error) {
-	args := m.Called(ctx, local_resource_id, workspace, namespace, name)
-	return args.Get(0).(*v1beta1.CreateTuplesResponse), args.Error(1)
+func (m *MockRelationsRepository) CheckForUpdate(ctx context.Context, namespace string, permission string, resourceType string, localResourceId string, sub *v1beta1.SubjectReference) (v1beta1.CheckForUpdateResponse_Allowed, *v1beta1.ConsistencyToken, error) {
+	panic("MockRelationsRepository.CheckForUpdate() is not supported - use SimpleRelationsRepository instead")
 }
 
-// Update the MockAuthz LookupResources method to match the exact signature
-func (m *MockAuthz) LookupResources(ctx context.Context, request *v1beta1.LookupResourcesRequest) (grpc.ServerStreamingClient[v1beta1.LookupResourcesResponse], error) {
-	args := m.Called(ctx, request)
-	return args.Get(0).(grpc.ServerStreamingClient[v1beta1.LookupResourcesResponse]), args.Error(1)
+func (m *MockRelationsRepository) LookupResources(ctx context.Context, in *v1beta1.LookupResourcesRequest) (grpc.ServerStreamingClient[v1beta1.LookupResourcesResponse], error) {
+	panic("MockRelationsRepository.LookupResources() is not supported - use SimpleRelationsRepository instead")
 }
 
-func (m *MockAuthz) LookupSubjects(ctx context.Context, request *v1beta1.LookupSubjectsRequest) (grpc.ServerStreamingClient[v1beta1.LookupSubjectsResponse], error) {
-	args := m.Called(ctx, request)
-	return args.Get(0).(grpc.ServerStreamingClient[v1beta1.LookupSubjectsResponse]), args.Error(1)
+func (m *MockRelationsRepository) LookupSubjects(ctx context.Context, in *v1beta1.LookupSubjectsRequest) (grpc.ServerStreamingClient[v1beta1.LookupSubjectsResponse], error) {
+	panic("MockRelationsRepository.LookupSubjects() is not supported - use SimpleRelationsRepository instead")
+}
+
+func (m *MockRelationsRepository) DeleteTuples(ctx context.Context, req *v1beta1.DeleteTuplesRequest) (*v1beta1.DeleteTuplesResponse, error) {
+	panic("MockRelationsRepository.DeleteTuples() is not supported - use SimpleRelationsRepository instead")
+}
+
+func (m *MockRelationsRepository) UnsetWorkspace(ctx context.Context, namespace string, resourceType string, localResourceId string) (*v1beta1.DeleteTuplesResponse, error) {
+	panic("MockRelationsRepository.UnsetWorkspace() is not supported - use SimpleRelationsRepository instead")
+}
+
+func (m *MockRelationsRepository) SetWorkspace(ctx context.Context, namespace string, resourceType string, localResourceId string, workspaceId string, replace bool) (*v1beta1.CreateTuplesResponse, error) {
+	panic("MockRelationsRepository.SetWorkspace() is not supported - use SimpleRelationsRepository instead")
 }
 
 type MockConsumer struct {

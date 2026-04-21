@@ -47,7 +47,7 @@ func TestReporterRepresentation_Structure(t *testing.T) {
 			"ReporterResourceID": reflect.TypeOf(uuid.UUID{}),
 			"Version":            reflect.TypeOf(uint(0)),
 			"Generation":         reflect.TypeOf(uint(0)),
-			"CommonVersion":      reflect.TypeOf(uint(0)),
+			"CommonVersion":      reflect.TypeOf((*uint)(nil)),
 			"Tombstone":          reflect.TypeOf(false),
 			"ReporterVersion":    reflect.TypeOf((*string)(nil)),
 		}
@@ -174,8 +174,8 @@ func TestReporterRepresentation_Structure(t *testing.T) {
 			}
 		}
 
-		// Check uint fields
-		uintFields := []string{"Version", "Generation", "CommonVersion"}
+		// Check uint fields (CommonVersion is now nullable so excluded)
+		uintFields := []string{"Version", "Generation"}
 
 		for _, fieldName := range uintFields {
 			field, found := rrType.FieldByName(fieldName)
@@ -198,6 +198,7 @@ func TestReporterRepresentation_EdgeCases(t *testing.T) {
 	t.Run("should handle unicode characters", func(t *testing.T) {
 		t.Parallel()
 
+		commonVersion := uint(1)
 		_, err := NewReporterRepresentation(
 			internal.JsonObject{
 				"name":        "测试资源",
@@ -206,7 +207,7 @@ func TestReporterRepresentation_EdgeCases(t *testing.T) {
 			uuid.MustParse("550e8400-e29b-41d4-a716-446655440010"),
 			1,
 			1,
-			1,
+			&commonVersion,
 			"test-transaction-id-unicode-test",
 			false,
 			nil,
@@ -217,6 +218,7 @@ func TestReporterRepresentation_EdgeCases(t *testing.T) {
 	t.Run("should handle special characters in string fields", func(t *testing.T) {
 		t.Parallel()
 
+		commonVersion := uint(1)
 		_, err := NewReporterRepresentation(
 			internal.JsonObject{
 				"special_field": "Value with special chars: !@#$%^&*()_+-=[]{}|;':\",./<>?",
@@ -224,7 +226,7 @@ func TestReporterRepresentation_EdgeCases(t *testing.T) {
 			uuid.MustParse("550e8400-e29b-41d4-a716-446655440011"),
 			1,
 			1,
-			1,
+			&commonVersion,
 			"test-transaction-id-special-chars-test",
 			false,
 			nil,
@@ -235,12 +237,13 @@ func TestReporterRepresentation_EdgeCases(t *testing.T) {
 	t.Run("should handle large integer values", func(t *testing.T) {
 		t.Parallel()
 
+		commonVersion := uint(4294967295)
 		_, err := NewReporterRepresentation(
 			internal.JsonObject{"test": "data"},
 			uuid.MustParse("550e8400-e29b-41d4-a716-446655440012"),
-			4294967295, // Max uint32 Version
-			4294967295, // Max uint32 Generation
-			4294967295, // Max uint32 CommonVersion
+			4294967295,     // Max uint32 Version
+			4294967295,     // Max uint32 Generation
+			&commonVersion, // Max uint32 CommonVersion
 			"test-transaction-id-large-integers",
 			false,
 			nil,
@@ -251,12 +254,13 @@ func TestReporterRepresentation_EdgeCases(t *testing.T) {
 	t.Run("should handle empty string values for nullable fields", func(t *testing.T) {
 		t.Parallel()
 
+		commonVersion := uint(1)
 		_, err := NewReporterRepresentation(
 			internal.JsonObject{"test": "data"},
 			uuid.MustParse("550e8400-e29b-41d4-a716-446655440012"),
 			1,
 			1,
-			1,
+			&commonVersion,
 			"test-transaction-id-empty-string",
 			false,
 			internal.StringPtr(""), // Empty ReporterVersion
@@ -267,12 +271,13 @@ func TestReporterRepresentation_EdgeCases(t *testing.T) {
 	t.Run("should handle nil values for nullable fields", func(t *testing.T) {
 		t.Parallel()
 
+		commonVersion := uint(1)
 		_, err := NewReporterRepresentation(
 			internal.JsonObject{"test": "data"},
 			uuid.MustParse("550e8400-e29b-41d4-a716-446655440012"),
 			1,
 			1,
-			1,
+			&commonVersion,
 			"test-transaction-id-nil-values",
 			false,
 			nil, // Nil ReporterVersion
@@ -318,12 +323,13 @@ func TestReporterRepresentation_EdgeCases(t *testing.T) {
 			},
 		}
 
+		commonVersion := uint(1)
 		_, err := NewReporterRepresentation(
 			complexData,
 			uuid.MustParse("550e8400-e29b-41d4-a716-446655440012"),
 			1,
 			1,
-			1,
+			&commonVersion,
 			"test-transaction-id-complex-json",
 			false,
 			nil,
@@ -334,12 +340,13 @@ func TestReporterRepresentation_EdgeCases(t *testing.T) {
 	t.Run("should handle empty JSON object", func(t *testing.T) {
 		t.Parallel()
 
+		commonVersion := uint(1)
 		_, err := NewReporterRepresentation(
 			internal.JsonObject{},
 			uuid.MustParse("550e8400-e29b-41d4-a716-446655440012"),
 			1,
 			1,
-			1,
+			&commonVersion,
 			"test-transaction-id-empty-json",
 			false,
 			nil,
@@ -364,12 +371,13 @@ func TestReporterRepresentation_EdgeCases(t *testing.T) {
 		for _, tc := range testCases {
 			t.Run(tc.name, func(t *testing.T) {
 				t.Parallel()
+				commonVersion := uint(1)
 				_, err := NewReporterRepresentation(
 					internal.JsonObject{"test": "data"},
 					uuid.MustParse("550e8400-e29b-41d4-a716-446655440012"),
 					tc.version,
 					1,
-					1,
+					&commonVersion,
 					"test-transaction-id-version-boundary",
 					false,
 					nil,
@@ -400,12 +408,13 @@ func TestReporterRepresentation_EdgeCases(t *testing.T) {
 		for _, tc := range testCases {
 			t.Run(tc.name, func(t *testing.T) {
 				t.Parallel()
+				commonVersion := uint(1)
 				_, err := NewReporterRepresentation(
 					internal.JsonObject{"test": "data"},
 					uuid.MustParse("550e8400-e29b-41d4-a716-446655440012"),
 					1,
 					tc.generation,
-					1,
+					&commonVersion,
 					"test-transaction-id-generation-boundary",
 					false,
 					nil,
@@ -422,12 +431,16 @@ func TestReporterRepresentation_EdgeCases(t *testing.T) {
 	t.Run("should handle tombstone flag variations", func(t *testing.T) {
 		t.Parallel()
 
+		commonVersion := uint(1)
 		testCases := []struct {
-			name      string
-			tombstone bool
+			name          string
+			tombstone     bool
+			commonVersion *uint
 		}{
-			{"tombstone_true", true},
-			{"tombstone_false", false},
+			// Tombstone rows represent deletions and must not carry a CommonVersion.
+			{"tombstone_true", true, nil},
+			// Live rows may carry a CommonVersion.
+			{"tombstone_false", false, &commonVersion},
 		}
 
 		for _, tc := range testCases {
@@ -438,7 +451,7 @@ func TestReporterRepresentation_EdgeCases(t *testing.T) {
 					uuid.MustParse("550e8400-e29b-41d4-a716-446655440012"),
 					1,
 					1,
-					1,
+					tc.commonVersion,
 					"test-transaction-id-tombstone-flag",
 					tc.tombstone,
 					nil,
@@ -677,7 +690,8 @@ func TestReporterRepresentation_Serialization(t *testing.T) {
 		rr := fixture.ValidReporterRepresentation()
 		rr.Version = 4294967295 // Max uint32
 		rr.Generation = 4294967295
-		rr.CommonVersion = 4294967295
+		commonVersion := uint(4294967295)
+		rr.CommonVersion = &commonVersion
 
 		// Test JSON marshaling with large integer values
 		jsonData, err := json.Marshal(rr)
@@ -691,7 +705,30 @@ func TestReporterRepresentation_Serialization(t *testing.T) {
 		// Check that large integer values are preserved
 		AssertEqual(t, uint(4294967295), unmarshaled.Version, "Large Version should match after JSON round-trip")
 		AssertEqual(t, uint(4294967295), unmarshaled.Generation, "Large Generation should match after JSON round-trip")
-		AssertEqual(t, uint(4294967295), unmarshaled.CommonVersion, "Large CommonVersion should match after JSON round-trip")
+		if unmarshaled.CommonVersion != nil {
+			AssertEqual(t, uint(4294967295), *unmarshaled.CommonVersion, "Large CommonVersion should match after JSON round-trip")
+		} else {
+			t.Error("CommonVersion should not be nil after JSON round-trip")
+		}
+	})
+
+	t.Run("should preserve nil CommonVersion through JSON round-trip", func(t *testing.T) {
+		t.Parallel()
+
+		fixture := NewTestFixture(t)
+		rr := fixture.ValidReporterRepresentation()
+		rr.CommonVersion = nil
+
+		jsonData, err := json.Marshal(rr)
+		AssertNoError(t, err, "Should be able to marshal ReporterRepresentation with nil CommonVersion to JSON")
+
+		var unmarshaled ReporterRepresentation
+		err = json.Unmarshal(jsonData, &unmarshaled)
+		AssertNoError(t, err, "Should be able to unmarshal ReporterRepresentation with nil CommonVersion from JSON")
+
+		if unmarshaled.CommonVersion != nil {
+			t.Errorf("expected CommonVersion to be nil after JSON round-trip, got: %v", *unmarshaled.CommonVersion)
+		}
 	})
 
 	t.Run("should handle empty data object in JSON serialization", func(t *testing.T) {

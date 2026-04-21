@@ -1,6 +1,7 @@
 package model
 
 import (
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -171,7 +172,7 @@ func TestIndividualSnapshotMethods(t *testing.T) {
 		versionOne,
 		genOne,
 		testData,
-		versionOne,
+		&versionOne,
 		nil, // No reporter version for this test
 		transactionId,
 	)
@@ -210,10 +211,11 @@ func TestSnapshotSerialization(t *testing.T) {
 	t.Parallel()
 
 	// Test that snapshots can be used for JSON serialization
+	commonVersion := uint(1)
 	snapshot := ResourceSnapshot{
 		ID:               uuid.New(),
 		Type:             "test-resource",
-		CommonVersion:    1,
+		CommonVersion:    &commonVersion,
 		ConsistencyToken: "test-token",
 	}
 
@@ -224,11 +226,50 @@ func TestSnapshotSerialization(t *testing.T) {
 	if snapshot.Type != "test-resource" {
 		t.Error("Snapshot Type should match")
 	}
-	if snapshot.CommonVersion != 1 {
+	if snapshot.CommonVersion == nil || *snapshot.CommonVersion != 1 {
 		t.Error("Snapshot CommonVersion should match")
 	}
 
 	t.Log("Snapshot serialization fields are accessible")
+
+	t.Run("json with nil CommonVersion", func(t *testing.T) {
+		t.Parallel()
+		snapshotWithNil := ResourceSnapshot{
+			ID:               uuid.New(),
+			Type:             "test-resource",
+			CommonVersion:    nil,
+			ConsistencyToken: "test-token",
+			CreatedAt:        time.Now(),
+			UpdatedAt:        time.Now(),
+		}
+
+		// Ensure the snapshot can be created and CommonVersion is nil
+		if snapshotWithNil.CommonVersion != nil {
+			t.Errorf("expected CommonVersion to be nil, got: %v", *snapshotWithNil.CommonVersion)
+		}
+
+		// Ensure other fields are still valid
+		if snapshotWithNil.ID == uuid.Nil {
+			t.Error("Snapshot ID should be valid even when CommonVersion is nil")
+		}
+		if snapshotWithNil.Type != "test-resource" {
+			t.Error("Snapshot Type should match even when CommonVersion is nil")
+		}
+
+		// Verify that json:"common_version,omitempty" causes the field to be absent
+		// in the marshaled output and remains nil after a round-trip unmarshal.
+		data, err := json.Marshal(snapshotWithNil)
+		if err != nil {
+			t.Fatalf("json.Marshal failed: %v", err)
+		}
+		var unmarshaled ResourceSnapshot
+		if err := json.Unmarshal(data, &unmarshaled); err != nil {
+			t.Fatalf("json.Unmarshal failed: %v", err)
+		}
+		if unmarshaled.CommonVersion != nil {
+			t.Errorf("expected unmarshaled CommonVersion to be nil, got: %v", *unmarshaled.CommonVersion)
+		}
+	})
 }
 
 func TestCommonRepresentationSnapshot_TransactionId_EmptyMeansNotSet(t *testing.T) {
@@ -259,7 +300,7 @@ func TestReporterRepresentationSnapshot_TransactionId_EmptyMeansNotSet(t *testin
 		Version:            1,
 		Generation:         0,
 		ReporterVersion:    nil,
-		CommonVersion:      0,
+		CommonVersion:      nil,
 		TransactionId:      "",
 		Tombstone:          false,
 		CreatedAt:          time.Time{},
@@ -277,7 +318,7 @@ func TestResourceSnapshot_CreatedAtUpdatedAt_ZeroMeansNotSet(t *testing.T) {
 	snapshot := ResourceSnapshot{
 		ID:               uuid.New(),
 		Type:             "test",
-		CommonVersion:    0,
+		CommonVersion:    nil,
 		ConsistencyToken: "",
 		CreatedAt:        time.Time{},
 		UpdatedAt:        time.Time{},

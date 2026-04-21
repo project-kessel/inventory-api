@@ -16,7 +16,7 @@ import (
 	"github.com/project-kessel/inventory-api/internal/pubsub"
 	"github.com/project-kessel/inventory-api/internal/subject/selfsubject"
 	kessel "github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
-	"github.com/sony/gobreaker"
+	"github.com/sony/gobreaker/v2"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -64,8 +64,8 @@ type UsecaseConfig struct {
 type Usecase struct {
 	schemaService       *model.SchemaService
 	resourceRepository  model.ResourceRepository
-	waitForNotifBreaker *gobreaker.CircuitBreaker
-	Authz               model.Authorizer
+	waitForNotifBreaker *gobreaker.CircuitBreaker[any]
+	Relations           model.RelationsRepository
 	MetaAuthorizer      metaauthorizer.MetaAuthorizer
 	Namespace           string
 	Log                 *log.Helper
@@ -76,8 +76,8 @@ type Usecase struct {
 }
 
 func New(resourceRepository model.ResourceRepository, schemaRepository model.SchemaRepository,
-	authz model.Authorizer, namespace string, logger log.Logger,
-	listenManager pubsub.ListenManagerImpl, waitForNotifBreaker *gobreaker.CircuitBreaker, usecaseConfig *UsecaseConfig, metricsCollector *metricscollector.MetricsCollector, metaAuthorizer metaauthorizer.MetaAuthorizer, selfSubjectStrategy selfsubject.SelfSubjectStrategy) *Usecase {
+	relations model.RelationsRepository, namespace string, logger log.Logger,
+	listenManager pubsub.ListenManagerImpl, waitForNotifBreaker *gobreaker.CircuitBreaker[any], usecaseConfig *UsecaseConfig, metricsCollector *metricscollector.MetricsCollector, metaAuthorizer metaauthorizer.MetaAuthorizer, selfSubjectStrategy selfsubject.SelfSubjectStrategy) *Usecase {
 	if metaAuthorizer == nil {
 		metaAuthorizer = metaauthorizer.NewSimpleMetaAuthorizer()
 	}
@@ -86,7 +86,7 @@ func New(resourceRepository model.ResourceRepository, schemaRepository model.Sch
 		resourceRepository:  resourceRepository,
 		schemaService:       model.NewSchemaService(schemaRepository, log.NewHelper(logger)),
 		waitForNotifBreaker: waitForNotifBreaker,
-		Authz:               authz,
+		Relations:           relations,
 		MetaAuthorizer:      metaAuthorizer,
 		Namespace:           namespace,
 		Log:                 log.NewHelper(logger),
@@ -195,7 +195,7 @@ func (uc *Usecase) ReportResource(ctx context.Context, cmd ReportResourceCommand
 		timeoutCtx, cancel := context.WithTimeout(ctx, listenTimeout)
 		defer cancel()
 
-		_, err := uc.waitForNotifBreaker.Execute(func() (interface{}, error) {
+		_, err := uc.waitForNotifBreaker.Execute(func() (any, error) {
 			err = subscription.BlockForNotification(timeoutCtx)
 			if err != nil {
 				// Return error for circuit breaker
@@ -364,10 +364,10 @@ func (uc *Usecase) CheckForUpdate(ctx context.Context, relation model.Relation, 
 		return false, "", err
 	}
 
-	// Convert model types to v1beta1 for the Authz interface
+	// Convert model types to v1beta1 for the Relations interface
 	namespace := reporterResourceKey.ReporterType().Serialize()
 	v1beta1Subject := subjectToV1Beta1(sub)
-	allowed, token, err := uc.Authz.CheckForUpdate(ctx, namespace, relation.Serialize(), reporterResourceKey.ResourceType().Serialize(), reporterResourceKey.LocalResourceId().Serialize(), v1beta1Subject)
+	allowed, token, err := uc.Relations.CheckForUpdate(ctx, namespace, relation.Serialize(), reporterResourceKey.ResourceType().Serialize(), reporterResourceKey.LocalResourceId().Serialize(), v1beta1Subject)
 	if err != nil {
 		return false, "", err
 	}
@@ -393,7 +393,7 @@ func (uc *Usecase) CheckForUpdateBulk(ctx context.Context, cmd CheckForUpdateBul
 	}
 
 	req := checkForUpdateBulkCommandToV1beta1(cmd)
-	resp, err := uc.Authz.CheckForUpdateBulk(ctx, req)
+	resp, err := uc.Relations.CheckForUpdateBulk(ctx, req)
 	if err != nil {
 		return nil, err
 	}
@@ -413,9 +413,9 @@ func (uc *Usecase) CheckBulk(ctx context.Context, cmd CheckBulkCommand) (*CheckB
 		}
 	}
 
-	// Convert to v1beta1 for the Authz interface
+	// Convert to v1beta1 for the Relations interface
 	v1beta1Req := checkBulkCommandToV1beta1(cmd)
-	resp, err := uc.Authz.CheckBulk(ctx, v1beta1Req)
+	resp, err := uc.Relations.CheckBulk(ctx, v1beta1Req)
 	if err != nil {
 		return nil, err
 	}
@@ -455,9 +455,9 @@ func (uc *Usecase) CheckSelfBulk(ctx context.Context, cmd CheckSelfBulkCommand) 
 		}
 	}
 
-	// Convert to v1beta1 for the Authz interface
+	// Convert to v1beta1 for the Relations interface
 	v1beta1Req := checkBulkCommandToV1beta1(bulkCmd)
-	resp, err := uc.Authz.CheckBulk(ctx, v1beta1Req)
+	resp, err := uc.Relations.CheckBulk(ctx, v1beta1Req)
 	if err != nil {
 		return nil, err
 	}
@@ -465,11 +465,11 @@ func (uc *Usecase) CheckSelfBulk(ctx context.Context, cmd CheckSelfBulkCommand) 
 	return checkBulkResultFromV1beta1(resp, bulkCmd)
 }
 
-// checkPermission runs Authz.Check with the given consistency token. Used by Check (after resolveConsistencyToken) and by CheckSelf.
+// checkPermission runs Relations.Check with the given consistency token. Used by Check (after resolveConsistencyToken) and by CheckSelf.
 func (uc *Usecase) checkPermission(ctx context.Context, relation model.Relation, sub model.SubjectReference, reporterResourceKey model.ReporterResourceKey, consistencyToken string) (bool, model.ConsistencyToken, error) {
 	namespace := reporterResourceKey.ReporterType().Serialize()
 	v1beta1Subject := subjectToV1Beta1(sub)
-	allowed, returnedToken, err := uc.Authz.Check(ctx, namespace, relation.Serialize(), consistencyToken, reporterResourceKey.ResourceType().Serialize(), reporterResourceKey.LocalResourceId().Serialize(), v1beta1Subject)
+	allowed, returnedToken, err := uc.Relations.Check(ctx, namespace, relation.Serialize(), consistencyToken, reporterResourceKey.ResourceType().Serialize(), reporterResourceKey.LocalResourceId().Serialize(), v1beta1Subject)
 	if err != nil {
 		return false, model.MinimizeLatencyToken, err
 	}
@@ -498,9 +498,9 @@ func (uc *Usecase) LookupResources(ctx context.Context, cmd LookupResourcesComma
 		return nil, err
 	}
 
-	// Convert to v1beta1 for the Authz interface
+	// Convert to v1beta1 for the Relations interface
 	v1beta1Req := lookupResourcesCommandToV1beta1(cmd)
-	return uc.Authz.LookupResources(ctx, v1beta1Req)
+	return uc.Relations.LookupResources(ctx, v1beta1Req)
 }
 
 // LookupSubjects delegates subject lookup to the authorization service.
@@ -515,9 +515,9 @@ func (uc *Usecase) LookupSubjects(ctx context.Context, cmd LookupSubjectsCommand
 		return nil, err
 	}
 
-	// Convert to v1beta1 for the Authz interface
+	// Convert to v1beta1 for the Relations interface
 	v1beta1Req := lookupSubjectsCommandToV1beta1(cmd)
-	return uc.Authz.LookupSubjects(ctx, v1beta1Req)
+	return uc.Relations.LookupSubjects(ctx, v1beta1Req)
 }
 
 // lookupConsistencyTokenFromDB looks up the consistency token from the inventory database.
@@ -655,7 +655,7 @@ func (uc *Usecase) validateReportResourceCommand(ctx context.Context, cmd Report
 	return nil
 }
 
-// subjectToV1Beta1 converts a model.SubjectReference to a v1beta1 SubjectReference for the Authz interface.
+// subjectToV1Beta1 converts a model.SubjectReference to a v1beta1 SubjectReference for the Relations interface.
 func subjectToV1Beta1(sub model.SubjectReference) *kessel.SubjectReference {
 	subKey := sub.Subject()
 	ref := &kessel.SubjectReference{
@@ -674,7 +674,7 @@ func subjectToV1Beta1(sub model.SubjectReference) *kessel.SubjectReference {
 	return ref
 }
 
-// checkBulkCommandToV1beta1 converts a CheckBulkCommand to v1beta1 for the Authz interface.
+// checkBulkCommandToV1beta1 converts a CheckBulkCommand to v1beta1 for the Relations interface.
 func checkBulkCommandToV1beta1(cmd CheckBulkCommand) *kessel.CheckBulkRequest {
 	items := make([]*kessel.CheckBulkRequestItem, len(cmd.Items))
 	for i, item := range cmd.Items {

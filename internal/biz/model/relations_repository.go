@@ -9,9 +9,9 @@ import (
 	kessel "github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
 )
 
-// Authorizer defines the interface for authorization and access control operations.
-// It provides methods for checking permissions, managing relationships, and health checks.
-type Authorizer interface {
+// RelationsRepository defines the interface for managing relations (tuples, checks, and lookups)
+// It provides methods for reading and writing relationships, permission checks, and health checks.
+type RelationsRepository interface {
 	Health(ctx context.Context) (*kesselv1.GetReadyzResponse, error)
 	Check(ctx context.Context, namespace string, permission string, consistencyToken string, resourceType string, localResourceId string, sub *kessel.SubjectReference) (kessel.CheckResponse_Allowed, *kessel.ConsistencyToken, error)
 	CheckForUpdate(ctx context.Context, namespace string, permission string, resourceType string, localResourceId string, sub *kessel.SubjectReference) (kessel.CheckForUpdateResponse_Allowed, *kessel.ConsistencyToken, error)

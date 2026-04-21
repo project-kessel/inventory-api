@@ -6,11 +6,11 @@ import (
 
 type RelationsTuple struct {
 	resource RelationsResource
-	relation string
+	relation Relation
 	subject  RelationsSubject
 }
 
-func NewRelationsTuple(resource RelationsResource, relation string, subject RelationsSubject) RelationsTuple {
+func NewRelationsTuple(resource RelationsResource, relation Relation, subject RelationsSubject) RelationsTuple {
 
 	resourceId := resource.Id()
 	resourceName := strings.ToLower(resource.Type().Name())
@@ -24,7 +24,7 @@ func NewRelationsTuple(resource RelationsResource, relation string, subject Rela
 
 	return RelationsTuple{
 		resource: relationsResource,
-		relation: strings.ToLower(relation),
+		relation: DeserializeRelation(strings.ToLower(relation.Serialize())),
 		subject:  NewRelationsSubject(subjectResource, subject.Relation()),
 	}
 }
@@ -33,7 +33,7 @@ func (rt RelationsTuple) Resource() RelationsResource {
 	return rt.resource
 }
 
-func (rt RelationsTuple) Relation() string {
+func (rt RelationsTuple) Relation() Relation {
 	return rt.relation
 }
 
@@ -88,10 +88,10 @@ func (rr RelationsResource) Type() RelationsObjectType {
 // RelationsSubject represents a subject in a relationship tuple
 type RelationsSubject struct {
 	subject  RelationsResource // Subject is also a resource reference
-	relation string
+	relation *Relation         // nil means no subject relation (direct reference)
 }
 
-func NewRelationsSubject(subject RelationsResource, relation string) RelationsSubject {
+func NewRelationsSubject(subject RelationsResource, relation *Relation) RelationsSubject {
 	return RelationsSubject{
 		subject:  subject,
 		relation: relation,
@@ -102,8 +102,13 @@ func (rs RelationsSubject) Subject() RelationsResource {
 	return rs.subject
 }
 
-func (rs RelationsSubject) Relation() string {
+func (rs RelationsSubject) Relation() *Relation {
 	return rs.relation
+}
+
+// HasRelation returns true if this subject has a relation set.
+func (rs RelationsSubject) HasRelation() bool {
+	return rs.relation != nil
 }
 
 const (
@@ -130,10 +135,9 @@ func NewWorkspaceRelationsTuple(workspaceID string, key ReporterResourceKey) Rel
 	/*
 	 The only relation Inventory currently replicates to relations is a workspace, in which
 	 the subject is the workspace itself; there should not be any subject relation.
-	 Setting the subject relation to an empty string to indicate that the value should be empty in the query
-	 and avoids nil which uses wildcard semantics.
+	 nil indicates no subject relation (direct reference) and avoids wildcard semantics.
 	*/
-	subject := NewRelationsSubject(workspaceSubject, "")
+	subject := NewRelationsSubject(workspaceSubject, nil)
 
-	return NewRelationsTuple(resource, WorkspaceRelation, subject)
+	return NewRelationsTuple(resource, DeserializeRelation(WorkspaceRelation), subject)
 }

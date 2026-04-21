@@ -562,7 +562,7 @@ func tuplesToV1Beta1(tuples []model.RelationsTuple) []*kesselapi.Relationship {
 				},
 				Id: tuple.Resource().Id().Serialize(),
 			},
-			Relation: tuple.Relation(),
+			Relation: tuple.Relation().Serialize(),
 			Subject: &kesselapi.SubjectReference{
 				Subject: &kesselapi.ObjectReference{
 					Type: &kesselapi.ObjectType{
@@ -581,13 +581,12 @@ func tupleToFilter(tuple model.RelationsTuple) *kesselapi.RelationTupleFilter {
 	resourceNamespace := tuple.Resource().Type().Namespace()
 	resourceType := tuple.Resource().Type().Name()
 	resourceId := tuple.Resource().Id().Serialize()
-	relation := tuple.Relation()
+	relation := tuple.Relation().Serialize()
 	subjectNamespace := tuple.Subject().Subject().Type().Namespace()
 	subjectType := tuple.Subject().Subject().Type().Name()
 	subjectId := tuple.Subject().Subject().Id().Serialize()
-	subjectRelation := tuple.Subject().Relation()
 
-	return &kesselapi.RelationTupleFilter{
+	filter := &kesselapi.RelationTupleFilter{
 		ResourceNamespace: proto.String(resourceNamespace),
 		ResourceType:      proto.String(resourceType),
 		ResourceId:        proto.String(resourceId),
@@ -596,9 +595,14 @@ func tupleToFilter(tuple model.RelationsTuple) *kesselapi.RelationTupleFilter {
 			SubjectNamespace: proto.String(subjectNamespace),
 			SubjectType:      proto.String(subjectType),
 			SubjectId:        proto.String(subjectId),
-			Relation:         proto.String(subjectRelation),
 		},
 	}
+	if tuple.Subject().HasRelation() {
+		filter.SubjectFilter.Relation = proto.String(tuple.Subject().Relation().Serialize())
+	} else {
+		filter.SubjectFilter.Relation = proto.String("")
+	}
+	return filter
 }
 
 // --- streaming adapters ---

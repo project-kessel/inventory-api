@@ -44,9 +44,9 @@ func testPrincipalTuple(namespace, resourceType, resourceID, relation, subjectID
 	resource := model.NewRelationsResource(model.DeserializeLocalResourceId(resourceID), resourceObjType)
 	subjectObjType := model.NewRelationsObjectType("principal", "rbac")
 	subjectResource := model.NewRelationsResource(model.DeserializeLocalResourceId(subjectID), subjectObjType)
-	subject := model.NewRelationsSubject(subjectResource, "")
+	subject := model.NewRelationsSubject(subjectResource, nil)
 
-	return model.NewRelationsTuple(resource, relation, subject)
+	return model.NewRelationsTuple(resource, model.DeserializeRelation(relation), subject)
 }
 
 func TestSimpleRelationsRepository_DefaultDeny(t *testing.T) {

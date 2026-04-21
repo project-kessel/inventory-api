@@ -189,13 +189,14 @@ func relationshipToRelationsTuple(rel *pb.Relationship) (model.RelationsTuple, e
 	)
 	subjectResource := model.NewRelationsResource(subjectId, subjectType)
 
-	var subjectRelation string
+	var subjectRelation *model.Relation
 	if rel.GetSubject().Relation != nil {
-		subjectRelation = *rel.GetSubject().Relation
+		r := model.DeserializeRelation(*rel.GetSubject().Relation)
+		subjectRelation = &r
 	}
 	subject := model.NewRelationsSubject(subjectResource, subjectRelation)
 
-	return model.NewRelationsTuple(resource, rel.GetRelation(), subject), nil
+	return model.NewRelationsTuple(resource, model.DeserializeRelation(rel.GetRelation()), subject), nil
 }
 
 func tupleFilterFromProto(pf *pb.RelationTupleFilter) model.TupleFilter {

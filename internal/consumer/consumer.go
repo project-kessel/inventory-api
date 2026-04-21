@@ -529,7 +529,7 @@ func (i *InventoryConsumer) CreateTuple(ctx context.Context, tuples *[]model.Rel
 
 			firstTuple := (*tuples)[0]
 			resourceKey := firstTupleToResourceKey(firstTuple)
-			relation := model.DeserializeRelation(firstTuple.Relation())
+			relation := firstTuple.Relation()
 			subject := firstTupleToSubjectRef(firstTuple)
 
 			checkResult, checkErr := i.Relations.Check(ctx, resourceKey, relation, subject, model.NewConsistencyMinimizeLatency())
@@ -769,10 +769,8 @@ func firstTupleToSubjectRef(tuple model.RelationsTuple) model.SubjectReference {
 		model.DeserializeReporterType(tuple.Subject().Subject().Type().Namespace()),
 		model.DeserializeReporterInstanceId(""),
 	)
-	subjectRelation := tuple.Subject().Relation()
-	if subjectRelation != "" {
-		rel := model.DeserializeRelation(subjectRelation)
-		return model.NewSubjectReference(subjectKey, &rel)
+	if tuple.Subject().HasRelation() {
+		return model.NewSubjectReference(subjectKey, tuple.Subject().Relation())
 	}
 	return model.NewSubjectReferenceWithoutRelation(subjectKey)
 }

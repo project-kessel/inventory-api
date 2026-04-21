@@ -40,8 +40,8 @@ func testHelperTuple(namespace, resourceType, resourceID, relation, subjectNames
 	resource := model.NewRelationsResource(model.DeserializeLocalResourceId(resourceID), resourceObjType)
 	subjectObjType := model.NewRelationsObjectType(subjectType, subjectNamespace)
 	subjectResource := model.NewRelationsResource(model.DeserializeLocalResourceId(subjectID), subjectObjType)
-	subject := model.NewRelationsSubject(subjectResource, "")
-	return model.NewRelationsTuple(resource, relation, subject)
+	subject := model.NewRelationsSubject(subjectResource, nil)
+	return model.NewRelationsTuple(resource, model.DeserializeRelation(relation), subject)
 }
 
 type testSelfSubjectStrategy struct{}

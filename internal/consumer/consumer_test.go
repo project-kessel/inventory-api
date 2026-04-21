@@ -772,9 +772,9 @@ func TestFencingToken_WritingAfterRebalance(t *testing.T) {
 	assert.Nil(t, err)
 	subjectType := model.NewRelationsObjectType("workspace", "rbac")
 	subjectResource := model.NewRelationsResource(subjectId, subjectType)
-	subject := model.NewRelationsSubject(subjectResource, "")
+	subject := model.NewRelationsSubject(subjectResource, nil)
 
-	domainTuple := model.NewRelationsTuple(resource, "t_workspace", subject)
+	domainTuple := model.NewRelationsTuple(resource, model.DeserializeRelation("t_workspace"), subject)
 	tuples := &[]model.RelationsTuple{domainTuple}
 
 	// Try to create a tuple with the stale token
@@ -812,9 +812,9 @@ func TestInventoryConsumer_CreateTuple_FailedPrecondition(t *testing.T) {
 	assert.Nil(t, err)
 	subjectType := model.NewRelationsObjectType("workspace", "rbac")
 	subjectResource := model.NewRelationsResource(subjectId, subjectType)
-	subject := model.NewRelationsSubject(subjectResource, "")
+	subject := model.NewRelationsSubject(subjectResource, nil)
 
-	domainTuple := model.NewRelationsTuple(resource, "t_workspace", subject)
+	domainTuple := model.NewRelationsTuple(resource, model.DeserializeRelation("t_workspace"), subject)
 	tuples := &[]model.RelationsTuple{domainTuple}
 
 	resp, err := tester.inv.CreateTuple(context.Background(), tuples)
@@ -846,9 +846,9 @@ func TestInventoryConsumer_UpdateTuple_FailedPrecondition(t *testing.T) {
 	assert.Nil(t, err)
 	subjectType := model.NewRelationsObjectType("workspace", "rbac")
 	subjectResource := model.NewRelationsResource(subjectId, subjectType)
-	subject := model.NewRelationsSubject(subjectResource, "")
+	subject := model.NewRelationsSubject(subjectResource, nil)
 
-	domainTuple := model.NewRelationsTuple(resource, "t_workspace", subject)
+	domainTuple := model.NewRelationsTuple(resource, model.DeserializeRelation("t_workspace"), subject)
 	tuples := &[]model.RelationsTuple{domainTuple}
 
 	resp, err := tester.inv.UpdateTuple(context.Background(), tuples, nil)
@@ -880,9 +880,9 @@ func TestInventoryConsumer_DeleteTuple_FailedPrecondition(t *testing.T) {
 	assert.Nil(t, err)
 	subjectType := model.NewRelationsObjectType("workspace", "rbac")
 	subjectResource := model.NewRelationsResource(subjectId, subjectType)
-	subject := model.NewRelationsSubject(subjectResource, "")
+	subject := model.NewRelationsSubject(subjectResource, nil)
 
-	domainTuple := model.NewRelationsTuple(resource, "t_workspace", subject)
+	domainTuple := model.NewRelationsTuple(resource, model.DeserializeRelation("t_workspace"), subject)
 	tuples := []model.RelationsTuple{domainTuple}
 
 	resp, err := tester.inv.DeleteTuple(context.Background(), tuples)

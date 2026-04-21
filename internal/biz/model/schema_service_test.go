@@ -204,7 +204,7 @@ func TestCreateWorkspaceTuple(t *testing.T) {
 				assert.Equal(t, "host", resource.Type().Name())
 				assert.Equal(t, "hbi", resource.Type().Namespace())
 
-				assert.Equal(t, "workspace", tuple.Relation())
+				assert.Equal(t, model.DeserializeRelation("workspace"), tuple.Relation())
 
 				subject := tuple.Subject()
 				subjectResource := subject.Subject()

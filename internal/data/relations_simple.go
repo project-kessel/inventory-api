@@ -182,7 +182,7 @@ func simpleTupleKeyFromModelTuple(tuple model.RelationsTuple) simpleTupleKey {
 		ResourceNamespace: tuple.Resource().Type().Namespace(),
 		ResourceType:      tuple.Resource().Type().Name(),
 		ResourceID:        tuple.Resource().Id().Serialize(),
-		Relation:          tuple.Relation(),
+		Relation:          tuple.Relation().Serialize(),
 		SubjectNamespace:  tuple.Subject().Subject().Type().Namespace(),
 		SubjectType:       tuple.Subject().Subject().Type().Name(),
 		SubjectID:         tuple.Subject().Subject().Id().Serialize(),

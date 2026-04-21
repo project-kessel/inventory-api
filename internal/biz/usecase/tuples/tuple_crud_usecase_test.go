@@ -32,10 +32,10 @@ func createTestTuple() model.RelationsTuple {
 	subjectId, _ := model.NewLocalResourceId("subject-1")
 	return model.NewRelationsTuple(
 		model.NewRelationsResource(resourceId, model.NewRelationsObjectType("workspace", "rbac")),
-		"member",
+		model.DeserializeRelation("member"),
 		model.NewRelationsSubject(
 			model.NewRelationsResource(subjectId, model.NewRelationsObjectType("principal", "rbac")),
-			"",
+			nil,
 		),
 	)
 }

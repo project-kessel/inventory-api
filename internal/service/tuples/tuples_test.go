@@ -201,7 +201,7 @@ func TestRelationshipToRelationsTuple(t *testing.T) {
 		assert.Equal(t, "ws-1", tuple.Resource().Id().Serialize())
 		assert.Equal(t, "workspace", tuple.Resource().Type().Name())
 		assert.Equal(t, "rbac", tuple.Resource().Type().Namespace())
-		assert.Equal(t, "member", tuple.Relation())
+		assert.Equal(t, model.DeserializeRelation("member"), tuple.Relation())
 		assert.Equal(t, "user-1", tuple.Subject().Subject().Id().Serialize())
 	})
 
@@ -231,7 +231,8 @@ func TestRelationshipToRelationsTuple(t *testing.T) {
 		tuple, err := relationshipToRelationsTuple(rel)
 
 		require.NoError(t, err)
-		assert.Equal(t, "members", tuple.Subject().Relation())
+		expectedRel := model.DeserializeRelation("members")
+		assert.Equal(t, &expectedRel, tuple.Subject().Relation())
 	})
 
 	t.Run("invalid resource ID", func(t *testing.T) {

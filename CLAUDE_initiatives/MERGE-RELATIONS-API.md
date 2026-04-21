@@ -64,7 +64,11 @@ For issues that are technical debt, code quality improvements, refactoring, or g
 
 ### Keeping Context Fresh
 
+<<<<<<< Updated upstream
 **Last initiative plan read**: 2026-04-09
+=======
+**Last initiative plan read**: 2026-04-13
+>>>>>>> Stashed changes
 
 When reading this file:
 1. Check the "Last initiative plan read" date above
@@ -145,7 +149,11 @@ Before considering work complete, all code changes must be verified:
 
 ## Currently Active Work
 
+<<<<<<< Updated upstream
 - **RHCLOUD-46010** - Phase 2: Bring Create/Delete/ReadTuples and AcquireLock endpoints over to inventory-api from relations-api (In Progress)
+=======
+- **RHCLOUD-46010** - Phase 2: Bring Create/Delete/ReadTuples and AcquireLock endpoints over to inventory-api from relations-api (Code Review)
+>>>>>>> Stashed changes
 
 **Note**: For all issues related to this initiative, query Jira using parent epic [RHCLOUD-44628](https://issues.redhat.com/browse/RHCLOUD-44628).
 

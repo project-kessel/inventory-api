@@ -6,7 +6,6 @@ import (
 
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
 	"github.com/go-kratos/kratos/v2/transport"
-	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
 	"github.com/project-kessel/inventory-api/internal/pubsub"
 
@@ -17,21 +16,14 @@ type MockHealthRepo struct {
 	mock.Mock
 }
 
-func (m *MockHealthRepo) IsBackendAvailable(ctx context.Context) (*pb.GetReadyzResponse, error) {
+func (m *MockHealthRepo) IsBackendAvailable(ctx context.Context) (model.HealthResult, error) {
 	args := m.Called(ctx)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
-	}
-	return args.Get(0).(*pb.GetReadyzResponse), args.Error(1)
+	return args.Get(0).(model.HealthResult), args.Error(1)
 }
 
-func (m *MockHealthRepo) IsRelationsAvailable(ctx context.Context) (*pb.GetReadyzResponse, error) {
+func (m *MockHealthRepo) IsRelationsAvailable(ctx context.Context) (model.HealthResult, error) {
 	args := m.Called(ctx)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
-	}
-	return args.Get(0).(*pb.GetReadyzResponse), args.Error(1)
-
+	return args.Get(0).(model.HealthResult), args.Error(1)
 }
 
 // MockRelationsRepository is a minimal mock for RelationsRepository.

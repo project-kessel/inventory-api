@@ -64,11 +64,7 @@ For issues that are technical debt, code quality improvements, refactoring, or g
 
 ### Keeping Context Fresh
 
-<<<<<<< Updated upstream
-**Last initiative plan read**: 2026-04-09
-=======
 **Last initiative plan read**: 2026-04-13
->>>>>>> Stashed changes
 
 When reading this file:
 1. Check the "Last initiative plan read" date above

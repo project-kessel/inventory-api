@@ -89,3 +89,16 @@ func (rt ResourceTypeRef) ResourceType() model.ResourceType { return rt.resource
 
 // metaObject seals the interface - only types in this package can implement MetaObject.
 func (ResourceTypeRef) metaObject() {}
+
+// TupleSystem represents the tuple/relationship management system for meta-authorization.
+// Used for authorizing CRUD operations on relationship tuples.
+// This is a singleton-like object since tuple operations are system-level.
+type TupleSystem struct{}
+
+// NewTupleSystem creates a new TupleSystem for meta-authorization.
+func NewTupleSystem() TupleSystem {
+	return TupleSystem{}
+}
+
+// metaObject seals the interface - only types in this package can implement MetaObject.
+func (TupleSystem) metaObject() {}

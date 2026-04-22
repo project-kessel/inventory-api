@@ -10,6 +10,7 @@ import (
 
 	"github.com/project-kessel/inventory-api/internal/authn"
 	authnFactory "github.com/project-kessel/inventory-api/internal/authn/factory"
+	"github.com/project-kessel/inventory-api/internal/biz/usecase/metaauthorizer"
 	"github.com/project-kessel/inventory-api/internal/config/relations"
 	"github.com/project-kessel/inventory-api/internal/config/schema"
 	"github.com/project-kessel/inventory-api/internal/consistency"
@@ -35,6 +36,7 @@ type OptionsConfig struct {
 	Schema              *schema.Options
 	SelfSubjectStrategy *selfsubject.Options
 	BusinessMetrics     *metricscollector.Options `mapstructure:"business-metrics"`
+	MetaAuthorizer      *metaauthorizer.Options   `mapstructure:"metaauthorizer"`
 }
 
 // NewOptionsConfig returns a new OptionsConfig with default options set
@@ -50,6 +52,7 @@ func NewOptionsConfig() *OptionsConfig {
 		Schema:              schema.NewOptions(),
 		SelfSubjectStrategy: selfsubject.NewOptions(),
 		BusinessMetrics:     metricscollector.NewOptions(),
+		MetaAuthorizer:      metaauthorizer.NewOptions(),
 	}
 }
 

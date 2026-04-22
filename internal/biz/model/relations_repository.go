@@ -21,6 +21,7 @@ type RelationsRepository interface {
 	LookupSubjects(ctx context.Context, in *kessel.LookupSubjectsRequest) (grpc.ServerStreamingClient[kessel.LookupSubjectsResponse], error)
 	CreateTuples(context.Context, *kessel.CreateTuplesRequest) (*kessel.CreateTuplesResponse, error)
 	DeleteTuples(context.Context, *kessel.DeleteTuplesRequest) (*kessel.DeleteTuplesResponse, error)
+	ReadTuples(context.Context, *kessel.ReadTuplesRequest) (grpc.ServerStreamingClient[kessel.ReadTuplesResponse], error)
 	AcquireLock(context.Context, *kessel.AcquireLockRequest) (*kessel.AcquireLockResponse, error)
 	UnsetWorkspace(context.Context, string, string, string) (*kessel.DeleteTuplesResponse, error)
 	SetWorkspace(context.Context, string, string, string, string, bool) (*kessel.CreateTuplesResponse, error)

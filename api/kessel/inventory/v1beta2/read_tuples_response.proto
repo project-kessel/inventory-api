@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+package kessel.inventory.v1beta2;
+
+import "kessel/inventory/v1beta2/relationship.proto";
+import "kessel/inventory/v1beta2/response_pagination.proto";
+import "kessel/inventory/v1beta2/consistency_token.proto";
+
+option go_package = "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2";
+option java_multiple_files = true;
+option java_package = "org.project_kessel.api.inventory.v1beta2";
+
+// DEPRECATED: ReadTuplesResponse is part of the legacy tuple-layer API.
+// This type exists only for RBAC backward compatibility and will be removed.
+message ReadTuplesResponse {
+  Relationship tuple = 1;
+  ResponsePagination pagination = 2;
+  ConsistencyToken consistency_token = 3;
+}

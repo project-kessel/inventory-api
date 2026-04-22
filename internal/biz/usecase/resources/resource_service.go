@@ -36,14 +36,8 @@ var (
 	ErrInventoryIdMismatch   = model.ErrInventoryIdMismatch
 )
 
-// Application-layer errors for meta-authorization and self-subject resolution.
+// Application-layer errors for self-subject resolution.
 var (
-	// ErrMetaAuthorizerUnavailable indicates the meta authorizer is not configured.
-	ErrMetaAuthorizerUnavailable = errors.New("meta authorizer unavailable")
-	// ErrMetaAuthorizationDenied indicates the meta authorization check failed.
-	ErrMetaAuthorizationDenied = errors.New("meta authorization denied")
-	// ErrMetaAuthzContextMissing indicates missing authz context in request.
-	ErrMetaAuthzContextMissing = errors.New("meta authorization context missing")
 	// ErrSelfSubjectMissing indicates the subject could not be derived for self checks.
 	ErrSelfSubjectMissing = errors.New("self subject missing")
 )
@@ -585,7 +579,7 @@ func (uc *Usecase) resolveConsistencyToken(ctx context.Context, consistency mode
 func (uc *Usecase) selfSubjectFromContext(ctx context.Context) (model.SubjectReference, error) {
 	authzCtx, ok := authnapi.FromAuthzContext(ctx)
 	if !ok {
-		return model.SubjectReference{}, ErrMetaAuthzContextMissing
+		return model.SubjectReference{}, metaauthorizer.ErrMetaAuthzContextMissing
 	}
 	if uc == nil || uc.SelfSubjectStrategy == nil {
 		return model.SubjectReference{}, ErrSelfSubjectMissing
@@ -599,22 +593,7 @@ func (uc *Usecase) selfSubjectFromContext(ctx context.Context) (model.SubjectRef
 
 // enforceMetaAuthzObject calls the MetaAuthorizer to validate access using a MetaObject.
 func (uc *Usecase) enforceMetaAuthzObject(ctx context.Context, relation metaauthorizer.Relation, metaObject metaauthorizer.MetaObject) error {
-	authzCtx, ok := authnapi.FromAuthzContext(ctx)
-	if !ok {
-		return ErrMetaAuthzContextMissing
-	}
-	if uc.MetaAuthorizer == nil {
-		return ErrMetaAuthorizerUnavailable
-	}
-
-	allowed, err := uc.MetaAuthorizer.Check(ctx, metaObject, relation, authzCtx)
-	if err != nil {
-		return err
-	}
-	if !allowed {
-		return ErrMetaAuthorizationDenied
-	}
-	return nil
+	return metaauthorizer.EnforceMetaAuthzObject(ctx, uc.MetaAuthorizer, relation, metaObject)
 }
 
 // validateReportResourceCommand validates a ReportResourceCommand against schemas.

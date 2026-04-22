@@ -64,7 +64,7 @@ For issues that are technical debt, code quality improvements, refactoring, or g
 
 ### Keeping Context Fresh
 
-**Last initiative plan read**: 2026-04-21
+**Last initiative plan read**: 2026-04-22
 
 When reading this file:
 1. Check the "Last initiative plan read" date above
@@ -82,12 +82,14 @@ When reading this file:
 When instructed to update Jira issue status or transitions:
 
 1. Perform the requested Jira update via the jira-mcp-server tools
-2. Update the "Currently Active Work" section of this file:
+2. Re-check the issue to verify the current state (status and assignee may have changed)
+3. Update the "Currently Active Work" section of this file:
    - Add issues that are moved to active statuses ("In Progress", "Code Review", etc.)
    - Remove issues that are moved to completed or blocked status
    - Include assignee and status in parentheses (e.g., "(Mark McLaughlin, Code Review)")
    - Use "Unassigned" if no assignee is set
    - Keep this section as a simple list of what's currently being worked on
+   - If status or assignee changed unexpectedly, flag to the user. If it changed to closed/done then also remove issue 
 
 ### Adding Jira Comments
 
@@ -107,7 +109,7 @@ When instructed to add a comment to a Jira issue:
 
 ## Currently Active Work
 
-- **RHCLOUD-46020** - Phase 2: Update client sdks to incorporate all new inventory-api endpoints (Jonathan Marcantonio, In Progress)
+- **RHCLOUD-46116** - Phase 2: Track and assist customer migration to inventory-api endpoints (Mark McLaughlin, In Progress)
 
 **Note**: For all issues related to this initiative, query Jira using parent epic [RHCLOUD-44628](https://issues.redhat.com/browse/RHCLOUD-44628).
 

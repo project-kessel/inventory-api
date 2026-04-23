@@ -25,7 +25,7 @@ todos:
     status: completed
   - id: verify
     content: Ensure project compiles, lint passes, and all unit tests pass
-    status: pending
+    status: completed
 isProject: false
 ---
 
@@ -319,6 +319,7 @@ type ReadTuplesItem struct {
 - **Single DeleteTuples** -- takes `TupleFilter` (mirrors Relations API's actual contract), eliminates the artificial split
 - **Multi-value returns** -- for simple results (Check, CreateTuples, DeleteTuples, AcquireLock), eliminating wrapper structs
 - **Tiny types** -- `LockId`, `LockToken` replace raw strings; `FencingCheck` uses them
+- **End-to-end type propagation** -- when replacing `ReporterResourceKey` with `ResourceReference`, propagate through the entire call chain (service -> usecase -> repository). Do not insert local adapter shims (`ResourceReferenceFromKey`) at call sites. The adapter functions are temporary bridges to be removed once migration is complete. Lossy back-conversions (`ReporterResourceKeyFromReference`) are a bug.
 
 ## DDD implementation conventions
 
@@ -326,48 +327,66 @@ Every type in this plan must follow the conventions defined in [`AGENTS.md`](AGE
 
 ### Rules
 
-1. **Tiny types** -- use defined types on primitives (`type LockId string`) instead of raw `string`/`int`. Tiny types get a `New*` constructor (with invariant validation where applicable), a `Serialize() string` method, and a `String() string` method.
+1. **Tiny types** -- use Go defined types on primitives (`type LockId string`) instead of raw `string`/`int`. Add to `common.go` alongside the existing tiny types. Each gets a `New*` constructor (with invariant validation), a `Serialize()` method (using the generic helpers), a `String()` method, and a `Deserialize*` function. See `common.go` for the established pattern.
 2. **Unexported fields** -- all struct fields are unexported. No exceptions for "simple" types.
 3. **Constructor initialization** -- every struct type has a `New*` constructor. Constructors validate invariants (required fields non-zero, valid combinations) and return `(T, error)` when validation can fail. For structs where all fields are always valid (e.g., result types constructed only by infrastructure code), constructors may return `T` without error.
 4. **Invariant examples**: `NewResourceReference` must require non-zero `ResourceType` and `LocalResourceId`. `NewRelationship` must require non-zero object, relation, and subject. `NewFencingCheck` must require non-zero `LockId` and `LockToken`.
 5. **Getters only if used** -- add a getter only when a caller outside the type's own methods actually needs it. Do not add speculative getters. When in doubt, leave it out; a getter can always be added later.
 6. **Immutability** -- no setter methods. To change a value, construct a new instance.
-7. **`Deserialize*` functions** -- bypass validation; reserved for reconstructing from trusted storage or wire formats (database rows, protobuf fields). Named `Deserialize*`, not `New*`.
-8. **One type per file** (for new types) -- each new domain type gets its own file (e.g., `relationship.go`, `resource_reference.go`, `fencing_check.go`). Small related types may share a file (e.g., `ReporterReference` in `resource_reference.go`).
+7. **`Deserialize*` functions** -- bypass validation; reserved for reconstructing from trusted storage or wire formats (database rows, protobuf fields). Named `Deserialize*`, not `New*`. Serialize/deserialize pairs are added as needed, not upfront.
+8. **One struct type per file** -- each struct value object gets its own file for a flat view of the domain (e.g., `relationship.go`, `fencing_check.go`, `health_result.go`). Tightly coupled types may share a file (e.g., `CheckBulkResult` + `CheckBulkResultPair` + `CheckBulkResultItem` in `check_bulk_result.go`; `TupleFilter` + `TupleSubjectFilter` in `tuple_filter.go`).
+9. **Delete `relations_results.go`** -- after migrating all types to their own files, delete the monolithic results file.
 
 ### Type-by-type conventions
 
-| Type | Kind | Constructor | Invariants | Getters (add only if used) |
-|------|------|-------------|------------|---------------------------|
-| `LockId` | tiny type | `NewLockId(s string) (LockId, error)` | non-empty | `Serialize`, `String` |
-| `LockToken` | tiny type | `NewLockToken(s string) (LockToken, error)` | non-empty | `Serialize`, `String` |
-| `ResourceReference` | struct value object | `NewResourceReference(...)` | non-zero `ResourceType`, `LocalResourceId` | `ResourceType`, `ResourceId`, `Reporter`, `HasReporter` |
-| `ReporterReference` | struct value object | `NewReporterReference(...)` | non-zero `ReporterType` | `ReporterType`, `InstanceId`, `HasInstanceId` |
-| `RepresentationType` | struct value object | `NewRepresentationType(...)` | non-zero `ResourceType` | `ResourceType`, `ReporterType`, `HasReporterType` |
-| `SubjectReference` | struct value object | `NewSubjectReference(...)` | non-zero `ResourceReference` | `Resource`, `Relation`, `HasRelation` |
-| `Relationship` | struct value object | `NewRelationship(...)` | non-zero object, relation, subject | `Object`, `Relation`, `Subject` |
-| `RelationsTuple` | struct value object | `NewRelationsTuple(...)` | non-zero object, relation, subject | `Object`, `Relation`, `Subject` |
-| `FencingCheck` | struct value object | `NewFencingCheck(lockId LockId, lockToken LockToken)` | non-zero `LockId`, `LockToken` | `LockId`, `LockToken` |
-| `TupleFilter` | struct value object | `NewTupleFilter(...)` or builder | all fields optional (nil = match any) | field accessors as needed |
-| `TupleSubjectFilter` | struct value object | `NewTupleSubjectFilter(...)` or builder | all fields optional | field accessors as needed |
-| `HealthResult` | struct value object | `NewHealthResult(status string, code int)` | none (infrastructure result) | `Status`, `Code` |
-| `CheckBulkResult` | struct value object | `NewCheckBulkResult(...)` | non-empty pairs | `Pairs`, `ConsistencyToken` |
-| `CheckBulkResultPair` | struct value object | `NewCheckBulkResultPair(...)` | valid request + result | `Request`, `Result` |
-| `CheckBulkResultItem` | struct value object | `NewCheckBulkResultItem(...)` | none (infrastructure result) | `Allowed`, `Error`, `ErrorCode` |
-| `LookupObjectsItem` | struct value object | `NewLookupObjectsItem(...)` | non-zero `ResourceReference` | `Object`, `ContinuationToken` |
-| `LookupSubjectsItem` | struct value object | `NewLookupSubjectsItem(...)` | non-zero `SubjectReference` | `Subject`, `ContinuationToken` |
-| `ReadTuplesItem` | struct value object | `NewReadTuplesItem(...)` | non-zero object, relation, subject | `Object`, `Relation`, `Subject`, `ContinuationToken`, `ConsistencyToken` |
-| `ResultStream[T]` | interface | N/A | N/A | `Recv() (T, error)` |
+| Type | Kind | File | Constructor | Invariants |
+|------|------|------|-------------|------------|
+| `LockId` | tiny type | `common.go` | `NewLockId(s string) (LockId, error)` | non-empty |
+| `LockToken` | tiny type | `common.go` | `NewLockToken(s string) (LockToken, error)` | non-empty |
+| `ResourceReference` | struct | `resource_reference.go` | `NewResourceReference(...)` | non-zero `ResourceType`, `LocalResourceId` |
+| `ReporterReference` | struct | `resource_reference.go` | `NewReporterReference(...)` | non-zero `ReporterType` |
+| `RepresentationType` | struct | `resource_reference.go` | `NewRepresentationType(...)` | non-zero `ResourceType` |
+| `SubjectReference` | struct | `subject_reference.go` | `NewSubjectReference(...)` | non-zero `ResourceReference` |
+| `Relationship` | struct | `relationship.go` | `NewRelationship(...)` | non-zero object, relation, subject |
+| `RelationsTuple` | struct | `relations_tuple.go` | `NewRelationsTuple(...)` | non-zero object, relation, subject |
+| `FencingCheck` | struct | `fencing_check.go` | `NewFencingCheck(...)` | non-zero `LockId`, `LockToken` |
+| `TupleFilter` | struct | `tuple_filter.go` | `NewTupleFilter(...)` or builder | all fields optional |
+| `TupleSubjectFilter` | struct | `tuple_filter.go` | `NewTupleSubjectFilter(...)` or builder | all fields optional |
+| `HealthResult` | struct | `health_result.go` | `NewHealthResult(...)` | none (infra result) |
+| `CheckBulkResult` | struct | `check_bulk_result.go` | `NewCheckBulkResult(...)` | non-empty pairs |
+| `CheckBulkResultPair` | struct | `check_bulk_result.go` | `NewCheckBulkResultPair(...)` | valid request + result |
+| `CheckBulkResultItem` | struct | `check_bulk_result.go` | `NewCheckBulkResultItem(...)` | none (infra result) |
+| `LookupObjectsItem` | struct | `lookup_objects_item.go` | `NewLookupObjectsItem(...)` | non-zero `ResourceReference` |
+| `LookupSubjectsItem` | struct | `lookup_subjects_item.go` | `NewLookupSubjectsItem(...)` | non-zero `SubjectReference` |
+| `ReadTuplesItem` | struct | `read_tuples_item.go` | `NewReadTuplesItem(...)` | non-zero object, relation, subject |
+| `ResultStream[T]` | interface | `result_stream.go` | N/A | N/A |
 
 ## Files to change
 
 ### Model layer ([`internal/biz/model/`](internal/biz/model/))
-- New file for `ResourceReference`, `ReporterReference`, `RepresentationType`
-- Update [`relations_repository.go`](internal/biz/model/relations_repository.go) -- new interface
-- Update [`relations_results.go`](internal/biz/model/relations_results.go) -- remove eliminated types, update remaining types
-- Update [`subject_reference.go`](internal/biz/model/subject_reference.go) -- wrap `ResourceReference` instead of `ReporterResourceKey`
-- Update [`relations_tuple.go`](internal/biz/model/relations_tuple.go) -- rewrite `RelationsTuple` to use `ResourceReference`/`SubjectReference`; remove deprecated `RelationsResource`, `RelationsSubject`, `RelationsObjectType`; update `NewWorkspaceRelationsTuple`
-- Add `LockId`, `LockToken` tiny types (in [`common.go`](internal/biz/model/common.go) or separate file)
+
+Tiny types in existing file:
+- [`common.go`](internal/biz/model/common.go) -- add `LockId`, `LockToken` (already done on branch)
+
+Existing files to update:
+- [`relations_repository.go`](internal/biz/model/relations_repository.go) -- new interface (already done on branch)
+- [`subject_reference.go`](internal/biz/model/subject_reference.go) -- wrap `ResourceReference` instead of `ReporterResourceKey`
+- [`relations_tuple.go`](internal/biz/model/relations_tuple.go) -- rewrite to use `ResourceReference`/`SubjectReference`; remove deprecated `RelationsResource`, `RelationsSubject`, `RelationsObjectType`
+
+One file per struct type (flat domain view):
+- [`resource_reference.go`](internal/biz/model/resource_reference.go) -- `ResourceReference`, `ReporterReference`, `RepresentationType`
+- [`relationship.go`](internal/biz/model/relationship.go) -- `Relationship`
+- [`fencing_check.go`](internal/biz/model/fencing_check.go) -- `FencingCheck`
+- [`health_result.go`](internal/biz/model/health_result.go) -- `HealthResult`
+- [`check_bulk_result.go`](internal/biz/model/check_bulk_result.go) -- `CheckBulkResult`, `CheckBulkResultPair`, `CheckBulkResultItem`
+- [`lookup_objects_item.go`](internal/biz/model/lookup_objects_item.go) -- `LookupObjectsItem`
+- [`lookup_subjects_item.go`](internal/biz/model/lookup_subjects_item.go) -- `LookupSubjectsItem`
+- [`tuple_filter.go`](internal/biz/model/tuple_filter.go) -- `TupleFilter`, `TupleSubjectFilter`
+- [`read_tuples_item.go`](internal/biz/model/read_tuples_item.go) -- `ReadTuplesItem`
+- [`result_stream.go`](internal/biz/model/result_stream.go) -- `ResultStream[T]`
+
+Delete after migration:
+- [`relations_results.go`](internal/biz/model/relations_results.go) -- delete once all types are migrated to their own files
 
 ### Data layer ([`internal/data/`](internal/data/))
 - [`grpc_relations_repository.go`](internal/data/grpc_relations_repository.go) -- implement new interface, update protobuf conversion
@@ -375,18 +394,42 @@ Every type in this plan must follow the conventions defined in [`AGENTS.md`](AGE
 - [`relations_simple.go`](internal/data/relations_simple.go) -- implement new signatures
 - Remove `DeleteTuplesByFilter` from all implementations
 
-### Use case layer
-- [`internal/biz/usecase/resources/resource_service.go`](internal/biz/usecase/resources/resource_service.go) -- update all calls to use `Relationship`, `ResourceReference`, etc.
-- [`internal/biz/usecase/resources/commands.go`](internal/biz/usecase/resources/commands.go) -- update command types (remove `CheckBulkItem`, rename `LookupResourcesCommand` to `LookupObjectsCommand`, etc.)
+### Use case layer (end-to-end -- no local adapter shims)
+
+The usecase layer currently accepts `ReporterResourceKey` and converts to `ResourceReference` at the call site via `ResourceReferenceFromKey(key)`. This is a local shim, not an end-to-end change. The fix is to propagate `ResourceReference` through the entire call chain:
+
+- [`internal/biz/usecase/resources/commands.go`](internal/biz/usecase/resources/commands.go):
+  - `CheckBulkItem.Resource`: `ReporterResourceKey` -> `ResourceReference`
+  - `CheckSelfBulkItem.Resource`: `ReporterResourceKey` -> `ResourceReference`
+  - `LookupSubjectsCommand.Resource`: `ReporterResourceKey` -> `ResourceReference`
+  - Remove `CheckBulkItem` entirely (replaced by `Relationship` at interface level)
+  - Rename `LookupResourcesCommand` -> `LookupObjectsCommand`
+- [`internal/biz/usecase/resources/resource_service.go`](internal/biz/usecase/resources/resource_service.go):
+  - Methods that accept `ReporterResourceKey` and call Relations (`Check`, `CheckSelf`, `CheckForUpdate`, `checkPermission`, `LookupSubjects`) should accept `ResourceReference` or build it early from the service-layer input, not convert at the call site
+  - Remove all `ResourceReferenceFromKey(reporterResourceKey)` shim calls -- the type must flow naturally
+  - Remove the lossy `ReporterResourceKeyFromReference(p.Request().Object())` back-conversion in `toUsecaseCheckBulkResult` (line ~639) -- this reconstructs a `ReporterResourceKey` with zero-value reporter fields when none exist, which is a bug waiting to happen
+  - Meta-authorization: replace `NewInventoryResourceFromKey(reporterResourceKey)` with `NewInventoryResource(ref.Reporter().ReporterType(), ref.ResourceType(), ref.ResourceId())` -- use the existing constructor with primitive fields extracted from `ResourceReference`, no new `FromReference` adapter needed
+  - `resolveConsistency`, `resolveFromDB`, `lookupConsistencyTokenFromDB` accept `ReporterResourceKey` for DB lookup -- these may still need `ReporterResourceKey` since the resource repository uses it. The conversion from `ResourceReference` to `ReporterResourceKey` should happen at the DB boundary (data layer), not in the usecase
+- [`internal/biz/usecase/metaauthorizer/metaauthorizer.go`](internal/biz/usecase/metaauthorizer/metaauthorizer.go):
+  - Remove `NewInventoryResourceFromKey` -- it just unpacks three fields that callers can pass directly to `NewInventoryResource`. Avoid adding replacement adapters like `NewInventoryResourceFromReference`; callers extract fields themselves
 - [`internal/biz/usecase/tuples/commands.go`](internal/biz/usecase/tuples/commands.go) -- update `FencingCheck` to use `LockId`/`LockToken`
 - [`internal/biz/usecase/tuples/tuple_crud_usecase.go`](internal/biz/usecase/tuples/tuple_crud_usecase.go) -- update `DeleteTuples` call (no more `DeleteTuplesByFilter`)
 
 ### Consumer
 - [`internal/consumer/consumer.go`](internal/consumer/consumer.go) -- update to use `Relationship`, `ResourceReference`, `LockId`, `LockToken`
 
-### Service layer
-- [`internal/service/resources/kesselinventoryservice.go`](internal/service/resources/kesselinventoryservice.go) -- update `ToLookupResourcesCommand` -> `ToLookupObjectsCommand`, update response conversion
+### Service layer (entry point -- build `ResourceReference` here)
+
+The service layer is the entry point where protobuf types are converted to model types. `ResourceReference` should be constructed here (from proto fields), so the usecase layer receives it natively:
+
+- [`internal/service/resources/kesselinventoryservice.go`](internal/service/resources/kesselinventoryservice.go) -- construct `ResourceReference` from proto fields instead of `ReporterResourceKey`; update `ToLookupResourcesCommand` -> `ToLookupObjectsCommand`; update response conversion
 - [`internal/service/tuples/tuples.go`](internal/service/tuples/tuples.go) -- update `relationshipToRelationsTuple` to build new `RelationsTuple` (using `ResourceReference`/`SubjectReference`)
+
+### Adapter functions to remove
+
+Once the end-to-end migration is complete, remove the lossy adapter functions from `resource_reference.go`:
+- `ResourceReferenceFromKey(key ReporterResourceKey) ResourceReference` -- temporary bridge, remove when no callers remain
+- `ReporterResourceKeyFromReference(ref ResourceReference) ReporterResourceKey` -- lossy (zero-values on missing reporter, silently discards error), remove when no callers remain
 
 ### Health
 - [`internal/data/health/healthrepository.go`](internal/data/health/healthrepository.go) -- no change (already uses `HealthResult`)

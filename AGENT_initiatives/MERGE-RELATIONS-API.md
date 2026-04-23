@@ -60,6 +60,17 @@ For issues that are technical debt, code quality improvements, refactoring, or g
 - Component was previously "Management Fabric" - now updated to "Fabric Kessel"
 - Legacy label "mgmt-fabric-kessel" has been removed
 
+### Jira Formatting Requirements
+
+When creating or updating Jira issues, always use **Jira markup**, NOT Markdown:
+
+- **Headings**: `h1.`, `h2.`, `h3.`, etc. (NOT `#`, `##`, `###`)
+- **Bold**: `*bold text*` (single asterisks, NOT `**bold**`)
+- **Inline code**: `{{code}}` (double curly braces, NOT backticks)
+- **Code blocks**: `{code:yaml}...{code}` or `{code:java}...{code}` (NOT triple backticks)
+- **Lists**: `*` for bullets, `#` for numbered (same as Markdown)
+- **Links**: `[text|url]` (NOT `[text](url)`)
+
 ## Standard Operating Procedures (SOPs)
 
 ### Keeping Context Fresh
@@ -101,6 +112,14 @@ When instructed to add a comment to a Jira issue:
 4. Only post the comment after receiving user approval
 5. Make any requested revisions before posting
 
+**Formatting requirements:**
+- Use Jira markup, NOT Markdown
+- Bold: `*bold text*` (single asterisks)
+- Inline code: `{{code}}` (double curly braces)
+- Code blocks: `{code}...{code}` (single curly braces)
+- Headings: `h1. Heading`, `h2. Heading`, etc.
+- Lists: `*` or `#` for bullet/numbered lists (same as Markdown)
+
 ## Next Phases (Future Work)
 
 - **Phase 3**: Functional testing and performance
@@ -110,6 +129,7 @@ When instructed to add a comment to a Jira issue:
 ## Currently Active Work
 
 - **RHCLOUD-46116** - Phase 2: Track and assist customer migration to inventory-api endpoints (Mark McLaughlin, In Progress)
+- **RHCLOUD-47111** - Phase 2: Configure tuple CRUD allowlist for stage environment (Mark McLaughlin, In Progress)
 
 **Note**: For all issues related to this initiative, query Jira using parent epic [RHCLOUD-44628](https://issues.redhat.com/browse/RHCLOUD-44628).
 

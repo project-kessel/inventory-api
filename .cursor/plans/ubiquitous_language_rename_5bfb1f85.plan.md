@@ -1,9 +1,9 @@
 ---
 name: Relations Ubiquitous Language
-overview: Redesign the RelationsRepository interface using ubiquitous language domain types (Relationship, ResourceReference, SubjectReference, RepresentationType) with DDD principles, eliminating redundant result types and introducing tiny types throughout.
+overview: "Redesign the RelationsRepository interface using ubiquitous language domain types (Relationship, ResourceReference, SubjectReference, RepresentationType) with DDD principles: tiny types, unexported fields, constructors with invariant validation, getters only if used, immutability."
 todos:
   - id: define-new-types
-    content: "Define new domain types in internal/biz/model/: ResourceReference, ReporterReference, RepresentationType, Relationship, LockId, LockToken. Redesign SubjectReference to wrap ResourceReference. Redesign TupleFilter, TupleSubjectFilter, ReadTuplesItem as proper domain types with tiny types."
+    content: "Define new domain types in internal/biz/model/: ResourceReference, ReporterReference, RepresentationType, Relationship, LockId, LockToken. Redesign SubjectReference to wrap ResourceReference. Redesign TupleFilter, TupleSubjectFilter, ReadTuplesItem as proper domain types with tiny types. All types must use unexported fields, New* constructors with invariant checks, and getters only if used."
     status: completed
   - id: update-interface
     content: Rewrite RelationsRepository interface with Relationship, RepresentationType, multi-value returns, single DeleteTuples(filter), LookupObjects rename, tiny types
@@ -20,8 +20,11 @@ todos:
   - id: update-mocks-tests
     content: Update mocks and all test files for new types, renamed methods, and multi-value returns
     status: completed
+  - id: ddd-enforce-conventions
+    content: "Ensure all new and redesigned types follow DDD conventions: unexported fields, New* constructors with invariant validation, getters only if used, no setters. Verify relations_results.go types are migrated to individual files with proper encapsulation. Update AGENTS.md with DDD conventions."
+    status: completed
   - id: verify
-    content: Ensure project compiles and all unit tests pass
+    content: Ensure project compiles, lint passes, and all unit tests pass
     status: pending
 isProject: false
 ---
@@ -133,27 +136,27 @@ type RelationsTuple struct {
 
 // TupleFilter -- proper domain type with tiny types. All fields optional (nil = match any).
 type TupleFilter struct {
-    ObjectType   *ResourceType
-    ReporterType *ReporterType
-    ObjectId     *LocalResourceId
-    Relation     *Relation
-    Subject      *TupleSubjectFilter
+    objectType   *ResourceType
+    reporterType *ReporterType
+    objectId     *LocalResourceId
+    relation     *Relation
+    subject      *TupleSubjectFilter
 }
 
 type TupleSubjectFilter struct {
-    SubjectType  *ResourceType
-    ReporterType *ReporterType
-    SubjectId    *LocalResourceId
-    Relation     *Relation
+    subjectType  *ResourceType
+    reporterType *ReporterType
+    subjectId    *LocalResourceId
+    relation     *Relation
 }
 
 // ReadTuplesItem -- proper domain type replacing raw string passthrough.
 type ReadTuplesItem struct {
-    Object            ResourceReference
-    Relation          Relation
-    Subject           SubjectReference
-    ContinuationToken string
-    ConsistencyToken  ConsistencyToken
+    object            ResourceReference
+    relation          Relation
+    subject           SubjectReference
+    continuationToken string
+    consistencyToken  ConsistencyToken
 }
 
 // New tiny types
@@ -216,70 +219,69 @@ type RelationsRepository interface {
 
 ### Updated result types
 
+All result types use unexported fields, `New*` constructors, and getters only if used.
+
 ```go
 // CheckBulkItem is eliminated -- Check APIs take []Relationship directly.
-// CheckBulkResultPair.Request uses Relationship (the query concept).
 
 type CheckBulkResultItem struct {
-    Allowed   bool
-    Error     error
-    ErrorCode int32
+    allowed   bool
+    err       error
+    errorCode int32
 }
 
 type CheckBulkResultPair struct {
-    Request Relationship
-    Result  CheckBulkResultItem
+    request Relationship
+    result  CheckBulkResultItem
 }
 
 type CheckBulkResult struct {
-    Pairs            []CheckBulkResultPair
-    ConsistencyToken ConsistencyToken
+    pairs            []CheckBulkResultPair
+    consistencyToken ConsistencyToken
 }
 
 type LookupObjectsItem struct {
-    Object            ResourceReference
-    ContinuationToken string
+    object            ResourceReference
+    continuationToken string
 }
 
 type LookupSubjectsItem struct {
-    Subject           SubjectReference
-    ContinuationToken string
+    subject           SubjectReference
+    continuationToken string
 }
 
 type FencingCheck struct {
-    LockId    LockId
-    LockToken LockToken
+    lockId    LockId
+    lockToken LockToken
 }
 
 type HealthResult struct {
-    Status string
-    Code   int
+    status string
+    code   int
 }
 
-// TupleFilter -- redesigned as a proper domain type with tiny types.
-// All fields optional (nil = match any).
+// TupleFilter -- all fields optional (nil = match any).
 type TupleFilter struct {
-    ObjectType   *ResourceType
-    ReporterType *ReporterType
-    ObjectId     *LocalResourceId
-    Relation     *Relation
-    Subject      *TupleSubjectFilter
+    objectType   *ResourceType
+    reporterType *ReporterType
+    objectId     *LocalResourceId
+    relation     *Relation
+    subject      *TupleSubjectFilter
 }
 
 type TupleSubjectFilter struct {
-    SubjectType  *ResourceType
-    ReporterType *ReporterType
-    SubjectId    *LocalResourceId
-    Relation     *Relation
+    subjectType  *ResourceType
+    reporterType *ReporterType
+    subjectId    *LocalResourceId
+    relation     *Relation
 }
 
-// ReadTuplesItem -- redesigned as a proper domain type.
 type ReadTuplesItem struct {
-    Object            ResourceReference
-    Relation          Relation
-    Subject           SubjectReference
-    ContinuationToken string
-    ConsistencyToken  ConsistencyToken
+    object            ResourceReference
+    relation          Relation
+    subject           SubjectReference
+    continuationToken string
+    consistencyToken  ConsistencyToken
 }
 ```
 
@@ -317,6 +319,45 @@ type ReadTuplesItem struct {
 - **Single DeleteTuples** -- takes `TupleFilter` (mirrors Relations API's actual contract), eliminates the artificial split
 - **Multi-value returns** -- for simple results (Check, CreateTuples, DeleteTuples, AcquireLock), eliminating wrapper structs
 - **Tiny types** -- `LockId`, `LockToken` replace raw strings; `FencingCheck` uses them
+
+## DDD implementation conventions
+
+Every type in this plan must follow the conventions defined in [`AGENTS.md`](AGENTS.md) under "Domain Model Conventions". Concretely:
+
+### Rules
+
+1. **Tiny types** -- use defined types on primitives (`type LockId string`) instead of raw `string`/`int`. Tiny types get a `New*` constructor (with invariant validation where applicable), a `Serialize() string` method, and a `String() string` method.
+2. **Unexported fields** -- all struct fields are unexported. No exceptions for "simple" types.
+3. **Constructor initialization** -- every struct type has a `New*` constructor. Constructors validate invariants (required fields non-zero, valid combinations) and return `(T, error)` when validation can fail. For structs where all fields are always valid (e.g., result types constructed only by infrastructure code), constructors may return `T` without error.
+4. **Invariant examples**: `NewResourceReference` must require non-zero `ResourceType` and `LocalResourceId`. `NewRelationship` must require non-zero object, relation, and subject. `NewFencingCheck` must require non-zero `LockId` and `LockToken`.
+5. **Getters only if used** -- add a getter only when a caller outside the type's own methods actually needs it. Do not add speculative getters. When in doubt, leave it out; a getter can always be added later.
+6. **Immutability** -- no setter methods. To change a value, construct a new instance.
+7. **`Deserialize*` functions** -- bypass validation; reserved for reconstructing from trusted storage or wire formats (database rows, protobuf fields). Named `Deserialize*`, not `New*`.
+8. **One type per file** (for new types) -- each new domain type gets its own file (e.g., `relationship.go`, `resource_reference.go`, `fencing_check.go`). Small related types may share a file (e.g., `ReporterReference` in `resource_reference.go`).
+
+### Type-by-type conventions
+
+| Type | Kind | Constructor | Invariants | Getters (add only if used) |
+|------|------|-------------|------------|---------------------------|
+| `LockId` | tiny type | `NewLockId(s string) (LockId, error)` | non-empty | `Serialize`, `String` |
+| `LockToken` | tiny type | `NewLockToken(s string) (LockToken, error)` | non-empty | `Serialize`, `String` |
+| `ResourceReference` | struct value object | `NewResourceReference(...)` | non-zero `ResourceType`, `LocalResourceId` | `ResourceType`, `ResourceId`, `Reporter`, `HasReporter` |
+| `ReporterReference` | struct value object | `NewReporterReference(...)` | non-zero `ReporterType` | `ReporterType`, `InstanceId`, `HasInstanceId` |
+| `RepresentationType` | struct value object | `NewRepresentationType(...)` | non-zero `ResourceType` | `ResourceType`, `ReporterType`, `HasReporterType` |
+| `SubjectReference` | struct value object | `NewSubjectReference(...)` | non-zero `ResourceReference` | `Resource`, `Relation`, `HasRelation` |
+| `Relationship` | struct value object | `NewRelationship(...)` | non-zero object, relation, subject | `Object`, `Relation`, `Subject` |
+| `RelationsTuple` | struct value object | `NewRelationsTuple(...)` | non-zero object, relation, subject | `Object`, `Relation`, `Subject` |
+| `FencingCheck` | struct value object | `NewFencingCheck(lockId LockId, lockToken LockToken)` | non-zero `LockId`, `LockToken` | `LockId`, `LockToken` |
+| `TupleFilter` | struct value object | `NewTupleFilter(...)` or builder | all fields optional (nil = match any) | field accessors as needed |
+| `TupleSubjectFilter` | struct value object | `NewTupleSubjectFilter(...)` or builder | all fields optional | field accessors as needed |
+| `HealthResult` | struct value object | `NewHealthResult(status string, code int)` | none (infrastructure result) | `Status`, `Code` |
+| `CheckBulkResult` | struct value object | `NewCheckBulkResult(...)` | non-empty pairs | `Pairs`, `ConsistencyToken` |
+| `CheckBulkResultPair` | struct value object | `NewCheckBulkResultPair(...)` | valid request + result | `Request`, `Result` |
+| `CheckBulkResultItem` | struct value object | `NewCheckBulkResultItem(...)` | none (infrastructure result) | `Allowed`, `Error`, `ErrorCode` |
+| `LookupObjectsItem` | struct value object | `NewLookupObjectsItem(...)` | non-zero `ResourceReference` | `Object`, `ContinuationToken` |
+| `LookupSubjectsItem` | struct value object | `NewLookupSubjectsItem(...)` | non-zero `SubjectReference` | `Subject`, `ContinuationToken` |
+| `ReadTuplesItem` | struct value object | `NewReadTuplesItem(...)` | non-zero object, relation, subject | `Object`, `Relation`, `Subject`, `ContinuationToken`, `ConsistencyToken` |
+| `ResultStream[T]` | interface | N/A | N/A | `Recv() (T, error)` |
 
 ## Files to change
 

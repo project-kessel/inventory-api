@@ -38,5 +38,5 @@ func NewCheckBulkResult(pairs []CheckBulkResultPair, consistencyToken Consistenc
 	return CheckBulkResult{pairs: pairs, consistencyToken: consistencyToken}
 }
 
-func (r CheckBulkResult) Pairs() []CheckBulkResultPair      { return r.pairs }
+func (r CheckBulkResult) Pairs() []CheckBulkResultPair       { return r.pairs }
 func (r CheckBulkResult) ConsistencyToken() ConsistencyToken { return r.consistencyToken }

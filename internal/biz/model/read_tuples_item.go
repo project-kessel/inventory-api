@@ -19,8 +19,8 @@ func NewReadTuplesItem(object ResourceReference, relation Relation, subject Subj
 	}
 }
 
-func (i ReadTuplesItem) Object() ResourceReference       { return i.object }
-func (i ReadTuplesItem) Relation() Relation              { return i.relation }
-func (i ReadTuplesItem) Subject() SubjectReference       { return i.subject }
-func (i ReadTuplesItem) ContinuationToken() string       { return i.continuationToken }
+func (i ReadTuplesItem) Object() ResourceReference          { return i.object }
+func (i ReadTuplesItem) Relation() Relation                 { return i.relation }
+func (i ReadTuplesItem) Subject() SubjectReference          { return i.subject }
+func (i ReadTuplesItem) ContinuationToken() string          { return i.continuationToken }
 func (i ReadTuplesItem) ConsistencyToken() ConsistencyToken { return i.consistencyToken }

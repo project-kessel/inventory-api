@@ -17,6 +17,6 @@ func NewRelationship(object ResourceReference, relation Relation, subject Subjec
 	}
 }
 
-func (r Relationship) Object() ResourceReference  { return r.object }
-func (r Relationship) Relation() Relation          { return r.relation }
-func (r Relationship) Subject() SubjectReference   { return r.subject }
+func (r Relationship) Object() ResourceReference { return r.object }
+func (r Relationship) Relation() Relation        { return r.relation }
+func (r Relationship) Subject() SubjectReference { return r.subject }

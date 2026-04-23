@@ -780,4 +780,3 @@ func (i *InventoryConsumer) RebalanceCallback(consumer *kafka.Consumer, event ka
 	}
 	return nil
 }
-

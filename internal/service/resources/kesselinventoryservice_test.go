@@ -54,23 +54,6 @@ func testTupleFilterForHelper(namespace, resourceType, resourceID, relation, sub
 			WithSubjectId(sid))
 }
 
-func testHelperTuple(namespace, resourceType, resourceID, relation, subjectNamespace, subjectType, subjectID string) model.RelationsTuple {
-	objRep := model.NewReporterReference(model.DeserializeReporterType(namespace), nil)
-	object := model.NewResourceReference(
-		model.DeserializeResourceType(resourceType),
-		model.DeserializeLocalResourceId(resourceID),
-		&objRep,
-	)
-	subRep := model.NewReporterReference(model.DeserializeReporterType(subjectNamespace), nil)
-	subjectRes := model.NewResourceReference(
-		model.DeserializeResourceType(subjectType),
-		model.DeserializeLocalResourceId(subjectID),
-		&subRep,
-	)
-	subject := model.NewSubjectReferenceWithoutRelation(subjectRes)
-	return model.NewRelationsTuple(object, model.DeserializeRelation(relation), subject)
-}
-
 type testSelfSubjectStrategy struct{}
 
 func (testSelfSubjectStrategy) SubjectFromAuthorizationContext(authzContext authnapi.AuthzContext) (model.SubjectReference, error) {

@@ -54,9 +54,9 @@ func (c *InventoryService) DeleteResource(ctx context.Context, r *pb.DeleteResou
 }
 
 func (s *InventoryService) Check(ctx context.Context, req *pb.CheckRequest) (*pb.CheckResponse, error) {
-	reporterResourceKey, err := reporterKeyFromResourceReference(req.Object)
+	resourceRef, err := resourceReferenceFromProto(req.Object)
 	if err != nil {
-		log.Error("Failed to build reporter resource key: ", err)
+		log.Error("Failed to build resource reference: ", err)
 		return nil, err
 	}
 	subjectRef, err := subjectReferenceFromProto(req.GetSubject())
@@ -70,7 +70,7 @@ func (s *InventoryService) Check(ctx context.Context, req *pb.CheckRequest) (*pb
 		return nil, err
 	}
 	consistency := consistencyFromProto(req.GetConsistency())
-	allowed, consistencyToken, err := s.Ctl.Check(ctx, relation, subjectRef, reporterResourceKey, consistency)
+	allowed, consistencyToken, err := s.Ctl.Check(ctx, relation, subjectRef, resourceRef, consistency)
 	if err != nil {
 		return nil, err
 	}
@@ -79,9 +79,9 @@ func (s *InventoryService) Check(ctx context.Context, req *pb.CheckRequest) (*pb
 
 func (s *InventoryService) CheckForUpdate(ctx context.Context, req *pb.CheckForUpdateRequest) (*pb.CheckForUpdateResponse, error) {
 	log.Info("CheckForUpdate using v1beta2 db")
-	reporterResourceKey, err := reporterKeyFromResourceReference(req.Object)
+	resourceRef, err := resourceReferenceFromProto(req.Object)
 	if err != nil {
-		log.Error("Failed to build reporter resource key: ", err)
+		log.Error("Failed to build resource reference: ", err)
 		return nil, err
 	}
 	subjectRef, err := subjectReferenceFromProto(req.GetSubject())
@@ -94,7 +94,7 @@ func (s *InventoryService) CheckForUpdate(ctx context.Context, req *pb.CheckForU
 		log.Error("Failed to build relation: ", err)
 		return nil, err
 	}
-	allowed, consistencyToken, err := s.Ctl.CheckForUpdate(ctx, relation, subjectRef, reporterResourceKey)
+	allowed, consistencyToken, err := s.Ctl.CheckForUpdate(ctx, relation, subjectRef, resourceRef)
 	if err != nil {
 		return nil, err
 	}
@@ -129,7 +129,7 @@ func (s *InventoryService) CheckBulk(ctx context.Context, req *pb.CheckBulkReque
 }
 
 func (s *InventoryService) CheckSelf(ctx context.Context, req *pb.CheckSelfRequest) (*pb.CheckSelfResponse, error) {
-	reporterResourceKey, err := reporterKeyFromResourceReference(req.Object)
+	resourceRef, err := resourceReferenceFromProto(req.Object)
 	if err != nil {
 		return nil, err
 	}
@@ -139,7 +139,7 @@ func (s *InventoryService) CheckSelf(ctx context.Context, req *pb.CheckSelfReque
 	}
 	consistency := consistencyFromProto(req.GetConsistency())
 	log.Debugf("CheckSelf request consistency: %s", model.ConsistencyTypeOf(consistency))
-	resp, consistencyToken, err := s.Ctl.CheckSelf(ctx, relation, reporterResourceKey, consistency)
+	resp, consistencyToken, err := s.Ctl.CheckSelf(ctx, relation, resourceRef, consistency)
 	if err != nil {
 		return nil, err
 	}
@@ -171,6 +171,35 @@ func (s *InventoryService) CheckSelfBulk(ctx context.Context, req *pb.CheckSelfB
 	return fromCheckSelfBulkResult(resp, req), nil
 }
 
+// resourceReferenceFromProto converts a v1beta2 ResourceReference to a model.ResourceReference.
+// Used by Relations-flow endpoints (Check, CheckForUpdate, CheckBulk, LookupSubjects, etc.).
+func resourceReferenceFromProto(resource *pb.ResourceReference) (model.ResourceReference, error) {
+	localResourceId, err := model.NewLocalResourceId(resource.GetResourceId())
+	if err != nil {
+		return model.ResourceReference{}, err
+	}
+	resourceType, err := model.NewResourceType(resource.GetResourceType())
+	if err != nil {
+		return model.ResourceReference{}, err
+	}
+	reporterType, err := model.NewReporterType(resource.GetReporter().GetType())
+	if err != nil {
+		return model.ResourceReference{}, err
+	}
+
+	var instanceId *model.ReporterInstanceId
+	if id := resource.GetReporter().GetInstanceId(); id != "" {
+		rid, err := model.NewReporterInstanceId(id)
+		if err != nil {
+			return model.ResourceReference{}, err
+		}
+		instanceId = &rid
+	}
+
+	reporter := model.NewReporterReference(reporterType, instanceId)
+	return model.NewResourceReference(resourceType, localResourceId, &reporter), nil
+}
+
 func subjectReferenceFromProto(subject *pb.SubjectReference) (model.SubjectReference, error) {
 	localResourceId, err := model.NewLocalResourceId(subject.Resource.GetResourceId())
 	if err != nil {
@@ -180,33 +209,30 @@ func subjectReferenceFromProto(subject *pb.SubjectReference) (model.SubjectRefer
 	if err != nil {
 		return model.SubjectReference{}, err
 	}
-	// TODO: Reporter is optional and we should also consider instance ID
 	reporterType, err := model.NewReporterType(subject.Resource.GetReporter().GetType())
 	if err != nil {
 		return model.SubjectReference{}, err
 	}
 
-	key, err := model.NewReporterResourceKey(localResourceId, resourceType, reporterType, model.ReporterInstanceId(""))
-	if err != nil {
-		return model.SubjectReference{}, err
-	}
+	reporter := model.NewReporterReference(reporterType, nil)
+	resource := model.NewResourceReference(resourceType, localResourceId, &reporter)
 
 	if subject.GetRelation() != "" {
 		relation, err := model.NewRelation(subject.GetRelation())
 		if err != nil {
 			return model.SubjectReference{}, err
 		}
-		return model.NewSubjectReference(key, &relation), nil
+		return model.NewSubjectReference(resource, &relation), nil
 	}
 
-	return model.NewSubjectReferenceWithoutRelation(key), nil
+	return model.NewSubjectReferenceWithoutRelation(resource), nil
 }
 
 // protoToCheckBulkItem converts a single *pb.CheckBulkRequestItem to a resources.CheckBulkItem.
 // Both CheckBulkRequest and CheckForUpdateBulkRequest share the same item type, so this helper
 // is reused by toCheckBulkCommand and toCheckForUpdateBulkCommand.
 func protoToCheckBulkItem(item *pb.CheckBulkRequestItem, idx int) (resources.CheckBulkItem, error) {
-	resourceKey, err := reporterKeyFromResourceReference(item.GetObject())
+	resourceRef, err := resourceReferenceFromProto(item.GetObject())
 	if err != nil {
 		return resources.CheckBulkItem{}, fmt.Errorf("invalid resource at index %d: %w", idx, err)
 	}
@@ -219,7 +245,7 @@ func protoToCheckBulkItem(item *pb.CheckBulkRequestItem, idx int) (resources.Che
 		return resources.CheckBulkItem{}, fmt.Errorf("invalid relation at index %d: %w", idx, err)
 	}
 	return resources.CheckBulkItem{
-		Resource: resourceKey,
+		Resource: resourceRef,
 		Relation: relation,
 		Subject:  subjectRef,
 	}, nil
@@ -362,7 +388,7 @@ func fromCheckForUpdateBulkResult(result *resources.CheckBulkResult, req *pb.Che
 func toCheckSelfBulkCommand(req *pb.CheckSelfBulkRequest) (resources.CheckSelfBulkCommand, error) {
 	items := make([]resources.CheckSelfBulkItem, len(req.GetItems()))
 	for i, item := range req.GetItems() {
-		resourceKey, err := reporterKeyFromResourceReference(item.GetObject())
+		resourceRef, err := resourceReferenceFromProto(item.GetObject())
 		if err != nil {
 			return resources.CheckSelfBulkCommand{}, fmt.Errorf("invalid resource at index %d: %w", i, err)
 		}
@@ -371,7 +397,7 @@ func toCheckSelfBulkCommand(req *pb.CheckSelfBulkRequest) (resources.CheckSelfBu
 			return resources.CheckSelfBulkCommand{}, fmt.Errorf("invalid relation at index %d: %w", i, err)
 		}
 		items[i] = resources.CheckSelfBulkItem{
-			Resource: resourceKey,
+			Resource: resourceRef,
 			Relation: relation,
 		}
 	}
@@ -444,12 +470,12 @@ func (s *InventoryService) StreamedListObjects(
 	consistency := consistencyFromProto(req.GetConsistency())
 	log.Debugf("StreamedListObjects consistency: %s", model.ConsistencyTypeOf(consistency))
 
-	lookupCmd, err := ToLookupResourcesCommand(req)
+	lookupCmd, err := ToLookupObjectsCommand(req)
 	if err != nil {
 		return err
 	}
 
-	clientStream, err := s.Ctl.LookupResources(ctx, lookupCmd)
+	clientStream, err := s.Ctl.LookupObjects(ctx, lookupCmd)
 	if err != nil {
 		return err
 	}
@@ -463,7 +489,7 @@ func (s *InventoryService) StreamedListObjects(
 			return err
 		}
 
-		if err := stream.Send(ToLookupResourceResponse(item)); err != nil {
+		if err := stream.Send(ToLookupObjectsResponse(item)); err != nil {
 			return err
 		}
 	}
@@ -503,36 +529,35 @@ func (s *InventoryService) StreamedListSubjects(
 	}
 }
 
-// ToLookupResourcesCommand converts a v1beta2 StreamedListObjectsRequest to a LookupResourcesCommand.
-func ToLookupResourcesCommand(request *pb.StreamedListObjectsRequest) (resources.LookupResourcesCommand, error) {
+// ToLookupObjectsCommand converts a v1beta2 StreamedListObjectsRequest to a LookupObjectsCommand.
+func ToLookupObjectsCommand(request *pb.StreamedListObjectsRequest) (resources.LookupObjectsCommand, error) {
 	if request == nil {
-		return resources.LookupResourcesCommand{}, fmt.Errorf("request is nil")
+		return resources.LookupObjectsCommand{}, fmt.Errorf("request is nil")
 	}
-	// TODO: value normalization should be moved to model
 	resourceType, err := model.NewResourceType(NormalizeType(request.ObjectType.GetResourceType()))
 	if err != nil {
-		return resources.LookupResourcesCommand{}, fmt.Errorf("invalid resource type: %w", err)
+		return resources.LookupObjectsCommand{}, fmt.Errorf("invalid resource type: %w", err)
 	}
 	reporterType, err := model.NewReporterType(NormalizeType(request.ObjectType.GetReporterType()))
 	if err != nil {
-		return resources.LookupResourcesCommand{}, fmt.Errorf("invalid reporter type: %w", err)
+		return resources.LookupObjectsCommand{}, fmt.Errorf("invalid reporter type: %w", err)
 	}
 	relation, err := model.NewRelation(request.Relation)
 	if err != nil {
-		return resources.LookupResourcesCommand{}, fmt.Errorf("invalid relation: %w", err)
+		return resources.LookupObjectsCommand{}, fmt.Errorf("invalid relation: %w", err)
 	}
 	subjectRef, err := subjectReferenceFromProto(request.Subject)
 	if err != nil {
-		return resources.LookupResourcesCommand{}, fmt.Errorf("invalid subject: %w", err)
+		return resources.LookupObjectsCommand{}, fmt.Errorf("invalid subject: %w", err)
 	}
 
-	return resources.LookupResourcesCommand{
-		ResourceType: resourceType,
-		ReporterType: reporterType,
-		Relation:     relation,
-		Subject:      subjectRef,
-		Pagination:   paginationFromProto(request.Pagination),
-		Consistency:  consistencyFromProto(request.GetConsistency()),
+	objectType := model.NewRepresentationTypeRequired(resourceType, reporterType)
+	return resources.LookupObjectsCommand{
+		ObjectType:  objectType,
+		Relation:    relation,
+		Subject:     subjectRef,
+		Pagination:  paginationFromProto(request.Pagination),
+		Consistency: consistencyFromProto(request.GetConsistency()),
 	}, nil
 }
 
@@ -541,19 +566,23 @@ func NormalizeType(val string) string {
 	return normalized
 }
 
-func ToLookupResourceResponse(item model.LookupResourcesItem) *pb.StreamedListObjectsResponse {
-	return &pb.StreamedListObjectsResponse{
+func ToLookupObjectsResponse(item model.LookupObjectsItem) *pb.StreamedListObjectsResponse {
+	obj := item.Object()
+	resp := &pb.StreamedListObjectsResponse{
 		Object: &pb.ResourceReference{
-			Reporter: &pb.ReporterReference{
-				Type: item.ReporterType.String(),
-			},
-			ResourceId:   item.ResourceId.String(),
-			ResourceType: item.ResourceType.String(),
+			ResourceId:   obj.ResourceId().String(),
+			ResourceType: obj.ResourceType().String(),
 		},
 		Pagination: &pb.ResponsePagination{
-			ContinuationToken: item.ContinuationToken,
+			ContinuationToken: item.ContinuationToken(),
 		},
 	}
+	if obj.HasReporter() {
+		resp.Object.Reporter = &pb.ReporterReference{
+			Type: obj.Reporter().ReporterType().String(),
+		}
+	}
+	return resp
 }
 
 // ToLookupSubjectsCommand converts a v1beta2 LookupSubjectsRequest to a LookupSubjectsCommand.
@@ -561,7 +590,7 @@ func ToLookupSubjectsCommand(request *pb.StreamedListSubjectsRequest) (resources
 	if request == nil {
 		return resources.LookupSubjectsCommand{}, fmt.Errorf("request is nil")
 	}
-	reporterResourceKey, err := reporterKeyFromResourceReference(request.Resource)
+	resourceRef, err := resourceReferenceFromProto(request.Resource)
 	if err != nil {
 		return resources.LookupSubjectsCommand{}, fmt.Errorf("invalid resource: %w", err)
 	}
@@ -569,7 +598,7 @@ func ToLookupSubjectsCommand(request *pb.StreamedListSubjectsRequest) (resources
 	if err != nil {
 		return resources.LookupSubjectsCommand{}, fmt.Errorf("invalid relation: %w", err)
 	}
-	subjectType, err := model.NewResourceType(NormalizeType(request.SubjectType.GetResourceType()))
+	subjectResType, err := model.NewResourceType(NormalizeType(request.SubjectType.GetResourceType()))
 	if err != nil {
 		return resources.LookupSubjectsCommand{}, fmt.Errorf("invalid subject type: %w", err)
 	}
@@ -588,10 +617,9 @@ func ToLookupSubjectsCommand(request *pb.StreamedListSubjectsRequest) (resources
 	}
 
 	return resources.LookupSubjectsCommand{
-		Resource:        reporterResourceKey,
+		Resource:        resourceRef,
 		Relation:        relation,
-		SubjectType:     subjectType,
-		SubjectReporter: subjectReporter,
+		SubjectType:     model.NewRepresentationTypeRequired(subjectResType, subjectReporter),
 		SubjectRelation: subjectRelation,
 		Pagination:      paginationFromProto(request.Pagination),
 		Consistency:     consistencyFromProto(request.GetConsistency()),
@@ -599,23 +627,26 @@ func ToLookupSubjectsCommand(request *pb.StreamedListSubjectsRequest) (resources
 }
 
 func ToLookupSubjectsResponse(item model.LookupSubjectsItem) *pb.StreamedListSubjectsResponse {
-	subjectRef := &pb.SubjectReference{
+	subResource := item.Subject().Resource()
+	subRef := &pb.SubjectReference{
 		Resource: &pb.ResourceReference{
-			Reporter: &pb.ReporterReference{
-				Type: item.SubjectReporter.String(),
-			},
-			ResourceId:   item.SubjectId.String(),
-			ResourceType: item.SubjectType.String(),
+			ResourceId:   subResource.ResourceId().String(),
+			ResourceType: subResource.ResourceType().String(),
 		},
 	}
-	if item.SubjectRelation != nil {
-		rel := item.SubjectRelation.String()
-		subjectRef.Relation = &rel
+	if subResource.HasReporter() {
+		subRef.Resource.Reporter = &pb.ReporterReference{
+			Type: subResource.Reporter().ReporterType().String(),
+		}
+	}
+	if item.Subject().HasRelation() {
+		rel := item.Subject().Relation().String()
+		subRef.Relation = &rel
 	}
 	return &pb.StreamedListSubjectsResponse{
-		Subject: subjectRef,
+		Subject: subRef,
 		Pagination: &pb.ResponsePagination{
-			ContinuationToken: item.ContinuationToken,
+			ContinuationToken: item.ContinuationToken(),
 		},
 	}
 }

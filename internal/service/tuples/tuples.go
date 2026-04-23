@@ -173,51 +173,71 @@ func relationshipToRelationsTuple(rel *pb.Relationship) (model.RelationsTuple, e
 	if err != nil {
 		return model.RelationsTuple{}, fmt.Errorf("invalid resource ID: %w", err)
 	}
-	resourceType := model.NewRelationsObjectType(
-		rel.GetResource().GetType().GetName(),
-		rel.GetResource().GetType().GetNamespace(),
+	objReporterType := model.DeserializeReporterType(rel.GetResource().GetType().GetNamespace())
+	objReporter := model.NewReporterReference(objReporterType, nil)
+	object := model.NewResourceReference(
+		model.DeserializeResourceType(rel.GetResource().GetType().GetName()),
+		resourceId,
+		&objReporter,
 	)
-	resource := model.NewRelationsResource(resourceId, resourceType)
 
 	subjectId, err := model.NewLocalResourceId(rel.GetSubject().GetSubject().GetId())
 	if err != nil {
 		return model.RelationsTuple{}, fmt.Errorf("invalid subject ID: %w", err)
 	}
-	subjectType := model.NewRelationsObjectType(
-		rel.GetSubject().GetSubject().GetType().GetName(),
-		rel.GetSubject().GetSubject().GetType().GetNamespace(),
+	subReporterType := model.DeserializeReporterType(rel.GetSubject().GetSubject().GetType().GetNamespace())
+	subReporter := model.NewReporterReference(subReporterType, nil)
+	subResource := model.NewResourceReference(
+		model.DeserializeResourceType(rel.GetSubject().GetSubject().GetType().GetName()),
+		subjectId,
+		&subReporter,
 	)
-	subjectResource := model.NewRelationsResource(subjectId, subjectType)
 
-	var subjectRelation *model.Relation
+	var subjectRef model.SubjectReference
 	if rel.GetSubject().Relation != nil {
 		r := model.DeserializeRelation(*rel.GetSubject().Relation)
-		subjectRelation = &r
+		subjectRef = model.NewSubjectReference(subResource, &r)
+	} else {
+		subjectRef = model.NewSubjectReferenceWithoutRelation(subResource)
 	}
-	subject := model.NewRelationsSubject(subjectResource, subjectRelation)
 
-	return model.NewRelationsTuple(resource, model.DeserializeRelation(rel.GetRelation()), subject), nil
+	return model.NewRelationsTuple(object, model.DeserializeRelation(rel.GetRelation()), subjectRef), nil
 }
 
 func tupleFilterFromProto(pf *pb.RelationTupleFilter) model.TupleFilter {
 	if pf == nil {
-		return model.TupleFilter{}
+		return model.NewTupleFilter()
 	}
 
-	filter := model.TupleFilter{
-		ResourceNamespace: pf.ResourceNamespace,
-		ResourceType:      pf.ResourceType,
-		ResourceId:        pf.ResourceId,
-		Relation:          pf.Relation,
+	filter := model.NewTupleFilter()
+	if pf.ResourceNamespace != nil {
+		filter = filter.WithReporterType(model.DeserializeReporterType(*pf.ResourceNamespace))
+	}
+	if pf.ResourceType != nil {
+		filter = filter.WithObjectType(model.DeserializeResourceType(*pf.ResourceType))
+	}
+	if pf.ResourceId != nil {
+		filter = filter.WithObjectId(model.DeserializeLocalResourceId(*pf.ResourceId))
+	}
+	if pf.Relation != nil {
+		filter = filter.WithRelation(model.DeserializeRelation(*pf.Relation))
 	}
 
 	if pf.GetSubjectFilter() != nil {
-		filter.SubjectFilter = &model.TupleSubjectFilter{
-			SubjectNamespace: pf.GetSubjectFilter().SubjectNamespace,
-			SubjectType:      pf.GetSubjectFilter().SubjectType,
-			SubjectId:        pf.GetSubjectFilter().SubjectId,
-			Relation:         pf.GetSubjectFilter().Relation,
+		sf := model.NewTupleSubjectFilter()
+		if pf.GetSubjectFilter().SubjectNamespace != nil {
+			sf = sf.WithReporterType(model.DeserializeReporterType(*pf.GetSubjectFilter().SubjectNamespace))
 		}
+		if pf.GetSubjectFilter().SubjectType != nil {
+			sf = sf.WithSubjectType(model.DeserializeResourceType(*pf.GetSubjectFilter().SubjectType))
+		}
+		if pf.GetSubjectFilter().SubjectId != nil {
+			sf = sf.WithSubjectId(model.DeserializeLocalResourceId(*pf.GetSubjectFilter().SubjectId))
+		}
+		if pf.GetSubjectFilter().Relation != nil {
+			sf = sf.WithRelation(model.DeserializeRelation(*pf.GetSubjectFilter().Relation))
+		}
+		filter = filter.WithSubject(sf)
 	}
 
 	return filter
@@ -271,39 +291,52 @@ func fromDeleteTuplesResult(result *tuplesctl.DeleteTuplesResult) *pb.DeleteTupl
 }
 
 func readTuplesItemToProto(item model.ReadTuplesItem) *pb.ReadTuplesResponse {
+	obj := item.Object()
+	sub := item.Subject().Resource()
+
+	objNamespace := ""
+	if obj.HasReporter() {
+		objNamespace = obj.Reporter().ReporterType().Serialize()
+	}
+	subNamespace := ""
+	if sub.HasReporter() {
+		subNamespace = sub.Reporter().ReporterType().Serialize()
+	}
+
 	tuple := &pb.Relationship{
 		Resource: &pb.RelationObjectReference{
 			Type: &pb.RelationObjectType{
-				Namespace: item.ResourceNamespace,
-				Name:      item.ResourceType,
+				Namespace: objNamespace,
+				Name:      obj.ResourceType().Serialize(),
 			},
-			Id: item.ResourceId,
+			Id: obj.ResourceId().Serialize(),
 		},
-		Relation: item.Relation,
+		Relation: item.Relation().Serialize(),
 		Subject: &pb.RelationSubjectReference{
 			Subject: &pb.RelationObjectReference{
 				Type: &pb.RelationObjectType{
-					Namespace: item.SubjectNamespace,
-					Name:      item.SubjectType,
+					Namespace: subNamespace,
+					Name:      sub.ResourceType().Serialize(),
 				},
-				Id: item.SubjectId,
+				Id: sub.ResourceId().Serialize(),
 			},
 		},
 	}
-	if item.SubjectRelation != nil {
-		tuple.Subject.Relation = item.SubjectRelation
+	if item.Subject().HasRelation() {
+		rel := item.Subject().Relation().Serialize()
+		tuple.Subject.Relation = &rel
 	}
 
 	resp := &pb.ReadTuplesResponse{
 		Tuple: tuple,
 	}
 
-	if item.ContinuationToken != "" {
-		resp.Pagination = &pb.ResponsePagination{ContinuationToken: item.ContinuationToken}
+	if item.ContinuationToken() != "" {
+		resp.Pagination = &pb.ResponsePagination{ContinuationToken: item.ContinuationToken()}
 	}
 
-	if item.ConsistencyToken != "" {
-		resp.ConsistencyToken = &pb.ConsistencyToken{Token: item.ConsistencyToken.Serialize()}
+	if item.ConsistencyToken() != "" {
+		resp.ConsistencyToken = &pb.ConsistencyToken{Token: item.ConsistencyToken().Serialize()}
 	}
 
 	return resp

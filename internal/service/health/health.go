@@ -56,7 +56,7 @@ func (s *HealthService) GetReadyz(ctx context.Context, req *pb.GetReadyzRequest)
 		return nil, err
 	}
 	return &pb.GetReadyzResponse{
-		Status: result.Status,
-		Code:   uint32(result.Code),
+		Status: result.Status(),
+		Code:   uint32(result.Code()),
 	}, nil
 }

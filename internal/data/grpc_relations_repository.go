@@ -105,90 +105,67 @@ func (a *GRPCRelationsRepository) Health(ctx context.Context) (model.HealthResul
 	}
 
 	a.incrSuccessCounter("Health")
-	return model.HealthResult{
-		Status: resp.GetStatus(),
-		Code:   int(resp.GetCode()),
-	}, nil
+	return model.NewHealthResult(resp.GetStatus(), int(resp.GetCode())), nil
 }
 
-func (a *GRPCRelationsRepository) Check(ctx context.Context, resource model.ReporterResourceKey, relation model.Relation,
-	subject model.SubjectReference, consistency model.Consistency,
-) (model.CheckResult, error) {
-	namespace := resource.ReporterType().Serialize()
-	resourceType := resource.ResourceType().Serialize()
-	localResourceId := resource.LocalResourceId().Serialize()
-
-	log.Infof("Check: on resourceType=%s, localResourceId=%s", resourceType, localResourceId)
+func (a *GRPCRelationsRepository) Check(ctx context.Context, rel model.Relationship, consistency model.Consistency,
+) (bool, model.ConsistencyToken, error) {
+	obj := rel.Object()
+	log.Infof("Check: on resourceType=%s, localResourceId=%s",
+		obj.ResourceType().Serialize(), obj.ResourceId().Serialize())
 
 	opts, err := a.getCallOptions()
 	if err != nil {
 		a.incrFailureCounter("Check")
-		return model.CheckResult{}, err
+		return false, model.MinimizeLatencyToken, err
 	}
 
 	resp, err := a.CheckService.Check(ctx, &kesselapi.CheckRequest{
-		Resource: &kesselapi.ObjectReference{
-			Type: &kesselapi.ObjectType{
-				Namespace: namespace,
-				Name:      resourceType,
-			},
-			Id: localResourceId,
-		},
-		Relation:    relation.Serialize(),
-		Subject:     subjectToV1Beta1(subject),
+		Resource:    resourceReferenceToV1Beta1(obj),
+		Relation:    rel.Relation().Serialize(),
+		Subject:     subjectToV1Beta1(rel.Subject()),
 		Consistency: consistencyToV1Beta1(consistency),
 	}, opts...)
 
 	if err != nil {
 		a.incrFailureCounter("Check")
-		return model.CheckResult{}, err
+		return false, model.MinimizeLatencyToken, err
 	}
 
 	a.incrSuccessCounter("Check")
-	return model.CheckResult{
-		Allowed:          resp.GetAllowed() == kesselapi.CheckResponse_ALLOWED_TRUE,
-		ConsistencyToken: tokenFromV1Beta1(resp.GetConsistencyToken()),
-	}, nil
+	return resp.GetAllowed() == kesselapi.CheckResponse_ALLOWED_TRUE,
+		tokenFromV1Beta1(resp.GetConsistencyToken()), nil
 }
 
-func (a *GRPCRelationsRepository) CheckForUpdate(ctx context.Context, resource model.ReporterResourceKey, relation model.Relation,
-	subject model.SubjectReference,
-) (model.CheckResult, error) {
+func (a *GRPCRelationsRepository) CheckForUpdate(ctx context.Context, rel model.Relationship,
+) (bool, model.ConsistencyToken, error) {
 	opts, err := a.getCallOptions()
 	if err != nil {
 		a.incrFailureCounter("CheckForUpdate")
-		return model.CheckResult{}, err
+		return false, model.MinimizeLatencyToken, err
 	}
 
 	resp, err := a.CheckService.CheckForUpdate(ctx, &kesselapi.CheckForUpdateRequest{
-		Resource: &kesselapi.ObjectReference{
-			Type: &kesselapi.ObjectType{
-				Namespace: resource.ReporterType().Serialize(),
-				Name:      resource.ResourceType().Serialize(),
-			},
-			Id: resource.LocalResourceId().Serialize(),
-		},
-		Relation: relation.Serialize(),
-		Subject:  subjectToV1Beta1(subject),
+		Resource: resourceReferenceToV1Beta1(rel.Object()),
+		Relation: rel.Relation().Serialize(),
+		Subject:  subjectToV1Beta1(rel.Subject()),
 	}, opts...)
 
 	if err != nil {
 		a.incrFailureCounter("CheckForUpdate")
-		return model.CheckResult{}, err
+		return false, model.MinimizeLatencyToken, err
 	}
 
 	a.incrSuccessCounter("CheckForUpdate")
-	return model.CheckResult{
-		Allowed:          resp.GetAllowed() == kesselapi.CheckForUpdateResponse_ALLOWED_TRUE,
-		ConsistencyToken: tokenFromV1Beta1(resp.GetConsistencyToken()),
-	}, nil
+	return resp.GetAllowed() == kesselapi.CheckForUpdateResponse_ALLOWED_TRUE,
+		tokenFromV1Beta1(resp.GetConsistencyToken()), nil
 }
 
-func (a *GRPCRelationsRepository) CheckBulk(ctx context.Context, items []model.CheckBulkItem, consistency model.Consistency,
+func (a *GRPCRelationsRepository) CheckBulk(ctx context.Context, rels []model.Relationship, consistency model.Consistency,
 ) (model.CheckBulkResult, error) {
-	log.Infof("CheckBulk: checking %d items", len(items))
+	log.Infof("CheckBulk: checking %d items", len(rels))
 
-	protoItems := checkBulkItemsToV1Beta1(items)
+	protoItems := relationshipsToCheckBulkV1Beta1(rels)
 	protoConsistency := consistencyToV1Beta1(consistency)
 
 	opts, err := a.getCallOptions()
@@ -207,14 +184,14 @@ func (a *GRPCRelationsRepository) CheckBulk(ctx context.Context, items []model.C
 	}
 
 	a.incrSuccessCounter("CheckBulk")
-	return checkBulkResultFromV1Beta1(resp.GetPairs(), items, resp.GetConsistencyToken())
+	return checkBulkResultFromV1Beta1(resp.GetPairs(), rels, resp.GetConsistencyToken())
 }
 
-func (a *GRPCRelationsRepository) CheckForUpdateBulk(ctx context.Context, items []model.CheckBulkItem,
+func (a *GRPCRelationsRepository) CheckForUpdateBulk(ctx context.Context, rels []model.Relationship,
 ) (model.CheckBulkResult, error) {
-	log.Infof("CheckForUpdateBulk: checking %d items", len(items))
+	log.Infof("CheckForUpdateBulk: checking %d items", len(rels))
 
-	protoItems := checkBulkItemsToV1Beta1(items)
+	protoItems := relationshipsToCheckBulkV1Beta1(rels)
 
 	opts, err := a.getCallOptions()
 	if err != nil {
@@ -231,22 +208,30 @@ func (a *GRPCRelationsRepository) CheckForUpdateBulk(ctx context.Context, items 
 	}
 
 	a.incrSuccessCounter("CheckForUpdateBulk")
-	return checkBulkResultFromV1Beta1(resp.GetPairs(), items, resp.GetConsistencyToken())
+	return checkBulkResultFromV1Beta1(resp.GetPairs(), rels, resp.GetConsistencyToken())
 }
 
-func (a *GRPCRelationsRepository) LookupResources(ctx context.Context, resourceType model.ResourceType, reporterType model.ReporterType,
-	relation model.Relation, subject model.SubjectReference, pagination *model.Pagination, consistency model.Consistency,
-) (model.ResultStream[model.LookupResourcesItem], error) {
+func (a *GRPCRelationsRepository) LookupObjects(ctx context.Context,
+	objectType model.RepresentationType,
+	relation model.Relation, subject model.SubjectReference,
+	pagination *model.Pagination, consistency model.Consistency,
+) (model.ResultStream[model.LookupObjectsItem], error) {
 	opts, err := a.getCallOptions()
 	if err != nil {
-		a.incrFailureCounter("LookupResources")
+		a.incrFailureCounter("LookupObjects")
 		return nil, err
+	}
+
+	reporterType, err := objectType.RequireReporterType()
+	if err != nil {
+		a.incrFailureCounter("LookupObjects")
+		return nil, fmt.Errorf("LookupObjects requires reporter type: %w", err)
 	}
 
 	stream, err := a.LookupService.LookupResources(ctx, &kesselapi.LookupResourcesRequest{
 		ResourceType: &kesselapi.ObjectType{
 			Namespace: reporterType.Serialize(),
-			Name:      resourceType.Serialize(),
+			Name:      objectType.ResourceType().Serialize(),
 		},
 		Relation:    relation.Serialize(),
 		Subject:     subjectToV1Beta1(subject),
@@ -254,15 +239,17 @@ func (a *GRPCRelationsRepository) LookupResources(ctx context.Context, resourceT
 		Consistency: consistencyToV1Beta1(consistency),
 	}, opts...)
 	if err != nil {
-		a.incrFailureCounter("LookupResources")
+		a.incrFailureCounter("LookupObjects")
 		return nil, err
 	}
 
-	return &lookupResourcesStream{stream: stream}, nil
+	return &lookupObjectsStream{stream: stream}, nil
 }
 
-func (a *GRPCRelationsRepository) LookupSubjects(ctx context.Context, resource model.ReporterResourceKey, relation model.Relation,
-	subjectType model.ResourceType, subjectReporter model.ReporterType, subjectRelation *model.Relation,
+func (a *GRPCRelationsRepository) LookupSubjects(ctx context.Context,
+	object model.ResourceReference, relation model.Relation,
+	subjectType model.RepresentationType,
+	subjectRelation *model.Relation,
 	pagination *model.Pagination, consistency model.Consistency,
 ) (model.ResultStream[model.LookupSubjectsItem], error) {
 	opts, err := a.getCallOptions()
@@ -271,18 +258,18 @@ func (a *GRPCRelationsRepository) LookupSubjects(ctx context.Context, resource m
 		return nil, err
 	}
 
+	subReporterType, err := subjectType.RequireReporterType()
+	if err != nil {
+		a.incrFailureCounter("LookupSubjects")
+		return nil, fmt.Errorf("LookupSubjects requires subject reporter type: %w", err)
+	}
+
 	req := &kesselapi.LookupSubjectsRequest{
-		Resource: &kesselapi.ObjectReference{
-			Type: &kesselapi.ObjectType{
-				Namespace: resource.ReporterType().Serialize(),
-				Name:      resource.ResourceType().Serialize(),
-			},
-			Id: resource.LocalResourceId().Serialize(),
-		},
+		Resource: resourceReferenceToV1Beta1(object),
 		Relation: relation.Serialize(),
 		SubjectType: &kesselapi.ObjectType{
-			Namespace: subjectReporter.Serialize(),
-			Name:      subjectType.Serialize(),
+			Namespace: subReporterType.Serialize(),
+			Name:      subjectType.ResourceType().Serialize(),
 		},
 		Pagination:  paginationToV1Beta1(pagination),
 		Consistency: consistencyToV1Beta1(consistency),
@@ -303,12 +290,12 @@ func (a *GRPCRelationsRepository) LookupSubjects(ctx context.Context, resource m
 }
 
 func (a *GRPCRelationsRepository) CreateTuples(ctx context.Context, tuples []model.RelationsTuple, upsert bool, fencing *model.FencingCheck,
-) (model.TuplesResult, error) {
+) (model.ConsistencyToken, error) {
 	log.Infof("Creating tuples: %d", len(tuples))
 	opts, err := a.getCallOptions()
 	if err != nil {
 		a.incrFailureCounter("CreateTuples")
-		return model.TuplesResult{}, err
+		return model.MinimizeLatencyToken, err
 	}
 
 	req := &kesselapi.CreateTuplesRequest{
@@ -316,82 +303,42 @@ func (a *GRPCRelationsRepository) CreateTuples(ctx context.Context, tuples []mod
 		Tuples: tuplesToV1Beta1(tuples),
 	}
 	if fencing != nil {
-		req.FencingCheck = &kesselapi.FencingCheck{
-			LockId:    fencing.LockId,
-			LockToken: fencing.LockToken,
-		}
+		req.FencingCheck = fencingCheckToV1Beta1(fencing)
 	}
 
 	resp, err := a.TupleService.CreateTuples(ctx, req, opts...)
 	if err != nil {
 		a.incrFailureCounter("CreateTuples")
-		return model.TuplesResult{}, err
+		return model.MinimizeLatencyToken, err
 	}
 
 	a.incrSuccessCounter("CreateTuples")
-	return model.TuplesResult{
-		ConsistencyToken: tokenFromV1Beta1(resp.GetConsistencyToken()),
-	}, nil
+	return tokenFromV1Beta1(resp.GetConsistencyToken()), nil
 }
 
-func (a *GRPCRelationsRepository) DeleteTuples(ctx context.Context, tuples []model.RelationsTuple, fencing *model.FencingCheck,
-) (model.TuplesResult, error) {
+func (a *GRPCRelationsRepository) DeleteTuples(ctx context.Context, filter model.TupleFilter, fencing *model.FencingCheck,
+) (model.ConsistencyToken, error) {
 	opts, err := a.getCallOptions()
 	if err != nil {
 		a.incrFailureCounter("DeleteTuples")
-		return model.TuplesResult{}, err
-	}
-
-	req := &kesselapi.DeleteTuplesRequest{
-		Filter: tupleToFilter(tuples[0]),
-	}
-	if fencing != nil {
-		req.FencingCheck = &kesselapi.FencingCheck{
-			LockId:    fencing.LockId,
-			LockToken: fencing.LockToken,
-		}
-	}
-
-	resp, err := a.TupleService.DeleteTuples(ctx, req, opts...)
-	if err != nil {
-		a.incrFailureCounter("DeleteTuples")
-		return model.TuplesResult{}, err
-	}
-
-	a.incrSuccessCounter("DeleteTuples")
-	return model.TuplesResult{
-		ConsistencyToken: tokenFromV1Beta1(resp.GetConsistencyToken()),
-	}, nil
-}
-
-func (a *GRPCRelationsRepository) DeleteTuplesByFilter(ctx context.Context, filter model.TupleFilter, fencing *model.FencingCheck,
-) (model.TuplesResult, error) {
-	opts, err := a.getCallOptions()
-	if err != nil {
-		a.incrFailureCounter("DeleteTuplesByFilter")
-		return model.TuplesResult{}, err
+		return model.MinimizeLatencyToken, err
 	}
 
 	req := &kesselapi.DeleteTuplesRequest{
 		Filter: tupleFilterToV1Beta1(filter),
 	}
 	if fencing != nil {
-		req.FencingCheck = &kesselapi.FencingCheck{
-			LockId:    fencing.LockId,
-			LockToken: fencing.LockToken,
-		}
+		req.FencingCheck = fencingCheckToV1Beta1(fencing)
 	}
 
 	resp, err := a.TupleService.DeleteTuples(ctx, req, opts...)
 	if err != nil {
-		a.incrFailureCounter("DeleteTuplesByFilter")
-		return model.TuplesResult{}, err
+		a.incrFailureCounter("DeleteTuples")
+		return model.MinimizeLatencyToken, err
 	}
 
-	a.incrSuccessCounter("DeleteTuplesByFilter")
-	return model.TuplesResult{
-		ConsistencyToken: tokenFromV1Beta1(resp.GetConsistencyToken()),
-	}, nil
+	a.incrSuccessCounter("DeleteTuples")
+	return tokenFromV1Beta1(resp.GetConsistencyToken()), nil
 }
 
 func (a *GRPCRelationsRepository) ReadTuples(ctx context.Context, filter model.TupleFilter, pagination *model.Pagination, consistency model.Consistency,
@@ -416,39 +363,44 @@ func (a *GRPCRelationsRepository) ReadTuples(ctx context.Context, filter model.T
 	return &readTuplesStream{stream: stream}, nil
 }
 
-func (a *GRPCRelationsRepository) AcquireLock(ctx context.Context, lockId string) (model.AcquireLockResult, error) {
+func (a *GRPCRelationsRepository) AcquireLock(ctx context.Context, lockId model.LockId) (model.LockToken, error) {
 	opts, err := a.getCallOptions()
 	if err != nil {
 		a.incrFailureCounter("AcquireLock")
-		return model.AcquireLockResult{}, err
+		return model.LockToken(""), err
 	}
 
 	resp, err := a.TupleService.AcquireLock(ctx, &kesselapi.AcquireLockRequest{
-		LockId: lockId,
+		LockId: lockId.String(),
 	}, opts...)
 	if err != nil {
 		a.incrFailureCounter("AcquireLock")
-		return model.AcquireLockResult{}, err
+		return model.LockToken(""), err
 	}
 
 	a.incrSuccessCounter("AcquireLock")
-	return model.AcquireLockResult{
-		LockToken: resp.GetLockToken(),
-	}, nil
+	return model.DeserializeLockToken(resp.GetLockToken()), nil
 }
 
 // --- protobuf conversion helpers ---
 
+func resourceReferenceToV1Beta1(ref model.ResourceReference) *kesselapi.ObjectReference {
+	objType := &kesselapi.ObjectType{
+		Name: ref.ResourceType().Serialize(),
+	}
+	if ref.HasReporter() {
+		objType.Namespace = ref.Reporter().ReporterType().Serialize()
+	}
+	return &kesselapi.ObjectReference{
+		Type: objType,
+		Id:   ref.ResourceId().Serialize(),
+	}
+}
+
 func subjectToV1Beta1(sub model.SubjectReference) *kesselapi.SubjectReference {
-	subKey := sub.Subject()
+	subResource := sub.Resource()
 	ref := &kesselapi.SubjectReference{
-		Subject: &kesselapi.ObjectReference{
-			Type: &kesselapi.ObjectType{
-				Namespace: subKey.ReporterType().Serialize(),
-				Name:      subKey.ResourceType().Serialize(),
-			},
-			Id: subKey.LocalResourceId().Serialize(),
-		},
+		Subject: resourceReferenceToV1Beta1(subResource),
 	}
 	if sub.HasRelation() {
 		relation := sub.Relation().Serialize()
@@ -494,134 +446,123 @@ func paginationToV1Beta1(pagination *model.Pagination) *kesselapi.RequestPaginat
 	return result
 }
 
-func checkBulkItemsToV1Beta1(items []model.CheckBulkItem) []*kesselapi.CheckBulkRequestItem {
-	protoItems := make([]*kesselapi.CheckBulkRequestItem, len(items))
-	for i, item := range items {
+func fencingCheckToV1Beta1(fencing *model.FencingCheck) *kesselapi.FencingCheck {
+	return &kesselapi.FencingCheck{
+		LockId:    fencing.LockId().String(),
+		LockToken: fencing.LockToken().String(),
+	}
+}
+
+func relationshipsToCheckBulkV1Beta1(rels []model.Relationship) []*kesselapi.CheckBulkRequestItem {
+	protoItems := make([]*kesselapi.CheckBulkRequestItem, len(rels))
+	for i, rel := range rels {
 		protoItems[i] = &kesselapi.CheckBulkRequestItem{
-			Resource: &kesselapi.ObjectReference{
-				Type: &kesselapi.ObjectType{
-					Namespace: item.Resource.ReporterType().Serialize(),
-					Name:      item.Resource.ResourceType().Serialize(),
-				},
-				Id: item.Resource.LocalResourceId().Serialize(),
-			},
-			Relation: item.Relation.Serialize(),
-			Subject:  subjectToV1Beta1(item.Subject),
+			Resource: resourceReferenceToV1Beta1(rel.Object()),
+			Relation: rel.Relation().Serialize(),
+			Subject:  subjectToV1Beta1(rel.Subject()),
 		}
 	}
 	return protoItems
 }
 
-func checkBulkResultFromV1Beta1(respPairs []*kesselapi.CheckBulkResponsePair, items []model.CheckBulkItem, protoToken *kesselapi.ConsistencyToken) (model.CheckBulkResult, error) {
-	if len(respPairs) != len(items) {
+func checkBulkResultFromV1Beta1(respPairs []*kesselapi.CheckBulkResponsePair, rels []model.Relationship, protoToken *kesselapi.ConsistencyToken) (model.CheckBulkResult, error) {
+	if len(respPairs) != len(rels) {
 		return model.CheckBulkResult{}, status.Errorf(codes.Internal,
-			"internal error: mismatched backend check results: expected %d pairs, got %d", len(items), len(respPairs))
+			"internal error: mismatched backend check results: expected %d pairs, got %d", len(rels), len(respPairs))
 	}
 
 	pairs := make([]model.CheckBulkResultPair, len(respPairs))
 	for i, pair := range respPairs {
 		var resultItem model.CheckBulkResultItem
 		if pair.GetError() != nil {
-			resultItem = model.CheckBulkResultItem{
-				Allowed:   false,
-				Error:     fmt.Errorf("check failed: %s", pair.GetError().GetMessage()),
-				ErrorCode: pair.GetError().GetCode(),
-			}
+			resultItem = model.NewCheckBulkResultItem(
+				false,
+				fmt.Errorf("check failed: %s", pair.GetError().GetMessage()),
+				pair.GetError().GetCode(),
+			)
 		} else if pair.GetItem() != nil {
-			resultItem = model.CheckBulkResultItem{
-				Allowed: pair.GetItem().GetAllowed() == kesselapi.CheckBulkResponseItem_ALLOWED_TRUE,
-			}
+			resultItem = model.NewCheckBulkResultItem(
+				pair.GetItem().GetAllowed() == kesselapi.CheckBulkResponseItem_ALLOWED_TRUE,
+				nil, 0,
+			)
 		} else {
-			resultItem = model.CheckBulkResultItem{
-				Allowed:   false,
-				Error:     fmt.Errorf("malformed backend response: both error and item are nil for pair %v", pair),
-				ErrorCode: int32(codes.Internal),
-			}
+			resultItem = model.NewCheckBulkResultItem(
+				false,
+				fmt.Errorf("malformed backend response: both error and item are nil for pair %v", pair),
+				int32(codes.Internal),
+			)
 		}
 
-		pairs[i] = model.CheckBulkResultPair{
-			Request: items[i],
-			Result:  resultItem,
-		}
+		pairs[i] = model.NewCheckBulkResultPair(rels[i], resultItem)
 	}
 
-	return model.CheckBulkResult{
-		Pairs:            pairs,
-		ConsistencyToken: tokenFromV1Beta1(protoToken),
-	}, nil
+	return model.NewCheckBulkResult(pairs, tokenFromV1Beta1(protoToken)), nil
 }
 
 func tuplesToV1Beta1(tuples []model.RelationsTuple) []*kesselapi.Relationship {
 	relationships := make([]*kesselapi.Relationship, len(tuples))
 	for i, tuple := range tuples {
 		relationships[i] = &kesselapi.Relationship{
-			Resource: &kesselapi.ObjectReference{
-				Type: &kesselapi.ObjectType{
-					Name:      tuple.Resource().Type().Name(),
-					Namespace: tuple.Resource().Type().Namespace(),
-				},
-				Id: tuple.Resource().Id().Serialize(),
-			},
+			Resource: resourceReferenceToV1Beta1(tuple.Object()),
 			Relation: tuple.Relation().Serialize(),
-			Subject: &kesselapi.SubjectReference{
-				Subject: &kesselapi.ObjectReference{
-					Type: &kesselapi.ObjectType{
-						Name:      tuple.Subject().Subject().Type().Name(),
-						Namespace: tuple.Subject().Subject().Type().Namespace(),
-					},
-					Id: tuple.Subject().Subject().Id().Serialize(),
-				},
-			},
+			Subject:  subjectToV1Beta1(tuple.Subject()),
 		}
 	}
 	return relationships
 }
 
-func tupleToFilter(tuple model.RelationsTuple) *kesselapi.RelationTupleFilter {
-	resourceNamespace := tuple.Resource().Type().Namespace()
-	resourceType := tuple.Resource().Type().Name()
-	resourceId := tuple.Resource().Id().Serialize()
-	relation := tuple.Relation().Serialize()
-	subjectNamespace := tuple.Subject().Subject().Type().Namespace()
-	subjectType := tuple.Subject().Subject().Type().Name()
-	subjectId := tuple.Subject().Subject().Id().Serialize()
-
-	filter := &kesselapi.RelationTupleFilter{
-		ResourceNamespace: proto.String(resourceNamespace),
-		ResourceType:      proto.String(resourceType),
-		ResourceId:        proto.String(resourceId),
-		Relation:          proto.String(relation),
-		SubjectFilter: &kesselapi.SubjectFilter{
-			SubjectNamespace: proto.String(subjectNamespace),
-			SubjectType:      proto.String(subjectType),
-			SubjectId:        proto.String(subjectId),
-		},
+func tupleFilterToV1Beta1(filter model.TupleFilter) *kesselapi.RelationTupleFilter {
+	result := &kesselapi.RelationTupleFilter{}
+	if filter.ReporterType() != nil {
+		result.ResourceNamespace = proto.String(filter.ReporterType().Serialize())
 	}
-	if tuple.Subject().HasRelation() {
-		filter.SubjectFilter.Relation = proto.String(tuple.Subject().Relation().Serialize())
-	} else {
-		filter.SubjectFilter.Relation = proto.String("")
+	if filter.ObjectType() != nil {
+		result.ResourceType = proto.String(filter.ObjectType().Serialize())
 	}
-	return filter
+	if filter.ObjectId() != nil {
+		result.ResourceId = proto.String(filter.ObjectId().Serialize())
+	}
+	if filter.Relation() != nil {
+		result.Relation = proto.String(filter.Relation().Serialize())
+	}
+	if filter.Subject() != nil {
+		sf := &kesselapi.SubjectFilter{}
+		if filter.Subject().ReporterType() != nil {
+			sf.SubjectNamespace = proto.String(filter.Subject().ReporterType().Serialize())
+		}
+		if filter.Subject().SubjectType() != nil {
+			sf.SubjectType = proto.String(filter.Subject().SubjectType().Serialize())
+		}
+		if filter.Subject().SubjectId() != nil {
+			sf.SubjectId = proto.String(filter.Subject().SubjectId().Serialize())
+		}
+		if filter.Subject().Relation() != nil {
+			sf.Relation = proto.String(filter.Subject().Relation().Serialize())
+		}
+		result.SubjectFilter = sf
+	}
+	return result
 }
 
 // --- streaming adapters ---
 
-type lookupResourcesStream struct {
+type lookupObjectsStream struct {
 	stream grpc.ServerStreamingClient[kesselapi.LookupResourcesResponse]
 }
 
-func (s *lookupResourcesStream) Recv() (model.LookupResourcesItem, error) {
+func (s *lookupObjectsStream) Recv() (model.LookupObjectsItem, error) {
 	resp, err := s.stream.Recv()
 	if err != nil {
-		return model.LookupResourcesItem{}, err
+		return model.LookupObjectsItem{}, err
 	}
-	return model.LookupResourcesItem{
-		ResourceId:        model.DeserializeLocalResourceId(resp.GetResource().GetId()),
-		ResourceType:      model.DeserializeResourceType(resp.GetResource().GetType().GetName()),
-		ReporterType:      model.DeserializeReporterType(resp.GetResource().GetType().GetNamespace()),
-		ContinuationToken: resp.GetPagination().GetContinuationToken(),
-	}, nil
+	reporterType := model.DeserializeReporterType(resp.GetResource().GetType().GetNamespace())
+	reporter := model.NewReporterReference(reporterType, nil)
+	object := model.NewResourceReference(
+		model.DeserializeResourceType(resp.GetResource().GetType().GetName()),
+		model.DeserializeLocalResourceId(resp.GetResource().GetId()),
+		&reporter,
+	)
+	return model.NewLookupObjectsItem(object, resp.GetPagination().GetContinuationToken()), nil
 }
 
 type lookupSubjectsStream struct {
@@ -634,28 +575,33 @@ func (s *lookupSubjectsStream) Recv() (model.LookupSubjectsItem, error) {
 		return model.LookupSubjectsItem{}, err
 	}
 
-	item := model.LookupSubjectsItem{
-		SubjectId:         model.DeserializeLocalResourceId(resp.GetSubject().GetSubject().GetId()),
-		SubjectType:       model.DeserializeResourceType(resp.GetSubject().GetSubject().GetType().GetName()),
-		SubjectReporter:   model.DeserializeReporterType(resp.GetSubject().GetSubject().GetType().GetNamespace()),
-		ContinuationToken: resp.GetPagination().GetContinuationToken(),
-	}
-	if resp.GetSubject().Relation != nil {
-		rel := model.DeserializeRelation(*resp.GetSubject().Relation)
-		item.SubjectRelation = &rel
+	subProto := resp.GetSubject()
+	subjectObj := subProto.GetSubject()
+	reporterType := model.DeserializeReporterType(subjectObj.GetType().GetNamespace())
+	reporter := model.NewReporterReference(reporterType, nil)
+	subResource := model.NewResourceReference(
+		model.DeserializeResourceType(subjectObj.GetType().GetName()),
+		model.DeserializeLocalResourceId(subjectObj.GetId()),
+		&reporter,
+	)
+
+	var subjectRef model.SubjectReference
+	if subProto.Relation != nil {
+		rel := model.DeserializeRelation(*subProto.Relation)
+		subjectRef = model.NewSubjectReference(subResource, &rel)
+	} else {
+		subjectRef = model.NewSubjectReferenceWithoutRelation(subResource)
 	}
 
-	return item, nil
+	return model.NewLookupSubjectsItem(subjectRef, resp.GetPagination().GetContinuationToken()), nil
 }
 
-// emptyLookupResourcesStream implements ResultStream for an empty result set.
-type emptyLookupResourcesStream struct{}
+type emptyLookupObjectsStream struct{}
 
-func (s *emptyLookupResourcesStream) Recv() (model.LookupResourcesItem, error) {
-	return model.LookupResourcesItem{}, io.EOF
+func (s *emptyLookupObjectsStream) Recv() (model.LookupObjectsItem, error) {
+	return model.LookupObjectsItem{}, io.EOF
 }
 
-// emptyLookupSubjectsStream implements ResultStream for an empty result set.
 type emptyLookupSubjectsStream struct{}
 
 func (s *emptyLookupSubjectsStream) Recv() (model.LookupSubjectsItem, error) {
@@ -672,46 +618,46 @@ func (s *readTuplesStream) Recv() (model.ReadTuplesItem, error) {
 		return model.ReadTuplesItem{}, err
 	}
 	tuple := resp.GetTuple()
-	item := model.ReadTuplesItem{
-		ResourceNamespace: tuple.GetResource().GetType().GetNamespace(),
-		ResourceType:      tuple.GetResource().GetType().GetName(),
-		ResourceId:        tuple.GetResource().GetId(),
-		Relation:          tuple.GetRelation(),
-		SubjectNamespace:  tuple.GetSubject().GetSubject().GetType().GetNamespace(),
-		SubjectType:       tuple.GetSubject().GetSubject().GetType().GetName(),
-		SubjectId:         tuple.GetSubject().GetSubject().GetId(),
-		ContinuationToken: resp.GetPagination().GetContinuationToken(),
-	}
+
+	objReporterType := model.DeserializeReporterType(tuple.GetResource().GetType().GetNamespace())
+	objReporter := model.NewReporterReference(objReporterType, nil)
+	object := model.NewResourceReference(
+		model.DeserializeResourceType(tuple.GetResource().GetType().GetName()),
+		model.DeserializeLocalResourceId(tuple.GetResource().GetId()),
+		&objReporter,
+	)
+
+	subReporterType := model.DeserializeReporterType(tuple.GetSubject().GetSubject().GetType().GetNamespace())
+	subReporter := model.NewReporterReference(subReporterType, nil)
+	subResource := model.NewResourceReference(
+		model.DeserializeResourceType(tuple.GetSubject().GetSubject().GetType().GetName()),
+		model.DeserializeLocalResourceId(tuple.GetSubject().GetSubject().GetId()),
+		&subReporter,
+	)
+
+	var subjectRef model.SubjectReference
 	if tuple.GetSubject().Relation != nil {
-		item.SubjectRelation = tuple.GetSubject().Relation
+		rel := model.DeserializeRelation(*tuple.GetSubject().Relation)
+		subjectRef = model.NewSubjectReference(subResource, &rel)
+	} else {
+		subjectRef = model.NewSubjectReferenceWithoutRelation(subResource)
 	}
+
+	var consistencyToken model.ConsistencyToken
 	if token := resp.GetConsistencyToken().GetToken(); token != "" {
-		item.ConsistencyToken = model.DeserializeConsistencyToken(token)
+		consistencyToken = model.DeserializeConsistencyToken(token)
 	}
-	return item, nil
+	return model.NewReadTuplesItem(
+		object,
+		model.DeserializeRelation(tuple.GetRelation()),
+		subjectRef,
+		resp.GetPagination().GetContinuationToken(),
+		consistencyToken,
+	), nil
 }
 
-// emptyReadTuplesStream implements ResultStream for an empty result set.
 type emptyReadTuplesStream struct{}
 
 func (s *emptyReadTuplesStream) Recv() (model.ReadTuplesItem, error) {
 	return model.ReadTuplesItem{}, io.EOF
-}
-
-func tupleFilterToV1Beta1(filter model.TupleFilter) *kesselapi.RelationTupleFilter {
-	result := &kesselapi.RelationTupleFilter{
-		ResourceNamespace: filter.ResourceNamespace,
-		ResourceType:      filter.ResourceType,
-		ResourceId:        filter.ResourceId,
-		Relation:          filter.Relation,
-	}
-	if filter.SubjectFilter != nil {
-		result.SubjectFilter = &kesselapi.SubjectFilter{
-			SubjectNamespace: filter.SubjectFilter.SubjectNamespace,
-			SubjectType:      filter.SubjectFilter.SubjectType,
-			SubjectId:        filter.SubjectFilter.SubjectId,
-			Relation:         filter.SubjectFilter.Relation,
-		}
-	}
-	return result
 }

@@ -35,13 +35,40 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
+func testTupleFilterForHelper(namespace, resourceType, resourceID, relation, subjectNamespace, subjectType, subjectID string) model.TupleFilter {
+	rn := model.DeserializeReporterType(namespace)
+	ot := model.DeserializeResourceType(resourceType)
+	oid := model.DeserializeLocalResourceId(resourceID)
+	rel := model.DeserializeRelation(relation)
+	subRN := model.DeserializeReporterType(subjectNamespace)
+	st := model.DeserializeResourceType(subjectType)
+	sid := model.DeserializeLocalResourceId(subjectID)
+	return model.NewTupleFilter().
+		WithReporterType(rn).
+		WithObjectType(ot).
+		WithObjectId(oid).
+		WithRelation(rel).
+		WithSubject(model.NewTupleSubjectFilter().
+			WithReporterType(subRN).
+			WithSubjectType(st).
+			WithSubjectId(sid))
+}
+
 func testHelperTuple(namespace, resourceType, resourceID, relation, subjectNamespace, subjectType, subjectID string) model.RelationsTuple {
-	resourceObjType := model.NewRelationsObjectType(resourceType, namespace)
-	resource := model.NewRelationsResource(model.DeserializeLocalResourceId(resourceID), resourceObjType)
-	subjectObjType := model.NewRelationsObjectType(subjectType, subjectNamespace)
-	subjectResource := model.NewRelationsResource(model.DeserializeLocalResourceId(subjectID), subjectObjType)
-	subject := model.NewRelationsSubject(subjectResource, nil)
-	return model.NewRelationsTuple(resource, model.DeserializeRelation(relation), subject)
+	objRep := model.NewReporterReference(model.DeserializeReporterType(namespace), nil)
+	object := model.NewResourceReference(
+		model.DeserializeResourceType(resourceType),
+		model.DeserializeLocalResourceId(resourceID),
+		&objRep,
+	)
+	subRep := model.NewReporterReference(model.DeserializeReporterType(subjectNamespace), nil)
+	subjectRes := model.NewResourceReference(
+		model.DeserializeResourceType(subjectType),
+		model.DeserializeLocalResourceId(subjectID),
+		&subRep,
+	)
+	subject := model.NewSubjectReferenceWithoutRelation(subjectRes)
+	return model.NewRelationsTuple(object, model.DeserializeRelation(relation), subject)
 }
 
 type testSelfSubjectStrategy struct{}
@@ -52,6 +79,11 @@ func (testSelfSubjectStrategy) SubjectFromAuthorizationContext(authzContext auth
 	}
 	subjectID := string(authzContext.Subject.SubjectId)
 	return buildTestSubjectReference(subjectID)
+}
+
+func resourceRefFromKey(key model.ReporterResourceKey) model.ResourceReference {
+	reporter := model.NewReporterReference(key.ReporterType(), nil)
+	return model.NewResourceReference(key.ResourceType(), key.LocalResourceId(), &reporter)
 }
 
 // buildTestSubjectReference creates a model.SubjectReference for testing.
@@ -72,7 +104,7 @@ func buildTestSubjectReference(subjectID string) (model.SubjectReference, error)
 	if err != nil {
 		return model.SubjectReference{}, err
 	}
-	return model.NewSubjectReferenceWithoutRelation(key), nil
+	return model.NewSubjectReferenceWithoutRelation(resourceRefFromKey(key)), nil
 }
 
 func newTestSelfSubjectStrategy() selfsubject.SelfSubjectStrategy {
@@ -285,7 +317,7 @@ func TestInventoryService_DeleteResource_NoIdentity(t *testing.T) {
 	})
 }
 
-func TestToLookupResourcesCommand(t *testing.T) {
+func TestToLookupObjectsCommand(t *testing.T) {
 	permission := "view"
 	reporterType := "hbi"
 	input := &pb.StreamedListObjectsRequest{
@@ -309,21 +341,22 @@ func TestToLookupResourcesCommand(t *testing.T) {
 		},
 	}
 
-	result, err := svc.ToLookupResourcesCommand(input)
+	result, err := svc.ToLookupObjectsCommand(input)
 	require.NoError(t, err)
 
 	// Verify the command fields
-	assert.Equal(t, "host", result.ResourceType.Serialize())
-	assert.Equal(t, "hbi", result.ReporterType.Serialize())
+	assert.Equal(t, "host", result.ObjectType.ResourceType().Serialize())
+	require.NotNil(t, result.ObjectType.ReporterType())
+	assert.Equal(t, "hbi", result.ObjectType.ReporterType().Serialize())
 	assert.Equal(t, "view", result.Relation.Serialize())
-	assert.Equal(t, "res-id", result.Subject.Subject().LocalResourceId().Serialize())
-	assert.Equal(t, "principal", result.Subject.Subject().ResourceType().Serialize())
-	assert.Equal(t, "rbac", result.Subject.Subject().ReporterType().Serialize())
+	assert.Equal(t, "res-id", result.Subject.Resource().ResourceId().Serialize())
+	assert.Equal(t, "principal", result.Subject.Resource().ResourceType().Serialize())
+	assert.Equal(t, "rbac", result.Subject.Resource().Reporter().ReporterType().Serialize())
 	require.NotNil(t, result.Pagination)
 	assert.Equal(t, uint32(50), result.Pagination.Limit)
 }
 
-func TestToLookupResourcesCommand_WithConsistencyToken(t *testing.T) {
+func TestToLookupObjectsCommand_WithConsistencyToken(t *testing.T) {
 	permission := "view"
 	reporterType := "hbi"
 	token := "test-consistency-token"
@@ -350,7 +383,7 @@ func TestToLookupResourcesCommand_WithConsistencyToken(t *testing.T) {
 		},
 	}
 
-	result, err := svc.ToLookupResourcesCommand(input)
+	result, err := svc.ToLookupObjectsCommand(input)
 	require.NoError(t, err)
 
 	assert.Equal(t, model.ConsistencyAtLeastAsFresh, model.ConsistencyTypeOf(result.Consistency), "expected at-least-as-fresh when token provided")
@@ -359,7 +392,7 @@ func TestToLookupResourcesCommand_WithConsistencyToken(t *testing.T) {
 	assert.Equal(t, token, atLeastAsFreshToken.String(), "command should use the request consistency token")
 }
 
-func TestToLookupResourcesCommand_NoPagination(t *testing.T) {
+func TestToLookupObjectsCommand_NoPagination(t *testing.T) {
 	permission := "view"
 	reporterType := "hbi"
 	input := &pb.StreamedListObjectsRequest{
@@ -381,15 +414,16 @@ func TestToLookupResourcesCommand_NoPagination(t *testing.T) {
 		// Pagination intentionally omitted
 	}
 
-	result, err := svc.ToLookupResourcesCommand(input)
+	result, err := svc.ToLookupObjectsCommand(input)
 	require.NoError(t, err)
 
-	assert.Equal(t, "host", result.ResourceType.Serialize())
-	assert.Equal(t, "hbi", result.ReporterType.Serialize())
+	assert.Equal(t, "host", result.ObjectType.ResourceType().Serialize())
+	require.NotNil(t, result.ObjectType.ReporterType())
+	assert.Equal(t, "hbi", result.ObjectType.ReporterType().Serialize())
 	assert.Equal(t, "view", result.Relation.Serialize())
-	assert.Equal(t, "res-id", result.Subject.Subject().LocalResourceId().Serialize())
-	assert.Equal(t, "principal", result.Subject.Subject().ResourceType().Serialize())
-	assert.Equal(t, "rbac", result.Subject.Subject().ReporterType().Serialize())
+	assert.Equal(t, "res-id", result.Subject.Resource().ResourceId().Serialize())
+	assert.Equal(t, "principal", result.Subject.Resource().ResourceType().Serialize())
+	assert.Equal(t, "rbac", result.Subject.Resource().Reporter().ReporterType().Serialize())
 	// When pagination is not specified, both fields should be nil
 	assert.Nil(t, result.Pagination)
 }
@@ -415,12 +449,14 @@ func TestToLookupSubjectsCommand_NoPagination(t *testing.T) {
 	result, err := svc.ToLookupSubjectsCommand(input)
 	require.NoError(t, err)
 
-	assert.Equal(t, "resource-1", result.Resource.LocalResourceId().Serialize())
+	assert.Equal(t, "resource-1", result.Resource.ResourceId().Serialize())
 	assert.Equal(t, "host", result.Resource.ResourceType().Serialize())
-	assert.Equal(t, "hbi", result.Resource.ReporterType().Serialize())
+	require.NotNil(t, result.Resource.Reporter())
+	assert.Equal(t, "hbi", result.Resource.Reporter().ReporterType().Serialize())
 	assert.Equal(t, "view", result.Relation.Serialize())
-	assert.Equal(t, "principal", result.SubjectType.Serialize())
-	assert.Equal(t, "hbi", result.SubjectReporter.Serialize())
+	assert.Equal(t, "principal", result.SubjectType.ResourceType().Serialize())
+	require.NotNil(t, result.SubjectType.ReporterType())
+	assert.Equal(t, "hbi", result.SubjectType.ReporterType().Serialize())
 	// When pagination is not specified, both fields should be nil
 	assert.Nil(t, result.Pagination)
 }
@@ -450,13 +486,16 @@ func IsValidType(val string) bool {
 	return typePattern.MatchString(val)
 }
 
-func TestToLookupResourceResponse(t *testing.T) {
-	input := model.LookupResourcesItem{
-		ResourceId:        model.DeserializeLocalResourceId("abc123"),
-		ResourceType:      model.DeserializeResourceType("type-y"),
-		ReporterType:      model.DeserializeReporterType("reporter-x"),
-		ContinuationToken: "next-page-token",
-	}
+func TestToLookupObjectsResponse(t *testing.T) {
+	rep := model.NewReporterReference(model.DeserializeReporterType("reporter-x"), nil)
+	input := model.NewLookupObjectsItem(
+		model.NewResourceReference(
+			model.DeserializeResourceType("type-y"),
+			model.DeserializeLocalResourceId("abc123"),
+			&rep,
+		),
+		"next-page-token",
+	)
 
 	expected := &pb.StreamedListObjectsResponse{
 		Object: &pb.ResourceReference{
@@ -471,7 +510,7 @@ func TestToLookupResourceResponse(t *testing.T) {
 		},
 	}
 
-	result := svc.ToLookupResourceResponse(input)
+	result := svc.ToLookupObjectsResponse(input)
 	assert.Equal(t, expected, result)
 }
 
@@ -671,20 +710,18 @@ func TestInventoryService_CheckSelfBulk_ResponseLengthMismatch(t *testing.T) {
 			model.DeserializeReporterType("hbi"),
 			model.DeserializeReporterInstanceId(""),
 		)
+		subj, _ := buildTestSubjectReference("test-user")
+		rel1 := model.NewRelationship(resourceRefFromKey(key1), model.DeserializeRelation("view"), subj)
+		rel2 := model.NewRelationship(resourceRefFromKey(key2), model.DeserializeRelation("view"), subj)
 		mockRelations.
 			On("CheckBulk", mock.Anything, mock.Anything, mock.Anything).
-			Return(model.CheckBulkResult{
-				Pairs: []model.CheckBulkResultPair{
-					{
-						Request: model.CheckBulkItem{Resource: key1, Relation: model.DeserializeRelation("view")},
-						Result:  model.CheckBulkResultItem{Allowed: true},
-					},
-					{
-						Request: model.CheckBulkItem{Resource: key2, Relation: model.DeserializeRelation("view")},
-						Result:  model.CheckBulkResultItem{Allowed: true},
-					},
+			Return(model.NewCheckBulkResult(
+				[]model.CheckBulkResultPair{
+					model.NewCheckBulkResultPair(rel1, model.NewCheckBulkResultItem(true, nil, 0)),
+					model.NewCheckBulkResultPair(rel2, model.NewCheckBulkResultItem(true, nil, 0)),
 				},
-			}, nil).
+				"",
+			), nil).
 			Once()
 
 		return TestServerConfig{
@@ -1506,8 +1543,7 @@ func TestInventoryService_CheckBulk_ConsistencyToken(t *testing.T) {
 		snapshotVersion := simpleAuthz.RetainCurrentSnapshot() // Retain at v3
 
 		// Remove one permission -> v4
-		deleteTuple := testHelperTuple("hbi", "host", "resource-1", "view", "rbac", "principal", "subject-a")
-		_, _ = simpleAuthz.DeleteTuples(context.Background(), []model.RelationsTuple{deleteTuple}, nil)
+		_, _ = simpleAuthz.DeleteTuples(context.Background(), testTupleFilterForHelper("hbi", "host", "resource-1", "view", "rbac", "principal", "subject-a"), nil)
 		currentVersion := simpleAuthz.Version()
 
 		uc := newTestUsecase(t, testUsecaseConfig{Relations: simpleAuthz})
@@ -1675,8 +1711,7 @@ func TestInventoryService_CheckSelfBulk_ConsistencyToken(t *testing.T) {
 		snapshotVersion := simpleAuthz.RetainCurrentSnapshot() // Retain at v3
 
 		// Remove one permission -> v4
-		deleteTuple := testHelperTuple("hbi", "host", "resource-1", "view", "rbac", "principal", "subject-a")
-		_, _ = simpleAuthz.DeleteTuples(context.Background(), []model.RelationsTuple{deleteTuple}, nil)
+		_, _ = simpleAuthz.DeleteTuples(context.Background(), testTupleFilterForHelper("hbi", "host", "resource-1", "view", "rbac", "principal", "subject-a"), nil)
 		currentVersion := simpleAuthz.Version()
 
 		uc := newTestUsecase(t, testUsecaseConfig{Relations: simpleAuthz})
@@ -2679,36 +2714,34 @@ func TestInventoryService_CheckForUpdateBulk_AllAllowed(t *testing.T) {
 			model.DeserializeReporterType("hbi"),
 			model.DeserializeReporterInstanceId(""),
 		)
+		subjA, _ := buildTestSubjectReference("subject-a")
+		subjB, _ := buildTestSubjectReference("subject-b")
+		req1 := model.NewRelationship(resourceRefFromKey(key1), model.DeserializeRelation("update"), subjA)
+		req2 := model.NewRelationship(resourceRefFromKey(key2), model.DeserializeRelation("update"), subjB)
 		mockRelations.
 			On("CheckForUpdateBulk",
 				mock.Anything,
-				mock.MatchedBy(func(items []model.CheckBulkItem) bool {
-					if len(items) != 2 {
+				mock.MatchedBy(func(rels []model.Relationship) bool {
+					if len(rels) != 2 {
 						return false
 					}
-					s1 := items[0].Subject.Subject()
-					s2 := items[1].Subject.Subject()
-					return string(s1.LocalResourceId()) == "subject-a" &&
-						string(s1.ResourceType()) == "principal" &&
-						string(s1.ReporterType()) == "rbac" &&
-						string(s2.LocalResourceId()) == "subject-b" &&
-						string(s2.ResourceType()) == "principal" &&
-						string(s2.ReporterType()) == "rbac"
+					s1 := rels[0].Subject().Resource()
+					s2 := rels[1].Subject().Resource()
+					return s1.ResourceId().String() == "subject-a" &&
+						s1.ResourceType().String() == "principal" &&
+						s1.Reporter().ReporterType().String() == "rbac" &&
+						s2.ResourceId().String() == "subject-b" &&
+						s2.ResourceType().String() == "principal" &&
+						s2.Reporter().ReporterType().String() == "rbac"
 				}),
 			).
-			Return(model.CheckBulkResult{
-				Pairs: []model.CheckBulkResultPair{
-					{
-						Request: model.CheckBulkItem{Resource: key1, Relation: model.DeserializeRelation("update")},
-						Result:  model.CheckBulkResultItem{Allowed: true},
-					},
-					{
-						Request: model.CheckBulkItem{Resource: key2, Relation: model.DeserializeRelation("update")},
-						Result:  model.CheckBulkResultItem{Allowed: true},
-					},
+			Return(model.NewCheckBulkResult(
+				[]model.CheckBulkResultPair{
+					model.NewCheckBulkResultPair(req1, model.NewCheckBulkResultItem(true, nil, 0)),
+					model.NewCheckBulkResultPair(req2, model.NewCheckBulkResultItem(true, nil, 0)),
 				},
-				ConsistencyToken: model.DeserializeConsistencyToken("update-bulk-token"),
-			}, nil).
+				model.DeserializeConsistencyToken("update-bulk-token"),
+			), nil).
 			Once()
 
 		return TestServerConfig{
@@ -2994,21 +3027,16 @@ func TestInventoryService_CheckForUpdateBulk_PairError(t *testing.T) {
 			model.DeserializeReporterType("hbi"),
 			model.DeserializeReporterInstanceId(""),
 		)
+		subjA, _ := buildTestSubjectReference("subject-a")
+		errReq := model.NewRelationship(resourceRefFromKey(key1), model.DeserializeRelation("update"), subjA)
 		mockRelations.
 			On("CheckForUpdateBulk", mock.Anything, mock.Anything).
-			Return(model.CheckBulkResult{
-				Pairs: []model.CheckBulkResultPair{
-					{
-						Request: model.CheckBulkItem{Resource: key1, Relation: model.DeserializeRelation("update")},
-						Result: model.CheckBulkResultItem{
-							Allowed:   false,
-							Error:     errors.New("denied by policy"),
-							ErrorCode: int32(codes.PermissionDenied),
-						},
-					},
+			Return(model.NewCheckBulkResult(
+				[]model.CheckBulkResultPair{
+					model.NewCheckBulkResultPair(errReq, model.NewCheckBulkResultItem(false, errors.New("denied by policy"), int32(codes.PermissionDenied))),
 				},
-				ConsistencyToken: model.DeserializeConsistencyToken("error-token"),
-			}, nil).
+				model.DeserializeConsistencyToken("error-token"),
+			), nil).
 			Once()
 		return TestServerConfig{
 				Usecase:       newTestUsecase(t, testUsecaseConfig{Relations: mockRelations}),
@@ -3106,10 +3134,10 @@ func TestInventoryService_ReportResource_MetaAuthzProtocolBehavior(t *testing.T)
 }
 
 func TestInventoryService_StreamedListObjects_NilRequest(t *testing.T) {
-	// ToLookupResourcesCommand returns error for nil request
+	// ToLookupObjectsCommand returns error for nil request
 	// This is validated by protovalidate before reaching the handler,
 	// so this tests the internal function behavior only.
-	_, err := svc.ToLookupResourcesCommand(nil)
+	_, err := svc.ToLookupObjectsCommand(nil)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "request is nil")
 }

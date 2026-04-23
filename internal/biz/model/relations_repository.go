@@ -5,46 +5,53 @@ import (
 )
 
 // RelationsRepository defines the interface for managing relations (tuples, checks, and lookups).
-// It provides methods for reading and writing relationships, permission checks, and health checks.
 // All parameters and return types are model types; protobuf conversion is the responsibility
 // of the implementation (data layer).
 type RelationsRepository interface {
 	Health(ctx context.Context) (HealthResult, error)
 
-	Check(ctx context.Context, resource ReporterResourceKey, relation Relation,
-		subject SubjectReference, consistency Consistency,
-	) (CheckResult, error)
+	// --- Check APIs: use Relationship ---
 
-	CheckForUpdate(ctx context.Context, resource ReporterResourceKey, relation Relation,
-		subject SubjectReference,
-	) (CheckResult, error)
+	Check(ctx context.Context, rel Relationship, consistency Consistency,
+	) (bool, ConsistencyToken, error)
 
-	CheckBulk(ctx context.Context, items []CheckBulkItem, consistency Consistency,
+	CheckForUpdate(ctx context.Context, rel Relationship,
+	) (bool, ConsistencyToken, error)
+
+	CheckBulk(ctx context.Context, rels []Relationship, consistency Consistency,
 	) (CheckBulkResult, error)
 
-	CheckForUpdateBulk(ctx context.Context, items []CheckBulkItem,
+	CheckForUpdateBulk(ctx context.Context, rels []Relationship,
 	) (CheckBulkResult, error)
 
-	LookupResources(ctx context.Context, resourceType ResourceType, reporterType ReporterType,
-		relation Relation, subject SubjectReference, pagination *Pagination, consistency Consistency,
-	) (ResultStream[LookupResourcesItem], error)
+	// --- Lookup APIs: use RepresentationType for type patterns ---
 
-	LookupSubjects(ctx context.Context, resource ReporterResourceKey, relation Relation,
-		subjectType ResourceType, subjectReporter ReporterType, subjectRelation *Relation,
+	LookupObjects(ctx context.Context,
+		objectType RepresentationType,
+		relation Relation, subject SubjectReference,
+		pagination *Pagination, consistency Consistency,
+	) (ResultStream[LookupObjectsItem], error)
+
+	LookupSubjects(ctx context.Context,
+		object ResourceReference, relation Relation,
+		subjectType RepresentationType,
+		subjectRelation *Relation,
 		pagination *Pagination, consistency Consistency,
 	) (ResultStream[LookupSubjectsItem], error)
 
-	CreateTuples(ctx context.Context, tuples []RelationsTuple, upsert bool, fencing *FencingCheck,
-	) (TuplesResult, error)
+	// --- Tuple APIs ---
 
-	DeleteTuples(ctx context.Context, tuples []RelationsTuple, fencing *FencingCheck,
-	) (TuplesResult, error)
+	CreateTuples(ctx context.Context, tuples []RelationsTuple,
+		upsert bool, fencing *FencingCheck,
+	) (ConsistencyToken, error)
 
-	DeleteTuplesByFilter(ctx context.Context, filter TupleFilter, fencing *FencingCheck,
-	) (TuplesResult, error)
+	DeleteTuples(ctx context.Context, filter TupleFilter,
+		fencing *FencingCheck,
+	) (ConsistencyToken, error)
 
-	ReadTuples(ctx context.Context, filter TupleFilter, pagination *Pagination, consistency Consistency,
+	ReadTuples(ctx context.Context, filter TupleFilter,
+		pagination *Pagination, consistency Consistency,
 	) (ResultStream[ReadTuplesItem], error)
 
-	AcquireLock(ctx context.Context, lockId string) (AcquireLockResult, error)
+	AcquireLock(ctx context.Context, lockId LockId) (LockToken, error)
 }

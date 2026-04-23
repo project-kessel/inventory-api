@@ -108,8 +108,10 @@ func TestToDeleteTuplesCommand(t *testing.T) {
 		cmd, err := toDeleteTuplesCommand(req)
 
 		require.NoError(t, err)
-		assert.Equal(t, &namespace, cmd.Filter.ResourceNamespace)
-		assert.Equal(t, &resourceType, cmd.Filter.ResourceType)
+		require.NotNil(t, cmd.Filter.ReporterType())
+		require.NotNil(t, cmd.Filter.ObjectType())
+		assert.Equal(t, namespace, cmd.Filter.ReporterType().String())
+		assert.Equal(t, resourceType, cmd.Filter.ObjectType().String())
 	})
 
 	t.Run("with fencing check", func(t *testing.T) {
@@ -198,11 +200,11 @@ func TestRelationshipToRelationsTuple(t *testing.T) {
 		tuple, err := relationshipToRelationsTuple(rel)
 
 		require.NoError(t, err)
-		assert.Equal(t, "ws-1", tuple.Resource().Id().Serialize())
-		assert.Equal(t, "workspace", tuple.Resource().Type().Name())
-		assert.Equal(t, "rbac", tuple.Resource().Type().Namespace())
+		assert.Equal(t, "ws-1", tuple.Object().ResourceId().Serialize())
+		assert.Equal(t, "workspace", tuple.Object().ResourceType().Serialize())
+		assert.Equal(t, "rbac", tuple.Object().Reporter().ReporterType().Serialize())
 		assert.Equal(t, model.DeserializeRelation("member"), tuple.Relation())
-		assert.Equal(t, "user-1", tuple.Subject().Subject().Id().Serialize())
+		assert.Equal(t, "user-1", tuple.Subject().Resource().ResourceId().Serialize())
 	})
 
 	t.Run("with subject relation", func(t *testing.T) {
@@ -284,10 +286,14 @@ func TestTupleFilterFromProto(t *testing.T) {
 
 		result := tupleFilterFromProto(pf)
 
-		assert.Equal(t, &namespace, result.ResourceNamespace)
-		assert.Equal(t, &resourceType, result.ResourceType)
-		assert.Equal(t, &resourceId, result.ResourceId)
-		assert.Equal(t, &relation, result.Relation)
+		require.NotNil(t, result.ReporterType())
+		require.NotNil(t, result.ObjectType())
+		require.NotNil(t, result.ObjectId())
+		require.NotNil(t, result.Relation())
+		assert.Equal(t, namespace, result.ReporterType().String())
+		assert.Equal(t, resourceType, result.ObjectType().String())
+		assert.Equal(t, resourceId, result.ObjectId().String())
+		assert.Equal(t, model.DeserializeRelation(relation), *result.Relation())
 	})
 
 	t.Run("with subject filter", func(t *testing.T) {
@@ -303,9 +309,11 @@ func TestTupleFilterFromProto(t *testing.T) {
 
 		result := tupleFilterFromProto(pf)
 
-		require.NotNil(t, result.SubjectFilter)
-		assert.Equal(t, &subjectNamespace, result.SubjectFilter.SubjectNamespace)
-		assert.Equal(t, &subjectType, result.SubjectFilter.SubjectType)
+		require.NotNil(t, result.Subject())
+		require.NotNil(t, result.Subject().ReporterType())
+		require.NotNil(t, result.Subject().SubjectType())
+		assert.Equal(t, subjectNamespace, result.Subject().ReporterType().String())
+		assert.Equal(t, subjectType, result.Subject().SubjectType().String())
 	})
 }
 
@@ -437,15 +445,25 @@ func TestFromDeleteTuplesResult(t *testing.T) {
 
 func TestReadTuplesItemToProto(t *testing.T) {
 	t.Run("basic item", func(t *testing.T) {
-		item := model.ReadTuplesItem{
-			ResourceNamespace: "rbac",
-			ResourceType:      "workspace",
-			ResourceId:        "ws-1",
-			Relation:          "member",
-			SubjectNamespace:  "rbac",
-			SubjectType:       "principal",
-			SubjectId:         "user-1",
-		}
+		objRep := model.NewReporterReference(model.DeserializeReporterType("rbac"), nil)
+		object := model.NewResourceReference(
+			model.DeserializeResourceType("workspace"),
+			model.DeserializeLocalResourceId("ws-1"),
+			&objRep,
+		)
+		subRep := model.NewReporterReference(model.DeserializeReporterType("rbac"), nil)
+		subRes := model.NewResourceReference(
+			model.DeserializeResourceType("principal"),
+			model.DeserializeLocalResourceId("user-1"),
+			&subRep,
+		)
+		item := model.NewReadTuplesItem(
+			object,
+			model.DeserializeRelation("member"),
+			model.NewSubjectReferenceWithoutRelation(subRes),
+			"",
+			"",
+		)
 
 		result := readTuplesItemToProto(item)
 
@@ -461,16 +479,26 @@ func TestReadTuplesItemToProto(t *testing.T) {
 
 	t.Run("with subject relation", func(t *testing.T) {
 		subjectRelation := "members"
-		item := model.ReadTuplesItem{
-			ResourceNamespace: "rbac",
-			ResourceType:      "workspace",
-			ResourceId:        "ws-1",
-			Relation:          "member",
-			SubjectNamespace:  "rbac",
-			SubjectType:       "group",
-			SubjectId:         "group-1",
-			SubjectRelation:   &subjectRelation,
-		}
+		objRep := model.NewReporterReference(model.DeserializeReporterType("rbac"), nil)
+		object := model.NewResourceReference(
+			model.DeserializeResourceType("workspace"),
+			model.DeserializeLocalResourceId("ws-1"),
+			&objRep,
+		)
+		subRep := model.NewReporterReference(model.DeserializeReporterType("rbac"), nil)
+		subRes := model.NewResourceReference(
+			model.DeserializeResourceType("group"),
+			model.DeserializeLocalResourceId("group-1"),
+			&subRep,
+		)
+		r := model.DeserializeRelation(subjectRelation)
+		item := model.NewReadTuplesItem(
+			object,
+			model.DeserializeRelation("member"),
+			model.NewSubjectReference(subRes, &r),
+			"",
+			"",
+		)
 
 		result := readTuplesItemToProto(item)
 
@@ -479,17 +507,25 @@ func TestReadTuplesItemToProto(t *testing.T) {
 	})
 
 	t.Run("with pagination and consistency token", func(t *testing.T) {
-		item := model.ReadTuplesItem{
-			ResourceNamespace: "rbac",
-			ResourceType:      "workspace",
-			ResourceId:        "ws-1",
-			Relation:          "member",
-			SubjectNamespace:  "rbac",
-			SubjectType:       "principal",
-			SubjectId:         "user-1",
-			ContinuationToken: "page-token-abc",
-			ConsistencyToken:  model.DeserializeConsistencyToken("ct-123"),
-		}
+		objRep := model.NewReporterReference(model.DeserializeReporterType("rbac"), nil)
+		object := model.NewResourceReference(
+			model.DeserializeResourceType("workspace"),
+			model.DeserializeLocalResourceId("ws-1"),
+			&objRep,
+		)
+		subRep := model.NewReporterReference(model.DeserializeReporterType("rbac"), nil)
+		subRes := model.NewResourceReference(
+			model.DeserializeResourceType("principal"),
+			model.DeserializeLocalResourceId("user-1"),
+			&subRep,
+		)
+		item := model.NewReadTuplesItem(
+			object,
+			model.DeserializeRelation("member"),
+			model.NewSubjectReferenceWithoutRelation(subRes),
+			"page-token-abc",
+			model.DeserializeConsistencyToken("ct-123"),
+		)
 
 		result := readTuplesItemToProto(item)
 

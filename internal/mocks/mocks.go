@@ -38,24 +38,29 @@ type MockRelationsRepository struct {
 	mock.Mock
 }
 
-func (m *MockRelationsRepository) CheckBulk(ctx context.Context, items []model.CheckBulkItem, consistency model.Consistency) (model.CheckBulkResult, error) {
-	args := m.Called(ctx, items, consistency)
+func (m *MockRelationsRepository) CheckBulk(ctx context.Context, rels []model.Relationship, consistency model.Consistency) (model.CheckBulkResult, error) {
+	args := m.Called(ctx, rels, consistency)
 	return args.Get(0).(model.CheckBulkResult), args.Error(1)
 }
 
-func (m *MockRelationsRepository) CheckForUpdateBulk(ctx context.Context, items []model.CheckBulkItem) (model.CheckBulkResult, error) {
-	args := m.Called(ctx, items)
+func (m *MockRelationsRepository) CheckForUpdateBulk(ctx context.Context, rels []model.Relationship) (model.CheckBulkResult, error) {
+	args := m.Called(ctx, rels)
 	return args.Get(0).(model.CheckBulkResult), args.Error(1)
 }
 
-func (m *MockRelationsRepository) AcquireLock(ctx context.Context, lockId string) (model.AcquireLockResult, error) {
+func (m *MockRelationsRepository) AcquireLock(ctx context.Context, lockId model.LockId) (model.LockToken, error) {
 	args := m.Called(ctx, lockId)
-	return args.Get(0).(model.AcquireLockResult), args.Error(1)
+	return args.Get(0).(model.LockToken), args.Error(1)
 }
 
-func (m *MockRelationsRepository) CreateTuples(ctx context.Context, tuples []model.RelationsTuple, upsert bool, fencing *model.FencingCheck) (model.TuplesResult, error) {
+func (m *MockRelationsRepository) CreateTuples(ctx context.Context, tuples []model.RelationsTuple, upsert bool, fencing *model.FencingCheck) (model.ConsistencyToken, error) {
 	args := m.Called(ctx, tuples, upsert, fencing)
-	return args.Get(0).(model.TuplesResult), args.Error(1)
+	return args.Get(0).(model.ConsistencyToken), args.Error(1)
+}
+
+func (m *MockRelationsRepository) Check(ctx context.Context, rel model.Relationship, consistency model.Consistency) (bool, model.ConsistencyToken, error) {
+	args := m.Called(ctx, rel, consistency)
+	return args.Bool(0), args.Get(1).(model.ConsistencyToken), args.Error(2)
 }
 
 func (m *MockRelationsRepository) Health(_ context.Context) (model.HealthResult, error) {
@@ -66,27 +71,19 @@ func (m *MockRelationsRepository) ReadTuples(_ context.Context, _ model.TupleFil
 	panic("MockRelationsRepository.ReadTuples() is not supported - use SimpleRelationsRepository instead")
 }
 
-func (m *MockRelationsRepository) DeleteTuplesByFilter(_ context.Context, _ model.TupleFilter, _ *model.FencingCheck) (model.TuplesResult, error) {
-	panic("MockRelationsRepository.DeleteTuplesByFilter() is not supported - use SimpleRelationsRepository instead")
-}
-
-func (m *MockRelationsRepository) Check(_ context.Context, _ model.ReporterResourceKey, _ model.Relation, _ model.SubjectReference, _ model.Consistency) (model.CheckResult, error) {
-	panic("MockRelationsRepository.Check() is not supported - use SimpleRelationsRepository instead")
-}
-
-func (m *MockRelationsRepository) CheckForUpdate(_ context.Context, _ model.ReporterResourceKey, _ model.Relation, _ model.SubjectReference) (model.CheckResult, error) {
+func (m *MockRelationsRepository) CheckForUpdate(_ context.Context, _ model.Relationship) (bool, model.ConsistencyToken, error) {
 	panic("MockRelationsRepository.CheckForUpdate() is not supported - use SimpleRelationsRepository instead")
 }
 
-func (m *MockRelationsRepository) LookupResources(_ context.Context, _ model.ResourceType, _ model.ReporterType, _ model.Relation, _ model.SubjectReference, _ *model.Pagination, _ model.Consistency) (model.ResultStream[model.LookupResourcesItem], error) {
-	panic("MockRelationsRepository.LookupResources() is not supported - use SimpleRelationsRepository instead")
+func (m *MockRelationsRepository) LookupObjects(_ context.Context, _ model.RepresentationType, _ model.Relation, _ model.SubjectReference, _ *model.Pagination, _ model.Consistency) (model.ResultStream[model.LookupObjectsItem], error) {
+	panic("MockRelationsRepository.LookupObjects() is not supported - use SimpleRelationsRepository instead")
 }
 
-func (m *MockRelationsRepository) LookupSubjects(_ context.Context, _ model.ReporterResourceKey, _ model.Relation, _ model.ResourceType, _ model.ReporterType, _ *model.Relation, _ *model.Pagination, _ model.Consistency) (model.ResultStream[model.LookupSubjectsItem], error) {
+func (m *MockRelationsRepository) LookupSubjects(_ context.Context, _ model.ResourceReference, _ model.Relation, _ model.RepresentationType, _ *model.Relation, _ *model.Pagination, _ model.Consistency) (model.ResultStream[model.LookupSubjectsItem], error) {
 	panic("MockRelationsRepository.LookupSubjects() is not supported - use SimpleRelationsRepository instead")
 }
 
-func (m *MockRelationsRepository) DeleteTuples(_ context.Context, _ []model.RelationsTuple, _ *model.FencingCheck) (model.TuplesResult, error) {
+func (m *MockRelationsRepository) DeleteTuples(_ context.Context, _ model.TupleFilter, _ *model.FencingCheck) (model.ConsistencyToken, error) {
 	panic("MockRelationsRepository.DeleteTuples() is not supported - use SimpleRelationsRepository instead")
 }
 
@@ -140,14 +137,14 @@ type MockedSubscription struct {
 	mock.Mock
 }
 
-type MockLookupResourcesStream struct {
-	Responses []model.LookupResourcesItem
+type MockLookupObjectsStream struct {
+	Responses []model.LookupObjectsItem
 	current   int
 }
 
-func (m *MockLookupResourcesStream) Recv() (model.LookupResourcesItem, error) {
+func (m *MockLookupObjectsStream) Recv() (model.LookupObjectsItem, error) {
 	if m.current >= len(m.Responses) {
-		return model.LookupResourcesItem{}, io.EOF
+		return model.LookupObjectsItem{}, io.EOF
 	}
 	res := m.Responses[m.current]
 	m.current++

@@ -106,7 +106,7 @@ func (uc *Usecase) ReportResource(ctx context.Context, cmd ReportResourceCommand
 		return status.Errorf(codes.InvalidArgument, "failed to create reporter resource key: %v", err)
 	}
 
-	if err := uc.enforceMetaAuthzObject(ctx, metaauthorizer.RelationReportResource, metaauthorizer.NewInventoryResourceFromKey(reporterResourceKey)); err != nil {
+	if err := uc.enforceMetaAuthzObject(ctx, metaauthorizer.RelationReportResource, metaauthorizer.NewInventoryResource(reporterResourceKey.ReporterType(), reporterResourceKey.ResourceType(), reporterResourceKey.LocalResourceId())); err != nil {
 		return err
 	}
 
@@ -276,7 +276,7 @@ func (uc *Usecase) updateResource(tx *gorm.DB, cmd ReportResourceCommand, existi
 }
 
 func (uc *Usecase) Delete(ctx context.Context, reporterResourceKey model.ReporterResourceKey) error {
-	if err := uc.enforceMetaAuthzObject(ctx, metaauthorizer.RelationDeleteResource, metaauthorizer.NewInventoryResourceFromKey(reporterResourceKey)); err != nil {
+	if err := uc.enforceMetaAuthzObject(ctx, metaauthorizer.RelationDeleteResource, metaauthorizer.NewInventoryResource(reporterResourceKey.ReporterType(), reporterResourceKey.ResourceType(), reporterResourceKey.LocalResourceId())); err != nil {
 		return err
 	}
 
@@ -321,61 +321,62 @@ func (uc *Usecase) Delete(ctx context.Context, reporterResourceKey model.Reporte
 }
 
 // Check verifies if a subject has the specified relation/permission on a resource.
-func (uc *Usecase) Check(ctx context.Context, relation model.Relation, sub model.SubjectReference, reporterResourceKey model.ReporterResourceKey, consistency model.Consistency) (bool, model.ConsistencyToken, error) {
-	if err := uc.enforceMetaAuthzObject(ctx, metaauthorizer.RelationCheck, metaauthorizer.NewInventoryResourceFromKey(reporterResourceKey)); err != nil {
+func (uc *Usecase) Check(ctx context.Context, relation model.Relation, sub model.SubjectReference, resourceRef model.ResourceReference, consistency model.Consistency) (bool, model.ConsistencyToken, error) {
+	if err := uc.enforceMetaAuthzObject(ctx, metaauthorizer.RelationCheck, inventoryResourceFromRef(resourceRef)); err != nil {
 		return false, model.MinimizeLatencyToken, err
 	}
-	resolved, err := uc.resolveConsistency(ctx, consistency, reporterResourceKey, false)
+	resolved, err := uc.resolveConsistency(ctx, consistency, resourceRef, false)
 	if err != nil {
 		return false, model.MinimizeLatencyToken, err
 	}
-	return uc.checkPermission(ctx, relation, sub, reporterResourceKey, resolved)
+	return uc.checkPermission(ctx, relation, sub, resourceRef, resolved)
 }
 
 // CheckSelf verifies access for the authenticated user using the self-subject strategy.
-func (uc *Usecase) CheckSelf(ctx context.Context, relation model.Relation, reporterResourceKey model.ReporterResourceKey, consistency model.Consistency) (bool, model.ConsistencyToken, error) {
-	if err := uc.enforceMetaAuthzObject(ctx, metaauthorizer.RelationCheckSelf, metaauthorizer.NewInventoryResourceFromKey(reporterResourceKey)); err != nil {
+func (uc *Usecase) CheckSelf(ctx context.Context, relation model.Relation, resourceRef model.ResourceReference, consistency model.Consistency) (bool, model.ConsistencyToken, error) {
+	if err := uc.enforceMetaAuthzObject(ctx, metaauthorizer.RelationCheckSelf, inventoryResourceFromRef(resourceRef)); err != nil {
 		return false, model.MinimizeLatencyToken, err
 	}
 	subjectRef, err := uc.selfSubjectFromContext(ctx)
 	if err != nil {
 		return false, model.MinimizeLatencyToken, err
 	}
-	resolved, err := uc.resolveConsistency(ctx, consistency, reporterResourceKey, true)
+	resolved, err := uc.resolveConsistency(ctx, consistency, resourceRef, true)
 	if err != nil {
 		return false, model.MinimizeLatencyToken, err
 	}
-	return uc.checkPermission(ctx, relation, subjectRef, reporterResourceKey, resolved)
+	return uc.checkPermission(ctx, relation, subjectRef, resourceRef, resolved)
 }
 
 // CheckForUpdate verifies if a subject can update the resource.
-func (uc *Usecase) CheckForUpdate(ctx context.Context, relation model.Relation, sub model.SubjectReference, reporterResourceKey model.ReporterResourceKey) (bool, model.ConsistencyToken, error) {
-	if err := uc.enforceMetaAuthzObject(ctx, metaauthorizer.RelationCheckForUpdate, metaauthorizer.NewInventoryResourceFromKey(reporterResourceKey)); err != nil {
+func (uc *Usecase) CheckForUpdate(ctx context.Context, relation model.Relation, sub model.SubjectReference, resourceRef model.ResourceReference) (bool, model.ConsistencyToken, error) {
+	if err := uc.enforceMetaAuthzObject(ctx, metaauthorizer.RelationCheckForUpdate, inventoryResourceFromRef(resourceRef)); err != nil {
 		return false, "", err
 	}
 
-	result, err := uc.Relations.CheckForUpdate(ctx, reporterResourceKey, relation, sub)
+	rel := model.NewRelationship(resourceRef, relation, sub)
+	allowed, token, err := uc.Relations.CheckForUpdate(ctx, rel)
 	if err != nil {
 		return false, "", err
 	}
-	return result.Allowed, result.ConsistencyToken, nil
+	return allowed, token, nil
 }
 
 // CheckForUpdateBulk performs bulk strongly consistent check-for-update permission checks via relations-api.
 func (uc *Usecase) CheckForUpdateBulk(ctx context.Context, cmd CheckForUpdateBulkCommand) (*CheckBulkResult, error) {
 	for _, item := range cmd.Items {
-		if err := uc.enforceMetaAuthzObject(ctx, metaauthorizer.RelationCheckForUpdateBulk, metaauthorizer.NewInventoryResourceFromKey(item.Resource)); err != nil {
+		if err := uc.enforceMetaAuthzObject(ctx, metaauthorizer.RelationCheckForUpdateBulk, inventoryResourceFromRef(item.Resource)); err != nil {
 			uc.Log.WithContext(ctx).Errorf("meta authz failed for check for update bulk item: %v error: %v", item.Resource, err)
 			return nil, err
 		}
 	}
 
-	modelItems := checkBulkItemsToModel(cmd.Items)
-	result, err := uc.Relations.CheckForUpdateBulk(ctx, modelItems)
+	rels := checkBulkItemsToRelationships(cmd.Items)
+	result, err := uc.Relations.CheckForUpdateBulk(ctx, rels)
 	if err != nil {
 		return nil, err
 	}
-	if err := validateBulkResultLength(len(modelItems), len(result.Pairs)); err != nil {
+	if err := validateBulkResultLength(len(rels), len(result.Pairs())); err != nil {
 		return nil, err
 	}
 	return checkBulkResultFromModel(result), nil
@@ -387,18 +388,18 @@ func (uc *Usecase) CheckBulk(ctx context.Context, cmd CheckBulkCommand) (*CheckB
 		return nil, status.Errorf(codes.InvalidArgument, "inventory-managed consistency tokens aren't available")
 	}
 	for _, item := range cmd.Items {
-		if err := uc.enforceMetaAuthzObject(ctx, metaauthorizer.RelationCheckBulk, metaauthorizer.NewInventoryResourceFromKey(item.Resource)); err != nil {
+		if err := uc.enforceMetaAuthzObject(ctx, metaauthorizer.RelationCheckBulk, inventoryResourceFromRef(item.Resource)); err != nil {
 			uc.Log.WithContext(ctx).Errorf("meta authz failed for check bulk item: %v error: %v", item.Resource, err)
 			return nil, err
 		}
 	}
 
-	modelItems := checkBulkItemsToModel(cmd.Items)
-	result, err := uc.Relations.CheckBulk(ctx, modelItems, cmd.Consistency)
+	rels := checkBulkItemsToRelationships(cmd.Items)
+	result, err := uc.Relations.CheckBulk(ctx, rels, cmd.Consistency)
 	if err != nil {
 		return nil, err
 	}
-	if err := validateBulkResultLength(len(modelItems), len(result.Pairs)); err != nil {
+	if err := validateBulkResultLength(len(rels), len(result.Pairs())); err != nil {
 		return nil, err
 	}
 	return checkBulkResultFromModel(result), nil
@@ -410,7 +411,7 @@ func (uc *Usecase) CheckSelfBulk(ctx context.Context, cmd CheckSelfBulkCommand) 
 		return nil, status.Errorf(codes.InvalidArgument, "inventory-managed consistency tokens aren't available")
 	}
 	for _, item := range cmd.Items {
-		if err := uc.enforceMetaAuthzObject(ctx, metaauthorizer.RelationCheckSelf, metaauthorizer.NewInventoryResourceFromKey(item.Resource)); err != nil {
+		if err := uc.enforceMetaAuthzObject(ctx, metaauthorizer.RelationCheckSelf, inventoryResourceFromRef(item.Resource)); err != nil {
 			uc.Log.WithContext(ctx).Errorf("meta authz failed for check self item: %v error: %v", item.Resource, err)
 			return nil, err
 		}
@@ -421,45 +422,46 @@ func (uc *Usecase) CheckSelfBulk(ctx context.Context, cmd CheckSelfBulkCommand) 
 		return nil, err
 	}
 
-	modelItems := make([]model.CheckBulkItem, len(cmd.Items))
+	rels := make([]model.Relationship, len(cmd.Items))
 	for i, item := range cmd.Items {
-		modelItems[i] = model.CheckBulkItem{
-			Resource: item.Resource,
-			Relation: item.Relation,
-			Subject:  subjectRef,
-		}
+		rels[i] = model.NewRelationship(item.Resource, item.Relation, subjectRef)
 	}
 
-	result, err := uc.Relations.CheckBulk(ctx, modelItems, cmd.Consistency)
+	result, err := uc.Relations.CheckBulk(ctx, rels, cmd.Consistency)
 	if err != nil {
 		return nil, err
 	}
-	if err := validateBulkResultLength(len(modelItems), len(result.Pairs)); err != nil {
+	if err := validateBulkResultLength(len(rels), len(result.Pairs())); err != nil {
 		return nil, err
 	}
 	return checkBulkResultFromModel(result), nil
 }
 
 // checkPermission runs Relations.Check with the resolved consistency.
-func (uc *Usecase) checkPermission(ctx context.Context, relation model.Relation, sub model.SubjectReference, reporterResourceKey model.ReporterResourceKey, consistency model.Consistency) (bool, model.ConsistencyToken, error) {
-	result, err := uc.Relations.Check(ctx, reporterResourceKey, relation, sub, consistency)
+func (uc *Usecase) checkPermission(ctx context.Context, relation model.Relation, sub model.SubjectReference, resourceRef model.ResourceReference, consistency model.Consistency) (bool, model.ConsistencyToken, error) {
+	rel := model.NewRelationship(resourceRef, relation, sub)
+	allowed, token, err := uc.Relations.Check(ctx, rel, consistency)
 	if err != nil {
 		return false, model.MinimizeLatencyToken, err
 	}
-	return result.Allowed, result.ConsistencyToken, nil
+	return allowed, token, nil
 }
 
-// LookupResources delegates resource lookup to the authorization service.
-func (uc *Usecase) LookupResources(ctx context.Context, cmd LookupResourcesCommand) (model.ResultStream[model.LookupResourcesItem], error) {
+// LookupObjects delegates resource lookup to the authorization service.
+func (uc *Usecase) LookupObjects(ctx context.Context, cmd LookupObjectsCommand) (model.ResultStream[model.LookupObjectsItem], error) {
 	if model.ConsistencyTypeOf(cmd.Consistency) == model.ConsistencyAtLeastAsAcknowledged {
 		return nil, status.Errorf(codes.InvalidArgument, "inventory-managed consistency tokens aren't available")
 	}
-	metaObject := metaauthorizer.NewResourceTypeRef(cmd.ReporterType, cmd.ResourceType)
+	var reporterType model.ReporterType
+	if cmd.ObjectType.HasReporterType() {
+		reporterType = *cmd.ObjectType.ReporterType()
+	}
+	metaObject := metaauthorizer.NewResourceTypeRef(reporterType, cmd.ObjectType.ResourceType())
 	if err := uc.enforceMetaAuthzObject(ctx, metaauthorizer.RelationLookupResources, metaObject); err != nil {
 		return nil, err
 	}
 
-	return uc.Relations.LookupResources(ctx, cmd.ResourceType, cmd.ReporterType, cmd.Relation, cmd.Subject, cmd.Pagination, cmd.Consistency)
+	return uc.Relations.LookupObjects(ctx, cmd.ObjectType, cmd.Relation, cmd.Subject, cmd.Pagination, cmd.Consistency)
 }
 
 // LookupSubjects delegates subject lookup to the authorization service.
@@ -467,22 +469,24 @@ func (uc *Usecase) LookupSubjects(ctx context.Context, cmd LookupSubjectsCommand
 	if model.ConsistencyTypeOf(cmd.Consistency) == model.ConsistencyAtLeastAsAcknowledged {
 		return nil, status.Errorf(codes.InvalidArgument, "inventory-managed consistency tokens aren't available")
 	}
-	if err := uc.enforceMetaAuthzObject(ctx, metaauthorizer.RelationLookupSubjects, metaauthorizer.NewInventoryResourceFromKey(cmd.Resource)); err != nil {
+	if err := uc.enforceMetaAuthzObject(ctx, metaauthorizer.RelationLookupSubjects, inventoryResourceFromRef(cmd.Resource)); err != nil {
 		return nil, err
 	}
 
-	return uc.Relations.LookupSubjects(ctx, cmd.Resource, cmd.Relation, cmd.SubjectType, cmd.SubjectReporter, cmd.SubjectRelation, cmd.Pagination, cmd.Consistency)
+	return uc.Relations.LookupSubjects(ctx, cmd.Resource, cmd.Relation, cmd.SubjectType, cmd.SubjectRelation, cmd.Pagination, cmd.Consistency)
 }
 
 // lookupConsistencyTokenFromDB looks up the consistency token from the inventory database.
 // Returns the token if found, empty string if resource not found, or error for other failures.
-func (uc *Usecase) lookupConsistencyTokenFromDB(ctx context.Context, reporterResourceKey model.ReporterResourceKey) (string, error) {
+// Converts ResourceReference to ReporterResourceKey at the DB boundary.
+func (uc *Usecase) lookupConsistencyTokenFromDB(ctx context.Context, resourceRef model.ResourceReference) (string, error) {
+	reporterResourceKey := reporterKeyFromResourceRef(resourceRef)
 	// Passing nil tx is deliberate: this read-only consistency lookup should not run in a transaction.
 	res, err := uc.resourceRepository.FindResourceByKeys(nil, reporterResourceKey)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			// Resource doesn't exist in inventory, fall back to minimize_latency.
-			uc.Log.WithContext(ctx).Warnf("Resource not found in inventory, falling back to minimize_latency for key: %v", reporterResourceKey)
+			uc.Log.WithContext(ctx).Warnf("Resource not found in inventory, falling back to minimize_latency for ref: %v", resourceRef)
 			return "", nil
 		}
 		return "", err
@@ -494,7 +498,7 @@ func (uc *Usecase) lookupConsistencyTokenFromDB(ctx context.Context, reporterRes
 
 // resolveConsistency resolves the consistency preference to a concrete model.Consistency.
 // For unspecified consistency, uses the DefaultToAtLeastAsAcknowledged feature flag to decide.
-func (uc *Usecase) resolveConsistency(ctx context.Context, consistency model.Consistency, reporterResourceKey model.ReporterResourceKey, overrideFeatureFlag bool) (model.Consistency, error) {
+func (uc *Usecase) resolveConsistency(ctx context.Context, consistency model.Consistency, resourceRef model.ResourceReference, overrideFeatureFlag bool) (model.Consistency, error) {
 	featureFlagEnabled := uc.Config.DefaultToAtLeastAsAcknowledged
 	if featureFlagEnabled {
 		if overrideFeatureFlag {
@@ -517,12 +521,12 @@ func (uc *Usecase) resolveConsistency(ctx context.Context, consistency model.Con
 
 	case model.ConsistencyAtLeastAsAcknowledged:
 		uc.Log.WithContext(ctx).Debug("Using at_least_as_acknowledged consistency - looking up token from DB")
-		return uc.resolveFromDB(ctx, reporterResourceKey)
+		return uc.resolveFromDB(ctx, resourceRef)
 
 	case model.ConsistencyUnspecified:
 		if featureFlagEnabled && !overrideFeatureFlag {
 			uc.Log.WithContext(ctx).Debug("Default consistency - looking up token from DB")
-			return uc.resolveFromDB(ctx, reporterResourceKey)
+			return uc.resolveFromDB(ctx, resourceRef)
 		}
 		uc.Log.WithContext(ctx).Debug("Default consistency - using minimize_latency")
 		return model.NewConsistencyMinimizeLatency(), nil
@@ -533,8 +537,8 @@ func (uc *Usecase) resolveConsistency(ctx context.Context, consistency model.Con
 }
 
 // resolveFromDB looks up the consistency token from the inventory database and returns a model.Consistency.
-func (uc *Usecase) resolveFromDB(ctx context.Context, reporterResourceKey model.ReporterResourceKey) (model.Consistency, error) {
-	tokenStr, err := uc.lookupConsistencyTokenFromDB(ctx, reporterResourceKey)
+func (uc *Usecase) resolveFromDB(ctx context.Context, resourceRef model.ResourceReference) (model.Consistency, error) {
+	tokenStr, err := uc.lookupConsistencyTokenFromDB(ctx, resourceRef)
 	if err != nil {
 		return nil, err
 	}
@@ -610,17 +614,13 @@ func getNextTransactionID() (model.TransactionId, error) {
 	return model.NewTransactionId(txid.String()), nil
 }
 
-// checkBulkItemsToModel converts usecase-layer CheckBulkItems to model-layer CheckBulkItems.
-func checkBulkItemsToModel(items []CheckBulkItem) []model.CheckBulkItem {
-	modelItems := make([]model.CheckBulkItem, len(items))
+// checkBulkItemsToRelationships converts usecase-layer CheckBulkItems to model Relationships.
+func checkBulkItemsToRelationships(items []CheckBulkItem) []model.Relationship {
+	rels := make([]model.Relationship, len(items))
 	for i, item := range items {
-		modelItems[i] = model.CheckBulkItem{
-			Resource: item.Resource,
-			Relation: item.Relation,
-			Subject:  item.Subject,
-		}
+		rels[i] = model.NewRelationship(item.Resource, item.Relation, item.Subject)
 	}
-	return modelItems
+	return rels
 }
 
 func validateBulkResultLength(expected, actual int) error {
@@ -633,24 +633,24 @@ func validateBulkResultLength(expected, actual int) error {
 
 // checkBulkResultFromModel converts a model.CheckBulkResult to the usecase-layer CheckBulkResult.
 func checkBulkResultFromModel(result model.CheckBulkResult) *CheckBulkResult {
-	pairs := make([]CheckBulkResultPair, len(result.Pairs))
-	for i, p := range result.Pairs {
+	pairs := make([]CheckBulkResultPair, len(result.Pairs()))
+	for i, p := range result.Pairs() {
 		pairs[i] = CheckBulkResultPair{
 			Request: CheckBulkItem{
-				Resource: p.Request.Resource,
-				Relation: p.Request.Relation,
-				Subject:  p.Request.Subject,
+				Resource: p.Request().Object(),
+				Relation: p.Request().Relation(),
+				Subject:  p.Request().Subject(),
 			},
 			Result: CheckBulkResultItem{
-				Allowed:   p.Result.Allowed,
-				Error:     p.Result.Error,
-				ErrorCode: p.Result.ErrorCode,
+				Allowed:   p.Result().Allowed(),
+				Error:     p.Result().Err(),
+				ErrorCode: p.Result().ErrorCode(),
 			},
 		}
 	}
 	return &CheckBulkResult{
 		Pairs:            pairs,
-		ConsistencyToken: result.ConsistencyToken,
+		ConsistencyToken: result.ConsistencyToken(),
 	}
 }
 
@@ -663,6 +663,32 @@ func isSPInAllowlist(callerSubject authnapi.SubjectId, allowlist []string) bool 
 	}
 
 	return false
+}
+
+// inventoryResourceFromRef extracts primitive fields from a ResourceReference
+// to build an InventoryResource for meta-authorization.
+func inventoryResourceFromRef(ref model.ResourceReference) metaauthorizer.InventoryResource {
+	var reporterType model.ReporterType
+	if ref.HasReporter() {
+		reporterType = ref.Reporter().ReporterType()
+	}
+	return metaauthorizer.NewInventoryResource(reporterType, ref.ResourceType(), ref.ResourceId())
+}
+
+// reporterKeyFromResourceRef converts a ResourceReference to a ReporterResourceKey
+// for DB lookups at the repository boundary. Errors are silently ignored via the
+// zero-value fallback, matching the legacy behavior of ReporterResourceKeyFromReference.
+func reporterKeyFromResourceRef(ref model.ResourceReference) model.ReporterResourceKey {
+	var reporterType model.ReporterType
+	var instanceId model.ReporterInstanceId
+	if ref.HasReporter() {
+		reporterType = ref.Reporter().ReporterType()
+		if ref.Reporter().HasInstanceId() {
+			instanceId = *ref.Reporter().InstanceId()
+		}
+	}
+	key, _ := model.NewReporterResourceKey(ref.ResourceId(), ref.ResourceType(), reporterType, instanceId)
+	return key
 }
 
 func computeReadAfterWrite(uc *Usecase, writeVisibility WriteVisibility, callerSubject authnapi.SubjectId) bool {

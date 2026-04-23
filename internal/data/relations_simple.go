@@ -178,15 +178,22 @@ func simpleHasTupleInSnapshot(tuples map[simpleTupleKey]bool, resourceNamespace,
 }
 
 func simpleTupleKeyFromModelTuple(tuple model.RelationsTuple) simpleTupleKey {
-	return simpleTupleKey{
-		ResourceNamespace: tuple.Resource().Type().Namespace(),
-		ResourceType:      tuple.Resource().Type().Name(),
-		ResourceID:        tuple.Resource().Id().Serialize(),
-		Relation:          tuple.Relation().Serialize(),
-		SubjectNamespace:  tuple.Subject().Subject().Type().Namespace(),
-		SubjectType:       tuple.Subject().Subject().Type().Name(),
-		SubjectID:         tuple.Subject().Subject().Id().Serialize(),
+	obj := tuple.Object()
+	sub := tuple.Subject().Resource()
+	key := simpleTupleKey{
+		ResourceType: obj.ResourceType().Serialize(),
+		ResourceID:   obj.ResourceId().Serialize(),
+		Relation:     tuple.Relation().Serialize(),
+		SubjectType:  sub.ResourceType().Serialize(),
+		SubjectID:    sub.ResourceId().Serialize(),
 	}
+	if obj.HasReporter() {
+		key.ResourceNamespace = obj.Reporter().ReporterType().Serialize()
+	}
+	if sub.HasReporter() {
+		key.SubjectNamespace = sub.Reporter().ReporterType().Serialize()
+	}
+	return key
 }
 
 // SetHealthError configures the error returned by Health().
@@ -224,193 +231,181 @@ func (s *SimpleRelationsRepository) Health(_ context.Context) (model.HealthResul
 	if s.healthError != nil {
 		return model.HealthResult{}, s.healthError
 	}
-	return model.HealthResult{Status: "OK", Code: 200}, nil
+	return model.NewHealthResult("OK", 200), nil
 }
 
-func (s *SimpleRelationsRepository) Check(_ context.Context, resource model.ReporterResourceKey, relation model.Relation,
-	subject model.SubjectReference, consistency model.Consistency,
-) (model.CheckResult, error) {
+func simpleResourceRefFields(ref model.ResourceReference) (namespace, resType, resID string) {
+	resType = ref.ResourceType().Serialize()
+	resID = ref.ResourceId().Serialize()
+	if ref.HasReporter() {
+		namespace = ref.Reporter().ReporterType().Serialize()
+	}
+	return
+}
+
+func (s *SimpleRelationsRepository) Check(_ context.Context, rel model.Relationship, consistency model.Consistency,
+) (bool, model.ConsistencyToken, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
 	consistencyToken := consistencyToSimpleToken(consistency)
 	tuples := s.getTuplesForToken(consistencyToken)
-	resultToken := simpleFormatConsistencyToken(s.version)
+	resultToken := model.DeserializeConsistencyToken(simpleFormatConsistencyToken(s.version))
 
-	subKey := subject.Subject()
-	allowed := simpleHasTupleInSnapshot(tuples,
-		resource.ReporterType().Serialize(),
-		resource.ResourceType().Serialize(),
-		resource.LocalResourceId().Serialize(),
-		relation.Serialize(),
-		subKey.ReporterType().Serialize(),
-		subKey.ResourceType().Serialize(),
-		subKey.LocalResourceId().Serialize(),
-	)
+	objNs, objType, objId := simpleResourceRefFields(rel.Object())
+	subResource := rel.Subject().Resource()
+	subNs, subType, subId := simpleResourceRefFields(subResource)
 
-	return model.CheckResult{
-		Allowed:          allowed,
-		ConsistencyToken: model.DeserializeConsistencyToken(resultToken),
-	}, nil
+	allowed := simpleHasTupleInSnapshot(tuples, objNs, objType, objId,
+		rel.Relation().Serialize(), subNs, subType, subId)
+
+	return allowed, resultToken, nil
 }
 
-func (s *SimpleRelationsRepository) CheckForUpdate(_ context.Context, resource model.ReporterResourceKey, relation model.Relation,
-	subject model.SubjectReference,
-) (model.CheckResult, error) {
+func (s *SimpleRelationsRepository) CheckForUpdate(_ context.Context, rel model.Relationship,
+) (bool, model.ConsistencyToken, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	resultToken := simpleFormatConsistencyToken(s.version)
+	resultToken := model.DeserializeConsistencyToken(simpleFormatConsistencyToken(s.version))
 
-	subKey := subject.Subject()
-	allowed := simpleHasTupleInSnapshot(s.tuples,
-		resource.ReporterType().Serialize(),
-		resource.ResourceType().Serialize(),
-		resource.LocalResourceId().Serialize(),
-		relation.Serialize(),
-		subKey.ReporterType().Serialize(),
-		subKey.ResourceType().Serialize(),
-		subKey.LocalResourceId().Serialize(),
-	)
+	objNs, objType, objId := simpleResourceRefFields(rel.Object())
+	subResource := rel.Subject().Resource()
+	subNs, subType, subId := simpleResourceRefFields(subResource)
 
-	return model.CheckResult{
-		Allowed:          allowed,
-		ConsistencyToken: model.DeserializeConsistencyToken(resultToken),
-	}, nil
+	allowed := simpleHasTupleInSnapshot(s.tuples, objNs, objType, objId,
+		rel.Relation().Serialize(), subNs, subType, subId)
+
+	return allowed, resultToken, nil
 }
 
-func (s *SimpleRelationsRepository) CheckBulk(_ context.Context, items []model.CheckBulkItem, consistency model.Consistency,
+func (s *SimpleRelationsRepository) CheckBulk(_ context.Context, rels []model.Relationship, consistency model.Consistency,
 ) (model.CheckBulkResult, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
 	consistencyToken := consistencyToSimpleToken(consistency)
 	tuples := s.getTuplesForToken(consistencyToken)
-	resultToken := simpleFormatConsistencyToken(s.version)
+	resultToken := model.DeserializeConsistencyToken(simpleFormatConsistencyToken(s.version))
 
-	pairs := make([]model.CheckBulkResultPair, len(items))
-	for i, item := range items {
-		subKey := item.Subject.Subject()
-		allowed := simpleHasTupleInSnapshot(tuples,
-			item.Resource.ReporterType().Serialize(),
-			item.Resource.ResourceType().Serialize(),
-			item.Resource.LocalResourceId().Serialize(),
-			item.Relation.Serialize(),
-			subKey.ReporterType().Serialize(),
-			subKey.ResourceType().Serialize(),
-			subKey.LocalResourceId().Serialize(),
-		)
+	pairs := make([]model.CheckBulkResultPair, len(rels))
+	for i, rel := range rels {
+		objNs, objType, objId := simpleResourceRefFields(rel.Object())
+		subResource := rel.Subject().Resource()
+		subNs, subType, subId := simpleResourceRefFields(subResource)
 
-		pairs[i] = model.CheckBulkResultPair{
-			Request: item,
-			Result:  model.CheckBulkResultItem{Allowed: allowed},
-		}
+		allowed := simpleHasTupleInSnapshot(tuples, objNs, objType, objId,
+			rel.Relation().Serialize(), subNs, subType, subId)
+
+		pairs[i] = model.NewCheckBulkResultPair(rel, model.NewCheckBulkResultItem(allowed, nil, 0))
 	}
 
-	return model.CheckBulkResult{
-		Pairs:            pairs,
-		ConsistencyToken: model.DeserializeConsistencyToken(resultToken),
-	}, nil
+	return model.NewCheckBulkResult(pairs, resultToken), nil
 }
 
-func (s *SimpleRelationsRepository) CheckForUpdateBulk(_ context.Context, items []model.CheckBulkItem,
+func (s *SimpleRelationsRepository) CheckForUpdateBulk(_ context.Context, rels []model.Relationship,
 ) (model.CheckBulkResult, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	resultToken := simpleFormatConsistencyToken(s.version)
+	resultToken := model.DeserializeConsistencyToken(simpleFormatConsistencyToken(s.version))
 
-	pairs := make([]model.CheckBulkResultPair, len(items))
-	for i, item := range items {
-		subKey := item.Subject.Subject()
-		allowed := simpleHasTupleInSnapshot(s.tuples,
-			item.Resource.ReporterType().Serialize(),
-			item.Resource.ResourceType().Serialize(),
-			item.Resource.LocalResourceId().Serialize(),
-			item.Relation.Serialize(),
-			subKey.ReporterType().Serialize(),
-			subKey.ResourceType().Serialize(),
-			subKey.LocalResourceId().Serialize(),
-		)
+	pairs := make([]model.CheckBulkResultPair, len(rels))
+	for i, rel := range rels {
+		objNs, objType, objId := simpleResourceRefFields(rel.Object())
+		subResource := rel.Subject().Resource()
+		subNs, subType, subId := simpleResourceRefFields(subResource)
 
-		pairs[i] = model.CheckBulkResultPair{
-			Request: item,
-			Result:  model.CheckBulkResultItem{Allowed: allowed},
-		}
+		allowed := simpleHasTupleInSnapshot(s.tuples, objNs, objType, objId,
+			rel.Relation().Serialize(), subNs, subType, subId)
+
+		pairs[i] = model.NewCheckBulkResultPair(rel, model.NewCheckBulkResultItem(allowed, nil, 0))
 	}
 
-	return model.CheckBulkResult{
-		Pairs:            pairs,
-		ConsistencyToken: model.DeserializeConsistencyToken(resultToken),
-	}, nil
+	return model.NewCheckBulkResult(pairs, resultToken), nil
 }
 
-func (s *SimpleRelationsRepository) LookupResources(_ context.Context, resourceType model.ResourceType, reporterType model.ReporterType,
-	relation model.Relation, subject model.SubjectReference, _ *model.Pagination, _ model.Consistency,
-) (model.ResultStream[model.LookupResourcesItem], error) {
+func (s *SimpleRelationsRepository) LookupObjects(_ context.Context,
+	objectType model.RepresentationType,
+	relation model.Relation, subject model.SubjectReference,
+	_ *model.Pagination, _ model.Consistency,
+) (model.ResultStream[model.LookupObjectsItem], error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	requestedNamespace := reporterType.Serialize()
-	requestedType := resourceType.Serialize()
+	requestedType := objectType.ResourceType().Serialize()
+	requestedNamespace := ""
+	if objectType.HasReporterType() {
+		requestedNamespace = objectType.ReporterType().Serialize()
+	}
 	requestedRelation := relation.Serialize()
 
-	subKey := subject.Subject()
-	subjectNamespace := subKey.ReporterType().Serialize()
-	subjectType := subKey.ResourceType().Serialize()
-	subjectID := subKey.LocalResourceId().Serialize()
+	subResource := subject.Resource()
+	subNs, subType, subId := simpleResourceRefFields(subResource)
 
-	var results []model.LookupResourcesItem
+	var results []model.LookupObjectsItem
 	for key := range s.tuples {
 		namespaceMatches := requestedNamespace == "" || key.ResourceNamespace == requestedNamespace
 		typeMatches := requestedType == "" || key.ResourceType == requestedType
 		relationMatches := key.Relation == requestedRelation
-		subjectMatches := key.SubjectNamespace == subjectNamespace &&
-			key.SubjectType == subjectType &&
-			key.SubjectID == subjectID
+		subjectMatches := key.SubjectNamespace == subNs &&
+			key.SubjectType == subType &&
+			key.SubjectID == subId
 
 		if namespaceMatches && typeMatches && relationMatches && subjectMatches {
-			results = append(results, model.LookupResourcesItem{
-				ResourceId:   model.DeserializeLocalResourceId(key.ResourceID),
-				ResourceType: model.DeserializeResourceType(key.ResourceType),
-				ReporterType: model.DeserializeReporterType(key.ResourceNamespace),
-			})
+			reporterType := model.DeserializeReporterType(key.ResourceNamespace)
+			reporter := model.NewReporterReference(reporterType, nil)
+			results = append(results, model.NewLookupObjectsItem(
+				model.NewResourceReference(
+					model.DeserializeResourceType(key.ResourceType),
+					model.DeserializeLocalResourceId(key.ResourceID),
+					&reporter,
+				), "",
+			))
 		}
 	}
 
-	return &simpleLookupResourcesStream{results: results}, nil
+	return &simpleLookupObjectsStream{results: results}, nil
 }
 
-func (s *SimpleRelationsRepository) LookupSubjects(_ context.Context, resource model.ReporterResourceKey, relation model.Relation,
-	subjectType model.ResourceType, subjectReporter model.ReporterType, _ *model.Relation,
+func (s *SimpleRelationsRepository) LookupSubjects(_ context.Context,
+	object model.ResourceReference, relation model.Relation,
+	subjectType model.RepresentationType,
+	_ *model.Relation,
 	_ *model.Pagination, _ model.Consistency,
 ) (model.ResultStream[model.LookupSubjectsItem], error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	resourceNamespace := resource.ReporterType().Serialize()
-	resType := resource.ResourceType().Serialize()
-	resourceID := resource.LocalResourceId().Serialize()
+	objNs, objType, objId := simpleResourceRefFields(object)
 	requestedRelation := relation.Serialize()
 
-	wantSubjectNamespace := subjectReporter.Serialize()
-	wantSubjectType := subjectType.Serialize()
+	wantSubjectType := subjectType.ResourceType().Serialize()
+	wantSubjectNamespace := ""
+	if subjectType.HasReporterType() {
+		wantSubjectNamespace = subjectType.ReporterType().Serialize()
+	}
 
 	var results []model.LookupSubjectsItem
 	for key := range s.tuples {
-		resourceMatches := key.ResourceNamespace == resourceNamespace &&
-			key.ResourceType == resType &&
-			key.ResourceID == resourceID
+		resourceMatches := key.ResourceNamespace == objNs &&
+			key.ResourceType == objType &&
+			key.ResourceID == objId
 		relationMatches := key.Relation == requestedRelation
 		subjectTypeMatches := (wantSubjectNamespace == "" || key.SubjectNamespace == wantSubjectNamespace) &&
 			(wantSubjectType == "" || key.SubjectType == wantSubjectType)
 
 		if resourceMatches && relationMatches && subjectTypeMatches {
-			results = append(results, model.LookupSubjectsItem{
-				SubjectId:       model.DeserializeLocalResourceId(key.SubjectID),
-				SubjectType:     model.DeserializeResourceType(key.SubjectType),
-				SubjectReporter: model.DeserializeReporterType(key.SubjectNamespace),
-			})
+			reporterType := model.DeserializeReporterType(key.SubjectNamespace)
+			reporter := model.NewReporterReference(reporterType, nil)
+			subResource := model.NewResourceReference(
+				model.DeserializeResourceType(key.SubjectType),
+				model.DeserializeLocalResourceId(key.SubjectID),
+				&reporter,
+			)
+			results = append(results, model.NewLookupSubjectsItem(
+				model.NewSubjectReferenceWithoutRelation(subResource), "",
+			))
 		}
 	}
 
@@ -418,12 +413,12 @@ func (s *SimpleRelationsRepository) LookupSubjects(_ context.Context, resource m
 }
 
 func (s *SimpleRelationsRepository) CreateTuples(_ context.Context, tuples []model.RelationsTuple, _ bool, _ *model.FencingCheck,
-) (model.TuplesResult, error) {
+) (model.ConsistencyToken, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	if s.createTuplesError != nil {
-		return model.TuplesResult{}, s.createTuplesError
+		return model.MinimizeLatencyToken, s.createTuplesError
 	}
 
 	for _, tuple := range tuples {
@@ -432,66 +427,16 @@ func (s *SimpleRelationsRepository) CreateTuples(_ context.Context, tuples []mod
 	}
 	s.advanceVersion()
 
-	return model.TuplesResult{
-		ConsistencyToken: model.DeserializeConsistencyToken(strconv.FormatInt(s.version, 10)),
-	}, nil
+	return model.DeserializeConsistencyToken(strconv.FormatInt(s.version, 10)), nil
 }
 
-func (s *SimpleRelationsRepository) DeleteTuples(_ context.Context, tuples []model.RelationsTuple, _ *model.FencingCheck,
-) (model.TuplesResult, error) {
+func (s *SimpleRelationsRepository) DeleteTuples(_ context.Context, filter model.TupleFilter, _ *model.FencingCheck,
+) (model.ConsistencyToken, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	if s.deleteTuplesError != nil {
-		return model.TuplesResult{}, s.deleteTuplesError
-	}
-
-	for _, tuple := range tuples {
-		key := simpleTupleKeyFromModelTuple(tuple)
-		delete(s.tuples, key)
-	}
-	s.advanceVersion()
-
-	return model.TuplesResult{
-		ConsistencyToken: model.DeserializeConsistencyToken(strconv.FormatInt(s.version, 10)),
-	}, nil
-}
-
-func simpleMatchesTupleFilter(key simpleTupleKey, filter model.TupleFilter) bool {
-	if filter.ResourceNamespace != nil && *filter.ResourceNamespace != key.ResourceNamespace {
-		return false
-	}
-	if filter.ResourceType != nil && *filter.ResourceType != key.ResourceType {
-		return false
-	}
-	if filter.ResourceId != nil && *filter.ResourceId != key.ResourceID {
-		return false
-	}
-	if filter.Relation != nil && *filter.Relation != key.Relation {
-		return false
-	}
-	if filter.SubjectFilter != nil {
-		sf := filter.SubjectFilter
-		if sf.SubjectNamespace != nil && *sf.SubjectNamespace != key.SubjectNamespace {
-			return false
-		}
-		if sf.SubjectType != nil && *sf.SubjectType != key.SubjectType {
-			return false
-		}
-		if sf.SubjectId != nil && *sf.SubjectId != key.SubjectID {
-			return false
-		}
-	}
-	return true
-}
-
-func (s *SimpleRelationsRepository) DeleteTuplesByFilter(_ context.Context, filter model.TupleFilter, _ *model.FencingCheck,
-) (model.TuplesResult, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	if s.deleteTuplesError != nil {
-		return model.TuplesResult{}, s.deleteTuplesError
+		return model.MinimizeLatencyToken, s.deleteTuplesError
 	}
 
 	for key := range s.tuples {
@@ -501,9 +446,35 @@ func (s *SimpleRelationsRepository) DeleteTuplesByFilter(_ context.Context, filt
 	}
 	s.advanceVersion()
 
-	return model.TuplesResult{
-		ConsistencyToken: model.DeserializeConsistencyToken(strconv.FormatInt(s.version, 10)),
-	}, nil
+	return model.DeserializeConsistencyToken(strconv.FormatInt(s.version, 10)), nil
+}
+
+func simpleMatchesTupleFilter(key simpleTupleKey, filter model.TupleFilter) bool {
+	if filter.ReporterType() != nil && filter.ReporterType().Serialize() != key.ResourceNamespace {
+		return false
+	}
+	if filter.ObjectType() != nil && filter.ObjectType().Serialize() != key.ResourceType {
+		return false
+	}
+	if filter.ObjectId() != nil && filter.ObjectId().Serialize() != key.ResourceID {
+		return false
+	}
+	if filter.Relation() != nil && filter.Relation().Serialize() != key.Relation {
+		return false
+	}
+	if filter.Subject() != nil {
+		sf := filter.Subject()
+		if sf.ReporterType() != nil && sf.ReporterType().Serialize() != key.SubjectNamespace {
+			return false
+		}
+		if sf.SubjectType() != nil && sf.SubjectType().Serialize() != key.SubjectType {
+			return false
+		}
+		if sf.SubjectId() != nil && sf.SubjectId().Serialize() != key.SubjectID {
+			return false
+		}
+	}
+	return true
 }
 
 func (s *SimpleRelationsRepository) ReadTuples(_ context.Context, filter model.TupleFilter, _ *model.Pagination, _ model.Consistency,
@@ -514,35 +485,47 @@ func (s *SimpleRelationsRepository) ReadTuples(_ context.Context, filter model.T
 	var results []model.ReadTuplesItem
 	for key := range s.tuples {
 		if simpleMatchesTupleFilter(key, filter) {
-			results = append(results, model.ReadTuplesItem{
-				ResourceNamespace: key.ResourceNamespace,
-				ResourceType:      key.ResourceType,
-				ResourceId:        key.ResourceID,
-				Relation:          key.Relation,
-				SubjectNamespace:  key.SubjectNamespace,
-				SubjectType:       key.SubjectType,
-				SubjectId:         key.SubjectID,
-			})
+			objReporterType := model.DeserializeReporterType(key.ResourceNamespace)
+			objReporter := model.NewReporterReference(objReporterType, nil)
+			object := model.NewResourceReference(
+				model.DeserializeResourceType(key.ResourceType),
+				model.DeserializeLocalResourceId(key.ResourceID),
+				&objReporter,
+			)
+
+			subReporterType := model.DeserializeReporterType(key.SubjectNamespace)
+			subReporter := model.NewReporterReference(subReporterType, nil)
+			subResource := model.NewResourceReference(
+				model.DeserializeResourceType(key.SubjectType),
+				model.DeserializeLocalResourceId(key.SubjectID),
+				&subReporter,
+			)
+
+			results = append(results, model.NewReadTuplesItem(
+				object,
+				model.DeserializeRelation(key.Relation),
+				model.NewSubjectReferenceWithoutRelation(subResource),
+				"",
+				model.MinimizeLatencyToken,
+			))
 		}
 	}
 
 	return &simpleReadTuplesStream{results: results}, nil
 }
 
-func (s *SimpleRelationsRepository) AcquireLock(_ context.Context, lockId string) (model.AcquireLockResult, error) {
+func (s *SimpleRelationsRepository) AcquireLock(_ context.Context, lockId model.LockId) (model.LockToken, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	if s.acquireLockError != nil {
-		return model.AcquireLockResult{}, s.acquireLockError
+		return model.LockToken(""), s.acquireLockError
 	}
 
-	token := "token-" + lockId
-	s.locks[lockId] = token
+	token := "token-" + lockId.String()
+	s.locks[lockId.String()] = token
 
-	return model.AcquireLockResult{
-		LockToken: token,
-	}, nil
+	return model.DeserializeLockToken(token), nil
 }
 
 func consistencyToSimpleToken(c model.Consistency) string {
@@ -552,22 +535,20 @@ func consistencyToSimpleToken(c model.Consistency) string {
 	return ""
 }
 
-// simpleLookupResourcesStream implements model.ResultStream for LookupResourcesItem.
-type simpleLookupResourcesStream struct {
-	results []model.LookupResourcesItem
+type simpleLookupObjectsStream struct {
+	results []model.LookupObjectsItem
 	index   int
 }
 
-func (s *simpleLookupResourcesStream) Recv() (model.LookupResourcesItem, error) {
+func (s *simpleLookupObjectsStream) Recv() (model.LookupObjectsItem, error) {
 	if s.index >= len(s.results) {
-		return model.LookupResourcesItem{}, io.EOF
+		return model.LookupObjectsItem{}, io.EOF
 	}
 	result := s.results[s.index]
 	s.index++
 	return result, nil
 }
 
-// simpleLookupSubjectsStream implements model.ResultStream for LookupSubjectsItem.
 type simpleLookupSubjectsStream struct {
 	results []model.LookupSubjectsItem
 	index   int

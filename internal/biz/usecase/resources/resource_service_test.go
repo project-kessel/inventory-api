@@ -153,7 +153,19 @@ func buildTestSubjectReference(subjectID string) (model.SubjectReference, error)
 	if err != nil {
 		return model.SubjectReference{}, err
 	}
-	return model.NewSubjectReferenceWithoutRelation(key), nil
+	reporter := model.NewReporterReference(key.ReporterType(), nil)
+	ref := model.NewResourceReference(key.ResourceType(), key.LocalResourceId(), &reporter)
+	return model.NewSubjectReferenceWithoutRelation(ref), nil
+}
+
+// resourceRefFromKey builds a ResourceReference from an inventory ReporterResourceKey for authz tests.
+func resourceRefFromKey(key model.ReporterResourceKey) model.ResourceReference {
+	var instanceID *model.ReporterInstanceId
+	if inst := key.ReporterInstanceId(); inst != "" {
+		instanceID = &inst
+	}
+	reporter := model.NewReporterReference(key.ReporterType(), instanceID)
+	return model.NewResourceReference(key.ResourceType(), key.LocalResourceId(), &reporter)
 }
 
 func newTestSelfSubjectStrategy() selfsubject.SelfSubjectStrategy {
@@ -180,7 +192,7 @@ func TestCheckSelf_UsesCheckSelfRelation(t *testing.T) {
 	relation, err := model.NewRelation("view")
 	require.NoError(t, err)
 
-	allowed, _, err := h.usecase.CheckSelf(h.ctx, relation, key, model.NewConsistencyMinimizeLatency())
+	allowed, _, err := h.usecase.CheckSelf(h.ctx, relation, resourceRefFromKey(key), model.NewConsistencyMinimizeLatency())
 	require.NoError(t, err)
 	assert.True(t, allowed)
 	assert.Equal(t, 1, h.meta.calls)
@@ -194,7 +206,7 @@ func TestCheckSelf_DeniedByMetaAuthz(t *testing.T) {
 	relation, err := model.NewRelation("view")
 	require.NoError(t, err)
 
-	_, _, err = h.usecase.CheckSelf(h.ctx, relation, key, model.NewConsistencyMinimizeLatency())
+	_, _, err = h.usecase.CheckSelf(h.ctx, relation, resourceRefFromKey(key), model.NewConsistencyMinimizeLatency())
 	assert.ErrorIs(t, err, metaauthorizer.ErrMetaAuthorizationDenied)
 }
 
@@ -205,7 +217,7 @@ func TestCheckSelf_MissingAuthzContext(t *testing.T) {
 	relation, err := model.NewRelation("view")
 	require.NoError(t, err)
 
-	_, _, err = h.usecase.CheckSelf(context.Background(), relation, key, model.NewConsistencyMinimizeLatency())
+	_, _, err = h.usecase.CheckSelf(context.Background(), relation, resourceRefFromKey(key), model.NewConsistencyMinimizeLatency())
 	assert.ErrorIs(t, err, metaauthorizer.ErrMetaAuthzContextMissing)
 	assert.Equal(t, 0, h.meta.calls)
 }
@@ -245,7 +257,7 @@ func TestCheck_UsesCheckRelation(t *testing.T) {
 	relation, err := model.NewRelation("view")
 	require.NoError(t, err)
 
-	allowed, _, err := h.usecase.Check(h.ctx, relation, subject, key, model.NewConsistencyUnspecified())
+	allowed, _, err := h.usecase.Check(h.ctx, relation, subject, resourceRefFromKey(key), model.NewConsistencyUnspecified())
 	require.NoError(t, err)
 	assert.True(t, allowed)
 	assert.Equal(t, 1, h.meta.calls)
@@ -261,7 +273,7 @@ func TestCheckForUpdate_UsesCheckForUpdateRelation(t *testing.T) {
 	relation, err := model.NewRelation("view")
 	require.NoError(t, err)
 
-	allowed, _, err := h.usecase.CheckForUpdate(h.ctx, relation, subject, key)
+	allowed, _, err := h.usecase.CheckForUpdate(h.ctx, relation, subject, resourceRefFromKey(key))
 	require.NoError(t, err)
 	assert.True(t, allowed)
 	assert.Equal(t, 1, h.meta.calls)
@@ -279,7 +291,7 @@ func TestCheckForUpdateBulk_UsesCheckForUpdateBulkRelation(t *testing.T) {
 
 	cmd := CheckForUpdateBulkCommand{
 		Items: []CheckBulkItem{
-			{Resource: key, Relation: relation, Subject: subject},
+			{Resource: resourceRefFromKey(key), Relation: relation, Subject: subject},
 		},
 	}
 	result, err := h.usecase.CheckForUpdateBulk(h.ctx, cmd)
@@ -301,7 +313,7 @@ func TestCheckForUpdateBulk_MetaAuthzDenied(t *testing.T) {
 
 	_, err = h.usecase.CheckForUpdateBulk(h.ctx, CheckForUpdateBulkCommand{
 		Items: []CheckBulkItem{
-			{Resource: key, Relation: relation, Subject: subject},
+			{Resource: resourceRefFromKey(key), Relation: relation, Subject: subject},
 		},
 	})
 	assert.ErrorIs(t, err, metaauthorizer.ErrMetaAuthorizationDenied)
@@ -323,8 +335,8 @@ func TestCheckForUpdateBulk_MixedResults(t *testing.T) {
 
 	result, err := h.usecase.CheckForUpdateBulk(h.ctx, CheckForUpdateBulkCommand{
 		Items: []CheckBulkItem{
-			{Resource: key1, Relation: relation, Subject: subject},
-			{Resource: key2, Relation: relation, Subject: subject},
+			{Resource: resourceRefFromKey(key1), Relation: relation, Subject: subject},
+			{Resource: resourceRefFromKey(key2), Relation: relation, Subject: subject},
 		},
 	})
 	require.NoError(t, err)
@@ -348,8 +360,8 @@ func TestCheckSelfBulk_UsesCheckSelfRelationForEachItem(t *testing.T) {
 
 	cmd := CheckSelfBulkCommand{
 		Items: []CheckSelfBulkItem{
-			{Resource: key1, Relation: viewRelation},
-			{Resource: key2, Relation: editRelation},
+			{Resource: resourceRefFromKey(key1), Relation: viewRelation},
+			{Resource: resourceRefFromKey(key2), Relation: editRelation},
 		},
 		Consistency: model.NewConsistencyMinimizeLatency(),
 	}
@@ -369,7 +381,7 @@ func TestCheckSelfBulk_MissingAuthzContext(t *testing.T) {
 
 	cmd := CheckSelfBulkCommand{
 		Items: []CheckSelfBulkItem{
-			{Resource: key, Relation: viewRelation},
+			{Resource: resourceRefFromKey(key), Relation: viewRelation},
 		},
 		Consistency: model.NewConsistencyMinimizeLatency(),
 	}
@@ -391,7 +403,7 @@ func TestCheckBulk_RejectsInventoryManagedConsistency(t *testing.T) {
 	_, err = h.usecase.CheckBulk(h.ctx, CheckBulkCommand{
 		Items: []CheckBulkItem{
 			{
-				Resource: key,
+				Resource: resourceRefFromKey(key),
 				Relation: viewRelation,
 				Subject:  subject,
 			},
@@ -414,7 +426,7 @@ func TestCheckSelfBulk_RejectsInventoryManagedConsistency(t *testing.T) {
 	_, err = h.usecase.CheckSelfBulk(h.ctx, CheckSelfBulkCommand{
 		Items: []CheckSelfBulkItem{
 			{
-				Resource: key,
+				Resource: resourceRefFromKey(key),
 				Relation: viewRelation,
 			},
 		},
@@ -1693,7 +1705,7 @@ func TestResolveConsistency(t *testing.T) {
 				require.NoError(t, err)
 			}
 
-			result, err := h.usecase.resolveConsistency(h.ctx, tt.consistency, reporterResourceKey, false)
+			result, err := h.usecase.resolveConsistency(h.ctx, tt.consistency, resourceRefFromKey(reporterResourceKey), false)
 
 			if tt.expectedError {
 				assert.Error(t, err)
@@ -1767,7 +1779,7 @@ func TestResolveConsistency_OverrideFeatureFlag(t *testing.T) {
 				require.NoError(t, err)
 			}
 
-			result, err := h.usecase.resolveConsistency(h.ctx, tt.consistency, reporterResourceKey, true)
+			result, err := h.usecase.resolveConsistency(h.ctx, tt.consistency, resourceRefFromKey(reporterResourceKey), true)
 			if tt.expectedError {
 				assert.Error(t, err)
 			} else {
@@ -1787,7 +1799,7 @@ func TestResolveConsistency_NilConsistencyDefaultsToUnspecified(t *testing.T) {
 	h := newTestHarness(t, withNamespace("test-topic"))
 
 	reporterResourceKey := createReporterResourceKey(t, "test-resource-456", "host", "hbi", "test-instance")
-	result, err := h.usecase.resolveConsistency(h.ctx, nil, reporterResourceKey, false)
+	result, err := h.usecase.resolveConsistency(h.ctx, nil, resourceRefFromKey(reporterResourceKey), false)
 
 	assert.NoError(t, err)
 	assert.Equal(t, model.ConsistencyMinimizeLatency, model.ConsistencyTypeOf(result))
@@ -1802,7 +1814,7 @@ func TestResolveConsistency_OverrideFeatureFlag_LogsBypassWhenEnabled(t *testing
 	)
 
 	reporterResourceKey := createReporterResourceKey(t, "host-123", "host", "hbi", "instance-1")
-	_, err := h.usecase.resolveConsistency(h.ctx, model.NewConsistencyUnspecified(), reporterResourceKey, true)
+	_, err := h.usecase.resolveConsistency(h.ctx, model.NewConsistencyUnspecified(), resourceRefFromKey(reporterResourceKey), true)
 	require.NoError(t, err)
 	assert.Contains(t, strings.ToLower(logBuf.String()), "enabled but bypassed for this call")
 }
@@ -1816,7 +1828,7 @@ func TestResolveConsistency_OverrideFeatureFlag_LogsEnabledWhenNotBypassed(t *te
 	)
 
 	reporterResourceKey := createReporterResourceKey(t, "host-456", "host", "hbi", "instance-1")
-	_, err := h.usecase.resolveConsistency(h.ctx, model.NewConsistencyUnspecified(), reporterResourceKey, false)
+	_, err := h.usecase.resolveConsistency(h.ctx, model.NewConsistencyUnspecified(), resourceRefFromKey(reporterResourceKey), false)
 	require.NoError(t, err)
 	assert.Contains(t, strings.ToLower(logBuf.String()), "feature flag default-to-at-least-as-acknowledged is enabled")
 }
@@ -1830,7 +1842,7 @@ func TestResolveConsistency_OverrideFeatureFlag_LogsDisabledWhenFeatureOff(t *te
 	)
 
 	reporterResourceKey := createReporterResourceKey(t, "host-789", "host", "hbi", "instance-1")
-	_, err := h.usecase.resolveConsistency(h.ctx, model.NewConsistencyUnspecified(), reporterResourceKey, true)
+	_, err := h.usecase.resolveConsistency(h.ctx, model.NewConsistencyUnspecified(), resourceRefFromKey(reporterResourceKey), true)
 	require.NoError(t, err)
 	assert.Contains(t, strings.ToLower(logBuf.String()), "feature flag default-to-at-least-as-acknowledged is disabled")
 }
@@ -1859,7 +1871,7 @@ func TestCheck_AuthzDecisions(t *testing.T) {
 			relation, err := model.NewRelation("view")
 			require.NoError(t, err)
 
-			allowed, token, err := h.usecase.Check(h.ctx, relation, subject, key, model.NewConsistencyUnspecified())
+			allowed, token, err := h.usecase.Check(h.ctx, relation, subject, resourceRefFromKey(key), model.NewConsistencyUnspecified())
 			require.NoError(t, err)
 			assert.Equal(t, tt.wantAllowed, allowed)
 			assert.NotEmpty(t, token)
@@ -1892,7 +1904,7 @@ func TestCheckForUpdate_AuthzDecisions(t *testing.T) {
 			relation, err := model.NewRelation("update")
 			require.NoError(t, err)
 
-			allowed, token, err := h.usecase.CheckForUpdate(h.ctx, relation, subject, key)
+			allowed, token, err := h.usecase.CheckForUpdate(h.ctx, relation, subject, resourceRefFromKey(key))
 			require.NoError(t, err)
 			assert.Equal(t, tt.wantAllowed, allowed)
 			assert.NotEmpty(t, token)
@@ -1916,8 +1928,8 @@ func TestCheckBulk_RelationsMixedResults(t *testing.T) {
 
 	result, err := h.usecase.CheckBulk(h.ctx, CheckBulkCommand{
 		Items: []CheckBulkItem{
-			{Resource: key1, Relation: relation, Subject: subject},
-			{Resource: key2, Relation: relation, Subject: subject},
+			{Resource: resourceRefFromKey(key1), Relation: relation, Subject: subject},
+			{Resource: resourceRefFromKey(key2), Relation: relation, Subject: subject},
 		},
 		Consistency: model.NewConsistencyUnspecified(),
 	})
@@ -1930,7 +1942,7 @@ func TestCheckBulk_RelationsMixedResults(t *testing.T) {
 	assert.Equal(t, 2, h.meta.calls)
 }
 
-func TestLookupResources_StreamResults(t *testing.T) {
+func TestLookupObjects_StreamResults(t *testing.T) {
 	type grant struct {
 		subjectID, resourceID string
 	}
@@ -1968,12 +1980,12 @@ func TestLookupResources_StreamResults(t *testing.T) {
 			relation, err := model.NewRelation("view")
 			require.NoError(t, err)
 
-			stream, err := h.usecase.LookupResources(h.ctx, LookupResourcesCommand{
-				ResourceType: resourceType,
-				ReporterType: reporterType,
-				Relation:     relation,
-				Subject:      subject,
-				Consistency:  model.NewConsistencyUnspecified(),
+			objectType := model.NewRepresentationTypeRequired(resourceType, reporterType)
+			stream, err := h.usecase.LookupObjects(h.ctx, LookupObjectsCommand{
+				ObjectType:  objectType,
+				Relation:    relation,
+				Subject:     subject,
+				Consistency: model.NewConsistencyUnspecified(),
 			})
 			require.NoError(t, err)
 
@@ -1984,7 +1996,7 @@ func TestLookupResources_StreamResults(t *testing.T) {
 					break
 				}
 				require.NoError(t, err)
-				resourceIds = append(resourceIds, string(resp.ResourceId))
+				resourceIds = append(resourceIds, resp.Object().ResourceId().String())
 			}
 
 			slices.Sort(resourceIds)
@@ -2025,17 +2037,17 @@ func TestLookupSubjects_StreamResults(t *testing.T) {
 			key := createReporterResourceKey(t, "host-1", "host", "hbi", "instance-1")
 			relation, err := model.NewRelation("view")
 			require.NoError(t, err)
-			subjectType, err := model.NewResourceType("principal")
+			resType, err := model.NewResourceType("principal")
 			require.NoError(t, err)
 			subjectReporter, err := model.NewReporterType("rbac")
 			require.NoError(t, err)
+			subjectType := model.NewRepresentationTypeRequired(resType, subjectReporter)
 
 			stream, err := h.usecase.LookupSubjects(h.ctx, LookupSubjectsCommand{
-				Resource:        key,
-				Relation:        relation,
-				SubjectType:     subjectType,
-				SubjectReporter: subjectReporter,
-				Consistency:     model.NewConsistencyUnspecified(),
+				Resource:    resourceRefFromKey(key),
+				Relation:    relation,
+				SubjectType: subjectType,
+				Consistency: model.NewConsistencyUnspecified(),
 			})
 			require.NoError(t, err)
 
@@ -2046,7 +2058,7 @@ func TestLookupSubjects_StreamResults(t *testing.T) {
 					break
 				}
 				require.NoError(t, err)
-				subjectIds = append(subjectIds, string(resp.SubjectId))
+				subjectIds = append(subjectIds, resp.Subject().Resource().ResourceId().String())
 			}
 
 			slices.Sort(subjectIds)

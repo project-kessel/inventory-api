@@ -117,14 +117,14 @@ func TestCalculateTuples(t *testing.T) {
 				require.Len(t, *result.TuplesToCreate(), 1)
 				createTuple := (*result.TuplesToCreate())[0]
 
-				resource := createTuple.Resource()
+				resource := createTuple.Object()
 				expectedResourceStr := tt.expectedCreateResource
-				actualResourceStr := resource.Type().Namespace() + ":" + resource.Id().Serialize()
+				actualResourceStr := resource.Reporter().ReporterType().Serialize() + ":" + resource.ResourceId().Serialize()
 				assert.Equal(t, expectedResourceStr, actualResourceStr)
 
-				subject := createTuple.Subject()
+				subject := createTuple.Subject().Resource()
 				expectedSubjectStr := tt.expectedCreateSubject
-				actualSubjectStr := subject.Subject().Id().Serialize()
+				actualSubjectStr := subject.ResourceId().Serialize()
 				assert.Equal(t, expectedSubjectStr, actualSubjectStr)
 			}
 
@@ -133,14 +133,14 @@ func TestCalculateTuples(t *testing.T) {
 				require.Len(t, *result.TuplesToDelete(), 1)
 				deleteTuple := (*result.TuplesToDelete())[0]
 
-				resource := deleteTuple.Resource()
+				resource := deleteTuple.Object()
 				expectedResourceStr := tt.expectedDeleteResource
-				actualResourceStr := resource.Type().Namespace() + ":" + resource.Id().Serialize()
+				actualResourceStr := resource.Reporter().ReporterType().Serialize() + ":" + resource.ResourceId().Serialize()
 				assert.Equal(t, expectedResourceStr, actualResourceStr)
 
-				subject := deleteTuple.Subject()
+				subject := deleteTuple.Subject().Resource()
 				expectedSubjectStr := tt.expectedDeleteSubject
-				actualSubjectStr := subject.Subject().Id().Serialize()
+				actualSubjectStr := subject.ResourceId().Serialize()
 				assert.Equal(t, expectedSubjectStr, actualSubjectStr)
 			}
 		})
@@ -199,40 +199,37 @@ func TestCreateWorkspaceTuple(t *testing.T) {
 			validate: func(t *testing.T, tuple model.RelationsTuple) {
 				assert.IsType(t, model.RelationsTuple{}, tuple)
 
-				resource := tuple.Resource()
-				assert.Equal(t, "test-resource", resource.Id().String())
-				assert.Equal(t, "host", resource.Type().Name())
-				assert.Equal(t, "hbi", resource.Type().Namespace())
+				resource := tuple.Object()
+				assert.Equal(t, "test-resource", resource.ResourceId().String())
+				assert.Equal(t, "host", resource.ResourceType().Serialize())
+				assert.Equal(t, "hbi", resource.Reporter().ReporterType().Serialize())
 
 				assert.Equal(t, model.DeserializeRelation("workspace"), tuple.Relation())
 
-				subject := tuple.Subject()
-				subjectResource := subject.Subject()
-				assert.Equal(t, "workspace-123", subjectResource.Id().String())
-				assert.Equal(t, "workspace", subjectResource.Type().Name())
-				assert.Equal(t, "rbac", subjectResource.Type().Namespace())
+				subjectResource := tuple.Subject().Resource()
+				assert.Equal(t, "workspace-123", subjectResource.ResourceId().String())
+				assert.Equal(t, "workspace", subjectResource.ResourceType().Serialize())
+				assert.Equal(t, "rbac", subjectResource.Reporter().ReporterType().Serialize())
 			},
 		},
 		{
 			name:        "workspace ID with special characters",
 			workspaceID: "workspace-with-dashes_and_underscores",
 			validate: func(t *testing.T, tuple model.RelationsTuple) {
-				subject := tuple.Subject()
-				subjectResource := subject.Subject()
-				assert.Equal(t, "workspace-with-dashes_and_underscores", subjectResource.Id().String())
-				assert.Equal(t, "workspace", subjectResource.Type().Name())
-				assert.Equal(t, "rbac", subjectResource.Type().Namespace())
+				subjectResource := tuple.Subject().Resource()
+				assert.Equal(t, "workspace-with-dashes_and_underscores", subjectResource.ResourceId().String())
+				assert.Equal(t, "workspace", subjectResource.ResourceType().Serialize())
+				assert.Equal(t, "rbac", subjectResource.Reporter().ReporterType().Serialize())
 			},
 		},
 		{
 			name:        "empty workspace ID",
 			workspaceID: "",
 			validate: func(t *testing.T, tuple model.RelationsTuple) {
-				subject := tuple.Subject()
-				subjectResource := subject.Subject()
-				assert.Equal(t, "", subjectResource.Id().String())
-				assert.Equal(t, "workspace", subjectResource.Type().Name())
-				assert.Equal(t, "rbac", subjectResource.Type().Namespace())
+				subjectResource := tuple.Subject().Resource()
+				assert.Equal(t, "", subjectResource.ResourceId().String())
+				assert.Equal(t, "workspace", subjectResource.ResourceType().Serialize())
+				assert.Equal(t, "rbac", subjectResource.Reporter().ReporterType().Serialize())
 			},
 		},
 	}
@@ -396,8 +393,8 @@ func TestCalculateTuples_OperationTypeScenarios(t *testing.T) {
 						// Log the workspace IDs to understand what's being deleted
 						for i, tuple := range *deleteTuples {
 							t.Logf("Delete tuple %d: resource=%s, subject=%s", i,
-								tuple.Resource().Id().Serialize(),
-								tuple.Subject().Subject().Id().Serialize())
+								tuple.Object().ResourceId().Serialize(),
+								tuple.Subject().Resource().ResourceId().Serialize())
 						}
 					} else {
 						t.Logf("CREATE operation has TuplesToDelete=true but slice is empty or nil")

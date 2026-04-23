@@ -1,31 +1,31 @@
 package model
 
 // SubjectReference represents a subject in an authorization check.
-// It wraps a resource key (identifying the subject) with an optional relation.
+// It wraps a ResourceReference (identifying the subject) with an optional relation.
 type SubjectReference struct {
-	subject  ReporterResourceKey
+	resource ResourceReference
 	relation *Relation // nil means no relation (direct subject reference)
 }
 
 // NewSubjectReference creates a new SubjectReference with a relation.
-func NewSubjectReference(subject ReporterResourceKey, relation *Relation) SubjectReference {
+func NewSubjectReference(resource ResourceReference, relation *Relation) SubjectReference {
 	return SubjectReference{
-		subject:  subject,
+		resource: resource,
 		relation: relation,
 	}
 }
 
 // NewSubjectReferenceWithoutRelation creates a new SubjectReference without a relation.
-func NewSubjectReferenceWithoutRelation(subject ReporterResourceKey) SubjectReference {
+func NewSubjectReferenceWithoutRelation(resource ResourceReference) SubjectReference {
 	return SubjectReference{
-		subject:  subject,
+		resource: resource,
 		relation: nil,
 	}
 }
 
-// Subject returns the resource key identifying the subject.
-func (sr SubjectReference) Subject() ReporterResourceKey {
-	return sr.subject
+// Resource returns the ResourceReference identifying the subject.
+func (sr SubjectReference) Resource() ResourceReference {
+	return sr.resource
 }
 
 // Relation returns the optional relation on the subject (may be nil).

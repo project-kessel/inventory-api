@@ -41,7 +41,7 @@ type ReportResourceCommand struct {
 
 // CheckBulkItem represents a single item in a bulk check request.
 type CheckBulkItem struct {
-	Resource model.ReporterResourceKey
+	Resource model.ResourceReference
 	Relation model.Relation
 	Subject  model.SubjectReference
 }
@@ -81,7 +81,7 @@ type CheckForUpdateBulkCommand struct {
 // Unlike CheckBulkItem, no explicit subject is provided - the subject
 // is derived from the authenticated context.
 type CheckSelfBulkItem struct {
-	Resource model.ReporterResourceKey
+	Resource model.ResourceReference
 	Relation model.Relation
 }
 
@@ -91,33 +91,21 @@ type CheckSelfBulkCommand struct {
 	Consistency model.Consistency
 }
 
-// LookupResourcesCommand contains the request for looking up resources.
-type LookupResourcesCommand struct {
-	ResourceType model.ResourceType
-	ReporterType model.ReporterType
-	Relation     model.Relation
-	Subject      model.SubjectReference
-	Pagination   *model.Pagination
-	Consistency  model.Consistency
+// LookupObjectsCommand contains the request for looking up objects.
+type LookupObjectsCommand struct {
+	ObjectType  model.RepresentationType
+	Relation    model.Relation
+	Subject     model.SubjectReference
+	Pagination  *model.Pagination
+	Consistency model.Consistency
 }
 
 // LookupSubjectsCommand contains the request for looking up subjects.
 type LookupSubjectsCommand struct {
-	Resource        model.ReporterResourceKey
+	Resource        model.ResourceReference
 	Relation        model.Relation
-	SubjectType     model.ResourceType
-	SubjectReporter model.ReporterType
+	SubjectType     model.RepresentationType
 	SubjectRelation *model.Relation
 	Pagination      *model.Pagination
 	Consistency     model.Consistency
-}
-
-// LookupSubjectsResultItem represents a single subject from lookup.
-// NOTE: This type is currently unused. Streaming APIs (e.g., LookupSubjects) return
-// grpc.ServerStreamingClient directly from the usecase layer, bypassing domain-layer result types.
-// This differs from non-streaming APIs (Check, CheckBulk) which return domain types
-// (CheckBulkResult, etc.). This inconsistency should be addressed in future refactoring.
-type LookupSubjectsResultItem struct {
-	Subject           model.SubjectReference
-	ContinuationToken string
 }

@@ -44,15 +44,6 @@ func NewInventoryResource(reporterType model.ReporterType, resourceType model.Re
 	}
 }
 
-// NewInventoryResourceFromKey creates an InventoryResource from a ReporterResourceKey.
-func NewInventoryResourceFromKey(key model.ReporterResourceKey) InventoryResource {
-	return InventoryResource{
-		reporterType:    key.ReporterType(),
-		resourceType:    key.ResourceType(),
-		localResourceId: key.LocalResourceId(),
-	}
-}
-
 // ReporterType returns the reporter type of the resource.
 func (ir InventoryResource) ReporterType() model.ReporterType { return ir.reporterType }
 

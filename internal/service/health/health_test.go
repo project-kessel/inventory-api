@@ -37,7 +37,7 @@ func TestHealthService_GetReadyz(t *testing.T) {
 	ctx := context.TODO()
 
 	mockRepo := new(mocks.MockHealthRepo)
-	expectedResult := model.HealthResult{Status: "MOCK_OK", Code: 200}
+	expectedResult := model.NewHealthResult("MOCK_OK", 200)
 	mockRepo.On("IsBackendAvailable", ctx).Return(expectedResult, nil)
 
 	uc := biz.New(mockRepo, log.DefaultLogger)

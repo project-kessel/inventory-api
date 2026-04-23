@@ -72,8 +72,8 @@ type InventoryConsumer struct {
 	// to coordinate with rebalance callback
 	shutdownInProgress bool
 
-	lockToken          string
-	lockId             string
+	lockToken          model.LockToken
+	lockId             model.LockId
 	ResourceRepository model.ResourceRepository
 }
 
@@ -512,12 +512,9 @@ func (i *InventoryConsumer) CreateTuple(ctx context.Context, tuples *[]model.Rel
 		return "", fmt.Errorf("no tuples provided")
 	}
 
-	fencing := &model.FencingCheck{
-		LockId:    i.lockId,
-		LockToken: i.lockToken,
-	}
+	fc := model.NewFencingCheck(i.lockId, i.lockToken)
 
-	result, err := i.Relations.CreateTuples(ctx, *tuples, true, fencing)
+	token, err := i.Relations.CreateTuples(ctx, *tuples, true, &fc)
 	if err != nil {
 		if status.Convert(err).Code() == codes.FailedPrecondition {
 			i.Logger.Errorf("invalid fencing token: %v", i.lockToken)
@@ -528,19 +525,17 @@ func (i *InventoryConsumer) CreateTuple(ctx context.Context, tuples *[]model.Rel
 			i.Logger.Info("tuple already exists; fetching consistency token")
 
 			firstTuple := (*tuples)[0]
-			resourceKey := firstTupleToResourceKey(firstTuple)
-			relation := firstTuple.Relation()
-			subject := firstTupleToSubjectRef(firstTuple)
+			rel := model.NewRelationship(firstTuple.Object(), firstTuple.Relation(), firstTuple.Subject())
 
-			checkResult, checkErr := i.Relations.Check(ctx, resourceKey, relation, subject, model.NewConsistencyMinimizeLatency())
+			_, checkToken, checkErr := i.Relations.Check(ctx, rel, model.NewConsistencyMinimizeLatency())
 			if checkErr != nil {
 				return "", fmt.Errorf("failed to fetch consistency token: %w", checkErr)
 			}
-			return checkResult.ConsistencyToken.Serialize(), nil
+			return checkToken.Serialize(), nil
 		}
 		return "", fmt.Errorf("error creating tuple: %w", err)
 	}
-	return result.ConsistencyToken.Serialize(), nil
+	return token.Serialize(), nil
 }
 
 // UpdateTuple calls the Relations API to create and delete tuples from the message payload received and returns the consistency token
@@ -574,13 +569,11 @@ func (i *InventoryConsumer) UpdateTuple(ctx context.Context, tuplesToCreate *[]m
 func (i *InventoryConsumer) DeleteTuple(ctx context.Context, tuples []model.RelationsTuple) (string, error) {
 	var token string
 
-	fencing := &model.FencingCheck{
-		LockId:    i.lockId,
-		LockToken: i.lockToken,
-	}
+	fc := model.NewFencingCheck(i.lockId, i.lockToken)
 
 	for _, tuple := range tuples {
-		result, err := i.Relations.DeleteTuples(ctx, []model.RelationsTuple{tuple}, fencing)
+		filter := tupleToFilter(tuple)
+		consistencyToken, err := i.Relations.DeleteTuples(ctx, filter, &fc)
 		if err != nil {
 			if status.Convert(err).Code() == codes.FailedPrecondition {
 				i.Logger.Errorf("invalid fencing token: %v", i.lockToken)
@@ -590,11 +583,44 @@ func (i *InventoryConsumer) DeleteTuple(ctx context.Context, tuples []model.Rela
 		}
 
 		if token == "" {
-			token = result.ConsistencyToken.Serialize()
+			token = consistencyToken.Serialize()
 		}
 	}
 
 	return token, nil
+}
+
+// tupleToFilter converts a RelationsTuple to a TupleFilter for deletion.
+func tupleToFilter(tuple model.RelationsTuple) model.TupleFilter {
+	obj := tuple.Object()
+	sub := tuple.Subject().Resource()
+
+	filter := model.NewTupleFilter().
+		WithObjectType(obj.ResourceType()).
+		WithObjectId(obj.ResourceId()).
+		WithRelation(tuple.Relation()).
+		WithSubject(model.NewTupleSubjectFilter().
+			WithSubjectType(sub.ResourceType()).
+			WithSubjectId(sub.ResourceId()))
+
+	if obj.HasReporter() {
+		filter = filter.WithReporterType(obj.Reporter().ReporterType())
+	}
+	if sub.HasReporter() {
+		sf := filter.Subject()
+		if sf != nil {
+			updatedSf := sf.WithReporterType(sub.Reporter().ReporterType())
+			filter = filter.WithSubject(updatedSf)
+		}
+	}
+	if tuple.Subject().HasRelation() {
+		sf := filter.Subject()
+		if sf != nil {
+			updatedSf := sf.WithRelation(*tuple.Subject().Relation())
+			filter = filter.WithSubject(updatedSf)
+		}
+	}
+	return filter
 }
 
 // updateConsistencyTokenIfPresent updates the consistency token in the DB only if the token is non-empty.
@@ -687,22 +713,28 @@ func (i *InventoryConsumer) RebalanceCallback(consumer *kafka.Consumer, event ka
 
 		if len(ev.Partitions) > 0 {
 			p := ev.Partitions[0] // there should only be one partition
-			i.lockId = fmt.Sprintf("%s/%d", i.Config.ConsumerGroupID, p.Partition)
+			lockIdStr := fmt.Sprintf("%s/%d", i.Config.ConsumerGroupID, p.Partition)
+			lockId, err := model.NewLockId(lockIdStr)
+			if err != nil {
+				i.Logger.Errorf("failed to create lock ID: %v", err)
+				return err
+			}
+			i.lockId = lockId
 			i.Logger.Infof("Attempting to acquire lock for lockId: %s", i.lockId)
 
-			lockToken, err := i.Retry(func() (string, error) {
-				result, err := i.Relations.AcquireLock(context.Background(), i.lockId)
+			lockTokenStr, err := i.Retry(func() (string, error) {
+				token, err := i.Relations.AcquireLock(context.Background(), i.lockId)
 				if err != nil {
 					return "", err
 				}
-				return result.LockToken, nil
+				return token.String(), nil
 			}, i.MetricsCollector.ConsumerErrors)
 			if err != nil {
 				i.Logger.Errorf("failed to acquire lock token for %s: %v", i.lockId, err)
-				i.lockToken = ""
+				i.lockToken = model.LockToken("")
 				return err
 			}
-			i.lockToken = lockToken
+			i.lockToken = model.DeserializeLockToken(lockTokenStr)
 			i.Logger.Infof("Successfully acquired lock token. Token: %s", i.lockToken)
 		}
 
@@ -718,15 +750,15 @@ func (i *InventoryConsumer) RebalanceCallback(consumer *kafka.Consumer, event ka
 
 		if shutdownInProgress {
 			i.Logger.Info("shutdown in progress, skipping rebalance offset commit")
-			i.lockToken = ""
-			i.lockId = ""
+			i.lockToken = model.LockToken("")
+			i.lockId = model.LockId("")
 			return nil
 		}
 
 		if !hasOffsets {
 			i.Logger.Debug("no offsets to commit during rebalance")
-			i.lockToken = ""
-			i.lockId = ""
+			i.lockToken = model.LockToken("")
+			i.lockId = model.LockId("")
 			return nil
 		}
 
@@ -736,8 +768,8 @@ func (i *InventoryConsumer) RebalanceCallback(consumer *kafka.Consumer, event ka
 		err := i.commitStoredOffsets()
 		// clear the lock token regardless of commit success/failure
 		// since we're losing the partition assignment
-		i.lockToken = ""
-		i.lockId = ""
+		i.lockToken = model.LockToken("")
+		i.lockId = model.LockId("")
 		if err != nil {
 			i.Logger.Errorf("failed to commit offsets during rebalance: %v", err)
 			return err
@@ -749,28 +781,3 @@ func (i *InventoryConsumer) RebalanceCallback(consumer *kafka.Consumer, event ka
 	return nil
 }
 
-// firstTupleToResourceKey builds a ReporterResourceKey from a RelationsTuple's resource.
-// Used in the AlreadyExists fallback path to call Check for consistency token retrieval.
-func firstTupleToResourceKey(tuple model.RelationsTuple) model.ReporterResourceKey {
-	key, _ := model.NewReporterResourceKey(
-		tuple.Resource().Id(),
-		model.DeserializeResourceType(tuple.Resource().Type().Name()),
-		model.DeserializeReporterType(tuple.Resource().Type().Namespace()),
-		model.DeserializeReporterInstanceId(""),
-	)
-	return key
-}
-
-// firstTupleToSubjectRef builds a SubjectReference from a RelationsTuple's subject.
-func firstTupleToSubjectRef(tuple model.RelationsTuple) model.SubjectReference {
-	subjectKey, _ := model.NewReporterResourceKey(
-		tuple.Subject().Subject().Id(),
-		model.DeserializeResourceType(tuple.Subject().Subject().Type().Name()),
-		model.DeserializeReporterType(tuple.Subject().Subject().Type().Namespace()),
-		model.DeserializeReporterInstanceId(""),
-	)
-	if tuple.Subject().HasRelation() {
-		return model.NewSubjectReference(subjectKey, tuple.Subject().Relation())
-	}
-	return model.NewSubjectReferenceWithoutRelation(subjectKey)
-}

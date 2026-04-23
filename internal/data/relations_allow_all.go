@@ -21,71 +21,62 @@ func NewAllowAllRelationsRepository(logger *log.Helper) *AllowAllRelationsReposi
 }
 
 func (a *AllowAllRelationsRepository) Health(_ context.Context) (model.HealthResult, error) {
-	return model.HealthResult{Status: "OK", Code: 200}, nil
+	return model.NewHealthResult("OK", 200), nil
 }
 
-func (a *AllowAllRelationsRepository) Check(_ context.Context, _ model.ReporterResourceKey, _ model.Relation,
-	_ model.SubjectReference, _ model.Consistency,
-) (model.CheckResult, error) {
-	return model.CheckResult{Allowed: true}, nil
+func (a *AllowAllRelationsRepository) Check(_ context.Context, _ model.Relationship, _ model.Consistency,
+) (bool, model.ConsistencyToken, error) {
+	return true, model.MinimizeLatencyToken, nil
 }
 
-func (a *AllowAllRelationsRepository) CheckForUpdate(_ context.Context, _ model.ReporterResourceKey, _ model.Relation,
-	_ model.SubjectReference,
-) (model.CheckResult, error) {
-	return model.CheckResult{Allowed: true}, nil
+func (a *AllowAllRelationsRepository) CheckForUpdate(_ context.Context, _ model.Relationship,
+) (bool, model.ConsistencyToken, error) {
+	return true, model.MinimizeLatencyToken, nil
 }
 
-func (a *AllowAllRelationsRepository) CheckBulk(_ context.Context, items []model.CheckBulkItem, _ model.Consistency,
+func (a *AllowAllRelationsRepository) CheckBulk(_ context.Context, rels []model.Relationship, _ model.Consistency,
 ) (model.CheckBulkResult, error) {
-	pairs := make([]model.CheckBulkResultPair, len(items))
-	for i, item := range items {
-		pairs[i] = model.CheckBulkResultPair{
-			Request: item,
-			Result:  model.CheckBulkResultItem{Allowed: true},
-		}
+	pairs := make([]model.CheckBulkResultPair, len(rels))
+	for i, rel := range rels {
+		pairs[i] = model.NewCheckBulkResultPair(rel, model.NewCheckBulkResultItem(true, nil, 0))
 	}
-	return model.CheckBulkResult{Pairs: pairs}, nil
+	return model.NewCheckBulkResult(pairs, model.MinimizeLatencyToken), nil
 }
 
-func (a *AllowAllRelationsRepository) CheckForUpdateBulk(_ context.Context, items []model.CheckBulkItem,
+func (a *AllowAllRelationsRepository) CheckForUpdateBulk(_ context.Context, rels []model.Relationship,
 ) (model.CheckBulkResult, error) {
-	pairs := make([]model.CheckBulkResultPair, len(items))
-	for i, item := range items {
-		pairs[i] = model.CheckBulkResultPair{
-			Request: item,
-			Result:  model.CheckBulkResultItem{Allowed: true},
-		}
+	pairs := make([]model.CheckBulkResultPair, len(rels))
+	for i, rel := range rels {
+		pairs[i] = model.NewCheckBulkResultPair(rel, model.NewCheckBulkResultItem(true, nil, 0))
 	}
-	return model.CheckBulkResult{Pairs: pairs}, nil
+	return model.NewCheckBulkResult(pairs, model.MinimizeLatencyToken), nil
 }
 
-func (a *AllowAllRelationsRepository) LookupResources(_ context.Context, _ model.ResourceType, _ model.ReporterType,
-	_ model.Relation, _ model.SubjectReference, _ *model.Pagination, _ model.Consistency,
-) (model.ResultStream[model.LookupResourcesItem], error) {
-	return &emptyLookupResourcesStream{}, nil
+func (a *AllowAllRelationsRepository) LookupObjects(_ context.Context,
+	_ model.RepresentationType,
+	_ model.Relation, _ model.SubjectReference,
+	_ *model.Pagination, _ model.Consistency,
+) (model.ResultStream[model.LookupObjectsItem], error) {
+	return &emptyLookupObjectsStream{}, nil
 }
 
-func (a *AllowAllRelationsRepository) LookupSubjects(_ context.Context, _ model.ReporterResourceKey, _ model.Relation,
-	_ model.ResourceType, _ model.ReporterType, _ *model.Relation,
+func (a *AllowAllRelationsRepository) LookupSubjects(_ context.Context,
+	_ model.ResourceReference, _ model.Relation,
+	_ model.RepresentationType,
+	_ *model.Relation,
 	_ *model.Pagination, _ model.Consistency,
 ) (model.ResultStream[model.LookupSubjectsItem], error) {
 	return &emptyLookupSubjectsStream{}, nil
 }
 
 func (a *AllowAllRelationsRepository) CreateTuples(_ context.Context, _ []model.RelationsTuple, _ bool, _ *model.FencingCheck,
-) (model.TuplesResult, error) {
-	return model.TuplesResult{}, nil
+) (model.ConsistencyToken, error) {
+	return model.MinimizeLatencyToken, nil
 }
 
-func (a *AllowAllRelationsRepository) DeleteTuples(_ context.Context, _ []model.RelationsTuple, _ *model.FencingCheck,
-) (model.TuplesResult, error) {
-	return model.TuplesResult{}, nil
-}
-
-func (a *AllowAllRelationsRepository) DeleteTuplesByFilter(_ context.Context, _ model.TupleFilter, _ *model.FencingCheck,
-) (model.TuplesResult, error) {
-	return model.TuplesResult{}, nil
+func (a *AllowAllRelationsRepository) DeleteTuples(_ context.Context, _ model.TupleFilter, _ *model.FencingCheck,
+) (model.ConsistencyToken, error) {
+	return model.MinimizeLatencyToken, nil
 }
 
 func (a *AllowAllRelationsRepository) ReadTuples(_ context.Context, _ model.TupleFilter, _ *model.Pagination, _ model.Consistency,
@@ -93,6 +84,6 @@ func (a *AllowAllRelationsRepository) ReadTuples(_ context.Context, _ model.Tupl
 	return &emptyReadTuplesStream{}, nil
 }
 
-func (a *AllowAllRelationsRepository) AcquireLock(_ context.Context, _ string) (model.AcquireLockResult, error) {
-	return model.AcquireLockResult{}, nil
+func (a *AllowAllRelationsRepository) AcquireLock(_ context.Context, _ model.LockId) (model.LockToken, error) {
+	return model.LockToken(""), nil
 }

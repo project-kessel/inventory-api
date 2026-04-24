@@ -480,7 +480,10 @@ func (uc *Usecase) LookupSubjects(ctx context.Context, cmd LookupSubjectsCommand
 // Returns the token if found, empty string if resource not found, or error for other failures.
 // Converts ResourceReference to ReporterResourceKey at the DB boundary.
 func (uc *Usecase) lookupConsistencyTokenFromDB(ctx context.Context, resourceRef model.ResourceReference) (string, error) {
-	reporterResourceKey := reporterKeyFromResourceRef(resourceRef)
+	reporterResourceKey, err := reporterKeyFromResourceRef(resourceRef)
+	if err != nil {
+		return "", fmt.Errorf("failed to build reporter resource key from reference: %w", err)
+	}
 	// Passing nil tx is deliberate: this read-only consistency lookup should not run in a transaction.
 	res, err := uc.resourceRepository.FindResourceByKeys(nil, reporterResourceKey)
 	if err != nil {
@@ -666,9 +669,8 @@ func isSPInAllowlist(callerSubject authnapi.SubjectId, allowlist []string) bool 
 }
 
 // reporterKeyFromResourceRef converts a ResourceReference to a ReporterResourceKey
-// for DB lookups at the repository boundary. Errors are silently ignored via the
-// zero-value fallback, matching the legacy behavior of ReporterResourceKeyFromReference.
-func reporterKeyFromResourceRef(ref model.ResourceReference) model.ReporterResourceKey {
+// for DB lookups at the repository boundary.
+func reporterKeyFromResourceRef(ref model.ResourceReference) (model.ReporterResourceKey, error) {
 	var reporterType model.ReporterType
 	var instanceId model.ReporterInstanceId
 	if ref.HasReporter() {
@@ -677,8 +679,7 @@ func reporterKeyFromResourceRef(ref model.ResourceReference) model.ReporterResou
 			instanceId = *ref.Reporter().InstanceId()
 		}
 	}
-	key, _ := model.NewReporterResourceKey(ref.ResourceId(), ref.ResourceType(), reporterType, instanceId)
-	return key
+	return model.NewReporterResourceKey(ref.ResourceId(), ref.ResourceType(), reporterType, instanceId)
 }
 
 func computeReadAfterWrite(uc *Usecase, writeVisibility WriteVisibility, callerSubject authnapi.SubjectId) bool {

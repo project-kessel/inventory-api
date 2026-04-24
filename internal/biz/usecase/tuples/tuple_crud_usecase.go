@@ -40,13 +40,13 @@ func (uc *TupleCrudUseCase) CreateTuples(ctx context.Context, cmd CreateTuplesCo
 		fencing = &fc
 	}
 
-	token, err := uc.Authz.CreateTuples(ctx, cmd.Tuples, cmd.Upsert, fencing)
+	result, err := uc.Authz.CreateTuples(ctx, cmd.Tuples, cmd.Upsert, fencing)
 	if err != nil {
 		return nil, err
 	}
 
 	return &CreateTuplesResult{
-		ConsistencyToken: token,
+		ConsistencyToken: result.ConsistencyToken(),
 	}, nil
 }
 
@@ -65,13 +65,13 @@ func (uc *TupleCrudUseCase) DeleteTuples(ctx context.Context, cmd DeleteTuplesCo
 		fencing = &fc
 	}
 
-	token, err := uc.Authz.DeleteTuples(ctx, cmd.Filter, fencing)
+	result, err := uc.Authz.DeleteTuples(ctx, cmd.Filter, fencing)
 	if err != nil {
 		return nil, err
 	}
 
 	return &DeleteTuplesResult{
-		ConsistencyToken: token,
+		ConsistencyToken: result.ConsistencyToken(),
 	}, nil
 }
 
@@ -97,12 +97,12 @@ func (uc *TupleCrudUseCase) AcquireLock(ctx context.Context, cmd AcquireLockComm
 	}
 
 	lockId := model.DeserializeLockId(cmd.LockId)
-	token, err := uc.Authz.AcquireLock(ctx, lockId)
+	result, err := uc.Authz.AcquireLock(ctx, lockId)
 	if err != nil {
 		return nil, err
 	}
 
 	return &AcquireLockResult{
-		LockToken: token.String(),
+		LockToken: result.LockToken().String(),
 	}, nil
 }

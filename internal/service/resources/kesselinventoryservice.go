@@ -70,11 +70,11 @@ func (s *InventoryService) Check(ctx context.Context, req *pb.CheckRequest) (*pb
 		return nil, err
 	}
 	consistency := consistencyFromProto(req.GetConsistency())
-	allowed, consistencyToken, err := s.Ctl.Check(ctx, relation, subjectRef, resourceRef, consistency)
+	result, err := s.Ctl.Check(ctx, relation, subjectRef, resourceRef, consistency)
 	if err != nil {
 		return nil, err
 	}
-	return viewResponseFromAuthzRequestV1beta2(allowed, consistencyToken), nil
+	return viewResponseFromAuthzRequestV1beta2(result.Allowed(), result.ConsistencyToken()), nil
 }
 
 func (s *InventoryService) CheckForUpdate(ctx context.Context, req *pb.CheckForUpdateRequest) (*pb.CheckForUpdateResponse, error) {
@@ -94,11 +94,11 @@ func (s *InventoryService) CheckForUpdate(ctx context.Context, req *pb.CheckForU
 		log.Error("Failed to build relation: ", err)
 		return nil, err
 	}
-	allowed, consistencyToken, err := s.Ctl.CheckForUpdate(ctx, relation, subjectRef, resourceRef)
+	result, err := s.Ctl.CheckForUpdate(ctx, relation, subjectRef, resourceRef)
 	if err != nil {
 		return nil, err
 	}
-	return updateResponseFromAuthzRequestV1beta2(allowed, consistencyToken), nil
+	return updateResponseFromAuthzRequestV1beta2(result.Allowed(), result.ConsistencyToken()), nil
 }
 
 func (s *InventoryService) CheckForUpdateBulk(ctx context.Context, req *pb.CheckForUpdateBulkRequest) (*pb.CheckForUpdateBulkResponse, error) {
@@ -139,17 +139,17 @@ func (s *InventoryService) CheckSelf(ctx context.Context, req *pb.CheckSelfReque
 	}
 	consistency := consistencyFromProto(req.GetConsistency())
 	log.Debugf("CheckSelf request consistency: %s", model.ConsistencyTypeOf(consistency))
-	resp, consistencyToken, err := s.Ctl.CheckSelf(ctx, relation, resourceRef, consistency)
+	result, err := s.Ctl.CheckSelf(ctx, relation, resourceRef, consistency)
 	if err != nil {
 		return nil, err
 	}
 	allowed := pb.Allowed_ALLOWED_FALSE
-	if resp {
+	if result.Allowed() {
 		allowed = pb.Allowed_ALLOWED_TRUE
 	}
 	response := &pb.CheckSelfResponse{Allowed: allowed}
-	if consistencyToken != model.MinimizeLatencyToken {
-		response.ConsistencyToken = &pb.ConsistencyToken{Token: consistencyToken.Serialize()}
+	if result.ConsistencyToken() != model.MinimizeLatencyToken {
+		response.ConsistencyToken = &pb.ConsistencyToken{Token: result.ConsistencyToken().Serialize()}
 	}
 	return response, nil
 }

@@ -514,7 +514,7 @@ func (i *InventoryConsumer) CreateTuple(ctx context.Context, tuples *[]model.Rel
 
 	fc := model.NewFencingCheck(i.lockId, i.lockToken)
 
-	token, err := i.Relations.CreateTuples(ctx, *tuples, true, &fc)
+	result, err := i.Relations.CreateTuples(ctx, *tuples, true, &fc)
 	if err != nil {
 		if status.Convert(err).Code() == codes.FailedPrecondition {
 			i.Logger.Errorf("invalid fencing token: %v", i.lockToken)
@@ -527,15 +527,15 @@ func (i *InventoryConsumer) CreateTuple(ctx context.Context, tuples *[]model.Rel
 			firstTuple := (*tuples)[0]
 			rel := model.NewRelationship(firstTuple.Object(), firstTuple.Relation(), firstTuple.Subject())
 
-			_, checkToken, checkErr := i.Relations.Check(ctx, rel, model.NewConsistencyMinimizeLatency())
+			checkResult, checkErr := i.Relations.Check(ctx, rel, model.NewConsistencyMinimizeLatency())
 			if checkErr != nil {
 				return "", fmt.Errorf("failed to fetch consistency token: %w", checkErr)
 			}
-			return checkToken.Serialize(), nil
+			return checkResult.ConsistencyToken().Serialize(), nil
 		}
 		return "", fmt.Errorf("error creating tuple: %w", err)
 	}
-	return token.Serialize(), nil
+	return result.ConsistencyToken().Serialize(), nil
 }
 
 // UpdateTuple calls the Relations API to create and delete tuples from the message payload received and returns the consistency token
@@ -573,7 +573,7 @@ func (i *InventoryConsumer) DeleteTuple(ctx context.Context, tuples []model.Rela
 
 	for _, tuple := range tuples {
 		filter := tupleToFilter(tuple)
-		consistencyToken, err := i.Relations.DeleteTuples(ctx, filter, &fc)
+		result, err := i.Relations.DeleteTuples(ctx, filter, &fc)
 		if err != nil {
 			if status.Convert(err).Code() == codes.FailedPrecondition {
 				i.Logger.Errorf("invalid fencing token: %v", i.lockToken)
@@ -583,7 +583,7 @@ func (i *InventoryConsumer) DeleteTuple(ctx context.Context, tuples []model.Rela
 		}
 
 		if token == "" {
-			token = consistencyToken.Serialize()
+			token = result.ConsistencyToken().Serialize()
 		}
 	}
 
@@ -723,11 +723,11 @@ func (i *InventoryConsumer) RebalanceCallback(consumer *kafka.Consumer, event ka
 			i.Logger.Infof("Attempting to acquire lock for lockId: %s", i.lockId)
 
 			lockTokenStr, err := i.Retry(func() (string, error) {
-				token, err := i.Relations.AcquireLock(context.Background(), i.lockId)
+				result, err := i.Relations.AcquireLock(context.Background(), i.lockId)
 				if err != nil {
 					return "", err
 				}
-				return token.String(), nil
+				return result.LockToken().String(), nil
 			}, i.MetricsCollector.ConsumerErrors)
 			if err != nil {
 				i.Logger.Errorf("failed to acquire lock token for %s: %v", i.lockId, err)

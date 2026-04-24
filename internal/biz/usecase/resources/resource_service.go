@@ -321,45 +321,41 @@ func (uc *Usecase) Delete(ctx context.Context, reporterResourceKey model.Reporte
 }
 
 // Check verifies if a subject has the specified relation/permission on a resource.
-func (uc *Usecase) Check(ctx context.Context, relation model.Relation, sub model.SubjectReference, resourceRef model.ResourceReference, consistency model.Consistency) (bool, model.ConsistencyToken, error) {
+func (uc *Usecase) Check(ctx context.Context, relation model.Relation, sub model.SubjectReference, resourceRef model.ResourceReference, consistency model.Consistency) (model.CheckResult, error) {
 	if err := uc.enforceMetaAuthzObject(ctx, metaauthorizer.RelationCheck, metaauthorizer.NewInventoryResource(resourceRef.Reporter().ReporterType(), resourceRef.ResourceType(), resourceRef.ResourceId())); err != nil {
-		return false, model.MinimizeLatencyToken, err
+		return model.CheckResult{}, err
 	}
 	resolved, err := uc.resolveConsistency(ctx, consistency, resourceRef, false)
 	if err != nil {
-		return false, model.MinimizeLatencyToken, err
+		return model.CheckResult{}, err
 	}
 	return uc.checkPermission(ctx, relation, sub, resourceRef, resolved)
 }
 
 // CheckSelf verifies access for the authenticated user using the self-subject strategy.
-func (uc *Usecase) CheckSelf(ctx context.Context, relation model.Relation, resourceRef model.ResourceReference, consistency model.Consistency) (bool, model.ConsistencyToken, error) {
+func (uc *Usecase) CheckSelf(ctx context.Context, relation model.Relation, resourceRef model.ResourceReference, consistency model.Consistency) (model.CheckResult, error) {
 	if err := uc.enforceMetaAuthzObject(ctx, metaauthorizer.RelationCheckSelf, metaauthorizer.NewInventoryResource(resourceRef.Reporter().ReporterType(), resourceRef.ResourceType(), resourceRef.ResourceId())); err != nil {
-		return false, model.MinimizeLatencyToken, err
+		return model.CheckResult{}, err
 	}
 	subjectRef, err := uc.selfSubjectFromContext(ctx)
 	if err != nil {
-		return false, model.MinimizeLatencyToken, err
+		return model.CheckResult{}, err
 	}
 	resolved, err := uc.resolveConsistency(ctx, consistency, resourceRef, true)
 	if err != nil {
-		return false, model.MinimizeLatencyToken, err
+		return model.CheckResult{}, err
 	}
 	return uc.checkPermission(ctx, relation, subjectRef, resourceRef, resolved)
 }
 
 // CheckForUpdate verifies if a subject can update the resource.
-func (uc *Usecase) CheckForUpdate(ctx context.Context, relation model.Relation, sub model.SubjectReference, resourceRef model.ResourceReference) (bool, model.ConsistencyToken, error) {
+func (uc *Usecase) CheckForUpdate(ctx context.Context, relation model.Relation, sub model.SubjectReference, resourceRef model.ResourceReference) (model.CheckResult, error) {
 	if err := uc.enforceMetaAuthzObject(ctx, metaauthorizer.RelationCheckForUpdate, metaauthorizer.NewInventoryResource(resourceRef.Reporter().ReporterType(), resourceRef.ResourceType(), resourceRef.ResourceId())); err != nil {
-		return false, "", err
+		return model.CheckResult{}, err
 	}
 
 	rel := model.NewRelationship(resourceRef, relation, sub)
-	allowed, token, err := uc.Relations.CheckForUpdate(ctx, rel)
-	if err != nil {
-		return false, "", err
-	}
-	return allowed, token, nil
+	return uc.Relations.CheckForUpdate(ctx, rel)
 }
 
 // CheckForUpdateBulk performs bulk strongly consistent check-for-update permission checks via relations-api.
@@ -438,13 +434,9 @@ func (uc *Usecase) CheckSelfBulk(ctx context.Context, cmd CheckSelfBulkCommand) 
 }
 
 // checkPermission runs Relations.Check with the resolved consistency.
-func (uc *Usecase) checkPermission(ctx context.Context, relation model.Relation, sub model.SubjectReference, resourceRef model.ResourceReference, consistency model.Consistency) (bool, model.ConsistencyToken, error) {
+func (uc *Usecase) checkPermission(ctx context.Context, relation model.Relation, sub model.SubjectReference, resourceRef model.ResourceReference, consistency model.Consistency) (model.CheckResult, error) {
 	rel := model.NewRelationship(resourceRef, relation, sub)
-	allowed, token, err := uc.Relations.Check(ctx, rel, consistency)
-	if err != nil {
-		return false, model.MinimizeLatencyToken, err
-	}
-	return allowed, token, nil
+	return uc.Relations.Check(ctx, rel, consistency)
 }
 
 // LookupObjects delegates resource lookup to the authorization service.

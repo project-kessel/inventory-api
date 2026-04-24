@@ -25,13 +25,13 @@ func (a *AllowAllRelationsRepository) Health(_ context.Context) (model.HealthRes
 }
 
 func (a *AllowAllRelationsRepository) Check(_ context.Context, _ model.Relationship, _ model.Consistency,
-) (bool, model.ConsistencyToken, error) {
-	return true, model.MinimizeLatencyToken, nil
+) (model.CheckResult, error) {
+	return model.NewCheckResult(true, model.MinimizeLatencyToken), nil
 }
 
 func (a *AllowAllRelationsRepository) CheckForUpdate(_ context.Context, _ model.Relationship,
-) (bool, model.ConsistencyToken, error) {
-	return true, model.MinimizeLatencyToken, nil
+) (model.CheckResult, error) {
+	return model.NewCheckResult(true, model.MinimizeLatencyToken), nil
 }
 
 func (a *AllowAllRelationsRepository) CheckBulk(_ context.Context, rels []model.Relationship, _ model.Consistency,
@@ -70,13 +70,13 @@ func (a *AllowAllRelationsRepository) LookupSubjects(_ context.Context,
 }
 
 func (a *AllowAllRelationsRepository) CreateTuples(_ context.Context, _ []model.RelationsTuple, _ bool, _ *model.FencingCheck,
-) (model.ConsistencyToken, error) {
-	return model.MinimizeLatencyToken, nil
+) (model.TuplesResult, error) {
+	return model.NewTuplesResult(model.MinimizeLatencyToken), nil
 }
 
 func (a *AllowAllRelationsRepository) DeleteTuples(_ context.Context, _ model.TupleFilter, _ *model.FencingCheck,
-) (model.ConsistencyToken, error) {
-	return model.MinimizeLatencyToken, nil
+) (model.TuplesResult, error) {
+	return model.NewTuplesResult(model.MinimizeLatencyToken), nil
 }
 
 func (a *AllowAllRelationsRepository) ReadTuples(_ context.Context, _ model.TupleFilter, _ *model.Pagination, _ model.Consistency,
@@ -84,6 +84,6 @@ func (a *AllowAllRelationsRepository) ReadTuples(_ context.Context, _ model.Tupl
 	return &emptyReadTuplesStream{}, nil
 }
 
-func (a *AllowAllRelationsRepository) AcquireLock(_ context.Context, _ model.LockId) (model.LockToken, error) {
-	return model.LockToken(""), nil
+func (a *AllowAllRelationsRepository) AcquireLock(_ context.Context, _ model.LockId) (model.AcquireLockResult, error) {
+	return model.NewAcquireLockResult(model.LockToken("")), nil
 }

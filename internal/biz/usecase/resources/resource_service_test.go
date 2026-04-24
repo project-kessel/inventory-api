@@ -192,9 +192,9 @@ func TestCheckSelf_UsesCheckSelfRelation(t *testing.T) {
 	relation, err := model.NewRelation("view")
 	require.NoError(t, err)
 
-	allowed, _, err := h.usecase.CheckSelf(h.ctx, relation, resourceRefFromKey(key), model.NewConsistencyMinimizeLatency())
+	result, err := h.usecase.CheckSelf(h.ctx, relation, resourceRefFromKey(key), model.NewConsistencyMinimizeLatency())
 	require.NoError(t, err)
-	assert.True(t, allowed)
+	assert.True(t, result.Allowed())
 	assert.Equal(t, 1, h.meta.calls)
 	assert.Equal(t, []metaauthorizer.Relation{metaauthorizer.RelationCheckSelf}, h.meta.relations)
 }
@@ -206,7 +206,7 @@ func TestCheckSelf_DeniedByMetaAuthz(t *testing.T) {
 	relation, err := model.NewRelation("view")
 	require.NoError(t, err)
 
-	_, _, err = h.usecase.CheckSelf(h.ctx, relation, resourceRefFromKey(key), model.NewConsistencyMinimizeLatency())
+	_, err = h.usecase.CheckSelf(h.ctx, relation, resourceRefFromKey(key), model.NewConsistencyMinimizeLatency())
 	assert.ErrorIs(t, err, metaauthorizer.ErrMetaAuthorizationDenied)
 }
 
@@ -217,7 +217,7 @@ func TestCheckSelf_MissingAuthzContext(t *testing.T) {
 	relation, err := model.NewRelation("view")
 	require.NoError(t, err)
 
-	_, _, err = h.usecase.CheckSelf(context.Background(), relation, resourceRefFromKey(key), model.NewConsistencyMinimizeLatency())
+	_, err = h.usecase.CheckSelf(context.Background(), relation, resourceRefFromKey(key), model.NewConsistencyMinimizeLatency())
 	assert.ErrorIs(t, err, metaauthorizer.ErrMetaAuthzContextMissing)
 	assert.Equal(t, 0, h.meta.calls)
 }
@@ -257,9 +257,9 @@ func TestCheck_UsesCheckRelation(t *testing.T) {
 	relation, err := model.NewRelation("view")
 	require.NoError(t, err)
 
-	allowed, _, err := h.usecase.Check(h.ctx, relation, subject, resourceRefFromKey(key), model.NewConsistencyUnspecified())
+	result, err := h.usecase.Check(h.ctx, relation, subject, resourceRefFromKey(key), model.NewConsistencyUnspecified())
 	require.NoError(t, err)
-	assert.True(t, allowed)
+	assert.True(t, result.Allowed())
 	assert.Equal(t, 1, h.meta.calls)
 	assert.Equal(t, []metaauthorizer.Relation{metaauthorizer.RelationCheck}, h.meta.relations)
 }
@@ -273,9 +273,9 @@ func TestCheckForUpdate_UsesCheckForUpdateRelation(t *testing.T) {
 	relation, err := model.NewRelation("view")
 	require.NoError(t, err)
 
-	allowed, _, err := h.usecase.CheckForUpdate(h.ctx, relation, subject, resourceRefFromKey(key))
+	result, err := h.usecase.CheckForUpdate(h.ctx, relation, subject, resourceRefFromKey(key))
 	require.NoError(t, err)
-	assert.True(t, allowed)
+	assert.True(t, result.Allowed())
 	assert.Equal(t, 1, h.meta.calls)
 	assert.Equal(t, []metaauthorizer.Relation{metaauthorizer.RelationCheckForUpdate}, h.meta.relations)
 }
@@ -1871,10 +1871,10 @@ func TestCheck_AuthzDecisions(t *testing.T) {
 			relation, err := model.NewRelation("view")
 			require.NoError(t, err)
 
-			allowed, token, err := h.usecase.Check(h.ctx, relation, subject, resourceRefFromKey(key), model.NewConsistencyUnspecified())
+			result, err := h.usecase.Check(h.ctx, relation, subject, resourceRefFromKey(key), model.NewConsistencyUnspecified())
 			require.NoError(t, err)
-			assert.Equal(t, tt.wantAllowed, allowed)
-			assert.NotEmpty(t, token)
+			assert.Equal(t, tt.wantAllowed, result.Allowed())
+			assert.NotEmpty(t, result.ConsistencyToken())
 			assert.Equal(t, 1, h.meta.calls)
 		})
 	}
@@ -1904,10 +1904,10 @@ func TestCheckForUpdate_AuthzDecisions(t *testing.T) {
 			relation, err := model.NewRelation("update")
 			require.NoError(t, err)
 
-			allowed, token, err := h.usecase.CheckForUpdate(h.ctx, relation, subject, resourceRefFromKey(key))
+			result, err := h.usecase.CheckForUpdate(h.ctx, relation, subject, resourceRefFromKey(key))
 			require.NoError(t, err)
-			assert.Equal(t, tt.wantAllowed, allowed)
-			assert.NotEmpty(t, token)
+			assert.Equal(t, tt.wantAllowed, result.Allowed())
+			assert.NotEmpty(t, result.ConsistencyToken())
 			assert.Equal(t, 1, h.meta.calls)
 		})
 	}

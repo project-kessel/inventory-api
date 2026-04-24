@@ -746,17 +746,17 @@ func TestFencingToken_WritingAfterRebalance(t *testing.T) {
 
 	consumerAToken := "token-A"
 	consumerBToken := "token-B"
-	lock1 := relationsRepo.On("AcquireLock", mock.Anything, wantLock).Return(model.DeserializeLockToken(consumerAToken), nil).Once()
-	lock2 := relationsRepo.On("AcquireLock", mock.Anything, wantLock).Return(model.DeserializeLockToken(consumerBToken), nil).Once()
+	lock1 := relationsRepo.On("AcquireLock", mock.Anything, wantLock).Return(model.NewAcquireLockResult(model.DeserializeLockToken(consumerAToken)), nil).Once()
+	lock2 := relationsRepo.On("AcquireLock", mock.Anything, wantLock).Return(model.NewAcquireLockResult(model.DeserializeLockToken(consumerBToken)), nil).Once()
 	lock2.NotBefore(lock1)
 
 	relationsRepo.On("CreateTuples", mock.Anything, mock.Anything, mock.Anything, mock.MatchedBy(func(fencing *model.FencingCheck) bool {
 		return fencing != nil && fencing.LockToken() == model.DeserializeLockToken(consumerBToken)
-	})).Return(createSuccessResponse, nil)
+	})).Return(model.NewTuplesResult(createSuccessResponse), nil)
 
 	relationsRepo.On("CreateTuples", mock.Anything, mock.Anything, mock.Anything, mock.MatchedBy(func(fencing *model.FencingCheck) bool {
 		return fencing != nil && fencing.LockToken() == model.DeserializeLockToken(consumerAToken)
-	})).Return(model.MinimizeLatencyToken, errors.New("fencing token is invalid or expired"))
+	})).Return(model.TuplesResult{}, errors.New("fencing token is invalid or expired"))
 
 	testerA.inv.Relations = relationsRepo
 	testerB.inv.Relations = relationsRepo

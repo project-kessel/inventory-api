@@ -48,19 +48,19 @@ func (m *MockRelationsRepository) CheckForUpdateBulk(ctx context.Context, rels [
 	return args.Get(0).(model.CheckBulkResult), args.Error(1)
 }
 
-func (m *MockRelationsRepository) AcquireLock(ctx context.Context, lockId model.LockId) (model.LockToken, error) {
+func (m *MockRelationsRepository) AcquireLock(ctx context.Context, lockId model.LockId) (model.AcquireLockResult, error) {
 	args := m.Called(ctx, lockId)
-	return args.Get(0).(model.LockToken), args.Error(1)
+	return args.Get(0).(model.AcquireLockResult), args.Error(1)
 }
 
-func (m *MockRelationsRepository) CreateTuples(ctx context.Context, tuples []model.RelationsTuple, upsert bool, fencing *model.FencingCheck) (model.ConsistencyToken, error) {
+func (m *MockRelationsRepository) CreateTuples(ctx context.Context, tuples []model.RelationsTuple, upsert bool, fencing *model.FencingCheck) (model.TuplesResult, error) {
 	args := m.Called(ctx, tuples, upsert, fencing)
-	return args.Get(0).(model.ConsistencyToken), args.Error(1)
+	return args.Get(0).(model.TuplesResult), args.Error(1)
 }
 
-func (m *MockRelationsRepository) Check(ctx context.Context, rel model.Relationship, consistency model.Consistency) (bool, model.ConsistencyToken, error) {
+func (m *MockRelationsRepository) Check(ctx context.Context, rel model.Relationship, consistency model.Consistency) (model.CheckResult, error) {
 	args := m.Called(ctx, rel, consistency)
-	return args.Bool(0), args.Get(1).(model.ConsistencyToken), args.Error(2)
+	return args.Get(0).(model.CheckResult), args.Error(1)
 }
 
 func (m *MockRelationsRepository) Health(_ context.Context) (model.HealthResult, error) {
@@ -71,7 +71,7 @@ func (m *MockRelationsRepository) ReadTuples(_ context.Context, _ model.TupleFil
 	panic("MockRelationsRepository.ReadTuples() is not supported - use SimpleRelationsRepository instead")
 }
 
-func (m *MockRelationsRepository) CheckForUpdate(_ context.Context, _ model.Relationship) (bool, model.ConsistencyToken, error) {
+func (m *MockRelationsRepository) CheckForUpdate(_ context.Context, _ model.Relationship) (model.CheckResult, error) {
 	panic("MockRelationsRepository.CheckForUpdate() is not supported - use SimpleRelationsRepository instead")
 }
 
@@ -83,7 +83,7 @@ func (m *MockRelationsRepository) LookupSubjects(_ context.Context, _ model.Reso
 	panic("MockRelationsRepository.LookupSubjects() is not supported - use SimpleRelationsRepository instead")
 }
 
-func (m *MockRelationsRepository) DeleteTuples(_ context.Context, _ model.TupleFilter, _ *model.FencingCheck) (model.ConsistencyToken, error) {
+func (m *MockRelationsRepository) DeleteTuples(_ context.Context, _ model.TupleFilter, _ *model.FencingCheck) (model.TuplesResult, error) {
 	panic("MockRelationsRepository.DeleteTuples() is not supported - use SimpleRelationsRepository instead")
 }
 

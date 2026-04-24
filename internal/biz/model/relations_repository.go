@@ -13,10 +13,10 @@ type RelationsRepository interface {
 	// --- Check APIs: use Relationship ---
 
 	Check(ctx context.Context, rel Relationship, consistency Consistency,
-	) (bool, ConsistencyToken, error)
+	) (CheckResult, error)
 
 	CheckForUpdate(ctx context.Context, rel Relationship,
-	) (bool, ConsistencyToken, error)
+	) (CheckResult, error)
 
 	CheckBulk(ctx context.Context, rels []Relationship, consistency Consistency,
 	) (CheckBulkResult, error)
@@ -43,15 +43,15 @@ type RelationsRepository interface {
 
 	CreateTuples(ctx context.Context, tuples []RelationsTuple,
 		upsert bool, fencing *FencingCheck,
-	) (ConsistencyToken, error)
+	) (TuplesResult, error)
 
 	DeleteTuples(ctx context.Context, filter TupleFilter,
 		fencing *FencingCheck,
-	) (ConsistencyToken, error)
+	) (TuplesResult, error)
 
 	ReadTuples(ctx context.Context, filter TupleFilter,
 		pagination *Pagination, consistency Consistency,
 	) (ResultStream[ReadTuplesItem], error)
 
-	AcquireLock(ctx context.Context, lockId LockId) (LockToken, error)
+	AcquireLock(ctx context.Context, lockId LockId) (AcquireLockResult, error)
 }

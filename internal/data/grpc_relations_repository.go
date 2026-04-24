@@ -109,7 +109,7 @@ func (a *GRPCRelationsRepository) Health(ctx context.Context) (model.HealthResul
 }
 
 func (a *GRPCRelationsRepository) Check(ctx context.Context, rel model.Relationship, consistency model.Consistency,
-) (bool, model.ConsistencyToken, error) {
+) (model.CheckResult, error) {
 	obj := rel.Object()
 	log.Infof("Check: on resourceType=%s, localResourceId=%s",
 		obj.ResourceType().Serialize(), obj.ResourceId().Serialize())
@@ -117,7 +117,7 @@ func (a *GRPCRelationsRepository) Check(ctx context.Context, rel model.Relations
 	opts, err := a.getCallOptions()
 	if err != nil {
 		a.incrFailureCounter("Check")
-		return false, model.MinimizeLatencyToken, err
+		return model.CheckResult{}, err
 	}
 
 	resp, err := a.CheckService.Check(ctx, &kesselapi.CheckRequest{
@@ -129,20 +129,22 @@ func (a *GRPCRelationsRepository) Check(ctx context.Context, rel model.Relations
 
 	if err != nil {
 		a.incrFailureCounter("Check")
-		return false, model.MinimizeLatencyToken, err
+		return model.CheckResult{}, err
 	}
 
 	a.incrSuccessCounter("Check")
-	return resp.GetAllowed() == kesselapi.CheckResponse_ALLOWED_TRUE,
-		tokenFromV1Beta1(resp.GetConsistencyToken()), nil
+	return model.NewCheckResult(
+		resp.GetAllowed() == kesselapi.CheckResponse_ALLOWED_TRUE,
+		tokenFromV1Beta1(resp.GetConsistencyToken()),
+	), nil
 }
 
 func (a *GRPCRelationsRepository) CheckForUpdate(ctx context.Context, rel model.Relationship,
-) (bool, model.ConsistencyToken, error) {
+) (model.CheckResult, error) {
 	opts, err := a.getCallOptions()
 	if err != nil {
 		a.incrFailureCounter("CheckForUpdate")
-		return false, model.MinimizeLatencyToken, err
+		return model.CheckResult{}, err
 	}
 
 	resp, err := a.CheckService.CheckForUpdate(ctx, &kesselapi.CheckForUpdateRequest{
@@ -153,12 +155,14 @@ func (a *GRPCRelationsRepository) CheckForUpdate(ctx context.Context, rel model.
 
 	if err != nil {
 		a.incrFailureCounter("CheckForUpdate")
-		return false, model.MinimizeLatencyToken, err
+		return model.CheckResult{}, err
 	}
 
 	a.incrSuccessCounter("CheckForUpdate")
-	return resp.GetAllowed() == kesselapi.CheckForUpdateResponse_ALLOWED_TRUE,
-		tokenFromV1Beta1(resp.GetConsistencyToken()), nil
+	return model.NewCheckResult(
+		resp.GetAllowed() == kesselapi.CheckForUpdateResponse_ALLOWED_TRUE,
+		tokenFromV1Beta1(resp.GetConsistencyToken()),
+	), nil
 }
 
 func (a *GRPCRelationsRepository) CheckBulk(ctx context.Context, rels []model.Relationship, consistency model.Consistency,
@@ -290,12 +294,12 @@ func (a *GRPCRelationsRepository) LookupSubjects(ctx context.Context,
 }
 
 func (a *GRPCRelationsRepository) CreateTuples(ctx context.Context, tuples []model.RelationsTuple, upsert bool, fencing *model.FencingCheck,
-) (model.ConsistencyToken, error) {
+) (model.TuplesResult, error) {
 	log.Infof("Creating tuples: %d", len(tuples))
 	opts, err := a.getCallOptions()
 	if err != nil {
 		a.incrFailureCounter("CreateTuples")
-		return model.MinimizeLatencyToken, err
+		return model.TuplesResult{}, err
 	}
 
 	req := &kesselapi.CreateTuplesRequest{
@@ -309,19 +313,19 @@ func (a *GRPCRelationsRepository) CreateTuples(ctx context.Context, tuples []mod
 	resp, err := a.TupleService.CreateTuples(ctx, req, opts...)
 	if err != nil {
 		a.incrFailureCounter("CreateTuples")
-		return model.MinimizeLatencyToken, err
+		return model.TuplesResult{}, err
 	}
 
 	a.incrSuccessCounter("CreateTuples")
-	return tokenFromV1Beta1(resp.GetConsistencyToken()), nil
+	return model.NewTuplesResult(tokenFromV1Beta1(resp.GetConsistencyToken())), nil
 }
 
 func (a *GRPCRelationsRepository) DeleteTuples(ctx context.Context, filter model.TupleFilter, fencing *model.FencingCheck,
-) (model.ConsistencyToken, error) {
+) (model.TuplesResult, error) {
 	opts, err := a.getCallOptions()
 	if err != nil {
 		a.incrFailureCounter("DeleteTuples")
-		return model.MinimizeLatencyToken, err
+		return model.TuplesResult{}, err
 	}
 
 	req := &kesselapi.DeleteTuplesRequest{
@@ -334,11 +338,11 @@ func (a *GRPCRelationsRepository) DeleteTuples(ctx context.Context, filter model
 	resp, err := a.TupleService.DeleteTuples(ctx, req, opts...)
 	if err != nil {
 		a.incrFailureCounter("DeleteTuples")
-		return model.MinimizeLatencyToken, err
+		return model.TuplesResult{}, err
 	}
 
 	a.incrSuccessCounter("DeleteTuples")
-	return tokenFromV1Beta1(resp.GetConsistencyToken()), nil
+	return model.NewTuplesResult(tokenFromV1Beta1(resp.GetConsistencyToken())), nil
 }
 
 func (a *GRPCRelationsRepository) ReadTuples(ctx context.Context, filter model.TupleFilter, pagination *model.Pagination, consistency model.Consistency,
@@ -363,11 +367,11 @@ func (a *GRPCRelationsRepository) ReadTuples(ctx context.Context, filter model.T
 	return &readTuplesStream{stream: stream}, nil
 }
 
-func (a *GRPCRelationsRepository) AcquireLock(ctx context.Context, lockId model.LockId) (model.LockToken, error) {
+func (a *GRPCRelationsRepository) AcquireLock(ctx context.Context, lockId model.LockId) (model.AcquireLockResult, error) {
 	opts, err := a.getCallOptions()
 	if err != nil {
 		a.incrFailureCounter("AcquireLock")
-		return model.LockToken(""), err
+		return model.AcquireLockResult{}, err
 	}
 
 	resp, err := a.TupleService.AcquireLock(ctx, &kesselapi.AcquireLockRequest{
@@ -375,11 +379,11 @@ func (a *GRPCRelationsRepository) AcquireLock(ctx context.Context, lockId model.
 	}, opts...)
 	if err != nil {
 		a.incrFailureCounter("AcquireLock")
-		return model.LockToken(""), err
+		return model.AcquireLockResult{}, err
 	}
 
 	a.incrSuccessCounter("AcquireLock")
-	return model.DeserializeLockToken(resp.GetLockToken()), nil
+	return model.NewAcquireLockResult(model.DeserializeLockToken(resp.GetLockToken())), nil
 }
 
 // --- protobuf conversion helpers ---

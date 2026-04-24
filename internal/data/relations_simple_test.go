@@ -79,13 +79,13 @@ func testPrincipalTuple(namespace, resourceType, resourceID, relation, subjectID
 func TestSimpleRelationsRepository_DefaultDeny(t *testing.T) {
 	repo := NewSimpleRelationsRepository()
 
-	allowed, _, err := repo.Check(context.Background(),
+	result, err := repo.Check(context.Background(),
 		testRelationship("hbi", "host", "resource-1", "view", "user-123"),
 		model.NewConsistencyMinimizeLatency(),
 	)
 
 	require.NoError(t, err)
-	assert.False(t, allowed)
+	assert.False(t, result.Allowed())
 }
 
 func TestSimpleRelationsRepository_CreateTuples_ThenCheck(t *testing.T) {
@@ -98,13 +98,13 @@ func TestSimpleRelationsRepository_CreateTuples_ThenCheck(t *testing.T) {
 	_, err := repo.CreateTuples(context.Background(), tuples, false, nil)
 	require.NoError(t, err)
 
-	allowed, _, err := repo.Check(context.Background(),
+	result, err := repo.Check(context.Background(),
 		testRelationship("hbi", "host", "resource-1", "view", "user-123"),
 		model.NewConsistencyMinimizeLatency(),
 	)
 
 	require.NoError(t, err)
-	assert.True(t, allowed)
+	assert.True(t, result.Allowed())
 }
 
 func TestSimpleRelationsRepository_DeleteTuples(t *testing.T) {
@@ -118,26 +118,26 @@ func TestSimpleRelationsRepository_DeleteTuples(t *testing.T) {
 	_, err := repo.DeleteTuples(context.Background(), testTupleFilterForPrincipalTuple("hbi", "host", "resource-1", "view", "user-123"), nil)
 	require.NoError(t, err)
 
-	allowed, _, err := repo.Check(context.Background(),
+	result, err := repo.Check(context.Background(),
 		testRelationship("hbi", "host", "resource-1", "view", "user-123"),
 		model.NewConsistencyMinimizeLatency(),
 	)
 
 	require.NoError(t, err)
-	assert.False(t, allowed)
+	assert.False(t, result.Allowed())
 }
 
 func TestSimpleRelationsRepository_Grant(t *testing.T) {
 	repo := NewSimpleRelationsRepository()
 	repo.Grant("user-123", "view", "hbi", "host", "resource-1")
 
-	allowed, _, err := repo.Check(context.Background(),
+	result, err := repo.Check(context.Background(),
 		testRelationship("hbi", "host", "resource-1", "view", "user-123"),
 		model.NewConsistencyMinimizeLatency(),
 	)
 
 	require.NoError(t, err)
-	assert.True(t, allowed)
+	assert.True(t, result.Allowed())
 }
 
 func TestSimpleRelationsRepository_Health(t *testing.T) {
@@ -160,21 +160,21 @@ func TestSimpleRelationsRepository_Version(t *testing.T) {
 func TestSimpleRelationsRepository_ConsistencyToken(t *testing.T) {
 	repo := NewSimpleRelationsRepository()
 
-	_, token, err := repo.Check(context.Background(),
+	result, err := repo.Check(context.Background(),
 		testRelationship("hbi", "host", "resource-1", "view", "user-a"),
 		model.NewConsistencyMinimizeLatency(),
 	)
 	require.NoError(t, err)
-	assert.Equal(t, "1", token.Serialize())
+	assert.Equal(t, "1", result.ConsistencyToken().Serialize())
 
 	repo.Grant("user-a", "view", "hbi", "host", "resource-1")
 
-	_, token, err = repo.Check(context.Background(),
+	result, err = repo.Check(context.Background(),
 		testRelationship("hbi", "host", "resource-1", "view", "user-a"),
 		model.NewConsistencyMinimizeLatency(),
 	)
 	require.NoError(t, err)
-	assert.Equal(t, "2", token.Serialize())
+	assert.Equal(t, "2", result.ConsistencyToken().Serialize())
 }
 
 func TestSimpleRelationsRepository_RequiresExactMatch(t *testing.T) {
@@ -214,9 +214,9 @@ func TestSimpleRelationsRepository_RequiresExactMatch(t *testing.T) {
 				model.DeserializeRelation(tt.permission),
 				sub,
 			)
-			allowed, _, err := repo.Check(context.Background(), rel, model.NewConsistencyMinimizeLatency())
+			result, err := repo.Check(context.Background(), rel, model.NewConsistencyMinimizeLatency())
 			require.NoError(t, err)
-			assert.False(t, allowed)
+			assert.False(t, result.Allowed())
 		})
 	}
 }
@@ -225,32 +225,32 @@ func TestSimpleRelationsRepository_Reset(t *testing.T) {
 	repo := NewSimpleRelationsRepository()
 	repo.Grant("user-123", "view", "hbi", "host", "resource-1")
 
-	allowed, _, err := repo.Check(context.Background(),
+	result, err := repo.Check(context.Background(),
 		testRelationship("hbi", "host", "resource-1", "view", "user-123"),
 		model.NewConsistencyMinimizeLatency(),
 	)
 	require.NoError(t, err)
-	assert.True(t, allowed)
+	assert.True(t, result.Allowed())
 
 	repo.Reset()
 
-	allowed, _, err = repo.Check(context.Background(),
+	result, err = repo.Check(context.Background(),
 		testRelationship("hbi", "host", "resource-1", "view", "user-123"),
 		model.NewConsistencyMinimizeLatency(),
 	)
 	require.NoError(t, err)
-	assert.False(t, allowed)
+	assert.False(t, result.Allowed())
 }
 
 func TestSimpleRelationsRepository_CheckForUpdate(t *testing.T) {
 	repo := NewSimpleRelationsRepository()
 	repo.Grant("user-123", "edit", "hbi", "host", "resource-1")
 
-	allowed, _, err := repo.CheckForUpdate(context.Background(),
+	result, err := repo.CheckForUpdate(context.Background(),
 		testRelationship("hbi", "host", "resource-1", "edit", "user-123"),
 	)
 	require.NoError(t, err)
-	assert.True(t, allowed)
+	assert.True(t, result.Allowed())
 }
 
 func TestSimpleRelationsRepository_CheckBulk(t *testing.T) {
@@ -294,19 +294,19 @@ func TestSimpleRelationsRepository_MultipleTuples(t *testing.T) {
 	_, err := repo.CreateTuples(context.Background(), tuples, false, nil)
 	require.NoError(t, err)
 
-	allowed, _, err := repo.Check(context.Background(),
+	result, err := repo.Check(context.Background(),
 		testRelationship("hbi", "host", "resource-1", "view", "user-a"),
 		model.NewConsistencyMinimizeLatency(),
 	)
 	require.NoError(t, err)
-	assert.True(t, allowed)
+	assert.True(t, result.Allowed())
 
-	allowed, _, err = repo.Check(context.Background(),
+	result, err = repo.Check(context.Background(),
 		testRelationship("hbi", "host", "resource-2", "view", "user-b"),
 		model.NewConsistencyMinimizeLatency(),
 	)
 	require.NoError(t, err)
-	assert.True(t, allowed)
+	assert.True(t, result.Allowed())
 }
 
 func TestSimpleRelationsRepository_LookupResources(t *testing.T) {
@@ -434,30 +434,30 @@ func TestSimpleRelationsRepository_Snapshot_RetainAndCheck(t *testing.T) {
 	assert.Equal(t, int64(3), repo.Version())
 
 	// Without token: uses oldest available snapshot (v2, retained) -> allowed
-	allowed, _, err := repo.Check(context.Background(),
+	result, err := repo.Check(context.Background(),
 		testRelationship("hbi", "host", "resource-1", "view", "user-a"),
 		model.NewConsistencyMinimizeLatency(),
 	)
 	require.NoError(t, err)
-	assert.True(t, allowed)
+	assert.True(t, result.Allowed())
 
 	// With token at v3 (current): deleted -> denied
 	token3 := model.DeserializeConsistencyToken(simpleFormatConsistencyToken(3))
-	allowed, _, err = repo.Check(context.Background(),
+	result, err = repo.Check(context.Background(),
 		testRelationship("hbi", "host", "resource-1", "view", "user-a"),
 		model.NewConsistencyAtLeastAsFresh(token3),
 	)
 	require.NoError(t, err)
-	assert.False(t, allowed)
+	assert.False(t, result.Allowed())
 
 	// With token at v2 (snapshot): still has tuple -> allowed
 	token2 := model.DeserializeConsistencyToken(simpleFormatConsistencyToken(2))
-	allowed, _, err = repo.Check(context.Background(),
+	result, err = repo.Check(context.Background(),
 		testRelationship("hbi", "host", "resource-1", "view", "user-a"),
 		model.NewConsistencyAtLeastAsFresh(token2),
 	)
 	require.NoError(t, err)
-	assert.True(t, allowed)
+	assert.True(t, result.Allowed())
 }
 
 func TestSimpleRelationsRepository_Snapshot_NoRetained_UsesLatest(t *testing.T) {
@@ -466,12 +466,12 @@ func TestSimpleRelationsRepository_Snapshot_NoRetained_UsesLatest(t *testing.T) 
 	assert.Equal(t, int64(2), repo.Version())
 
 	token1 := model.DeserializeConsistencyToken(simpleFormatConsistencyToken(1))
-	allowed, _, err := repo.Check(context.Background(),
+	result, err := repo.Check(context.Background(),
 		testRelationship("hbi", "host", "resource-1", "view", "user-a"),
 		model.NewConsistencyAtLeastAsFresh(token1),
 	)
 	require.NoError(t, err)
-	assert.True(t, allowed)
+	assert.True(t, result.Allowed())
 }
 
 func TestSimpleRelationsRepository_Snapshot_FindsOldestAtLeastAsFresh(t *testing.T) {
@@ -487,35 +487,35 @@ func TestSimpleRelationsRepository_Snapshot_FindsOldestAtLeastAsFresh(t *testing
 	assert.Equal(t, int64(4), repo.Version())
 
 	token2 := model.DeserializeConsistencyToken(simpleFormatConsistencyToken(2))
-	allowed, _, err := repo.Check(context.Background(),
+	result, err := repo.Check(context.Background(),
 		testRelationship("hbi", "host", "resource-1", "view", "user-a"),
 		model.NewConsistencyAtLeastAsFresh(token2),
 	)
 	require.NoError(t, err)
-	assert.True(t, allowed)
+	assert.True(t, result.Allowed())
 
 	token3 := model.DeserializeConsistencyToken(simpleFormatConsistencyToken(3))
-	allowed, _, err = repo.Check(context.Background(),
+	result, err = repo.Check(context.Background(),
 		testRelationship("hbi", "host", "resource-1", "view", "user-a"),
 		model.NewConsistencyAtLeastAsFresh(token3),
 	)
 	require.NoError(t, err)
-	assert.True(t, allowed)
+	assert.True(t, result.Allowed())
 
 	token4 := model.DeserializeConsistencyToken(simpleFormatConsistencyToken(4))
-	allowed, _, err = repo.Check(context.Background(),
+	result, err = repo.Check(context.Background(),
 		testRelationship("hbi", "host", "resource-1", "view", "user-a"),
 		model.NewConsistencyAtLeastAsFresh(token4),
 	)
 	require.NoError(t, err)
-	assert.False(t, allowed)
+	assert.False(t, result.Allowed())
 
-	allowed, _, err = repo.Check(context.Background(),
+	result, err = repo.Check(context.Background(),
 		testRelationship("hbi", "host", "resource-2", "view", "user-a"),
 		model.NewConsistencyAtLeastAsFresh(token4),
 	)
 	require.NoError(t, err)
-	assert.True(t, allowed)
+	assert.True(t, result.Allowed())
 }
 
 func TestSimpleRelationsRepository_Snapshot_Release(t *testing.T) {
@@ -527,21 +527,21 @@ func TestSimpleRelationsRepository_Snapshot_Release(t *testing.T) {
 	require.NoError(t, err)
 
 	tokenV := model.DeserializeConsistencyToken(simpleFormatConsistencyToken(v))
-	allowed, _, err := repo.Check(context.Background(),
+	result, err := repo.Check(context.Background(),
 		testRelationship("hbi", "host", "resource-1", "view", "user-a"),
 		model.NewConsistencyAtLeastAsFresh(tokenV),
 	)
 	require.NoError(t, err)
-	assert.True(t, allowed)
+	assert.True(t, result.Allowed())
 
 	repo.ReleaseSnapshot(v)
 
-	allowed, _, err = repo.Check(context.Background(),
+	result, err = repo.Check(context.Background(),
 		testRelationship("hbi", "host", "resource-1", "view", "user-a"),
 		model.NewConsistencyAtLeastAsFresh(tokenV),
 	)
 	require.NoError(t, err)
-	assert.False(t, allowed)
+	assert.False(t, result.Allowed())
 }
 
 func TestSimpleRelationsRepository_Snapshot_ClearAll(t *testing.T) {
@@ -554,12 +554,12 @@ func TestSimpleRelationsRepository_Snapshot_ClearAll(t *testing.T) {
 	repo.ClearSnapshots()
 
 	token2 := model.DeserializeConsistencyToken(simpleFormatConsistencyToken(2))
-	allowed, _, err := repo.Check(context.Background(),
+	result, err := repo.Check(context.Background(),
 		testRelationship("hbi", "host", "resource-1", "view", "user-a"),
 		model.NewConsistencyAtLeastAsFresh(token2),
 	)
 	require.NoError(t, err)
-	assert.True(t, allowed)
+	assert.True(t, result.Allowed())
 }
 
 func TestSimpleRelationsRepository_CheckBulk_WithConsistencyToken(t *testing.T) {

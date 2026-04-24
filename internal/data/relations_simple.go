@@ -244,7 +244,7 @@ func simpleResourceRefFields(ref model.ResourceReference) (namespace, resType, r
 }
 
 func (s *SimpleRelationsRepository) Check(_ context.Context, rel model.Relationship, consistency model.Consistency,
-) (bool, model.ConsistencyToken, error) {
+) (model.CheckResult, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -259,11 +259,11 @@ func (s *SimpleRelationsRepository) Check(_ context.Context, rel model.Relations
 	allowed := simpleHasTupleInSnapshot(tuples, objNs, objType, objId,
 		rel.Relation().Serialize(), subNs, subType, subId)
 
-	return allowed, resultToken, nil
+	return model.NewCheckResult(allowed, resultToken), nil
 }
 
 func (s *SimpleRelationsRepository) CheckForUpdate(_ context.Context, rel model.Relationship,
-) (bool, model.ConsistencyToken, error) {
+) (model.CheckResult, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -276,7 +276,7 @@ func (s *SimpleRelationsRepository) CheckForUpdate(_ context.Context, rel model.
 	allowed := simpleHasTupleInSnapshot(s.tuples, objNs, objType, objId,
 		rel.Relation().Serialize(), subNs, subType, subId)
 
-	return allowed, resultToken, nil
+	return model.NewCheckResult(allowed, resultToken), nil
 }
 
 func (s *SimpleRelationsRepository) CheckBulk(_ context.Context, rels []model.Relationship, consistency model.Consistency,
@@ -413,12 +413,12 @@ func (s *SimpleRelationsRepository) LookupSubjects(_ context.Context,
 }
 
 func (s *SimpleRelationsRepository) CreateTuples(_ context.Context, tuples []model.RelationsTuple, _ bool, _ *model.FencingCheck,
-) (model.ConsistencyToken, error) {
+) (model.TuplesResult, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	if s.createTuplesError != nil {
-		return model.MinimizeLatencyToken, s.createTuplesError
+		return model.TuplesResult{}, s.createTuplesError
 	}
 
 	for _, tuple := range tuples {
@@ -427,16 +427,16 @@ func (s *SimpleRelationsRepository) CreateTuples(_ context.Context, tuples []mod
 	}
 	s.advanceVersion()
 
-	return model.DeserializeConsistencyToken(strconv.FormatInt(s.version, 10)), nil
+	return model.NewTuplesResult(model.DeserializeConsistencyToken(strconv.FormatInt(s.version, 10))), nil
 }
 
 func (s *SimpleRelationsRepository) DeleteTuples(_ context.Context, filter model.TupleFilter, _ *model.FencingCheck,
-) (model.ConsistencyToken, error) {
+) (model.TuplesResult, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	if s.deleteTuplesError != nil {
-		return model.MinimizeLatencyToken, s.deleteTuplesError
+		return model.TuplesResult{}, s.deleteTuplesError
 	}
 
 	for key := range s.tuples {
@@ -446,7 +446,7 @@ func (s *SimpleRelationsRepository) DeleteTuples(_ context.Context, filter model
 	}
 	s.advanceVersion()
 
-	return model.DeserializeConsistencyToken(strconv.FormatInt(s.version, 10)), nil
+	return model.NewTuplesResult(model.DeserializeConsistencyToken(strconv.FormatInt(s.version, 10))), nil
 }
 
 func simpleMatchesTupleFilter(key simpleTupleKey, filter model.TupleFilter) bool {
@@ -514,18 +514,18 @@ func (s *SimpleRelationsRepository) ReadTuples(_ context.Context, filter model.T
 	return &simpleReadTuplesStream{results: results}, nil
 }
 
-func (s *SimpleRelationsRepository) AcquireLock(_ context.Context, lockId model.LockId) (model.LockToken, error) {
+func (s *SimpleRelationsRepository) AcquireLock(_ context.Context, lockId model.LockId) (model.AcquireLockResult, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	if s.acquireLockError != nil {
-		return model.LockToken(""), s.acquireLockError
+		return model.AcquireLockResult{}, s.acquireLockError
 	}
 
 	token := "token-" + lockId.String()
 	s.locks[lockId.String()] = token
 
-	return model.DeserializeLockToken(token), nil
+	return model.NewAcquireLockResult(model.DeserializeLockToken(token)), nil
 }
 
 func consistencyToSimpleToken(c model.Consistency) string {

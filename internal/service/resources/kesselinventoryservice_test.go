@@ -3672,14 +3672,14 @@ func TestInventoryService_ReportResource_MissingRequiredFields(t *testing.T) {
 			mutate: func(r *pb.ReportResourceRequest) {
 				r.Type = ""
 			},
-			expectMsg: "type: value length must be at least 1 characters",
+			expectMsg: "type: must be at least 1 characters",
 		},
 		{
 			name: "invalid type pattern",
 			mutate: func(r *pb.ReportResourceRequest) {
 				r.Type = "host!@#"
 			},
-			expectMsg: "type: value does not match regex pattern `^[A-Za-z0-9_-]+$`",
+			expectMsg: "type: does not match regex pattern `^[A-Za-z0-9_-]+$`",
 		},
 		{
 			name: "missing representations",
@@ -3700,14 +3700,14 @@ func TestInventoryService_ReportResource_MissingRequiredFields(t *testing.T) {
 			mutate: func(r *pb.ReportResourceRequest) {
 				r.Representations.Metadata.LocalResourceId = ""
 			},
-			expectMsg: "representations.metadata.local_resource_id: value length must be at least 1 characters",
+			expectMsg: "representations.metadata.local_resource_id: must be at least 1 characters",
 		},
 		{
 			name: "missing api_href",
 			mutate: func(r *pb.ReportResourceRequest) {
 				r.Representations.Metadata.ApiHref = ""
 			},
-			expectMsg: "representations.metadata.api_href: value length must be at least 1 characters",
+			expectMsg: "representations.metadata.api_href: must be at least 1 characters",
 		},
 	}
 

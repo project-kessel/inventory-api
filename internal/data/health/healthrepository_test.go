@@ -36,17 +36,15 @@ func TestHealthInit(t *testing.T) {
 	healthRepo := New(db, relationsRepo, relationsConfig)
 	assert.NotNil(t, healthRepo)
 
-	// just check default negative case for now when using sqlite db, and empty config
-	// storage should be okay, relations api should not because tokenConfig is empty
 	resp, err := healthRepo.IsBackendAvailable(ctx)
 	assert.Nil(t, err)
-	assert.Equal(t, uint32(500), resp.Code)
-	assert.Equal(t, "RELATIONS-API UNHEALTHY", resp.Status)
+	assert.Equal(t, 500, resp.Code())
+	assert.Equal(t, "RELATIONS-API UNHEALTHY", resp.Status())
 
 	resp, err = healthRepo.IsRelationsAvailable(ctx)
 	assert.Nil(t, err)
-	assert.Equal(t, uint32(500), resp.Code)
-	assert.Equal(t, "RELATIONS-API UNHEALTHY", resp.Status)
+	assert.Equal(t, 500, resp.Code())
+	assert.Equal(t, "RELATIONS-API UNHEALTHY", resp.Status())
 }
 
 func TestHealthRepo_IsBackendAvailable_AllCases(t *testing.T) {
@@ -60,8 +58,8 @@ func TestHealthRepo_IsBackendAvailable_AllCases(t *testing.T) {
 	assert.NotNil(t, healthRepo)
 	resp, err := healthRepo.IsBackendAvailable(ctx)
 	assert.Nil(t, err)
-	assert.Equal(t, uint32(500), resp.Code)
-	assert.Equal(t, "RELATIONS-API UNHEALTHY", resp.Status)
+	assert.Equal(t, 500, resp.Code())
+	assert.Equal(t, "RELATIONS-API UNHEALTHY", resp.Status())
 
 	sqlDB, _ := db.DB()
 	if err := sqlDB.Close(); err != nil {
@@ -69,22 +67,20 @@ func TestHealthRepo_IsBackendAvailable_AllCases(t *testing.T) {
 	}
 	resp, err = healthRepo.IsBackendAvailable(ctx)
 	assert.Nil(t, err)
-	assert.Equal(t, uint32(500), resp.Code)
-	assert.Contains(t, resp.Status, "STORAGE UNHEALTHY")
-	assert.Contains(t, resp.Status, "RELATIONS-API UNHEALTHY")
+	assert.Equal(t, 500, resp.Code())
+	assert.Contains(t, resp.Status(), "STORAGE UNHEALTHY")
+	assert.Contains(t, resp.Status(), "RELATIONS-API UNHEALTHY")
 
 	db1 := setupGorm(t)
 	simpleRelations1 := data.NewSimpleRelationsRepository()
-	// Healthy relations (default state)
 	healthRepo1 := New(db1, simpleRelations1, relationsConfig)
 	resp, err = healthRepo1.IsBackendAvailable(ctx)
 	assert.NoError(t, err)
-	assert.Equal(t, uint32(200), resp.Code)
-	assert.Contains(t, resp.Status, "Storage type sqlite")
+	assert.Equal(t, 200, resp.Code())
+	assert.Contains(t, resp.Status(), "Storage type sqlite")
 
 	db2 := setupGorm(t)
 	simpleRelations2 := data.NewSimpleRelationsRepository()
-	// Healthy relations, but DB closed
 	sqlDB2, _ := db2.DB()
 	if err := sqlDB2.Close(); err != nil {
 		t.Logf("Warning: failed to close db: %v", err)
@@ -92,9 +88,9 @@ func TestHealthRepo_IsBackendAvailable_AllCases(t *testing.T) {
 	healthRepo2 := New(db2, simpleRelations2, relationsConfig)
 	resp, err = healthRepo2.IsBackendAvailable(ctx)
 	assert.NoError(t, err)
-	assert.Equal(t, uint32(500), resp.Code)
-	assert.Contains(t, resp.Status, "STORAGE UNHEALTHY: sqlite")
-	assert.NotContains(t, resp.Status, "RELATIONS-API UNHEALTHY")
+	assert.Equal(t, 500, resp.Code())
+	assert.Contains(t, resp.Status(), "STORAGE UNHEALTHY: sqlite")
+	assert.NotContains(t, resp.Status(), "RELATIONS-API UNHEALTHY")
 
 	db3 := setupGorm(t)
 	simpleRelations3 := data.NewSimpleRelationsRepository()
@@ -102,7 +98,7 @@ func TestHealthRepo_IsBackendAvailable_AllCases(t *testing.T) {
 	healthRepo3 := New(db3, simpleRelations3, relationsConfig)
 	resp, err = healthRepo3.IsBackendAvailable(ctx)
 	assert.NoError(t, err)
-	assert.Equal(t, uint32(500), resp.Code)
-	assert.Equal(t, "RELATIONS-API UNHEALTHY", resp.Status)
+	assert.Equal(t, 500, resp.Code())
+	assert.Equal(t, "RELATIONS-API UNHEALTHY", resp.Status())
 
 }

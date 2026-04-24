@@ -51,5 +51,12 @@ func (s *HealthService) GetReadyz(ctx context.Context, req *pb.GetReadyzRequest)
 			readyzLogged = true
 		}
 	}
-	return s.Ctl.IsBackendAvailable(ctx)
+	result, err := s.Ctl.IsBackendAvailable(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return &pb.GetReadyzResponse{
+		Status: result.Status(),
+		Code:   uint32(result.Code()),
+	}, nil
 }

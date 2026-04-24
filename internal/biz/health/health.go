@@ -5,12 +5,12 @@ import (
 
 	"github.com/go-kratos/kratos/v2/log"
 
-	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1"
+	"github.com/project-kessel/inventory-api/internal/biz/model"
 )
 
 type HealthRepo interface {
-	IsBackendAvailable(ctx context.Context) (*pb.GetReadyzResponse, error)
-	IsRelationsAvailable(ctx context.Context) (*pb.GetReadyzResponse, error)
+	IsBackendAvailable(ctx context.Context) (model.HealthResult, error)
+	IsRelationsAvailable(ctx context.Context) (model.HealthResult, error)
 }
 
 // HealthUsecase is a Health usecase.
@@ -24,6 +24,6 @@ func New(repo HealthRepo, logger log.Logger) *HealthUsecase {
 	return &HealthUsecase{repo: repo, log: log.NewHelper(logger)}
 }
 
-func (rc *HealthUsecase) IsBackendAvailable(ctx context.Context) (*pb.GetReadyzResponse, error) {
+func (rc *HealthUsecase) IsBackendAvailable(ctx context.Context) (model.HealthResult, error) {
 	return rc.repo.IsBackendAvailable(ctx)
 }

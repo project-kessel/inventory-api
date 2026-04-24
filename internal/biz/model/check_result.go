@@ -10,5 +10,6 @@ func NewCheckResult(allowed bool, consistencyToken ConsistencyToken) CheckResult
 	return CheckResult{allowed: allowed, consistencyToken: consistencyToken}
 }
 
-func (r CheckResult) Allowed() bool                     { return r.allowed }
+func (r CheckResult) Allowed() bool { return r.allowed }
+
 func (r CheckResult) ConsistencyToken() ConsistencyToken { return r.consistencyToken }

@@ -58,7 +58,7 @@ When working in this codebase, AI agents should:
 2. **Maintain consistency** - Use established patterns for error handling, validation, and testing
 3. **Security awareness** - Never bypass authentication/authorization; follow security guidelines
 4. **Performance consideration** - Use appropriate transaction patterns and avoid blocking operations
-5. **Test completeness** - Write tests for all new functionality following established patterns
+5. **Test-driven development** - Prefer writing tests first (TDD). When adding features or fixing bugs, start with a failing test, then implement the code to pass it. Follow the no-mocks philosophy in [Testing Guidelines](docs/testing-guidelines.md).
 6. **End-to-end type changes** - When replacing a type (e.g., `ReporterResourceKey` -> `ResourceReference`), propagate the change through the entire call chain. Do not insert local adapter/shim calls at the boundary (e.g., `ResourceReferenceFromKey(key)` at the call site). Instead, update the method signature, the callers, and the callers' callers until the new type flows naturally from entry point to implementation. Lossy back-and-forth conversions are a bug.
 7. **Do not remove comments** unless they are clearly wrong or obsolete. Preserve existing documentation.
 

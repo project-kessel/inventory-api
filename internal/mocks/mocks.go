@@ -6,13 +6,9 @@ import (
 
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
 	"github.com/go-kratos/kratos/v2/transport"
-	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1"
+	"github.com/project-kessel/inventory-api/internal/biz/model"
 	"github.com/project-kessel/inventory-api/internal/pubsub"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/metadata"
 
-	kesselv1 "github.com/project-kessel/relations-api/api/kessel/relations/v1"
-	"github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
 	"github.com/stretchr/testify/mock"
 )
 
@@ -20,21 +16,14 @@ type MockHealthRepo struct {
 	mock.Mock
 }
 
-func (m *MockHealthRepo) IsBackendAvailable(ctx context.Context) (*pb.GetReadyzResponse, error) {
+func (m *MockHealthRepo) IsBackendAvailable(ctx context.Context) (model.HealthResult, error) {
 	args := m.Called(ctx)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
-	}
-	return args.Get(0).(*pb.GetReadyzResponse), args.Error(1)
+	return args.Get(0).(model.HealthResult), args.Error(1)
 }
 
-func (m *MockHealthRepo) IsRelationsAvailable(ctx context.Context) (*pb.GetReadyzResponse, error) {
+func (m *MockHealthRepo) IsRelationsAvailable(ctx context.Context) (model.HealthResult, error) {
 	args := m.Called(ctx)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
-	}
-	return args.Get(0).(*pb.GetReadyzResponse), args.Error(1)
-
+	return args.Get(0).(model.HealthResult), args.Error(1)
 }
 
 // MockRelationsRepository is a minimal mock for RelationsRepository.
@@ -49,75 +38,53 @@ type MockRelationsRepository struct {
 	mock.Mock
 }
 
-func (m *MockRelationsRepository) CheckBulk(ctx context.Context, req *v1beta1.CheckBulkRequest) (*v1beta1.CheckBulkResponse, error) {
-	args := m.Called(ctx, req)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
-	}
-	return args.Get(0).(*v1beta1.CheckBulkResponse), args.Error(1)
+func (m *MockRelationsRepository) CheckBulk(ctx context.Context, rels []model.Relationship, consistency model.Consistency) (model.CheckBulkResult, error) {
+	args := m.Called(ctx, rels, consistency)
+	return args.Get(0).(model.CheckBulkResult), args.Error(1)
 }
 
-func (m *MockRelationsRepository) CheckForUpdateBulk(ctx context.Context, req *v1beta1.CheckForUpdateBulkRequest) (*v1beta1.CheckForUpdateBulkResponse, error) {
-	args := m.Called(ctx, req)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
-	}
-	return args.Get(0).(*v1beta1.CheckForUpdateBulkResponse), args.Error(1)
+func (m *MockRelationsRepository) CheckForUpdateBulk(ctx context.Context, rels []model.Relationship) (model.CheckBulkResult, error) {
+	args := m.Called(ctx, rels)
+	return args.Get(0).(model.CheckBulkResult), args.Error(1)
 }
 
-func (m *MockRelationsRepository) AcquireLock(ctx context.Context, req *v1beta1.AcquireLockRequest) (*v1beta1.AcquireLockResponse, error) {
-	args := m.Called(ctx, req)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
-	}
-	return args.Get(0).(*v1beta1.AcquireLockResponse), args.Error(1)
+func (m *MockRelationsRepository) AcquireLock(ctx context.Context, lockId model.LockId) (model.AcquireLockResult, error) {
+	args := m.Called(ctx, lockId)
+	return args.Get(0).(model.AcquireLockResult), args.Error(1)
 }
 
-func (m *MockRelationsRepository) CreateTuples(ctx context.Context, req *v1beta1.CreateTuplesRequest) (*v1beta1.CreateTuplesResponse, error) {
-	args := m.Called(ctx, req)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
-	}
-	return args.Get(0).(*v1beta1.CreateTuplesResponse), args.Error(1)
+func (m *MockRelationsRepository) CreateTuples(ctx context.Context, tuples []model.RelationsTuple, upsert bool, fencing *model.FencingCheck) (model.TuplesResult, error) {
+	args := m.Called(ctx, tuples, upsert, fencing)
+	return args.Get(0).(model.TuplesResult), args.Error(1)
 }
 
-// Stub methods that panic to enforce use of SimpleRelationsRepository for normal test cases.
-// MockRelationsRepository should only be used for edge cases that cannot be produced by SimpleRelationsRepository.
+func (m *MockRelationsRepository) Check(ctx context.Context, rel model.Relationship, consistency model.Consistency) (model.CheckResult, error) {
+	args := m.Called(ctx, rel, consistency)
+	return args.Get(0).(model.CheckResult), args.Error(1)
+}
 
-func (m *MockRelationsRepository) Health(ctx context.Context) (*kesselv1.GetReadyzResponse, error) {
+func (m *MockRelationsRepository) Health(_ context.Context) (model.HealthResult, error) {
 	panic("MockRelationsRepository.Health() is not supported - use SimpleRelationsRepository instead")
 }
 
-func (m *MockRelationsRepository) ReadTuples(ctx context.Context, request *v1beta1.ReadTuplesRequest) (grpc.ServerStreamingClient[v1beta1.ReadTuplesResponse], error) {
+func (m *MockRelationsRepository) ReadTuples(_ context.Context, _ model.TupleFilter, _ *model.Pagination, _ model.Consistency) (model.ResultStream[model.ReadTuplesItem], error) {
 	panic("MockRelationsRepository.ReadTuples() is not supported - use SimpleRelationsRepository instead")
 }
 
-func (m *MockRelationsRepository) Check(ctx context.Context, namespace string, permission string, consistencyToken string, resourceType string, localResourceId string, sub *v1beta1.SubjectReference) (v1beta1.CheckResponse_Allowed, *v1beta1.ConsistencyToken, error) {
-	panic("MockRelationsRepository.Check() is not supported - use SimpleRelationsRepository instead")
-}
-
-func (m *MockRelationsRepository) CheckForUpdate(ctx context.Context, namespace string, permission string, resourceType string, localResourceId string, sub *v1beta1.SubjectReference) (v1beta1.CheckForUpdateResponse_Allowed, *v1beta1.ConsistencyToken, error) {
+func (m *MockRelationsRepository) CheckForUpdate(_ context.Context, _ model.Relationship) (model.CheckResult, error) {
 	panic("MockRelationsRepository.CheckForUpdate() is not supported - use SimpleRelationsRepository instead")
 }
 
-func (m *MockRelationsRepository) LookupResources(ctx context.Context, in *v1beta1.LookupResourcesRequest) (grpc.ServerStreamingClient[v1beta1.LookupResourcesResponse], error) {
-	panic("MockRelationsRepository.LookupResources() is not supported - use SimpleRelationsRepository instead")
+func (m *MockRelationsRepository) LookupObjects(_ context.Context, _ model.RepresentationType, _ model.Relation, _ model.SubjectReference, _ *model.Pagination, _ model.Consistency) (model.ResultStream[model.LookupObjectsItem], error) {
+	panic("MockRelationsRepository.LookupObjects() is not supported - use SimpleRelationsRepository instead")
 }
 
-func (m *MockRelationsRepository) LookupSubjects(ctx context.Context, in *v1beta1.LookupSubjectsRequest) (grpc.ServerStreamingClient[v1beta1.LookupSubjectsResponse], error) {
+func (m *MockRelationsRepository) LookupSubjects(_ context.Context, _ model.ResourceReference, _ model.Relation, _ model.RepresentationType, _ *model.Relation, _ *model.Pagination, _ model.Consistency) (model.ResultStream[model.LookupSubjectsItem], error) {
 	panic("MockRelationsRepository.LookupSubjects() is not supported - use SimpleRelationsRepository instead")
 }
 
-func (m *MockRelationsRepository) DeleteTuples(ctx context.Context, req *v1beta1.DeleteTuplesRequest) (*v1beta1.DeleteTuplesResponse, error) {
+func (m *MockRelationsRepository) DeleteTuples(_ context.Context, _ model.TupleFilter, _ *model.FencingCheck) (model.TuplesResult, error) {
 	panic("MockRelationsRepository.DeleteTuples() is not supported - use SimpleRelationsRepository instead")
-}
-
-func (m *MockRelationsRepository) UnsetWorkspace(ctx context.Context, namespace string, resourceType string, localResourceId string) (*v1beta1.DeleteTuplesResponse, error) {
-	panic("MockRelationsRepository.UnsetWorkspace() is not supported - use SimpleRelationsRepository instead")
-}
-
-func (m *MockRelationsRepository) SetWorkspace(ctx context.Context, namespace string, resourceType string, localResourceId string, workspaceId string, replace bool) (*v1beta1.CreateTuplesResponse, error) {
-	panic("MockRelationsRepository.SetWorkspace() is not supported - use SimpleRelationsRepository instead")
 }
 
 type MockConsumer struct {
@@ -169,49 +136,19 @@ type MockedListenManager struct {
 type MockedSubscription struct {
 	mock.Mock
 }
-type MockLookupResourcesStream struct {
-	mock.Mock
-	Responses []*v1beta1.LookupResourcesResponse
+
+type MockLookupObjectsStream struct {
+	Responses []model.LookupObjectsItem
 	current   int
 }
 
-func (m *MockLookupResourcesStream) Recv() (*v1beta1.LookupResourcesResponse, error) {
+func (m *MockLookupObjectsStream) Recv() (model.LookupObjectsItem, error) {
 	if m.current >= len(m.Responses) {
-		return nil, io.EOF
+		return model.LookupObjectsItem{}, io.EOF
 	}
 	res := m.Responses[m.current]
 	m.current++
 	return res, nil
-}
-
-func (m *MockLookupResourcesStream) Header() (metadata.MD, error) {
-	args := m.Called()
-	return args.Get(0).(metadata.MD), args.Error(1)
-}
-
-func (m *MockLookupResourcesStream) Trailer() metadata.MD {
-	args := m.Called()
-	return args.Get(0).(metadata.MD)
-}
-
-func (m *MockLookupResourcesStream) CloseSend() error {
-	args := m.Called()
-	return args.Error(0)
-}
-
-func (m *MockLookupResourcesStream) Context() context.Context {
-	args := m.Called()
-	return args.Get(0).(context.Context)
-}
-
-func (m *MockLookupResourcesStream) SendMsg(msg interface{}) error {
-	args := m.Called(msg)
-	return args.Error(0)
-}
-
-func (m *MockLookupResourcesStream) RecvMsg(msg interface{}) error {
-	args := m.Called(msg)
-	return args.Error(0)
 }
 
 func (m *MockedListenManager) Subscribe(txid string) pubsub.Subscription {

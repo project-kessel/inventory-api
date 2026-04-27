@@ -21,7 +21,6 @@ import (
 	"github.com/project-kessel/inventory-api/internal/testutil"
 
 	"github.com/go-kratos/kratos/v2/log"
-	"github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
 	"github.com/stretchr/testify/assert"
 
 	. "github.com/project-kessel/inventory-api/cmd/common"
@@ -29,6 +28,32 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
+
+// testConsumerSampleTuple returns a valid RelationsTuple using ResourceReference (matches prior integration/notifications+rbac workspace tests).
+func testConsumerSampleTuple(t *testing.T) model.RelationsTuple {
+	t.Helper()
+	resourceId, err := model.NewLocalResourceId("4321")
+	require.NoError(t, err)
+	notif := model.NewReporterReference(model.DeserializeReporterType("notifications"), nil)
+	object := model.NewResourceReference(
+		model.DeserializeResourceType("integration"),
+		resourceId,
+		&notif,
+	)
+	subjectId, err := model.NewLocalResourceId("1234")
+	require.NoError(t, err)
+	rbac := model.NewReporterReference(model.DeserializeReporterType("rbac"), nil)
+	subjectRes := model.NewResourceReference(
+		model.DeserializeResourceType("workspace"),
+		subjectId,
+		&rbac,
+	)
+	return model.NewRelationsTuple(
+		object,
+		model.DeserializeRelation("t_workspace"),
+		model.NewSubjectReferenceWithoutRelation(subjectRes),
+	)
+}
 
 const (
 	testMessageKey    = `{"schema":{"type":"string","optional":false},"payload":"00000000-0000-0000-0000-000000000000"}`
@@ -513,7 +538,6 @@ func TestRebalanceCallback_AssignedPartitions(t *testing.T) {
 	tests := []struct {
 		name                  string
 		partitions            []kafka.TopicPartition
-		lockResponse          *v1beta1.AcquireLockResponse
 		lockError             error
 		expectedLockId        string
 		expectedLockToken     string
@@ -524,9 +548,6 @@ func TestRebalanceCallback_AssignedPartitions(t *testing.T) {
 			name: "successful lock acquisition",
 			partitions: []kafka.TopicPartition{
 				{Partition: 0, Topic: ToPointer("test-topic")},
-			},
-			lockResponse: &v1beta1.AcquireLockResponse{
-				LockToken: "test-lock-token-123",
 			},
 			lockError:             nil,
 			expectedLockId:        "inventory-consumer/0",
@@ -539,7 +560,6 @@ func TestRebalanceCallback_AssignedPartitions(t *testing.T) {
 			partitions: []kafka.TopicPartition{
 				{Partition: 0, Topic: ToPointer("test-topic")},
 			},
-			lockResponse:          nil,
 			lockError:             errors.New("lock acquisition failed"),
 			expectedLockId:        "inventory-consumer/0",
 			expectedLockToken:     "",
@@ -549,7 +569,6 @@ func TestRebalanceCallback_AssignedPartitions(t *testing.T) {
 		{
 			name:                  "no partitions assigned",
 			partitions:            []kafka.TopicPartition{},
-			lockResponse:          nil,
 			lockError:             nil,
 			expectedLockId:        "",
 			expectedLockToken:     "",
@@ -579,12 +598,12 @@ func TestRebalanceCallback_AssignedPartitions(t *testing.T) {
 			err := tester.inv.RebalanceCallback(nil, event)
 
 			assert.Equal(t, test.expectedError, err)
-			assert.Equal(t, test.expectedLockId, tester.inv.lockId)
+			assert.Equal(t, test.expectedLockId, tester.inv.lockId.String())
 			// For successful case, verify token was set (SimpleRelationsRepository generates token-{lockId})
 			if test.expectedError == nil && test.expectAcquireLockCall {
-				assert.NotEmpty(t, tester.inv.lockToken)
+				assert.NotEmpty(t, tester.inv.lockToken.String())
 			} else {
-				assert.Equal(t, test.expectedLockToken, tester.inv.lockToken)
+				assert.Equal(t, test.expectedLockToken, tester.inv.lockToken.String())
 			}
 		})
 	}
@@ -690,8 +709,8 @@ func TestRebalanceCallback_RevokedPartitions(t *testing.T) {
 			}
 
 			tester.inv.OffsetStorage = test.storedOffsets
-			tester.inv.lockId = test.initialLockId
-			tester.inv.lockToken = test.initialLockToken
+			tester.inv.lockId = model.DeserializeLockId(test.initialLockId)
+			tester.inv.lockToken = model.DeserializeLockToken(test.initialLockToken)
 
 			event := kafka.RevokedPartitions{
 				Partitions: test.partitions,
@@ -700,8 +719,8 @@ func TestRebalanceCallback_RevokedPartitions(t *testing.T) {
 			err := tester.inv.RebalanceCallback(nil, event)
 
 			assert.Equal(t, test.expectedError, err)
-			assert.Equal(t, test.expectedLockId, tester.inv.lockId)
-			assert.Equal(t, test.expectedLockToken, tester.inv.lockToken)
+			assert.Equal(t, test.expectedLockId, tester.inv.lockId.String())
+			assert.Equal(t, test.expectedLockToken, tester.inv.lockToken.String())
 
 			consumer.AssertExpectations(t)
 		})
@@ -721,29 +740,23 @@ func TestFencingToken_WritingAfterRebalance(t *testing.T) {
 	testerB.inv.Config.ConsumerGroupID = "test-group"
 
 	relationsRepo := &mocks.MockRelationsRepository{}
-	createSuccessResponse := &v1beta1.CreateTuplesResponse{ConsistencyToken: &v1beta1.ConsistencyToken{Token: "test-token"}}
+	createSuccessResponse := model.DeserializeConsistencyToken("test-token")
+	wantLock, err := model.NewLockId("test-group/0")
+	require.NoError(t, err)
 
 	consumerAToken := "token-A"
 	consumerBToken := "token-B"
-	lockCall1 := relationsRepo.On("AcquireLock", mock.Anything, mock.MatchedBy(func(req *v1beta1.AcquireLockRequest) bool {
-		return req.LockId == "test-group/0"
-	})).Return(&v1beta1.AcquireLockResponse{LockToken: consumerAToken}, nil).Once()
+	lock1 := relationsRepo.On("AcquireLock", mock.Anything, wantLock).Return(model.NewAcquireLockResult(model.DeserializeLockToken(consumerAToken)), nil).Once()
+	lock2 := relationsRepo.On("AcquireLock", mock.Anything, wantLock).Return(model.NewAcquireLockResult(model.DeserializeLockToken(consumerBToken)), nil).Once()
+	lock2.NotBefore(lock1)
 
-	lockCall2 := relationsRepo.On("AcquireLock", mock.Anything, mock.MatchedBy(func(req *v1beta1.AcquireLockRequest) bool {
-		return req.LockId == "test-group/0"
-	})).Return(&v1beta1.AcquireLockResponse{LockToken: consumerBToken}, nil).Once()
+	relationsRepo.On("CreateTuples", mock.Anything, mock.Anything, mock.Anything, mock.MatchedBy(func(fencing *model.FencingCheck) bool {
+		return fencing != nil && fencing.LockToken() == model.DeserializeLockToken(consumerBToken)
+	})).Return(model.NewTuplesResult(createSuccessResponse), nil)
 
-	// Ensure the calls happen in the right order
-	lockCall2.NotBefore(lockCall1)
-
-	// Mock the CreateTuples calls to only accept consumer B's token
-	relationsRepo.On("CreateTuples", mock.Anything, mock.MatchedBy(func(req *v1beta1.CreateTuplesRequest) bool {
-		return req.FencingCheck != nil && req.FencingCheck.LockToken == consumerBToken
-	})).Return(createSuccessResponse, nil)
-
-	relationsRepo.On("CreateTuples", mock.Anything, mock.MatchedBy(func(req *v1beta1.CreateTuplesRequest) bool {
-		return req.FencingCheck != nil && req.FencingCheck.LockToken == consumerAToken
-	})).Return((*v1beta1.CreateTuplesResponse)(nil), errors.New("fencing token is invalid or expired"))
+	relationsRepo.On("CreateTuples", mock.Anything, mock.Anything, mock.Anything, mock.MatchedBy(func(fencing *model.FencingCheck) bool {
+		return fencing != nil && fencing.LockToken() == model.DeserializeLockToken(consumerAToken)
+	})).Return(model.TuplesResult{}, errors.New("fencing token is invalid or expired"))
 
 	testerA.inv.Relations = relationsRepo
 	testerB.inv.Relations = relationsRepo
@@ -753,35 +766,23 @@ func TestFencingToken_WritingAfterRebalance(t *testing.T) {
 	}
 
 	// Consumer A acquires the lock first
-	err := testerA.inv.RebalanceCallback(nil, assignedPartitions)
+	err = testerA.inv.RebalanceCallback(nil, assignedPartitions)
 	assert.Nil(t, err)
-	assert.Equal(t, "test-group/0", testerA.inv.lockId)
-	assert.Equal(t, "token-A", testerA.inv.lockToken)
+	assert.Equal(t, "test-group/0", testerA.inv.lockId.String())
+	assert.Equal(t, "token-A", testerA.inv.lockToken.String())
 	staleToken := testerA.inv.lockToken
 
 	// Consumer B acquires the lock, invalidating A's token
 	err = testerB.inv.RebalanceCallback(nil, assignedPartitions)
 	assert.Nil(t, err)
-	assert.Equal(t, "test-group/0", testerB.inv.lockId)
-	assert.Equal(t, "token-B", testerB.inv.lockToken)
+	assert.Equal(t, "test-group/0", testerB.inv.lockId.String())
+	assert.Equal(t, "token-B", testerB.inv.lockToken.String())
 	assert.NotEqual(t, staleToken, testerB.inv.lockToken)
 
 	// Simulate consumer A waking up with the stale token
 	testerA.inv.lockToken = staleToken
 
-	// Create a domain tuple directly
-	resourceId, err := model.NewLocalResourceId("4321")
-	assert.Nil(t, err)
-	resourceType := model.NewRelationsObjectType("integration", "notifications")
-	resource := model.NewRelationsResource(resourceId, resourceType)
-
-	subjectId, err := model.NewLocalResourceId("1234")
-	assert.Nil(t, err)
-	subjectType := model.NewRelationsObjectType("workspace", "rbac")
-	subjectResource := model.NewRelationsResource(subjectId, subjectType)
-	subject := model.NewRelationsSubject(subjectResource, "")
-
-	domainTuple := model.NewRelationsTuple(resource, "t_workspace", subject)
+	domainTuple := testConsumerSampleTuple(t)
 	tuples := &[]model.RelationsTuple{domainTuple}
 
 	// Try to create a tuple with the stale token
@@ -807,21 +808,9 @@ func TestInventoryConsumer_CreateTuple_FailedPrecondition(t *testing.T) {
 	relationsRepo.SetCreateTuplesError(status.Error(codes.FailedPrecondition, "invalid fencing token"))
 
 	tester.inv.Relations = relationsRepo
-	tester.inv.lockToken = "test-token"
+	tester.inv.lockToken = model.DeserializeLockToken("test-token")
 
-	// Create a domain tuple directly
-	resourceId, err := model.NewLocalResourceId("4321")
-	assert.Nil(t, err)
-	resourceType := model.NewRelationsObjectType("integration", "notifications")
-	resource := model.NewRelationsResource(resourceId, resourceType)
-
-	subjectId, err := model.NewLocalResourceId("1234")
-	assert.Nil(t, err)
-	subjectType := model.NewRelationsObjectType("workspace", "rbac")
-	subjectResource := model.NewRelationsResource(subjectId, subjectType)
-	subject := model.NewRelationsSubject(subjectResource, "")
-
-	domainTuple := model.NewRelationsTuple(resource, "t_workspace", subject)
+	domainTuple := testConsumerSampleTuple(t)
 	tuples := &[]model.RelationsTuple{domainTuple}
 
 	resp, err := tester.inv.CreateTuple(context.Background(), tuples)
@@ -841,21 +830,9 @@ func TestInventoryConsumer_UpdateTuple_FailedPrecondition(t *testing.T) {
 	relationsRepo.SetCreateTuplesError(status.Error(codes.FailedPrecondition, "invalid fencing token"))
 
 	tester.inv.Relations = relationsRepo
-	tester.inv.lockToken = "test-token"
+	tester.inv.lockToken = model.DeserializeLockToken("test-token")
 
-	// Create a domain tuple directly
-	resourceId, err := model.NewLocalResourceId("4321")
-	assert.Nil(t, err)
-	resourceType := model.NewRelationsObjectType("integration", "notifications")
-	resource := model.NewRelationsResource(resourceId, resourceType)
-
-	subjectId, err := model.NewLocalResourceId("1234")
-	assert.Nil(t, err)
-	subjectType := model.NewRelationsObjectType("workspace", "rbac")
-	subjectResource := model.NewRelationsResource(subjectId, subjectType)
-	subject := model.NewRelationsSubject(subjectResource, "")
-
-	domainTuple := model.NewRelationsTuple(resource, "t_workspace", subject)
+	domainTuple := testConsumerSampleTuple(t)
 	tuples := &[]model.RelationsTuple{domainTuple}
 
 	resp, err := tester.inv.UpdateTuple(context.Background(), tuples, nil)
@@ -875,21 +852,9 @@ func TestInventoryConsumer_DeleteTuple_FailedPrecondition(t *testing.T) {
 	relationsRepo.SetDeleteTuplesError(status.Error(codes.FailedPrecondition, "invalid fencing token"))
 
 	tester.inv.Relations = relationsRepo
-	tester.inv.lockToken = "test-token"
+	tester.inv.lockToken = model.DeserializeLockToken("test-token")
 
-	// Create a domain tuple directly
-	resourceId, err := model.NewLocalResourceId("4321")
-	assert.Nil(t, err)
-	resourceType := model.NewRelationsObjectType("integration", "notifications")
-	resource := model.NewRelationsResource(resourceId, resourceType)
-
-	subjectId, err := model.NewLocalResourceId("1234")
-	assert.Nil(t, err)
-	subjectType := model.NewRelationsObjectType("workspace", "rbac")
-	subjectResource := model.NewRelationsResource(subjectId, subjectType)
-	subject := model.NewRelationsSubject(subjectResource, "")
-
-	domainTuple := model.NewRelationsTuple(resource, "t_workspace", subject)
+	domainTuple := testConsumerSampleTuple(t)
 	tuples := []model.RelationsTuple{domainTuple}
 
 	resp, err := tester.inv.DeleteTuple(context.Background(), tuples)

@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestToLookupResourcesCommand_WithLimitOnly(t *testing.T) {
+func TestToLookupObjectsCommand_WithLimitOnly(t *testing.T) {
 	permission := "view"
 	reporterType := "hbi"
 	input := &pb.StreamedListObjectsRequest{
@@ -34,7 +34,7 @@ func TestToLookupResourcesCommand_WithLimitOnly(t *testing.T) {
 		},
 	}
 
-	result, err := svc.ToLookupResourcesCommand(input)
+	result, err := svc.ToLookupObjectsCommand(input)
 	require.NoError(t, err)
 
 	require.NotNil(t, result.Pagination)
@@ -42,7 +42,7 @@ func TestToLookupResourcesCommand_WithLimitOnly(t *testing.T) {
 	assert.Nil(t, result.Pagination.Continuation)
 }
 
-func TestToLookupResourcesCommand_WithContinuationOnly(t *testing.T) {
+func TestToLookupObjectsCommand_WithContinuationOnly(t *testing.T) {
 	// This request has continuation but no limit (defaults to 0).
 	// Proto validation should reject this (limit must be > 0), but our converter
 	// just passes it through - validation happens before we reach this code.
@@ -72,7 +72,7 @@ func TestToLookupResourcesCommand_WithContinuationOnly(t *testing.T) {
 		},
 	}
 
-	result, err := svc.ToLookupResourcesCommand(input)
+	result, err := svc.ToLookupObjectsCommand(input)
 	require.NoError(t, err)
 
 	require.NotNil(t, result.Pagination)
@@ -81,7 +81,7 @@ func TestToLookupResourcesCommand_WithContinuationOnly(t *testing.T) {
 	assert.Equal(t, "continuation-token-123", *result.Pagination.Continuation)
 }
 
-func TestToLookupResourcesCommand_WithBothLimitAndContinuation(t *testing.T) {
+func TestToLookupObjectsCommand_WithBothLimitAndContinuation(t *testing.T) {
 	permission := "view"
 	reporterType := "hbi"
 	token := "continuation-token-456"
@@ -107,7 +107,7 @@ func TestToLookupResourcesCommand_WithBothLimitAndContinuation(t *testing.T) {
 		},
 	}
 
-	result, err := svc.ToLookupResourcesCommand(input)
+	result, err := svc.ToLookupObjectsCommand(input)
 	require.NoError(t, err)
 
 	require.NotNil(t, result.Pagination)
@@ -116,7 +116,7 @@ func TestToLookupResourcesCommand_WithBothLimitAndContinuation(t *testing.T) {
 	assert.Equal(t, "continuation-token-456", *result.Pagination.Continuation)
 }
 
-func TestToLookupResourcesCommand_WithEmptyContinuationToken(t *testing.T) {
+func TestToLookupObjectsCommand_WithEmptyContinuationToken(t *testing.T) {
 	permission := "view"
 	reporterType := "hbi"
 	emptyToken := ""
@@ -142,7 +142,7 @@ func TestToLookupResourcesCommand_WithEmptyContinuationToken(t *testing.T) {
 		},
 	}
 
-	result, err := svc.ToLookupResourcesCommand(input)
+	result, err := svc.ToLookupObjectsCommand(input)
 	require.NoError(t, err)
 
 	require.NotNil(t, result.Pagination)
@@ -267,7 +267,7 @@ func TestPaginationFromProto_NilInput(t *testing.T) {
 		// Pagination field is nil
 	}
 
-	result, err := svc.ToLookupResourcesCommand(input)
+	result, err := svc.ToLookupObjectsCommand(input)
 	require.NoError(t, err)
 
 	// When pagination is nil from proto, the Pagination pointer should be nil

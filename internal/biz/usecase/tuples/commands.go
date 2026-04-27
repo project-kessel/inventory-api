@@ -15,14 +15,14 @@ type CreateTuplesCommand struct {
 // DeleteTuplesCommand - domain command for deleting tuples (DEPRECATED).
 // This command exists only for RBAC backward compatibility and will be removed.
 type DeleteTuplesCommand struct {
-	Filter       TupleFilter
+	Filter       model.TupleFilter
 	FencingCheck *FencingCheck
 }
 
 // ReadTuplesCommand - domain command for reading tuples (DEPRECATED).
 // This command exists only for RBAC backward compatibility and will be removed.
 type ReadTuplesCommand struct {
-	Filter      TupleFilter
+	Filter      model.TupleFilter
 	Pagination  *model.Pagination
 	Consistency model.Consistency
 }
@@ -31,23 +31,6 @@ type ReadTuplesCommand struct {
 // This command exists only for RBAC backward compatibility and will be removed.
 type AcquireLockCommand struct {
 	LockId string
-}
-
-// TupleFilter represents filtering criteria for tuple queries.
-type TupleFilter struct {
-	ResourceNamespace *string
-	ResourceType      *string
-	ResourceId        *string
-	Relation          *string
-	SubjectFilter     *SubjectFilter
-}
-
-// SubjectFilter represents subject filtering criteria.
-type SubjectFilter struct {
-	SubjectNamespace *string
-	SubjectType      *string
-	SubjectId        *string
-	Relation         *string
 }
 
 // FencingCheck represents distributed locking parameters.

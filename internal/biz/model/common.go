@@ -441,3 +441,47 @@ func (t TransactionId) Serialize() string {
 func NewTransactionId(transactionId string) TransactionId {
 	return TransactionId(transactionId)
 }
+
+type LockId string
+
+func NewLockId(id string) (LockId, error) {
+	id = strings.TrimSpace(id)
+	if id == "" {
+		return LockId(""), fmt.Errorf("%w: LockId", ErrEmpty)
+	}
+	return LockId(id), nil
+}
+
+func (l LockId) String() string {
+	return string(l)
+}
+
+func (l LockId) Serialize() string {
+	return SerializeString(l)
+}
+
+func DeserializeLockId(value string) LockId {
+	return Deserialize[LockId](value)
+}
+
+type LockToken string
+
+func NewLockToken(token string) (LockToken, error) {
+	token = strings.TrimSpace(token)
+	if token == "" {
+		return LockToken(""), fmt.Errorf("%w: LockToken", ErrEmpty)
+	}
+	return LockToken(token), nil
+}
+
+func (l LockToken) String() string {
+	return string(l)
+}
+
+func (l LockToken) Serialize() string {
+	return SerializeString(l)
+}
+
+func DeserializeLockToken(value string) LockToken {
+	return Deserialize[LockToken](value)
+}

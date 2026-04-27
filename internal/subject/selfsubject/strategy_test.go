@@ -20,9 +20,9 @@ func TestRedHatRbacSelfSubjectStrategy_XRhIdentity_User(t *testing.T) {
 		},
 	})
 	assert.NoError(t, err)
-	assert.Equal(t, "redhat/user-123", subjectRef.Subject().LocalResourceId().String())
-	assert.Equal(t, "principal", subjectRef.Subject().ResourceType().String())
-	assert.Equal(t, "rbac", subjectRef.Subject().ReporterType().String())
+	assert.Equal(t, "redhat/user-123", subjectRef.Resource().ResourceId().String())
+	assert.Equal(t, "principal", subjectRef.Resource().ResourceType().String())
+	assert.Equal(t, "rbac", subjectRef.Resource().Reporter().ReporterType().String())
 }
 
 func TestRedHatRbacSelfSubjectStrategy_OIDC_IssuerMap(t *testing.T) {
@@ -41,7 +41,7 @@ func TestRedHatRbacSelfSubjectStrategy_OIDC_IssuerMap(t *testing.T) {
 		},
 	})
 	assert.NoError(t, err)
-	assert.Equal(t, "redhat/user-123", subjectRef.Subject().LocalResourceId().String())
+	assert.Equal(t, "redhat/user-123", subjectRef.Resource().ResourceId().String())
 }
 
 func TestRedHatRbacSelfSubjectStrategy_OIDC_Issuer_IsExact(t *testing.T) {

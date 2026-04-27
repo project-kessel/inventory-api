@@ -107,10 +107,7 @@ func buildSubjectReference(subjectID string) (model.SubjectReference, error) {
 		return model.SubjectReference{}, fmt.Errorf("invalid reporter type: %w", err)
 	}
 
-	key, err := model.NewReporterResourceKey(localResourceId, resourceType, reporterType, model.ReporterInstanceId(""))
-	if err != nil {
-		return model.SubjectReference{}, fmt.Errorf("failed to build subject key: %w", err)
-	}
-
-	return model.NewSubjectReferenceWithoutRelation(key), nil
+	reporter := model.NewReporterReference(reporterType, nil)
+	resource := model.NewResourceReference(resourceType, localResourceId, &reporter)
+	return model.NewSubjectReferenceWithoutRelation(resource), nil
 }

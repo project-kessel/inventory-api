@@ -51,20 +51,37 @@ func TestInMemorySchemaRepository_CreateResource_AlreadyExists(t *testing.T) {
 }
 
 func TestInMemorySchemaRepository_GetResource(t *testing.T) {
-	repo := NewInMemorySchemaRepository()
-	ctx := context.Background()
-
-	resource := bizmodel.ResourceSchema{
-		ResourceType:     "k8s_cluster",
-		ValidationSchema: validateSchemaTypeObject,
+	// NormalizeResourceType does ToLower + slash->underscore on both create and get paths.
+	cases := []struct {
+		name       string
+		createType string
+		lookupType string
+	}{
+		{"lowercase lookup", "k8s_cluster", "k8s_cluster"},
+		{"uppercase lookup normalizes", "k8s_cluster", "K8S_CLUSTER"},
+		{"mixed-case lookup", "k8s_cluster", "K8s_Cluster"},
+		{"slash normalizes to underscore", "rhel_host", "rhel/host"},
+		{"uppercase + slash", "rhel_host", "RHEL/Host"},
+		{"create uppercase, lookup lowercase", "HOST", "host"},
 	}
 
-	err := repo.CreateResourceSchema(ctx, resource)
-	assert.NoError(t, err)
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			repo := NewInMemorySchemaRepository()
+			ctx := context.Background()
 
-	retrieved, err := repo.GetResourceSchema(ctx, "k8s_cluster")
-	assert.NoError(t, err)
-	assert.Equal(t, "k8s_cluster", retrieved.ResourceType)
+			err := repo.CreateResourceSchema(ctx, bizmodel.ResourceSchema{
+				ResourceType:     tc.createType,
+				ValidationSchema: validateSchemaTypeObject,
+			})
+			assert.NoError(t, err)
+
+			retrieved, err := repo.GetResourceSchema(ctx, tc.lookupType)
+			assert.NoError(t, err)
+			assert.Equal(t, NormalizeResourceType(tc.createType), retrieved.ResourceType)
+		})
+	}
 }
 
 func TestInMemorySchemaRepository_GetResource_NotFound(t *testing.T) {
@@ -159,32 +176,44 @@ func TestInMemorySchemaRepository_GetResources(t *testing.T) {
 }
 
 func TestInMemorySchemaRepository_CreateResourceReporter(t *testing.T) {
-	repo := NewInMemorySchemaRepository()
-	ctx := context.Background()
+	// NormalizeResourceType does ToLower + slash->underscore; normalizeReporterType does ToLower only.
+	reporterValidation := bizmodel.NewJsonSchemaValidatorFromString(`{"type": "object", "properties": {"satellite_id": {"type": "string"}}}`)
 
-	// Create resource first
-	resource := bizmodel.ResourceSchema{
-		ResourceType:     "host",
-		ValidationSchema: validateSchemaTypeObject,
-	}
-	err := repo.CreateResourceSchema(ctx, resource)
-	assert.NoError(t, err)
-
-	// Create reporter
-	reporter := bizmodel.ReporterSchema{
-		ResourceType:     "host",
-		ReporterType:     "hbi",
-		ValidationSchema: bizmodel.NewJsonSchemaValidatorFromString(`{"type": "object", "properties": {"satellite_id": {"type": "string"}}}`),
+	cases := []struct {
+		name               string
+		createReporterType string
+		lookupReporterType string
+	}{
+		{"lowercase reporter", "hbi", "hbi"},
+		{"uppercase reporter lookup", "hbi", "HBI"},
+		{"create uppercase, lookup lowercase", "HBI", "hbi"},
 	}
 
-	err = repo.CreateReporterSchema(ctx, reporter)
-	assert.NoError(t, err)
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			repo := NewInMemorySchemaRepository()
+			ctx := context.Background()
 
-	// Verify reporter was created
-	retrieved, err := repo.GetReporterSchema(ctx, "host", "hbi")
-	assert.NoError(t, err)
-	assert.Equal(t, "host", retrieved.ResourceType)
-	assert.Equal(t, "hbi", retrieved.ReporterType)
+			err := repo.CreateResourceSchema(ctx, bizmodel.ResourceSchema{
+				ResourceType:     "host",
+				ValidationSchema: validateSchemaTypeObject,
+			})
+			assert.NoError(t, err)
+
+			err = repo.CreateReporterSchema(ctx, bizmodel.ReporterSchema{
+				ResourceType:     "host",
+				ReporterType:     tc.createReporterType,
+				ValidationSchema: reporterValidation,
+			})
+			assert.NoError(t, err)
+
+			retrieved, err := repo.GetReporterSchema(ctx, "host", tc.lookupReporterType)
+			assert.NoError(t, err)
+			assert.Equal(t, "host", retrieved.ResourceType)
+			assert.Equal(t, normalizeReporterType(tc.createReporterType), retrieved.ReporterType)
+		})
+	}
 }
 
 func TestInMemorySchemaRepository_GetResourceReporter_NotFound(t *testing.T) {

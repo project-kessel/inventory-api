@@ -3917,3 +3917,679 @@ func newFakeSchemaRepository(t *testing.T) model.SchemaRepository {
 
 	return schemaRepository
 }
+
+func TestInventoryService_CaseInsensitiveTypes(t *testing.T) {
+	t.Parallel()
+
+	t.Run("Report", func(t *testing.T) {
+		cases := []struct {
+			name               string
+			resourceType       string
+			reporterType       string
+			reporterInstanceId string
+		}{
+			{"lowercase types", "host", "hbi", "instance-001"},
+			{"uppercase resource type", "HOST", "hbi", "instance-001"},
+			{"uppercase reporter type", "host", "HBI", "instance-001"},
+			{"all uppercase", "HOST", "HBI", "INSTANCE-001"},
+			{"mixed case instance id", "host", "hbi", "Instance-001"},
+		}
+
+		for _, tc := range cases {
+			t.Run(tc.name, func(t *testing.T) {
+				runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
+					claims := &authnapi.Claims{
+						SubjectId: authnapi.SubjectId("reporter-service"),
+						AuthType:  authnapi.AuthTypeXRhIdentity,
+					}
+					uc := newTestUsecase(t, testUsecaseConfig{})
+					protoReq := &pb.ReportResourceRequest{
+						Type:               tc.resourceType,
+						ReporterType:       tc.reporterType,
+						ReporterInstanceId: tc.reporterInstanceId,
+						Representations: &pb.ResourceRepresentations{
+							Metadata: &pb.RepresentationMetadata{
+								LocalResourceId: "my-host-123",
+								ApiHref:         "https://api.example.com/hosts/my-host-123",
+							},
+							Common: &structpb.Struct{
+								Fields: map[string]*structpb.Value{
+									"hostname": structpb.NewStringValue("example-host"),
+								},
+							},
+						},
+					}
+
+					return TestServerConfig{
+						Usecase:       uc,
+						Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+					}, func(t *testing.T, tr *Transport) {
+						ctx := context.Background()
+						res := tr.Invoke(ctx, withBody(protoReq, ReportResource, httpEndpoint("POST /api/kessel/v1beta2/resources")))
+						Assert(t, res, requireSuccess())
+					}
+				})
+			})
+		}
+	})
+
+	t.Run("ReportUpdate", func(t *testing.T) {
+		cases := []struct {
+			name           string
+			createType     string
+			createReporter string
+			createInstance string
+			updateType     string
+			updateReporter string
+			updateInstance string
+		}{
+			{"create uppercase, update lowercase", "HOST", "HBI", "INSTANCE-001", "host", "hbi", "instance-001"},
+			{"create lowercase, update uppercase", "host", "hbi", "instance-001", "HOST", "HBI", "INSTANCE-001"},
+			{"create mixed, update lowercase", "Host", "Hbi", "Instance-001", "host", "hbi", "instance-001"},
+		}
+
+		for _, tc := range cases {
+			t.Run(tc.name, func(t *testing.T) {
+				runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
+					claims := &authnapi.Claims{
+						SubjectId: authnapi.SubjectId("reporter-service"),
+						AuthType:  authnapi.AuthTypeXRhIdentity,
+					}
+					uc := newTestUsecase(t, testUsecaseConfig{})
+
+					createReq := &pb.ReportResourceRequest{
+						Type:               tc.createType,
+						ReporterType:       tc.createReporter,
+						ReporterInstanceId: tc.createInstance,
+						Representations: &pb.ResourceRepresentations{
+							Metadata: &pb.RepresentationMetadata{
+								LocalResourceId: "my-host-123",
+								ApiHref:         "https://api.example.com/hosts/my-host-123",
+							},
+							Common: &structpb.Struct{
+								Fields: map[string]*structpb.Value{
+									"hostname": structpb.NewStringValue("original-host"),
+								},
+							},
+						},
+					}
+					updateReq := &pb.ReportResourceRequest{
+						Type:               tc.updateType,
+						ReporterType:       tc.updateReporter,
+						ReporterInstanceId: tc.updateInstance,
+						Representations: &pb.ResourceRepresentations{
+							Metadata: &pb.RepresentationMetadata{
+								LocalResourceId: "my-host-123",
+								ApiHref:         "https://api.example.com/hosts/my-host-123",
+							},
+							Common: &structpb.Struct{
+								Fields: map[string]*structpb.Value{
+									"hostname": structpb.NewStringValue("updated-host"),
+								},
+							},
+						},
+					}
+
+					return TestServerConfig{
+						Usecase:       uc,
+						Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+					}, func(t *testing.T, tr *Transport) {
+						ctx := context.Background()
+						res1 := tr.Invoke(ctx, withBody(createReq, ReportResource, httpEndpoint("POST /api/kessel/v1beta2/resources")))
+						Assert(t, res1, requireSuccess())
+
+						res2 := tr.Invoke(ctx, withBody(updateReq, ReportResource, httpEndpoint("POST /api/kessel/v1beta2/resources")))
+						Assert(t, res2, requireSuccess())
+					}
+				})
+			})
+		}
+	})
+
+	t.Run("Delete", func(t *testing.T) {
+		cases := []struct {
+			name           string
+			reportType     string
+			reportReporter string
+			reportInstance string
+			deleteType     string
+			deleteReporter string
+			deleteInstance string
+		}{
+			{"report uppercase, delete lowercase", "HOST", "HBI", "INSTANCE-001", "host", "hbi", "instance-001"},
+			{"report lowercase, delete uppercase", "host", "hbi", "instance-001", "HOST", "HBI", "INSTANCE-001"},
+		}
+
+		for _, tc := range cases {
+			t.Run(tc.name, func(t *testing.T) {
+				runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
+					claims := &authnapi.Claims{
+						SubjectId: authnapi.SubjectId("reporter-service"),
+						AuthType:  authnapi.AuthTypeXRhIdentity,
+					}
+					uc := newTestUsecase(t, testUsecaseConfig{})
+
+					reportReq := &pb.ReportResourceRequest{
+						Type:               tc.reportType,
+						ReporterType:       tc.reportReporter,
+						ReporterInstanceId: tc.reportInstance,
+						Representations: &pb.ResourceRepresentations{
+							Metadata: &pb.RepresentationMetadata{
+								LocalResourceId: "my-host-123",
+								ApiHref:         "https://api.example.com/hosts/my-host-123",
+							},
+							Common: &structpb.Struct{
+								Fields: map[string]*structpb.Value{
+									"hostname": structpb.NewStringValue("example-host"),
+								},
+							},
+						},
+					}
+					deleteInstance := tc.deleteInstance
+					deleteReq := &pb.DeleteResourceRequest{
+						Reference: &pb.ResourceReference{
+							ResourceType: tc.deleteType,
+							ResourceId:   "my-host-123",
+							Reporter: &pb.ReporterReference{
+								Type:       tc.deleteReporter,
+								InstanceId: &deleteInstance,
+							},
+						},
+					}
+
+					return TestServerConfig{
+						Usecase:       uc,
+						Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+					}, func(t *testing.T, tr *Transport) {
+						ctx := context.Background()
+						res1 := tr.Invoke(ctx, withBody(reportReq, ReportResource, httpEndpoint("POST /api/kessel/v1beta2/resources")))
+						Assert(t, res1, requireSuccess())
+
+						res2 := tr.Invoke(ctx, withBody(deleteReq, DeleteResource, httpEndpoint("DELETE /api/kessel/v1beta2/resources")))
+						Assert(t, res2, requireSuccess())
+					}
+				})
+			})
+		}
+	})
+
+	t.Run("Check", func(t *testing.T) {
+		cases := []struct {
+			name            string
+			resourceType    string
+			reporterType    string
+			expectedAllowed pb.Allowed
+		}{
+			{"lowercase types", "host", "hbi", pb.Allowed_ALLOWED_TRUE},
+			{"uppercase types", "HOST", "HBI", pb.Allowed_ALLOWED_TRUE},
+			{"mixed case", "Host", "Hbi", pb.Allowed_ALLOWED_TRUE},
+		}
+
+		for _, tc := range cases {
+			t.Run(tc.name, func(t *testing.T) {
+				runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
+					claims := &authnapi.Claims{
+						SubjectId: authnapi.SubjectId("user-123"),
+						AuthType:  authnapi.AuthTypeXRhIdentity,
+					}
+					simpleAuthz := data.NewSimpleRelationsRepository()
+					simpleAuthz.Grant("subject-456", "view", "hbi", "host", "resource-abc")
+
+					protoReq := &pb.CheckRequest{
+						Relation: "view",
+						Object: &pb.ResourceReference{
+							ResourceId:   "resource-abc",
+							ResourceType: tc.resourceType,
+							Reporter:     &pb.ReporterReference{Type: tc.reporterType},
+						},
+						Subject: &pb.SubjectReference{
+							Resource: &pb.ResourceReference{
+								ResourceId:   "subject-456",
+								ResourceType: "principal",
+								Reporter:     &pb.ReporterReference{Type: "rbac"},
+							},
+						},
+					}
+
+					return TestServerConfig{
+						Usecase:       newTestUsecase(t, testUsecaseConfig{Relations: simpleAuthz}),
+						Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+					}, func(t *testing.T, tr *Transport) {
+						ctx := context.Background()
+						res := tr.Invoke(ctx, withBody(protoReq, Check, httpEndpoint("POST /api/kessel/v1beta2/check")))
+						resp := Extract(t, res, expectSuccess(func() *pb.CheckResponse { return &pb.CheckResponse{} }))
+						assert.Equal(t, tc.expectedAllowed, resp.Allowed)
+					}
+				})
+			})
+		}
+	})
+
+	t.Run("CheckForUpdate", func(t *testing.T) {
+		cases := []struct {
+			name            string
+			resourceType    string
+			reporterType    string
+			expectedAllowed pb.Allowed
+		}{
+			{"lowercase types", "host", "hbi", pb.Allowed_ALLOWED_TRUE},
+			{"uppercase types", "HOST", "HBI", pb.Allowed_ALLOWED_TRUE},
+			{"mixed case", "Host", "Hbi", pb.Allowed_ALLOWED_TRUE},
+		}
+
+		for _, tc := range cases {
+			t.Run(tc.name, func(t *testing.T) {
+				runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
+					claims := &authnapi.Claims{
+						SubjectId: authnapi.SubjectId("user-123"),
+						AuthType:  authnapi.AuthTypeXRhIdentity,
+					}
+					simpleAuthz := data.NewSimpleRelationsRepository()
+					simpleAuthz.Grant("subject-789", "edit", "hbi", "host", "resource-xyz")
+
+					protoReq := &pb.CheckForUpdateRequest{
+						Relation: "edit",
+						Object: &pb.ResourceReference{
+							ResourceId:   "resource-xyz",
+							ResourceType: tc.resourceType,
+							Reporter:     &pb.ReporterReference{Type: tc.reporterType},
+						},
+						Subject: &pb.SubjectReference{
+							Resource: &pb.ResourceReference{
+								ResourceId:   "subject-789",
+								ResourceType: "principal",
+								Reporter:     &pb.ReporterReference{Type: "rbac"},
+							},
+						},
+					}
+
+					return TestServerConfig{
+						Usecase:       newTestUsecase(t, testUsecaseConfig{Relations: simpleAuthz}),
+						Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+					}, func(t *testing.T, tr *Transport) {
+						ctx := context.Background()
+						res := tr.Invoke(ctx, withBody(protoReq, CheckForUpdate, httpEndpoint("POST /api/kessel/v1beta2/checkforupdate")))
+						resp := Extract(t, res, expectSuccess(func() *pb.CheckForUpdateResponse { return &pb.CheckForUpdateResponse{} }))
+						assert.Equal(t, tc.expectedAllowed, resp.Allowed)
+					}
+				})
+			})
+		}
+	})
+
+	t.Run("CheckSelf", func(t *testing.T) {
+		cases := []struct {
+			name            string
+			resourceType    string
+			reporterType    string
+			expectedAllowed pb.Allowed
+		}{
+			{"lowercase types", "host", "hbi", pb.Allowed_ALLOWED_TRUE},
+			{"uppercase types", "HOST", "HBI", pb.Allowed_ALLOWED_TRUE},
+			{"mixed case", "Host", "Hbi", pb.Allowed_ALLOWED_TRUE},
+		}
+
+		for _, tc := range cases {
+			t.Run(tc.name, func(t *testing.T) {
+				runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
+					claims := &authnapi.Claims{
+						SubjectId: authnapi.SubjectId("user-123"),
+						AuthType:  authnapi.AuthTypeXRhIdentity,
+					}
+					simpleAuthz := data.NewSimpleRelationsRepository()
+					simpleAuthz.Grant("user-123", "view", "hbi", "host", "resource-abc")
+
+					protoReq := &pb.CheckSelfRequest{
+						Relation: "view",
+						Object: &pb.ResourceReference{
+							ResourceId:   "resource-abc",
+							ResourceType: tc.resourceType,
+							Reporter:     &pb.ReporterReference{Type: tc.reporterType},
+						},
+					}
+
+					return TestServerConfig{
+						Usecase:       newTestUsecase(t, testUsecaseConfig{Relations: simpleAuthz}),
+						Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+					}, func(t *testing.T, tr *Transport) {
+						ctx := context.Background()
+						res := tr.Invoke(ctx, withBody(protoReq, CheckSelf, httpEndpoint("POST /api/kessel/v1beta2/checkself")))
+						resp := Extract(t, res, expectSuccess(func() *pb.CheckSelfResponse { return &pb.CheckSelfResponse{} }))
+						assert.Equal(t, tc.expectedAllowed, resp.Allowed)
+					}
+				})
+			})
+		}
+	})
+
+	t.Run("CheckBulk", func(t *testing.T) {
+		cases := []struct {
+			name         string
+			resourceType string
+			reporterType string
+		}{
+			{"lowercase types", "host", "hbi"},
+			{"uppercase types", "HOST", "HBI"},
+			{"mixed case", "Host", "Hbi"},
+		}
+
+		for _, tc := range cases {
+			t.Run(tc.name, func(t *testing.T) {
+				runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
+					claims := &authnapi.Claims{
+						SubjectId: authnapi.SubjectId("user-123"),
+						AuthType:  authnapi.AuthTypeXRhIdentity,
+					}
+					simpleAuthz := data.NewSimpleRelationsRepository()
+					simpleAuthz.Grant("subject-a", "view", "hbi", "host", "resource-1")
+
+					protoReq := &pb.CheckBulkRequest{
+						Items: []*pb.CheckBulkRequestItem{
+							{
+								Object: &pb.ResourceReference{
+									ResourceId:   "resource-1",
+									ResourceType: tc.resourceType,
+									Reporter:     &pb.ReporterReference{Type: tc.reporterType},
+								},
+								Subject: &pb.SubjectReference{
+									Resource: &pb.ResourceReference{
+										ResourceId:   "subject-a",
+										ResourceType: "principal",
+										Reporter:     &pb.ReporterReference{Type: "rbac"},
+									},
+								},
+								Relation: "view",
+							},
+							{
+								Object: &pb.ResourceReference{
+									ResourceId:   "resource-2",
+									ResourceType: tc.resourceType,
+									Reporter:     &pb.ReporterReference{Type: tc.reporterType},
+								},
+								Subject: &pb.SubjectReference{
+									Resource: &pb.ResourceReference{
+										ResourceId:   "subject-b",
+										ResourceType: "principal",
+										Reporter:     &pb.ReporterReference{Type: "rbac"},
+									},
+								},
+								Relation: "edit",
+							},
+						},
+					}
+
+					return TestServerConfig{
+						Usecase:       newTestUsecase(t, testUsecaseConfig{Relations: simpleAuthz}),
+						Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+					}, func(t *testing.T, tr *Transport) {
+						ctx := context.Background()
+						res := tr.Invoke(ctx, withBody(protoReq, CheckBulk, httpEndpoint("POST /api/kessel/v1beta2/checkbulk")))
+						resp := Extract(t, res, expectSuccess(func() *pb.CheckBulkResponse { return &pb.CheckBulkResponse{} }))
+						require.Len(t, resp.Pairs, 2)
+						assert.Equal(t, pb.Allowed_ALLOWED_TRUE, resp.Pairs[0].GetItem().Allowed)
+						assert.Equal(t, pb.Allowed_ALLOWED_FALSE, resp.Pairs[1].GetItem().Allowed)
+					}
+				})
+			})
+		}
+	})
+
+	t.Run("CheckForUpdateBulk", func(t *testing.T) {
+		cases := []struct {
+			name         string
+			resourceType string
+			reporterType string
+		}{
+			{"lowercase types", "host", "hbi"},
+			{"uppercase types", "HOST", "HBI"},
+			{"mixed case", "Host", "Hbi"},
+		}
+
+		for _, tc := range cases {
+			t.Run(tc.name, func(t *testing.T) {
+				runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
+					claims := &authnapi.Claims{
+						SubjectId: authnapi.SubjectId("user-123"),
+						AuthType:  authnapi.AuthTypeXRhIdentity,
+					}
+					simpleAuthz := data.NewSimpleRelationsRepository()
+					simpleAuthz.Grant("subject-a", "update", "hbi", "host", "resource-1")
+
+					protoReq := &pb.CheckForUpdateBulkRequest{
+						Items: []*pb.CheckBulkRequestItem{
+							{
+								Object: &pb.ResourceReference{
+									ResourceId:   "resource-1",
+									ResourceType: tc.resourceType,
+									Reporter:     &pb.ReporterReference{Type: tc.reporterType},
+								},
+								Subject: &pb.SubjectReference{
+									Resource: &pb.ResourceReference{
+										ResourceId:   "subject-a",
+										ResourceType: "principal",
+										Reporter:     &pb.ReporterReference{Type: "rbac"},
+									},
+								},
+								Relation: "update",
+							},
+							{
+								Object: &pb.ResourceReference{
+									ResourceId:   "resource-2",
+									ResourceType: tc.resourceType,
+									Reporter:     &pb.ReporterReference{Type: tc.reporterType},
+								},
+								Subject: &pb.SubjectReference{
+									Resource: &pb.ResourceReference{
+										ResourceId:   "subject-b",
+										ResourceType: "principal",
+										Reporter:     &pb.ReporterReference{Type: "rbac"},
+									},
+								},
+								Relation: "update",
+							},
+						},
+					}
+
+					return TestServerConfig{
+						Usecase:       newTestUsecase(t, testUsecaseConfig{Relations: simpleAuthz}),
+						Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+					}, func(t *testing.T, tr *Transport) {
+						ctx := context.Background()
+						res := tr.Invoke(ctx, withBody(protoReq, CheckForUpdateBulk, httpEndpoint("POST /api/kessel/v1beta2/checkforupdatebulk")))
+						resp := Extract(t, res, expectSuccess(func() *pb.CheckForUpdateBulkResponse { return &pb.CheckForUpdateBulkResponse{} }))
+						require.Len(t, resp.Pairs, 2)
+						assert.Equal(t, pb.Allowed_ALLOWED_TRUE, resp.Pairs[0].GetItem().Allowed)
+						assert.Equal(t, pb.Allowed_ALLOWED_FALSE, resp.Pairs[1].GetItem().Allowed)
+					}
+				})
+			})
+		}
+	})
+
+	t.Run("CheckSelfBulk", func(t *testing.T) {
+		cases := []struct {
+			name         string
+			resourceType string
+			reporterType string
+		}{
+			{"lowercase types", "host", "hbi"},
+			{"uppercase types", "HOST", "HBI"},
+			{"mixed case", "Host", "Hbi"},
+		}
+
+		for _, tc := range cases {
+			t.Run(tc.name, func(t *testing.T) {
+				runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
+					claims := &authnapi.Claims{
+						SubjectId: authnapi.SubjectId("user-123"),
+						AuthType:  authnapi.AuthTypeXRhIdentity,
+					}
+					simpleAuthz := data.NewSimpleRelationsRepository()
+					simpleAuthz.Grant("user-123", "view", "hbi", "host", "resource-1")
+
+					protoReq := &pb.CheckSelfBulkRequest{
+						Items: []*pb.CheckSelfBulkRequestItem{
+							{
+								Object: &pb.ResourceReference{
+									ResourceId:   "resource-1",
+									ResourceType: tc.resourceType,
+									Reporter:     &pb.ReporterReference{Type: tc.reporterType},
+								},
+								Relation: "view",
+							},
+							{
+								Object: &pb.ResourceReference{
+									ResourceId:   "resource-2",
+									ResourceType: tc.resourceType,
+									Reporter:     &pb.ReporterReference{Type: tc.reporterType},
+								},
+								Relation: "edit",
+							},
+						},
+					}
+
+					return TestServerConfig{
+						Usecase:       newTestUsecase(t, testUsecaseConfig{Relations: simpleAuthz}),
+						Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+					}, func(t *testing.T, tr *Transport) {
+						ctx := context.Background()
+						res := tr.Invoke(ctx, withBody(protoReq, CheckSelfBulk, httpEndpoint("POST /api/kessel/v1beta2/checkselfbulk")))
+						resp := Extract(t, res, expectSuccess(func() *pb.CheckSelfBulkResponse { return &pb.CheckSelfBulkResponse{} }))
+						require.Len(t, resp.Pairs, 2)
+						assert.Equal(t, pb.Allowed_ALLOWED_TRUE, resp.Pairs[0].GetItem().Allowed)
+						assert.Equal(t, pb.Allowed_ALLOWED_FALSE, resp.Pairs[1].GetItem().Allowed)
+					}
+				})
+			})
+		}
+	})
+
+	t.Run("StreamedListObjects", func(t *testing.T) {
+		cases := []struct {
+			name         string
+			resourceType string
+			reporterType string
+			expectedIDs  []string
+		}{
+			{"lowercase types", "host", "hbi", []string{"host-1", "host-2"}},
+			{"uppercase types", "HOST", "HBI", []string{"host-1", "host-2"}},
+			{"mixed case", "Host", "Hbi", []string{"host-1", "host-2"}},
+		}
+
+		for _, tc := range cases {
+			t.Run(tc.name, func(t *testing.T) {
+				claims := &authnapi.Claims{
+					SubjectId: authnapi.SubjectId("user-abc"),
+					AuthType:  authnapi.AuthTypeXRhIdentity,
+				}
+				simpleAuthz := data.NewSimpleRelationsRepository()
+				simpleAuthz.Grant("subject-xyz", "view", "hbi", "host", "host-1")
+				simpleAuthz.Grant("subject-xyz", "view", "hbi", "host", "host-2")
+
+				uc := newTestUsecase(t, testUsecaseConfig{Relations: simpleAuthz})
+				client := newTestServer(t, TestServerConfig{
+					Usecase:       uc,
+					Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+				})
+
+				reporterType := tc.reporterType
+				req := &pb.StreamedListObjectsRequest{
+					ObjectType: &pb.RepresentationType{
+						ReporterType: &reporterType,
+						ResourceType: tc.resourceType,
+					},
+					Relation: "view",
+					Subject: &pb.SubjectReference{
+						Resource: &pb.ResourceReference{
+							ResourceId:   "subject-xyz",
+							ResourceType: "principal",
+							Reporter:     &pb.ReporterReference{Type: "rbac"},
+						},
+					},
+				}
+
+				stream, err := client.StreamedListObjects(context.Background(), req)
+				require.NoError(t, err)
+
+				var resourceIDs []string
+				for {
+					resp, err := stream.Recv()
+					if err == io.EOF {
+						break
+					}
+					require.NoError(t, err)
+					resourceIDs = append(resourceIDs, resp.Object.ResourceId)
+				}
+
+				slices.Sort(resourceIDs)
+				wantSorted := slices.Clone(tc.expectedIDs)
+				slices.Sort(wantSorted)
+				assert.Equal(t, wantSorted, resourceIDs)
+			})
+		}
+	})
+
+	t.Run("StreamedListSubjects", func(t *testing.T) {
+		cases := []struct {
+			name         string
+			resourceType string
+			reporterType string
+			expectedIDs  []string
+		}{
+			{"lowercase types", "host", "hbi", []string{"user-1", "user-2"}},
+			{"uppercase types", "HOST", "HBI", []string{"user-1", "user-2"}},
+			{"mixed case", "Host", "Hbi", []string{"user-1", "user-2"}},
+		}
+
+		for _, tc := range cases {
+			t.Run(tc.name, func(t *testing.T) {
+				claims := &authnapi.Claims{
+					SubjectId: authnapi.SubjectId("user-abc"),
+					AuthType:  authnapi.AuthTypeXRhIdentity,
+				}
+				simpleAuthz := data.NewSimpleRelationsRepository()
+				simpleAuthz.Grant("user-1", "view", "hbi", "host", "host-1")
+				simpleAuthz.Grant("user-2", "view", "hbi", "host", "host-1")
+
+				uc := newTestUsecase(t, testUsecaseConfig{Relations: simpleAuthz})
+				client := newTestServer(t, TestServerConfig{
+					Usecase:       uc,
+					Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+				})
+
+				reporterType := tc.reporterType
+				subjectReporterType := "rbac"
+				req := &pb.StreamedListSubjectsRequest{
+					Resource: &pb.ResourceReference{
+						ResourceType: tc.resourceType,
+						ResourceId:   "host-1",
+						Reporter:     &pb.ReporterReference{Type: reporterType},
+					},
+					Relation: "view",
+					SubjectType: &pb.RepresentationType{
+						ResourceType: "principal",
+						ReporterType: &subjectReporterType,
+					},
+				}
+
+				stream, err := client.StreamedListSubjects(context.Background(), req)
+				require.NoError(t, err)
+
+				var subjectIDs []string
+				for {
+					resp, err := stream.Recv()
+					if err == io.EOF {
+						break
+					}
+					require.NoError(t, err)
+					subjectIDs = append(subjectIDs, resp.Subject.Resource.ResourceId)
+				}
+
+				slices.Sort(subjectIDs)
+				wantSorted := slices.Clone(tc.expectedIDs)
+				slices.Sort(wantSorted)
+				assert.Equal(t, wantSorted, subjectIDs)
+			})
+		}
+	})
+}

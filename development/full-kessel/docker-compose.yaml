@@ -1,0 +1,360 @@
+### Full Kessel Local Deployment
+### Deploys Inventory API, Relations API, Inventory Consumer, and all dependencies
+### via a single compose file using pre-built images.
+###
+### Usage:
+###   make kessel-up      # start everything
+###   make kessel-down    # tear it all down
+###
+### Override images in .env for local dev builds, e.g.:
+###   INVENTORY_API_IMAGE=localhost/kessel-inventory:dev
+###
+### Profiles:
+###   relations  - Relations API + SpiceDB (remove when Relations merges into Inventory)
+###   consumer   - Inventory Consumer + HBI database + KIC Kafka Connect
+###   monitoring - Prometheus, Grafana, and Alertmanager (make kessel-up-monitoring)
+
+services:
+
+  ### ---------- Shared Infrastructure ----------
+
+  zookeeper:
+    image: quay.io/strimzi/kafka:latest-kafka-3.8.0
+    command: [
+      "sh", "-c",
+      "bin/zookeeper-server-start.sh config/zookeeper.properties"
+    ]
+    ports:
+      - "2181:2181"
+    environment:
+      LOG_DIR: /tmp/logs
+    networks:
+      - kessel
+
+  kafka:
+    image: quay.io/strimzi/kafka:latest-kafka-3.8.0
+    command: [
+      "sh", "-c",
+      "bin/kafka-server-start.sh config/server.properties \
+        --override listeners=$${KAFKA_LISTENERS} \
+        --override advertised.listeners=$${KAFKA_ADVERTISED_LISTENERS} \
+        --override zookeeper.connect=$${KAFKA_ZOOKEEPER_CONNECT} \
+        --override listener.security.protocol.map=$${KAFKA_LISTENER_SECURITY_PROTOCOL_MAP} \
+        --override inter.broker.listener.name=$${KAFKA_INTER_BROKER_LISTENER_NAME}"
+    ]
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+    environment:
+      LOG_DIR: "/tmp/logs"
+      KAFKA_LISTENERS: "HOST://0.0.0.0:9092,DOCKER://0.0.0.0:9093"
+      KAFKA_ADVERTISED_LISTENERS: "HOST://localhost:9092,DOCKER://kafka:9093"
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: "DOCKER:PLAINTEXT,HOST:PLAINTEXT"
+      KAFKA_INTER_BROKER_LISTENER_NAME: DOCKER
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+    healthcheck:
+      test: ["CMD-SHELL", "bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9093"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+    networks:
+      - kessel
+
+  kafka-setup:
+    image: quay.io/strimzi/kafka:latest-kafka-3.8.0
+    depends_on:
+      kafka:
+        condition: service_healthy
+    entrypoint: [ '/bin/sh', '-c' ]
+    command: |
+      "
+      echo -e 'Creating kafka topics'
+
+      # Inventory API topics
+      bin/kafka-topics.sh --bootstrap-server kafka:9093 --create --if-not-exists --topic outbox.event.kessel.resources --replication-factor 1 --partitions 1
+      bin/kafka-topics.sh --bootstrap-server kafka:9093 --create --if-not-exists --topic outbox.event.kessel.tuples --replication-factor 1 --partitions 1
+
+      # Inventory Consumer topics
+      bin/kafka-topics.sh --bootstrap-server kafka:9093 --create --if-not-exists --topic host-inventory.hbi.hosts --replication-factor 1 --partitions 6
+      bin/kafka-topics.sh --bootstrap-server kafka:9093 --create --if-not-exists --topic outbox.event.hbi.hosts --replication-factor 1 --partitions 1
+      bin/kafka-topics.sh --bootstrap-server kafka:9093 --create --if-not-exists --topic host-inventory.signal --replication-factor 1 --partitions 1
+
+      echo -e 'Successfully created the following topics:'
+      bin/kafka-topics.sh --bootstrap-server kafka:9093 --list
+      "
+    networks:
+      - kessel
+
+  ### ---------- Inventory API Stack ----------
+
+  invdatabase:
+    image: "postgres"
+    command: ["docker-entrypoint.sh", "-p", "5433", "-c", "config_file=/etc/postgresql/postgresql.conf"]
+    hostname: invdatabase
+    expose:
+      - "5433"
+    ports:
+      - "5433:5433"
+    volumes:
+      - ../configs/postgresql.conf:/etc/postgresql/postgresql.conf:ro,z
+    environment:
+      - "POSTGRES_PASSWORD=${POSTGRES_PASSWORD}"
+      - "POSTGRES_DB=spicedb"
+      - "PGPORT=5433"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -p 5433"]
+      interval: 5s
+      timeout: 3s
+      retries: 15
+    networks:
+      - kessel
+
+  invmigrate:
+    image: "${INVENTORY_API_IMAGE}"
+    environment:
+      INVENTORY_API_CONFIG: /inventory-api-compose.yaml
+    volumes:
+      - ./configs/inventory-api.yaml:/inventory-api-compose.yaml:ro,z
+      - ../../schema_cache.json:/schema_cache.json:ro,z
+    command: ["migrate"]
+    restart: "on-failure"
+    depends_on:
+      invdatabase:
+        condition: service_healthy
+    networks:
+      - kessel
+
+  inventory-api:
+    image: "${INVENTORY_API_IMAGE}"
+    depends_on:
+      invmigrate:
+        condition: service_completed_successfully
+    environment:
+      INVENTORY_API_CONFIG: /inventory-api-compose.yaml
+    volumes:
+      - ./configs/inventory-api.yaml:/inventory-api-compose.yaml:ro,z
+      - ../../schema_cache.json:/schema_cache.json:ro,z
+    command: ["serve"]
+    restart: "always"
+    ports:
+      - "8081:8081"
+      - "9081:9081"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8081/api/kessel/v1/livez || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+    networks:
+      - kessel
+
+  connect:
+    image: quay.io/debezium/connect:3.1
+    ports:
+      - "8083:8083"
+    environment:
+      - GROUP_ID=1
+      - CONFIG_STORAGE_TOPIC=my_connect_configs
+      - OFFSET_STORAGE_TOPIC=my_connect_offsets
+      - STATUS_STORAGE_TOPIC=my_connect_statuses
+      - BOOTSTRAP_SERVERS=kafka:9093
+    depends_on:
+      kafka:
+        condition: service_healthy
+      invdatabase:
+        condition: service_healthy
+    restart: "always"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8083/ || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+    networks:
+      - kessel
+
+  connect-setup:
+    image: quay.io/curl/curl:latest
+    depends_on:
+      connect:
+        condition: service_healthy
+    command: [
+      "/bin/sh", "-c",
+      "curl -d @/debezium-connector.json -H 'Content-Type: application/json' -X POST http://connect:8083/connectors"
+    ]
+    volumes:
+      - ../configs/debezium-connector.json:/debezium-connector.json:ro,z
+    restart: on-failure:10
+    networks:
+      - kessel
+
+  ### ---------- Relations API Stack (profile: relations) ----------
+
+  relations-database:
+    image: "postgres"
+    command: -c track_commit_timestamp=on
+    profiles: ["relations"]
+    ports:
+      - "5432:5432"
+    environment:
+      - "POSTGRES_PASSWORD=${POSTGRES_PASSWORD}"
+      - "POSTGRES_DB=spicedb"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -p 5432"]
+      interval: 5s
+      timeout: 3s
+      retries: 15
+    networks:
+      - kessel
+
+  spicedb-migrate:
+    image: "authzed/spicedb"
+    command: "migrate head"
+    profiles: ["relations"]
+    restart: "on-failure"
+    environment:
+      - "SPICEDB_DATASTORE_ENGINE=postgres"
+      - "SPICEDB_DATASTORE_CONN_URI=postgres://postgres:${POSTGRES_PASSWORD}@relations-database:5432/spicedb?sslmode=disable"
+    depends_on:
+      relations-database:
+        condition: service_healthy
+    networks:
+      - kessel
+
+  spicedb:
+    image: "authzed/spicedb"
+    command: "serve"
+    profiles: ["relations"]
+    restart: "always"
+    ports:
+      - "50051:50051"
+    environment:
+      - "SPICEDB_GRPC_PRESHARED_KEY=${SPICEDB_GRPC_PRESHARED_KEY}"
+      - "SPICEDB_DATASTORE_ENGINE=postgres"
+      - "SPICEDB_DATASTORE_CONN_URI=postgres://postgres:${POSTGRES_PASSWORD}@relations-database:5432/spicedb?sslmode=disable"
+    depends_on:
+      spicedb-migrate:
+        condition: service_completed_successfully
+    networks:
+      - kessel
+
+  relations-api:
+    image: "${RELATIONS_API_IMAGE}"
+    profiles: ["relations"]
+    environment:
+      - "SPICEDB_PRESHARED=${SPICEDB_GRPC_PRESHARED_KEY}"
+      - "SPICEDB_SCHEMA_FILE=/schema_file"
+      - "SPICEDB_ENDPOINT=spicedb:50051"
+    volumes:
+      - ./configs/schema.zed:/schema_file:ro,z
+    restart: "always"
+    depends_on:
+      spicedb:
+        condition: service_started
+    ports:
+      - "8000:8000"
+      - "9000:9000"
+    networks:
+      - kessel
+
+  ### ---------- Inventory Consumer Stack (profile: consumer) ----------
+
+  hbidatabase:
+    image: "postgres"
+    command: ["docker-entrypoint.sh", "-p", "5435", "-c", "config_file=/etc/postgresql/postgresql.conf"]
+    hostname: hbidatabase
+    profiles: ["consumer"]
+    expose:
+      - "5435"
+    ports:
+      - "5435:5435"
+    volumes:
+      - ../configs/postgresql.conf:/etc/postgresql/postgresql.conf:ro,z
+    environment:
+      - "POSTGRES_PASSWORD=supersecurewow"
+      - "POSTGRES_DB=host-inventory"
+      - "PGPORT=5435"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -p 5435"]
+      interval: 5s
+      timeout: 3s
+      retries: 15
+    networks:
+      - kessel
+
+  inventory-consumer:
+    image: "${INVENTORY_CONSUMER_IMAGE}"
+    profiles: ["consumer"]
+    environment:
+      INVENTORY_CONSUMER_CONFIG: /inventory-consumer-config.yaml
+    volumes:
+      - ./configs/inventory-consumer.yaml:/inventory-consumer-config.yaml:ro,z
+    command: ["start"]
+    restart: "always"
+    depends_on:
+      kafka:
+        condition: service_healthy
+      inventory-api:
+        condition: service_healthy
+    networks:
+      - kessel
+
+  kic-connect:
+    image: quay.io/debezium/connect:3.1
+    profiles: ["consumer"]
+    ports:
+      - "8084:8083"
+    environment:
+      - GROUP_ID=2
+      - CONFIG_STORAGE_TOPIC=kessel_kafka_connect_configs
+      - OFFSET_STORAGE_TOPIC=kessel_kafka_connect_offsets
+      - STATUS_STORAGE_TOPIC=kessel_kafka_connect_statuses
+      - BOOTSTRAP_SERVERS=kafka:9093
+    depends_on:
+      kafka:
+        condition: service_healthy
+      hbidatabase:
+        condition: service_healthy
+    restart: "always"
+    networks:
+      - kessel
+
+  ### ---------- Monitoring Stack (profile: monitoring) ----------
+
+  prometheus:
+    image: prom/prometheus
+    profiles: ["monitoring"]
+    volumes:
+      - ./configs/prometheus.yml:/etc/prometheus/prometheus.yml:ro,z
+    ports:
+      - "9050:9090"
+    networks:
+      - kessel
+
+  alertmanager:
+    image: prom/alertmanager
+    profiles: ["monitoring"]
+    ports:
+      - "9093:9093"
+    networks:
+      - kessel
+
+  grafana:
+    image: grafana/grafana-enterprise
+    profiles: ["monitoring"]
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana-storage:/var/lib/grafana
+      - ./configs/grafana-datasource.yml:/etc/grafana/provisioning/datasources/grafana-datasource.yml:ro,z
+      - ../configs/monitoring/dashboards:/etc/grafana/provisioning/dashboards:ro,z
+    networks:
+      - kessel
+
+volumes:
+  grafana-storage: {}
+
+networks:
+  kessel:
+    name: kessel
+    external: true

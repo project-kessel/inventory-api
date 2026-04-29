@@ -1,12 +1,17 @@
 server:
   http:
-    address: 0.0.0.0:8000
+    address: 0.0.0.0:8081
   grpc:
-    address: 0.0.0.0:9000
+    address: 0.0.0.0:9081
 authn:
   allow-unauthenticated: true
 authz:
-  impl: allow-all
+  impl: kessel
+  kessel:
+    insecure-client: true
+    url: relations-api:9000
+    enable-oidc-auth: false
+    principal-user-domain: 0.0.0.0:8084
 eventing:
   eventer: stdout
   kafka:
@@ -20,22 +25,21 @@ storage:
     user: "postgres"
     password: "yPsw5e6ab4bvAGe5H"
     dbname: "spicedb"
+schema:
+  repository: in-memory
+  in-memory:
+    type: json
+    path: schema_cache.json
 consumer:
   enabled: true
-  bootstrap-servers: localhost:9092
+  bootstrap-servers: kafka:9093
   retry-options:
     consumer-max-retries: 3
     operation-max-retries: 4
     backoff-factor: 5
   auth:
     enabled: false
-schema:
-  repository: in-memory
-  in-memory:
-    type: json
-    path: schema_cache.json
 log:
-  level: "debug"
+  level: "info"
   livez: true
   readyz: true
-

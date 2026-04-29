@@ -1,94 +1,17 @@
-### Top-Level targets allow you to deploy services based on Test Setup
-### See README for details
 services:
-  full-setup:
-    image: bash:3.1-alpine3.21
-    command: ["echo", "starting full-setup"]
-    depends_on:
-    - inventory-api
-    - kafka-setup
-    - connect-setup
-    networks:
-      - kessel
-    restart: on-failure
 
-  full-setup-relations-ready:
-    image: bash:3.1-alpine3.21
-    command: ["echo", "starting full-setup-relations-ready"]
-    depends_on:
-    - inventory-api
-    - kafka-setup
-    - connect-setup
-    networks:
-      - kessel
-    restart: on-failure
+  ### ---------- Inventory API Stack ----------
 
-  full-kessel-w-monitoring:
-    image: bash:3.1-alpine3.21
-    command: ["echo", "starting full-kessel-w-monitoring"]
-    depends_on:
-    - inventory-api
-    - kafka-setup
-    - connect-setup
-    - prometheus
-    - grafana
-    - alertmanager
-    networks:
-      - kessel
-    restart: on-failure
-
-  full-setup-w-sso:
-    image: bash:3.1-alpine3.21
-    command: ["echo", "starting full-setup-w-sso"]
-    depends_on:
-    - inventory-api
-    - kafka-setup
-    - connect-setup
-    - keycloak
-    networks:
-      - kessel
-    restart: on-failure
-
-  split-setup:
-    image: bash:3.1-alpine3.21
-    command: ["echo", "starting split-setup"]
-    depends_on:
-    - invmigrate
-    - kafka-setup
-    - connect-setup
-    networks:
-      - kessel
-    restart: on-failure
-
-  split-setup-relations-ready:
-    image: bash:3.1-alpine3.21
-    command: ["echo", "starting split-setup-releations-ready"]
-    depends_on:
-      - invmigrate
-      - kafka-setup
-      - connect-setup
-    networks:
-      - kessel
-    restart: on-failure
-
-  monitoring-only:
-    image: bash:3.1-alpine3.21
-    command: ["echo", "starting monitoring-only"]
-    depends_on:
-    - prometheus-ephem
-    - grafana
-    - alertmanager
-    networks:
-      - kessel
-    restart: on-failure
-
-### Individual services
   inventory-api:
     depends_on:
-      - invdatabase
-      - invmigrate
+      invmigrate:
+        condition: service_completed_successfully
     environment:
       INVENTORY_API_CONFIG: /inventory-api-compose.yaml
+      INVENTORY_API_SERVER_HTTP_ADDRESS: "0.0.0.0:${HTTP_PORT}"
+      INVENTORY_API_SERVER_GRPC_ADDRESS: "0.0.0.0:${GRPC_PORT}"
+      INVENTORY_API_AUTHZ_IMPL: "${AUTHZ_IMPL:-}"
+      INVENTORY_API_LOG_LEVEL: "${LOG_LEVEL:-}"
     build:
       context: ../
       dockerfile: Dockerfile
@@ -102,6 +25,11 @@ services:
     ports:
       - "${HTTP_PORT}:${HTTP_PORT}"
       - "${GRPC_PORT}:${GRPC_PORT}"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:${HTTP_PORT}/api/kessel/v1/livez || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
     networks:
       - kessel
 
@@ -118,7 +46,8 @@ services:
     command: ["migrate"]
     restart: "on-failure"
     depends_on:
-      - invdatabase
+      invdatabase:
+        condition: service_healthy
     networks:
       - kessel
 
@@ -136,8 +65,15 @@ services:
       - "POSTGRES_PASSWORD=yPsw5e6ab4bvAGe5H"
       - "POSTGRES_DB=spicedb"
       - "PGPORT=5433"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -p 5433"]
+      interval: 5s
+      timeout: 3s
+      retries: 15
     networks:
       - kessel
+
+  ### ---------- Kafka Stack ----------
 
   zookeeper:
     image: quay.io/strimzi/kafka:latest-kafka-3.8.0
@@ -174,13 +110,19 @@ services:
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: "DOCKER:PLAINTEXT,HOST:PLAINTEXT"
       KAFKA_INTER_BROKER_LISTENER_NAME: DOCKER
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+    healthcheck:
+      test: ["CMD-SHELL", "bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9093"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
     networks:
       - kessel
 
   kafka-setup:
     image: quay.io/strimzi/kafka:latest-kafka-3.8.0
     depends_on:
-      - kafka
+      kafka:
+        condition: service_healthy
     entrypoint: [ '/bin/sh', '-c' ]
     command: |
       "
@@ -196,6 +138,8 @@ services:
     networks:
       - kessel
 
+  ### ---------- Debezium Kafka Connect ----------
+
   connect:
     ports:
       - 8083:8083
@@ -206,28 +150,36 @@ services:
       - STATUS_STORAGE_TOPIC=my_connect_statuses
       - BOOTSTRAP_SERVERS=kafka:9093
     depends_on:
-      - zookeeper
-      - kafka
-      - invdatabase
+      kafka:
+        condition: service_healthy
+      invdatabase:
+        condition: service_healthy
     image: quay.io/debezium/connect:3.1
     restart: "always"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8083/ || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
     networks:
       - kessel
 
   connect-setup:
     image: quay.io/curl/curl:latest
     depends_on:
-      - kafka
-      - connect
+      connect:
+        condition: service_healthy
     command: [
       "/bin/sh", "-c",
-      "sleep 45 && curl -d @/debezium-connector.json -H 'Content-Type: application/json' -X POST http://connect:8083/connectors"
+      "curl -d @/debezium-connector.json -H 'Content-Type: application/json' -X POST http://connect:8083/connectors"
     ]
     volumes:
       - ./configs/debezium-connector.json:/debezium-connector.json:ro,z
-    restart: on-failure:30
+    restart: on-failure:10
     networks:
       - kessel
+
+  ### ---------- SSO (Keycloak) ----------
 
   keycloak:
     image: "quay.io/keycloak/keycloak:latest"
@@ -242,6 +194,8 @@ services:
       - 8084:8084
     networks:
       - kessel
+
+  ### ---------- Monitoring Stack ----------
 
   prometheus:
     image: prom/prometheus

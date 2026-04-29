@@ -1,0 +1,23 @@
+global:
+  scrape_interval: 10s
+scrape_configs:
+ - job_name: kessel-inventory-api
+   static_configs:
+    - targets:
+       - inventory-api:8081
+ - job_name: kessel-relations-api
+   static_configs:
+    - targets:
+       - relations-api:8000
+ - job_name: kessel-inventory-consumer
+   static_configs:
+    - targets:
+       - inventory-consumer:9000
+ - job_name: kessel-kafka-connect
+   static_configs:
+    - targets:
+       - connect:8083
+ - job_name: kessel-kic-connect
+   static_configs:
+    - targets:
+       - kic-connect:8083

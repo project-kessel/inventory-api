@@ -62,6 +62,16 @@ When working in this codebase, AI agents should:
 6. **End-to-end type changes** - When replacing a type (e.g., `ReporterResourceKey` -> `ResourceReference`), propagate the change through the entire call chain. Do not insert local adapter/shim calls at the boundary (e.g., `ResourceReferenceFromKey(key)` at the call site). Instead, update the method signature, the callers, and the callers' callers until the new type flows naturally from entry point to implementation. Lossy back-and-forth conversions are a bug.
 7. **Do not remove comments** unless they are clearly wrong or obsolete. Preserve existing documentation.
 
+### Docker Compose / Local Development
+When changing CLI flags, config keys, default values, authentication/authorization modes, ports, or service dependencies, check whether the local development setup still reflects those changes. The following files must stay in sync:
+
+- **Compose config files** (`development/configs/base.yaml`, `authn-sso.yaml`, `authn-rh-identity.yaml`, `local-w-relations.yaml`) - These are the YAML configs mounted into the inventory-api container. If a config key is added, renamed, or its default changes, update all affected config files.
+- **Compose files** (`development/docker-compose.yaml`, `development/full-kessel/docker-compose.yaml`) - Service definitions, environment variables, ports, and healthchecks. The inventory-api service uses Viper env var overrides (`INVENTORY_API_*`) for simple config differences between targets; complex nested config (authn chains, OIDC) requires a separate config file.
+- **Makefile targets** - The `inventory-up-*` and `kessel-up` targets in the Makefile pass config names, ports, and service lists to the startup scripts. If a new service or config variant is added, add or update the corresponding target.
+- **Documentation** (`docs/dev-guides/docker-compose-options.md`, `README.md`) - The docker-compose options guide documents all make targets, ports, and usage instructions. Keep it current when targets or behavior change.
+
+**Viper env var limitation**: The env key replacer in `cmd/root.go` only maps `.` to `_`, not `-` to `_`. Config keys containing hyphens (e.g., `consumer.bootstrap-servers`) cannot be overridden via `INVENTORY_API_*` environment variables. Only dot-separated keys work as env overrides.
+
 ### Common Operations
 - **Adding new resource types**: Update protobuf definitions, regenerate code, add schema validation
 - **Modifying APIs**: Use buf.build for breaking change detection, update both gRPC and HTTP

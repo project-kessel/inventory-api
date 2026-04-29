@@ -28,6 +28,11 @@ var (
 	ErrNoRepresentationProvided = errors.New("at least one of reporterRepresentation or commonRepresentation must be provided")
 )
 
+// Error reasons used in kratos errors across layers
+const (
+	ReasonNonUniqueTransactionID = "NON-UNIQUE TRANSACTION ID"
+)
+
 // Service-level sentinel errors - operation failures
 var (
 	// ErrResourceAlreadyExists indicates the resource already exists when creating.

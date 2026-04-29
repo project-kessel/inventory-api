@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	kratosErrors "github.com/go-kratos/kratos/v2/errors"
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/google/uuid"
 	"github.com/project-kessel/inventory-api/cmd/common"
@@ -49,6 +50,13 @@ type UsecaseConfig struct {
 	ReadAfterWriteAllowlist        []string
 	ConsumerEnabled                bool
 	DefaultToAtLeastAsAcknowledged bool
+	IdempotencyCheckEnabled        bool
+}
+
+func NewUsecaseConfig() *UsecaseConfig {
+	return &UsecaseConfig{
+		IdempotencyCheckEnabled: true,
+	}
 }
 
 // Usecase provides business logic operations for resource management in the inventory system.
@@ -141,7 +149,7 @@ func (uc *Usecase) ReportResource(ctx context.Context, cmd ReportResourceCommand
 	// predicate locks on the transaction_id indexes. The unique constraint on transaction_id
 	// provides the actual correctness guarantee, if a duplicate sneaks past this
 	// advisory check due to a concurrent commit.
-	if cmd.TransactionId != nil {
+	if uc.Config.IdempotencyCheckEnabled && cmd.TransactionId != nil {
 		alreadyProcessed, err := uc.resourceRepository.HasTransactionIdBeenProcessed(uc.resourceRepository.GetDB(), cmd.TransactionId.String())
 		if err != nil {
 			return fmt.Errorf("failed to check transaction ID: %w", err)
@@ -153,26 +161,39 @@ func (uc *Usecase) ReportResource(ctx context.Context, cmd ReportResourceCommand
 	}
 
 	var operationType model.EventOperationType
-	err = uc.resourceRepository.GetTransactionManager().HandleSerializableTransaction(
-		ReportResourceOperationName,
-		uc.resourceRepository.GetDB(),
-		func(tx *gorm.DB) error {
-			res, err := uc.resourceRepository.FindResourceByKeys(tx, reporterResourceKey)
-			if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
-				return fmt.Errorf("failed to lookup existing resource: %w", err)
-			}
+	reportResource := func() error {
+		return uc.resourceRepository.GetTransactionManager().HandleSerializableTransaction(
+			ReportResourceOperationName,
+			uc.resourceRepository.GetDB(),
+			func(tx *gorm.DB) error {
+				res, err := uc.resourceRepository.FindResourceByKeys(tx, reporterResourceKey)
+				if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+					return fmt.Errorf("failed to lookup existing resource: %w", err)
+				}
 
-			if err == nil && res != nil {
-				log.Info("Resource already exists, updating: ")
-				operationType = model.OperationTypeUpdated
-				return uc.updateResource(tx, cmd, res, txid.String())
-			}
+				if err == nil && res != nil {
+					log.Info("Resource already exists, updating: ")
+					operationType = model.OperationTypeUpdated
+					return uc.updateResource(tx, cmd, res, txid.String())
+				}
 
-			log.Info("Creating new resource")
-			operationType = model.OperationTypeCreated
-			return uc.createResource(tx, cmd, txid.String())
-		},
-	)
+				log.Info("Creating new resource")
+				operationType = model.OperationTypeCreated
+				return uc.createResource(tx, cmd, txid.String())
+			},
+		)
+	}
+
+	err = reportResource()
+	if err != nil && !uc.Config.IdempotencyCheckEnabled && isDuplicateTransactionError(err) {
+		log.Debugf("Idempotency check disabled and duplicate transaction ID detected, retrying with new transaction ID: %s", cmd.TransactionId.String())
+		retryTxid, retryErr := getNextTransactionID()
+		if retryErr != nil {
+			return retryErr
+		}
+		cmd.TransactionId = &retryTxid
+		err = reportResource()
+	}
 
 	if err != nil {
 		return err
@@ -599,6 +620,14 @@ func (uc *Usecase) validateReportResourceCommand(ctx context.Context, cmd Report
 	}
 
 	return nil
+}
+
+func isDuplicateTransactionError(err error) bool {
+	var kratosErr *kratosErrors.Error
+	if errors.As(err, &kratosErr) {
+		return kratosErr.Reason == model.ReasonNonUniqueTransactionID
+	}
+	return false
 }
 
 func getNextTransactionID() (model.TransactionId, error) {

@@ -181,7 +181,7 @@ func testRepositoryContract(t *testing.T, repo bizmodel.ResourceRepository, db *
 
 		// Error should indicate constraint violation
 		errorMsg := err.Error()
-		constraintViolation := strings.Contains(errorMsg, "duplicate") || strings.Contains(errorMsg, "NON-UNIQUE TRANSACTION ID")
+		constraintViolation := strings.Contains(errorMsg, "duplicate") || strings.Contains(errorMsg, bizmodel.ReasonNonUniqueTransactionID)
 		assert.True(t, constraintViolation, "Error should mention constraint violation, got: %s", errorMsg)
 	})
 
@@ -842,8 +842,8 @@ func TestUniqueConstraint_ReporterResourceCompositeKey(t *testing.T) {
 
 				// Error should indicate a constraint violation
 				errorMsg := err.Error()
-				// Both "duplicate" (fake repo) and "NON-UNIQUE TRANSACTION ID" (real DB) are acceptable
-				constraintViolation := strings.Contains(errorMsg, "duplicate") || strings.Contains(errorMsg, "NON-UNIQUE TRANSACTION ID")
+				// Both "duplicate" (fake repo) and ReasonNonUniqueTransactionID (real DB) are acceptable
+				constraintViolation := strings.Contains(errorMsg, "duplicate") || strings.Contains(errorMsg, bizmodel.ReasonNonUniqueTransactionID)
 				assert.True(t, constraintViolation, "Error should mention constraint violation, got: %s", errorMsg)
 			})
 
@@ -2506,7 +2506,7 @@ func testTransactionIDUniqueConstraint(t *testing.T, repo bizmodel.ResourceRepos
 		// This should fail due to unique constraint violation
 		err = repo.Save(db, resource2, bizmodel.OperationTypeCreated, "tx-duplicate-2")
 		require.Error(t, err, "Second save should fail due to duplicate TransactionID")
-		assert.Contains(t, err.Error(), "NON-UNIQUE TRANSACTION ID")
+		assert.Contains(t, err.Error(), bizmodel.ReasonNonUniqueTransactionID)
 	})
 
 	t.Run("should enforce unique TransactionID constraint on CommonRepresentation", func(t *testing.T) {

@@ -1401,6 +1401,114 @@ func TestInventoryAPIHTTP_v1beta2_CheckForUpdate_AllowedFalse(t *testing.T) {
 	assert.Equal(t, pbv1beta2.Allowed_ALLOWED_FALSE, resp.GetAllowed(), "Expected ALLOWED_FALSE for non-matching workspace")
 }
 
+func TestInventoryAPIHTTP_v1beta2_TransactionIdIdempotency(t *testing.T) {
+	enableShortMode(t)
+
+	ctx := context.Background()
+
+	conn, err := grpc.NewClient(
+		inventoryapi_grpc_url,
+		grpc.WithTransportCredentials(grpcinsecure.NewCredentials()),
+		grpc.WithPerRPCCredentials(&bearerAuth{token: "1234"}),
+	)
+	require.NoError(t, err, "Failed to create gRPC client")
+	defer func() {
+		if connErr := conn.Close(); connErr != nil {
+			t.Logf("Failed to close gRPC connection: %v", connErr)
+		}
+	}()
+
+	conn.Connect()
+
+	client := pbv1beta2.NewKesselInventoryServiceClient(conn)
+
+	suffix := fmt.Sprintf("%d", time.Now().UnixNano())
+	resourceId := "idempotency-host-" + suffix
+	reporterType := "hbi"
+	reporterInstanceId := "testuser-example-com"
+	txId := "e2e-txn-idempotency-test-" + suffix
+
+	resourceCreated := false
+	defer func() {
+		if !resourceCreated {
+			return
+		}
+		_, cleanupErr := client.DeleteResource(ctx, &pbv1beta2.DeleteResourceRequest{
+			Reference: &pbv1beta2.ResourceReference{
+				ResourceType: "host",
+				ResourceId:   resourceId,
+				Reporter: &pbv1beta2.ReporterReference{
+					Type:       reporterType,
+					InstanceId: proto.String(reporterInstanceId),
+				},
+			},
+		})
+		assert.NoError(t, cleanupErr, "Failed to Delete Resource during cleanup")
+	}()
+
+	reporterStruct, err := structpb.NewStruct(map[string]interface{}{
+		"ansible_host": "idempotency-host.example.com",
+	})
+	require.NoError(t, err, "Failed to create structpb for reporter")
+
+	makeReq := func(apiHref string) *pbv1beta2.ReportResourceRequest {
+		return &pbv1beta2.ReportResourceRequest{
+			WriteVisibility:    pbv1beta2.WriteVisibility_MINIMIZE_LATENCY,
+			Type:               "host",
+			ReporterType:       reporterType,
+			ReporterInstanceId: reporterInstanceId,
+			Representations: &pbv1beta2.ResourceRepresentations{
+				Metadata: &pbv1beta2.RepresentationMetadata{
+					LocalResourceId: resourceId,
+					ApiHref:         apiHref,
+					IdempotencyKey: &pbv1beta2.RepresentationMetadata_TransactionId{
+						TransactionId: txId,
+					},
+				},
+				Common: &structpb.Struct{
+					Fields: map[string]*structpb.Value{
+						"workspace_id": structpb.NewStringValue("ws-idempotency"),
+					},
+				},
+				Reporter: reporterStruct,
+			},
+		}
+	}
+
+	// First report — should succeed and store the transaction ID
+	_, err = client.ReportResource(ctx, makeReq("https://api.example.com/v1"))
+	require.NoError(t, err, "First report should succeed")
+	resourceCreated = true
+
+	// Verify transaction ID is stored in the DB
+	var txCount int64
+	err = db.Table("reporter_representations").Where("transaction_id = ?", txId).Count(&txCount).Error
+	require.NoError(t, err, "Failed to query reporter_representations")
+	assert.Greater(t, txCount, int64(0), "transaction_id should be stored in reporter_representations")
+
+	// Verify the api_href from the first report
+	var apiHref string
+	err = db.Table("reporter_resources").
+		Where("local_resource_id = ?", resourceId).
+		Select("api_href").
+		Scan(&apiHref).Error
+	require.NoError(t, err, "Failed to query api_href")
+	assert.Equal(t, "https://api.example.com/v1", apiHref)
+
+	// Second report with same transaction_id but different api_href — should be skipped
+	_, err = client.ReportResource(ctx, makeReq("https://api.example.com/v2-should-be-ignored"))
+	require.NoError(t, err, "Second report should succeed (silently skipped)")
+
+	// Verify api_href was NOT updated
+	err = db.Table("reporter_resources").
+		Where("local_resource_id = ?", resourceId).
+		Select("api_href").
+		Scan(&apiHref).Error
+	require.NoError(t, err, "Failed to query api_href after second report")
+	assert.Equal(t, "https://api.example.com/v1", apiHref,
+		"second report with same transaction_id should be a no-op; api_href should not change")
+}
+
 func TestInventoryAPIHTTP_v1beta2_CheckBulk_OrderAndEcho(t *testing.T) {
 	enableShortMode(t)
 

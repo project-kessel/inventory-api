@@ -171,7 +171,7 @@ func newTestUsecase(t *testing.T, cfg testUsecaseConfig) *usecase.Usecase {
 
 	usecaseCfg := cfg.Config
 	if usecaseCfg == nil {
-		usecaseCfg = &usecase.UsecaseConfig{}
+		usecaseCfg = usecase.NewUsecaseConfig()
 	}
 
 	// Default to PermissiveMetaAuthorizer for tests unless explicitly overridden
@@ -3762,6 +3762,80 @@ func TestInventoryService_ReportResource_TransactionIdIdempotency(t *testing.T) 
 
 				assert.Equal(t, apiHrefAfterFirst, apiHrefAfterSecond,
 					"second report with same transaction_id should be a no-op; api_href should not change")
+			}
+	})
+}
+
+func TestInventoryService_ReportResource_IdempotencyDisabled(t *testing.T) {
+	claims := &authnapi.Claims{
+		SubjectId: authnapi.SubjectId("reporter-service"),
+		AuthType:  authnapi.AuthTypeXRhIdentity,
+	}
+
+	txId := "txn-idempotency-disabled-test"
+	makeReq := func(apiHref string) *pb.ReportResourceRequest {
+		return &pb.ReportResourceRequest{
+			Type:               "host",
+			ReporterType:       "hbi",
+			ReporterInstanceId: "instance-001",
+			Representations: &pb.ResourceRepresentations{
+				Metadata: &pb.RepresentationMetadata{
+					LocalResourceId: "host-replay",
+					ApiHref:         apiHref,
+					IdempotencyKey: &pb.RepresentationMetadata_TransactionId{
+						TransactionId: txId,
+					},
+				},
+				Common: &structpb.Struct{
+					Fields: map[string]*structpb.Value{
+						"workspace_id": structpb.NewStringValue("ws-replay"),
+					},
+				},
+				Reporter: &structpb.Struct{
+					Fields: map[string]*structpb.Value{
+						"reporter_key": structpb.NewStringValue("reporter-val"),
+					},
+				},
+			},
+		}
+	}
+
+	runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
+		repo, _ := newSQLiteTestRepo(t)
+		idempotencyOff := usecase.NewUsecaseConfig()
+		idempotencyOff.IdempotencyCheckEnabled = false
+		uc := newTestUsecase(t, testUsecaseConfig{
+			Repo:   repo,
+			Config: idempotencyOff,
+		})
+		return TestServerConfig{
+				Usecase:       uc,
+				Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+			}, func(t *testing.T, tr *Transport) {
+				ctx := context.Background()
+				key := buildReporterResourceKey(t, "host-replay", "host", "hbi", "instance-001")
+
+				// First report
+				res1 := tr.Invoke(ctx, withBody(makeReq("https://api.example.com/v1"), ReportResource, httpEndpoint("POST /api/kessel/v1beta2/resources")))
+				Assert(t, res1, requireSuccess())
+
+				resource1, err := repo.FindResourceByKeys(repo.GetDB(), key)
+				require.NoError(t, err)
+				require.NotNil(t, resource1)
+				apiHrefAfterFirst := resource1.ReporterResources()[0].ApiHref().String()
+				assert.Equal(t, "https://api.example.com/v1", apiHrefAfterFirst)
+
+				// Second report with same transaction_id but different api_href — should NOT be skipped
+				res2 := tr.Invoke(ctx, withBody(makeReq("https://api.example.com/v2-replayed"), ReportResource, httpEndpoint("POST /api/kessel/v1beta2/resources")))
+				Assert(t, res2, requireSuccess())
+
+				resource2, err := repo.FindResourceByKeys(repo.GetDB(), key)
+				require.NoError(t, err)
+				require.NotNil(t, resource2)
+				apiHrefAfterSecond := resource2.ReporterResources()[0].ApiHref().String()
+
+				assert.Equal(t, "https://api.example.com/v2-replayed", apiHrefAfterSecond,
+					"with idempotency disabled, replayed event should update the resource")
 			}
 	})
 }

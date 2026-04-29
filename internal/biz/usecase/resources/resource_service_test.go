@@ -47,7 +47,7 @@ func newTestHarness(t *testing.T, opts ...harnessOption) *testHarness {
 	t.Helper()
 	cfg := &harnessConfig{
 		relationsRepo: &data.AllowAllRelationsRepository{},
-		usecaseConfig: &UsecaseConfig{},
+		usecaseConfig: NewUsecaseConfig(),
 		logger:        log.DefaultLogger,
 		namespace:     "rbac",
 	}
@@ -1503,7 +1503,7 @@ func TestReportResource_SchemaValidation(t *testing.T) {
 				"test-topic",
 				log.DefaultLogger,
 				nil, nil,
-				&UsecaseConfig{},
+				NewUsecaseConfig(),
 				metricscollector.NewFakeMetricsCollector(),
 				nil,
 				newTestSelfSubjectStrategy(),
@@ -1693,9 +1693,9 @@ func TestResolveConsistency(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			h := newTestHarness(t, withNamespace("test-topic"), withUsecaseConfig(&UsecaseConfig{
-				DefaultToAtLeastAsAcknowledged: tt.featureFlagEnabled,
-			}))
+			cfg := NewUsecaseConfig()
+			cfg.DefaultToAtLeastAsAcknowledged = tt.featureFlagEnabled
+			h := newTestHarness(t, withNamespace("test-topic"), withUsecaseConfig(cfg))
 
 			reporterResourceKey := createReporterResourceKey(t, "test-resource-123", "host", "hbi", "test-instance")
 
@@ -1767,9 +1767,9 @@ func TestResolveConsistency_OverrideFeatureFlag(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			h := newTestHarness(t, withNamespace("test-topic"), withUsecaseConfig(&UsecaseConfig{
-				DefaultToAtLeastAsAcknowledged: tt.featureFlagEnabled,
-			}))
+			cfg := NewUsecaseConfig()
+			cfg.DefaultToAtLeastAsAcknowledged = tt.featureFlagEnabled
+			h := newTestHarness(t, withNamespace("test-topic"), withUsecaseConfig(cfg))
 
 			reporterResourceKey := createReporterResourceKey(t, "test-resource-override", "host", "hbi", "test-instance")
 
@@ -1807,10 +1807,12 @@ func TestResolveConsistency_NilConsistencyDefaultsToUnspecified(t *testing.T) {
 
 func TestResolveConsistency_OverrideFeatureFlag_LogsBypassWhenEnabled(t *testing.T) {
 	var logBuf bytes.Buffer
+	cfg := NewUsecaseConfig()
+	cfg.DefaultToAtLeastAsAcknowledged = true
 	h := newTestHarness(t,
 		withNamespace("test-topic"),
 		withLogger(log.NewStdLogger(&logBuf)),
-		withUsecaseConfig(&UsecaseConfig{DefaultToAtLeastAsAcknowledged: true}),
+		withUsecaseConfig(cfg),
 	)
 
 	reporterResourceKey := createReporterResourceKey(t, "host-123", "host", "hbi", "instance-1")
@@ -1821,10 +1823,12 @@ func TestResolveConsistency_OverrideFeatureFlag_LogsBypassWhenEnabled(t *testing
 
 func TestResolveConsistency_OverrideFeatureFlag_LogsEnabledWhenNotBypassed(t *testing.T) {
 	var logBuf bytes.Buffer
+	cfg := NewUsecaseConfig()
+	cfg.DefaultToAtLeastAsAcknowledged = true
 	h := newTestHarness(t,
 		withNamespace("test-topic"),
 		withLogger(log.NewStdLogger(&logBuf)),
-		withUsecaseConfig(&UsecaseConfig{DefaultToAtLeastAsAcknowledged: true}),
+		withUsecaseConfig(cfg),
 	)
 
 	reporterResourceKey := createReporterResourceKey(t, "host-456", "host", "hbi", "instance-1")
@@ -1838,7 +1842,11 @@ func TestResolveConsistency_OverrideFeatureFlag_LogsDisabledWhenFeatureOff(t *te
 	h := newTestHarness(t,
 		withNamespace("test-topic"),
 		withLogger(log.NewStdLogger(&logBuf)),
-		withUsecaseConfig(&UsecaseConfig{DefaultToAtLeastAsAcknowledged: false}),
+		withUsecaseConfig(func() *UsecaseConfig {
+			cfg := NewUsecaseConfig()
+			cfg.DefaultToAtLeastAsAcknowledged = false
+			return cfg
+		}()),
 	)
 
 	reporterResourceKey := createReporterResourceKey(t, "host-789", "host", "hbi", "instance-1")

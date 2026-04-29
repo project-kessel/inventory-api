@@ -171,7 +171,7 @@ services:
         condition: service_healthy
     command: [
       "/bin/sh", "-c",
-      "curl -d @/debezium-connector.json -H 'Content-Type: application/json' -X POST http://connect:8083/connectors"
+      "curl -sf -d @/debezium-connector.json -H 'Content-Type: application/json' -X POST http://connect:8083/connectors || curl -sf -X GET http://connect:8083/connectors/debezium-connector"
     ]
     volumes:
       - ./configs/debezium-connector.json:/debezium-connector.json:ro,z

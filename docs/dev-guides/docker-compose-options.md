@@ -121,7 +121,7 @@ To deploy Relations API, clone the [Relations API repo](https://github.com/proje
 
 ### With Monitoring Stack
 
-Same as relations-ready setup plus Prometheus, Grafana, and Alertmanager:
+Same as basic setup (allow-unauthenticated auth, kessel authz) plus Prometheus, Grafana, and Alertmanager:
 
 ```shell
 make inventory-up-w-monitoring

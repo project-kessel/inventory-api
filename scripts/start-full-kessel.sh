@@ -27,7 +27,7 @@ if [ -n "${SCHEMA_ZED_FILE}" ]; then
 else
   SCHEMA_URL="${SCHEMA_ZED_URL:-https://raw.githubusercontent.com/RedHatInsights/rbac-config/refs/heads/master/configs/stage/schemas/schema.zed}"
   echo "Downloading schema.zed from ${SCHEMA_URL}"
-  curl -sSL -o "${SCHEMA_DEST}" "${SCHEMA_URL}"
+  curl -fsSL -o "${SCHEMA_DEST}" "${SCHEMA_URL}"
 fi
 
 ${DOCKER} compose --env-file "${ENV_FILE}" \

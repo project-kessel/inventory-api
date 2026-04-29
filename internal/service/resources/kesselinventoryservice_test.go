@@ -3961,13 +3961,13 @@ func TestInventoryService_CaseInsensitiveTypes(t *testing.T) {
 					}
 
 					return TestServerConfig{
-						Usecase:       uc,
-						Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
-					}, func(t *testing.T, tr *Transport) {
-						ctx := context.Background()
-						res := tr.Invoke(ctx, withBody(protoReq, ReportResource, httpEndpoint("POST /api/kessel/v1beta2/resources")))
-						Assert(t, res, requireSuccess())
-					}
+							Usecase:       uc,
+							Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+						}, func(t *testing.T, tr *Transport) {
+							ctx := context.Background()
+							res := tr.Invoke(ctx, withBody(protoReq, ReportResource, httpEndpoint("POST /api/kessel/v1beta2/resources")))
+							Assert(t, res, requireSuccess())
+						}
 				})
 			})
 		}
@@ -4031,16 +4031,16 @@ func TestInventoryService_CaseInsensitiveTypes(t *testing.T) {
 					}
 
 					return TestServerConfig{
-						Usecase:       uc,
-						Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
-					}, func(t *testing.T, tr *Transport) {
-						ctx := context.Background()
-						res1 := tr.Invoke(ctx, withBody(createReq, ReportResource, httpEndpoint("POST /api/kessel/v1beta2/resources")))
-						Assert(t, res1, requireSuccess())
+							Usecase:       uc,
+							Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+						}, func(t *testing.T, tr *Transport) {
+							ctx := context.Background()
+							res1 := tr.Invoke(ctx, withBody(createReq, ReportResource, httpEndpoint("POST /api/kessel/v1beta2/resources")))
+							Assert(t, res1, requireSuccess())
 
-						res2 := tr.Invoke(ctx, withBody(updateReq, ReportResource, httpEndpoint("POST /api/kessel/v1beta2/resources")))
-						Assert(t, res2, requireSuccess())
-					}
+							res2 := tr.Invoke(ctx, withBody(updateReq, ReportResource, httpEndpoint("POST /api/kessel/v1beta2/resources")))
+							Assert(t, res2, requireSuccess())
+						}
 				})
 			})
 		}
@@ -4098,16 +4098,16 @@ func TestInventoryService_CaseInsensitiveTypes(t *testing.T) {
 					}
 
 					return TestServerConfig{
-						Usecase:       uc,
-						Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
-					}, func(t *testing.T, tr *Transport) {
-						ctx := context.Background()
-						res1 := tr.Invoke(ctx, withBody(reportReq, ReportResource, httpEndpoint("POST /api/kessel/v1beta2/resources")))
-						Assert(t, res1, requireSuccess())
+							Usecase:       uc,
+							Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+						}, func(t *testing.T, tr *Transport) {
+							ctx := context.Background()
+							res1 := tr.Invoke(ctx, withBody(reportReq, ReportResource, httpEndpoint("POST /api/kessel/v1beta2/resources")))
+							Assert(t, res1, requireSuccess())
 
-						res2 := tr.Invoke(ctx, withBody(deleteReq, DeleteResource, httpEndpoint("DELETE /api/kessel/v1beta2/resources")))
-						Assert(t, res2, requireSuccess())
-					}
+							res2 := tr.Invoke(ctx, withBody(deleteReq, DeleteResource, httpEndpoint("DELETE /api/kessel/v1beta2/resources")))
+							Assert(t, res2, requireSuccess())
+						}
 				})
 			})
 		}
@@ -4152,14 +4152,14 @@ func TestInventoryService_CaseInsensitiveTypes(t *testing.T) {
 					}
 
 					return TestServerConfig{
-						Usecase:       newTestUsecase(t, testUsecaseConfig{Relations: simpleAuthz}),
-						Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
-					}, func(t *testing.T, tr *Transport) {
-						ctx := context.Background()
-						res := tr.Invoke(ctx, withBody(protoReq, Check, httpEndpoint("POST /api/kessel/v1beta2/check")))
-						resp := Extract(t, res, expectSuccess(func() *pb.CheckResponse { return &pb.CheckResponse{} }))
-						assert.Equal(t, tc.expectedAllowed, resp.Allowed)
-					}
+							Usecase:       newTestUsecase(t, testUsecaseConfig{Relations: simpleAuthz}),
+							Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+						}, func(t *testing.T, tr *Transport) {
+							ctx := context.Background()
+							res := tr.Invoke(ctx, withBody(protoReq, Check, httpEndpoint("POST /api/kessel/v1beta2/check")))
+							resp := Extract(t, res, expectSuccess(func() *pb.CheckResponse { return &pb.CheckResponse{} }))
+							assert.Equal(t, tc.expectedAllowed, resp.Allowed)
+						}
 				})
 			})
 		}
@@ -4204,14 +4204,14 @@ func TestInventoryService_CaseInsensitiveTypes(t *testing.T) {
 					}
 
 					return TestServerConfig{
-						Usecase:       newTestUsecase(t, testUsecaseConfig{Relations: simpleAuthz}),
-						Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
-					}, func(t *testing.T, tr *Transport) {
-						ctx := context.Background()
-						res := tr.Invoke(ctx, withBody(protoReq, CheckForUpdate, httpEndpoint("POST /api/kessel/v1beta2/checkforupdate")))
-						resp := Extract(t, res, expectSuccess(func() *pb.CheckForUpdateResponse { return &pb.CheckForUpdateResponse{} }))
-						assert.Equal(t, tc.expectedAllowed, resp.Allowed)
-					}
+							Usecase:       newTestUsecase(t, testUsecaseConfig{Relations: simpleAuthz}),
+							Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+						}, func(t *testing.T, tr *Transport) {
+							ctx := context.Background()
+							res := tr.Invoke(ctx, withBody(protoReq, CheckForUpdate, httpEndpoint("POST /api/kessel/v1beta2/checkforupdate")))
+							resp := Extract(t, res, expectSuccess(func() *pb.CheckForUpdateResponse { return &pb.CheckForUpdateResponse{} }))
+							assert.Equal(t, tc.expectedAllowed, resp.Allowed)
+						}
 				})
 			})
 		}
@@ -4249,14 +4249,14 @@ func TestInventoryService_CaseInsensitiveTypes(t *testing.T) {
 					}
 
 					return TestServerConfig{
-						Usecase:       newTestUsecase(t, testUsecaseConfig{Relations: simpleAuthz}),
-						Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
-					}, func(t *testing.T, tr *Transport) {
-						ctx := context.Background()
-						res := tr.Invoke(ctx, withBody(protoReq, CheckSelf, httpEndpoint("POST /api/kessel/v1beta2/checkself")))
-						resp := Extract(t, res, expectSuccess(func() *pb.CheckSelfResponse { return &pb.CheckSelfResponse{} }))
-						assert.Equal(t, tc.expectedAllowed, resp.Allowed)
-					}
+							Usecase:       newTestUsecase(t, testUsecaseConfig{Relations: simpleAuthz}),
+							Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+						}, func(t *testing.T, tr *Transport) {
+							ctx := context.Background()
+							res := tr.Invoke(ctx, withBody(protoReq, CheckSelf, httpEndpoint("POST /api/kessel/v1beta2/checkself")))
+							resp := Extract(t, res, expectSuccess(func() *pb.CheckSelfResponse { return &pb.CheckSelfResponse{} }))
+							assert.Equal(t, tc.expectedAllowed, resp.Allowed)
+						}
 				})
 			})
 		}
@@ -4319,16 +4319,16 @@ func TestInventoryService_CaseInsensitiveTypes(t *testing.T) {
 					}
 
 					return TestServerConfig{
-						Usecase:       newTestUsecase(t, testUsecaseConfig{Relations: simpleAuthz}),
-						Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
-					}, func(t *testing.T, tr *Transport) {
-						ctx := context.Background()
-						res := tr.Invoke(ctx, withBody(protoReq, CheckBulk, httpEndpoint("POST /api/kessel/v1beta2/checkbulk")))
-						resp := Extract(t, res, expectSuccess(func() *pb.CheckBulkResponse { return &pb.CheckBulkResponse{} }))
-						require.Len(t, resp.Pairs, 2)
-						assert.Equal(t, pb.Allowed_ALLOWED_TRUE, resp.Pairs[0].GetItem().Allowed)
-						assert.Equal(t, pb.Allowed_ALLOWED_FALSE, resp.Pairs[1].GetItem().Allowed)
-					}
+							Usecase:       newTestUsecase(t, testUsecaseConfig{Relations: simpleAuthz}),
+							Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+						}, func(t *testing.T, tr *Transport) {
+							ctx := context.Background()
+							res := tr.Invoke(ctx, withBody(protoReq, CheckBulk, httpEndpoint("POST /api/kessel/v1beta2/checkbulk")))
+							resp := Extract(t, res, expectSuccess(func() *pb.CheckBulkResponse { return &pb.CheckBulkResponse{} }))
+							require.Len(t, resp.Pairs, 2)
+							assert.Equal(t, pb.Allowed_ALLOWED_TRUE, resp.Pairs[0].GetItem().Allowed)
+							assert.Equal(t, pb.Allowed_ALLOWED_FALSE, resp.Pairs[1].GetItem().Allowed)
+						}
 				})
 			})
 		}
@@ -4391,16 +4391,16 @@ func TestInventoryService_CaseInsensitiveTypes(t *testing.T) {
 					}
 
 					return TestServerConfig{
-						Usecase:       newTestUsecase(t, testUsecaseConfig{Relations: simpleAuthz}),
-						Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
-					}, func(t *testing.T, tr *Transport) {
-						ctx := context.Background()
-						res := tr.Invoke(ctx, withBody(protoReq, CheckForUpdateBulk, httpEndpoint("POST /api/kessel/v1beta2/checkforupdatebulk")))
-						resp := Extract(t, res, expectSuccess(func() *pb.CheckForUpdateBulkResponse { return &pb.CheckForUpdateBulkResponse{} }))
-						require.Len(t, resp.Pairs, 2)
-						assert.Equal(t, pb.Allowed_ALLOWED_TRUE, resp.Pairs[0].GetItem().Allowed)
-						assert.Equal(t, pb.Allowed_ALLOWED_FALSE, resp.Pairs[1].GetItem().Allowed)
-					}
+							Usecase:       newTestUsecase(t, testUsecaseConfig{Relations: simpleAuthz}),
+							Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+						}, func(t *testing.T, tr *Transport) {
+							ctx := context.Background()
+							res := tr.Invoke(ctx, withBody(protoReq, CheckForUpdateBulk, httpEndpoint("POST /api/kessel/v1beta2/checkforupdatebulk")))
+							resp := Extract(t, res, expectSuccess(func() *pb.CheckForUpdateBulkResponse { return &pb.CheckForUpdateBulkResponse{} }))
+							require.Len(t, resp.Pairs, 2)
+							assert.Equal(t, pb.Allowed_ALLOWED_TRUE, resp.Pairs[0].GetItem().Allowed)
+							assert.Equal(t, pb.Allowed_ALLOWED_FALSE, resp.Pairs[1].GetItem().Allowed)
+						}
 				})
 			})
 		}
@@ -4449,16 +4449,16 @@ func TestInventoryService_CaseInsensitiveTypes(t *testing.T) {
 					}
 
 					return TestServerConfig{
-						Usecase:       newTestUsecase(t, testUsecaseConfig{Relations: simpleAuthz}),
-						Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
-					}, func(t *testing.T, tr *Transport) {
-						ctx := context.Background()
-						res := tr.Invoke(ctx, withBody(protoReq, CheckSelfBulk, httpEndpoint("POST /api/kessel/v1beta2/checkselfbulk")))
-						resp := Extract(t, res, expectSuccess(func() *pb.CheckSelfBulkResponse { return &pb.CheckSelfBulkResponse{} }))
-						require.Len(t, resp.Pairs, 2)
-						assert.Equal(t, pb.Allowed_ALLOWED_TRUE, resp.Pairs[0].GetItem().Allowed)
-						assert.Equal(t, pb.Allowed_ALLOWED_FALSE, resp.Pairs[1].GetItem().Allowed)
-					}
+							Usecase:       newTestUsecase(t, testUsecaseConfig{Relations: simpleAuthz}),
+							Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+						}, func(t *testing.T, tr *Transport) {
+							ctx := context.Background()
+							res := tr.Invoke(ctx, withBody(protoReq, CheckSelfBulk, httpEndpoint("POST /api/kessel/v1beta2/checkselfbulk")))
+							resp := Extract(t, res, expectSuccess(func() *pb.CheckSelfBulkResponse { return &pb.CheckSelfBulkResponse{} }))
+							require.Len(t, resp.Pairs, 2)
+							assert.Equal(t, pb.Allowed_ALLOWED_TRUE, resp.Pairs[0].GetItem().Allowed)
+							assert.Equal(t, pb.Allowed_ALLOWED_FALSE, resp.Pairs[1].GetItem().Allowed)
+						}
 				})
 			})
 		}

@@ -151,7 +151,7 @@ func (r *resourceRepository) Save(tx *gorm.DB, resource bizmodel.Resource, opera
 		dataReporterRepresentation := datamodel.DeserializeReporterRepresentationFromSnapshot(*reporterRepresentationSnapshot)
 		if err := tx.Create(&dataReporterRepresentation).Error; err != nil {
 			if errors.Is(err, gorm.ErrDuplicatedKey) {
-				return errors.BadRequest("NON-UNIQUE TRANSACTION ID", err.Error()).WithCause(err)
+				return errors.BadRequest(bizmodel.ReasonNonUniqueTransactionID, err.Error()).WithCause(err)
 			}
 			return fmt.Errorf("failed to save reporter representation: %w", err)
 		}
@@ -161,7 +161,7 @@ func (r *resourceRepository) Save(tx *gorm.DB, resource bizmodel.Resource, opera
 		dataCommonRepresentation := datamodel.DeserializeCommonRepresentationFromSnapshot(*commonRepresentationSnapshot)
 		if err := tx.Create(&dataCommonRepresentation).Error; err != nil {
 			if errors.Is(err, gorm.ErrDuplicatedKey) {
-				return errors.BadRequest("NON-UNIQUE TRANSACTION ID", err.Error()).WithCause(err)
+				return errors.BadRequest(bizmodel.ReasonNonUniqueTransactionID, err.Error()).WithCause(err)
 			}
 			return fmt.Errorf("failed to save common representation: %w", err)
 		}

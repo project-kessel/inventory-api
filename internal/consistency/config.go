@@ -10,6 +10,7 @@ type completedConfig struct {
 	ReadAfterWriteEnabled          bool
 	ReadAfterWriteAllowlist        []string
 	DefaultToAtLeastAsAcknowledged bool
+	IdempotencyCheckEnabled        bool
 }
 
 type CompletedConfig struct {
@@ -29,5 +30,6 @@ func (c *Config) Complete() (CompletedConfig, []error) {
 		ReadAfterWriteEnabled:          c.ReadAfterWriteEnabled,
 		ReadAfterWriteAllowlist:        c.ReadAfterWriteAllowlist,
 		DefaultToAtLeastAsAcknowledged: c.DefaultToAtLeastAsAcknowledged,
+		IdempotencyCheckEnabled:        c.IdempotencyCheckEnabled,
 	}}, nil
 }

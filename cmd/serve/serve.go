@@ -262,12 +262,12 @@ func NewCommand(
 				return err
 			}
 
-			usecaseConfig := &resourcesctl.UsecaseConfig{
-				ReadAfterWriteEnabled:          consistencyConfig.ReadAfterWriteEnabled,
-				ReadAfterWriteAllowlist:        consistencyConfig.ReadAfterWriteAllowlist,
-				ConsumerEnabled:                consumerOptions.Enabled,
-				DefaultToAtLeastAsAcknowledged: consistencyConfig.DefaultToAtLeastAsAcknowledged,
-			}
+			usecaseConfig := resourcesctl.NewUsecaseConfig()
+			usecaseConfig.ReadAfterWriteEnabled = consistencyConfig.ReadAfterWriteEnabled
+			usecaseConfig.ReadAfterWriteAllowlist = consistencyConfig.ReadAfterWriteAllowlist
+			usecaseConfig.ConsumerEnabled = consumerOptions.Enabled
+			usecaseConfig.DefaultToAtLeastAsAcknowledged = consistencyConfig.DefaultToAtLeastAsAcknowledged
+			usecaseConfig.IdempotencyCheckEnabled = consistencyConfig.IdempotencyCheckEnabled
 
 			// This circuit breaker is used to prevent request handlers from being blocked
 			// indefinitely if the consumer is not responding via notifications.

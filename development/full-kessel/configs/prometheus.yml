@@ -16,8 +16,4 @@ scrape_configs:
  - job_name: kessel-kafka-connect
    static_configs:
     - targets:
-       - connect:8083
- - job_name: kessel-kic-connect
-   static_configs:
-    - targets:
-       - kic-connect:8083
+       - kafka-connect:8083

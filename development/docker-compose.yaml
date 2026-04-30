@@ -140,14 +140,14 @@ services:
 
   ### ---------- Debezium Kafka Connect ----------
 
-  connect:
+  kafka-connect:
     ports:
       - 8083:8083
     environment:
       - GROUP_ID=1
-      - CONFIG_STORAGE_TOPIC=my_connect_configs
-      - OFFSET_STORAGE_TOPIC=my_connect_offsets
-      - STATUS_STORAGE_TOPIC=my_connect_statuses
+      - CONFIG_STORAGE_TOPIC=kafka_connect_configs
+      - OFFSET_STORAGE_TOPIC=kafka_connect_offsets
+      - STATUS_STORAGE_TOPIC=kafka_connect_statuses
       - BOOTSTRAP_SERVERS=kafka:9093
     depends_on:
       kafka:
@@ -164,14 +164,14 @@ services:
     networks:
       - kessel
 
-  connect-setup:
+  kafka-connect-setup:
     image: quay.io/curl/curl:latest
     depends_on:
-      connect:
+      kafka-connect:
         condition: service_healthy
     command: [
       "/bin/sh", "-c",
-      "curl -sf -d @/debezium-connector.json -H 'Content-Type: application/json' -X POST http://connect:8083/connectors || curl -sf -X GET http://connect:8083/connectors/debezium-connector"
+      "curl -sf -d @/debezium-connector.json -H 'Content-Type: application/json' -X POST http://kafka-connect:8083/connectors || curl -sf -X GET http://kafka-connect:8083/connectors/debezium-connector"
     ]
     volumes:
       - ./configs/debezium-connector.json:/debezium-connector.json:ro,z

@@ -184,27 +184,27 @@ pr-check:
 
 .PHONY: inventory-up
 inventory-up:
-	AUTHZ_IMPL=allow-all ./scripts/start-inventory.sh base 8000 9000 inventory-api connect-setup kafka-setup
+	AUTHZ_IMPL=allow-all ./scripts/start-inventory.sh base 8000 9000 inventory-api kafka-connect-setup kafka-setup
 
 .PHONY: inventory-up-relations-ready
 inventory-up-relations-ready:
-	./scripts/start-inventory.sh authn-rh-identity 8081 9081 inventory-api connect-setup kafka-setup
+	./scripts/start-inventory.sh authn-rh-identity 8081 9081 inventory-api kafka-connect-setup kafka-setup
 
 .PHONY: inventory-up-w-monitoring
 inventory-up-w-monitoring:
-	./scripts/start-inventory.sh base 8081 9081 inventory-api connect-setup kafka-setup prometheus grafana alertmanager
+	./scripts/start-inventory.sh base 8081 9081 inventory-api kafka-connect-setup kafka-setup prometheus grafana alertmanager
 
 .PHONY: inventory-up-split
 inventory-up-split:
-	AUTHZ_IMPL=allow-all ./scripts/start-inventory.sh base 8000 9000 invmigrate connect-setup kafka-setup
+	AUTHZ_IMPL=allow-all ./scripts/start-inventory.sh base 8000 9000 invmigrate kafka-connect-setup kafka-setup
 
 .PHONY: inventory-up-split-relations-ready
 inventory-up-split-relations-ready:
-	./scripts/start-inventory.sh base 8081 9081 invmigrate connect-setup kafka-setup
+	./scripts/start-inventory.sh base 8081 9081 invmigrate kafka-connect-setup kafka-setup
 
 .PHONY: inventory-up-sso
 inventory-up-sso:
-	./scripts/start-inventory.sh authn-sso 8081 9081 inventory-api connect-setup kafka-setup keycloak
+	./scripts/start-inventory.sh authn-sso 8081 9081 inventory-api kafka-connect-setup kafka-setup keycloak
 
 .PHONY: inventory-up-kind
 inventory-up-kind:

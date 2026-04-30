@@ -11,7 +11,7 @@
 ###
 ### Profiles:
 ###   relations  - Relations API + SpiceDB (remove when Relations merges into Inventory)
-###   consumer   - Inventory Consumer + HBI database + KIC Kafka Connect
+###   consumer   - Inventory Consumer
 ###   monitoring - Prometheus, Grafana, and Alertmanager (make kessel-up-monitoring)
 
 services:
@@ -78,7 +78,6 @@ services:
       # Inventory Consumer topics
       bin/kafka-topics.sh --bootstrap-server kafka:9093 --create --if-not-exists --topic host-inventory.hbi.hosts --replication-factor 1 --partitions 6
       bin/kafka-topics.sh --bootstrap-server kafka:9093 --create --if-not-exists --topic outbox.event.hbi.hosts --replication-factor 1 --partitions 1
-      bin/kafka-topics.sh --bootstrap-server kafka:9093 --create --if-not-exists --topic host-inventory.signal --replication-factor 1 --partitions 1
 
       echo -e 'Successfully created the following topics:'
       bin/kafka-topics.sh --bootstrap-server kafka:9093 --list
@@ -148,15 +147,15 @@ services:
     networks:
       - kessel
 
-  connect:
+  kafka-connect:
     image: quay.io/debezium/connect:3.1
     ports:
       - "8083:8083"
     environment:
       - GROUP_ID=1
-      - CONFIG_STORAGE_TOPIC=my_connect_configs
-      - OFFSET_STORAGE_TOPIC=my_connect_offsets
-      - STATUS_STORAGE_TOPIC=my_connect_statuses
+      - CONFIG_STORAGE_TOPIC=kafka_connect_configs
+      - OFFSET_STORAGE_TOPIC=kafka_connect_offsets
+      - STATUS_STORAGE_TOPIC=kafka_connect_statuses
       - BOOTSTRAP_SERVERS=kafka:9093
     depends_on:
       kafka:
@@ -172,14 +171,14 @@ services:
     networks:
       - kessel
 
-  connect-setup:
+  kafka-connect-setup:
     image: quay.io/curl/curl:latest
     depends_on:
-      connect:
+      kafka-connect:
         condition: service_healthy
     command: [
       "/bin/sh", "-c",
-      "curl -sf -d @/debezium-connector.json -H 'Content-Type: application/json' -X POST http://connect:8083/connectors || curl -sf -X GET http://connect:8083/connectors/debezium-connector"
+      "curl -sf -d @/debezium-connector.json -H 'Content-Type: application/json' -X POST http://kafka-connect:8083/connectors || curl -sf -X GET http://kafka-connect:8083/connectors/debezium-connector"
     ]
     volumes:
       - ../configs/debezium-connector.json:/debezium-connector.json:ro,z
@@ -258,29 +257,6 @@ services:
 
   ### ---------- Inventory Consumer Stack (profile: consumer) ----------
 
-  hbidatabase:
-    image: "postgres"
-    command: ["docker-entrypoint.sh", "-p", "5435", "-c", "config_file=/etc/postgresql/postgresql.conf"]
-    hostname: hbidatabase
-    profiles: ["consumer"]
-    expose:
-      - "5435"
-    ports:
-      - "5435:5435"
-    volumes:
-      - ../configs/postgresql.conf:/etc/postgresql/postgresql.conf:ro,z
-    environment:
-      - "POSTGRES_PASSWORD=supersecurewow"
-      - "POSTGRES_DB=host-inventory"
-      - "PGPORT=5435"
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -p 5435"]
-      interval: 5s
-      timeout: 3s
-      retries: 15
-    networks:
-      - kessel
-
   inventory-consumer:
     image: "${INVENTORY_CONSUMER_IMAGE}"
     profiles: ["consumer"]
@@ -295,26 +271,6 @@ services:
         condition: service_healthy
       inventory-api:
         condition: service_healthy
-    networks:
-      - kessel
-
-  kic-connect:
-    image: quay.io/debezium/connect:3.1
-    profiles: ["consumer"]
-    ports:
-      - "8084:8083"
-    environment:
-      - GROUP_ID=2
-      - CONFIG_STORAGE_TOPIC=kessel_kafka_connect_configs
-      - OFFSET_STORAGE_TOPIC=kessel_kafka_connect_offsets
-      - STATUS_STORAGE_TOPIC=kessel_kafka_connect_statuses
-      - BOOTSTRAP_SERVERS=kafka:9093
-    depends_on:
-      kafka:
-        condition: service_healthy
-      hbidatabase:
-        condition: service_healthy
-    restart: "always"
     networks:
       - kessel
 

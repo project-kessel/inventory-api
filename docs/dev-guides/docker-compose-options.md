@@ -30,8 +30,6 @@ make kessel-up
 
 This starts all services using the compose file at `development/full-kessel/docker-compose.yaml`. The SpiceDB schema is automatically downloaded from the [stage rbac-config repo](https://raw.githubusercontent.com/RedHatInsights/rbac-config/refs/heads/master/configs/stage/schemas/schema.zed) at startup.
 
-> NOTE: If you previously ran `make db/setup` for the Quick Start workflow, tear it down first with `make db/teardown` — the standalone postgres container holds port 5435 which conflicts with the HBI database in the full-kessel stack.
-
 ### Ports
 
 | Port | Service |
@@ -42,11 +40,9 @@ This starts all services using the compose file at `development/full-kessel/dock
 | 9000 | Relations API (gRPC) |
 | 50051 | SpiceDB (gRPC) |
 | 8083 | Inventory Kafka Connect |
-| 8084 | KIC Kafka Connect |
 | 9092 | Kafka |
 | 5432 | Relations DB (postgres) |
 | 5433 | Inventory DB (postgres) |
-| 5435 | HBI DB (postgres) |
 | 9050 | Prometheus (monitoring profile) |
 | 9093 | Alertmanager (monitoring profile) |
 | 3000 | Grafana (monitoring profile) |
@@ -83,7 +79,7 @@ To include Prometheus, Grafana, and Alertmanager:
 make kessel-up-monitoring
 ```
 
-Grafana is pre-loaded with a local Prometheus datasource and the current dashboards from the [dashboards folder](../../dashboards/). Prometheus is configured to scrape all Kessel services (Inventory API, Relations API, Consumer, and both Kafka Connect instances).
+Grafana is pre-loaded with a local Prometheus datasource and the current dashboards from the [dashboards folder](../../dashboards/). Prometheus is configured to scrape all Kessel services (Inventory API, Relations API, Consumer, and Kafka Connect).
 
 See [Monitoring Info](#monitoring-info) for URLs and login details.
 

@@ -51,18 +51,18 @@ func TestInMemorySchemaRepository_CreateResource_AlreadyExists(t *testing.T) {
 }
 
 func TestInMemorySchemaRepository_GetResource(t *testing.T) {
-	// NormalizeResourceType does ToLower + slash->underscore on both create and get paths.
 	cases := []struct {
-		name       string
-		createType string
-		lookupType string
+		name         string
+		createType   string
+		lookupType   string
+		expectedType string
 	}{
-		{"lowercase lookup", "k8s_cluster", "k8s_cluster"},
-		{"uppercase lookup normalizes", "k8s_cluster", "K8S_CLUSTER"},
-		{"mixed-case lookup", "k8s_cluster", "K8s_Cluster"},
-		{"slash normalizes to underscore", "rhel_host", "rhel/host"},
-		{"uppercase + slash", "rhel_host", "RHEL/Host"},
-		{"create uppercase, lookup lowercase", "HOST", "host"},
+		{"lowercase lookup", "k8s_cluster", "k8s_cluster", "k8s_cluster"},
+		{"uppercase lookup normalizes", "k8s_cluster", "K8S_CLUSTER", "k8s_cluster"},
+		{"mixed-case lookup", "k8s_cluster", "K8s_Cluster", "k8s_cluster"},
+		{"slash normalizes to underscore", "rhel_host", "rhel/host", "rhel_host"},
+		{"uppercase + slash", "rhel_host", "RHEL/Host", "rhel_host"},
+		{"create uppercase, lookup lowercase", "HOST", "host", "host"},
 	}
 
 	for _, tc := range cases {
@@ -79,7 +79,7 @@ func TestInMemorySchemaRepository_GetResource(t *testing.T) {
 
 			retrieved, err := repo.GetResourceSchema(ctx, tc.lookupType)
 			assert.NoError(t, err)
-			assert.Equal(t, NormalizeResourceType(tc.createType), retrieved.ResourceType)
+			assert.Equal(t, tc.expectedType, retrieved.ResourceType)
 		})
 	}
 }
@@ -176,17 +176,17 @@ func TestInMemorySchemaRepository_GetResources(t *testing.T) {
 }
 
 func TestInMemorySchemaRepository_CreateResourceReporter(t *testing.T) {
-	// NormalizeResourceType does ToLower + slash->underscore; normalizeReporterType does ToLower only.
 	reporterValidation := bizmodel.NewJsonSchemaValidatorFromString(`{"type": "object", "properties": {"satellite_id": {"type": "string"}}}`)
 
 	cases := []struct {
-		name               string
-		createReporterType string
-		lookupReporterType string
+		name                 string
+		createReporterType   string
+		lookupReporterType   string
+		expectedReporterType string
 	}{
-		{"lowercase reporter", "hbi", "hbi"},
-		{"uppercase reporter lookup", "hbi", "HBI"},
-		{"create uppercase, lookup lowercase", "HBI", "hbi"},
+		{"lowercase reporter", "hbi", "hbi", "hbi"},
+		{"uppercase reporter lookup", "hbi", "HBI", "hbi"},
+		{"create uppercase, lookup lowercase", "HBI", "hbi", "hbi"},
 	}
 
 	for _, tc := range cases {
@@ -211,7 +211,7 @@ func TestInMemorySchemaRepository_CreateResourceReporter(t *testing.T) {
 			retrieved, err := repo.GetReporterSchema(ctx, "host", tc.lookupReporterType)
 			assert.NoError(t, err)
 			assert.Equal(t, "host", retrieved.ResourceType)
-			assert.Equal(t, normalizeReporterType(tc.createReporterType), retrieved.ReporterType)
+			assert.Equal(t, tc.expectedReporterType, retrieved.ReporterType)
 		})
 	}
 }

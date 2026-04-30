@@ -528,6 +528,7 @@ func TestReporterInstanceId_Initialization(t *testing.T) {
 			t.Error("Expected error for whitespace string, got none")
 		}
 	})
+
 }
 
 func TestConsistencyToken_Initialization(t *testing.T) {

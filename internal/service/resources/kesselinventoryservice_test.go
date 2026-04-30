@@ -3991,3 +3991,484 @@ func newFakeSchemaRepository(t *testing.T) model.SchemaRepository {
 
 	return schemaRepository
 }
+
+func assertProtoEqual(t *testing.T, expected, actual proto.Message) {
+	t.Helper()
+	if !proto.Equal(expected, actual) {
+		t.Errorf("proto mismatch\nwant: %v\n got: %v", expected, actual)
+	}
+}
+
+// --- Case-insensitive test helpers ---
+
+type caseVariant struct {
+	name         string
+	resourceType string
+	reporterType string
+}
+
+var caseVariants = []caseVariant{
+	{"lowercase types", "host", "hbi"},
+	{"uppercase types", "HOST", "HBI"},
+	{"mixed case", "Host", "Hbi"},
+}
+
+func makeResourceRef(resourceId, resourceType, reporterType string) *pb.ResourceReference {
+	return &pb.ResourceReference{
+		ResourceId:   resourceId,
+		ResourceType: resourceType,
+		Reporter:     &pb.ReporterReference{Type: reporterType},
+	}
+}
+
+func makeSubjectRef(subjectId string) *pb.SubjectReference {
+	return &pb.SubjectReference{
+		Resource: makeResourceRef(subjectId, "principal", "rbac"),
+	}
+}
+
+func makeAuthzConfig(t *testing.T, authz *data.SimpleRelationsRepository, subjectId string) TestServerConfig {
+	t.Helper()
+	return TestServerConfig{
+		Usecase: newTestUsecase(t, testUsecaseConfig{Relations: authz}),
+		Authenticator: &StubAuthenticator{
+			Claims:   &authnapi.Claims{SubjectId: authnapi.SubjectId(subjectId), AuthType: authnapi.AuthTypeXRhIdentity},
+			Decision: authnapi.Allow,
+		},
+	}
+}
+
+func makeReportConfig(t *testing.T) TestServerConfig {
+	t.Helper()
+	return TestServerConfig{
+		Usecase: newTestUsecase(t, testUsecaseConfig{}),
+		Authenticator: &StubAuthenticator{
+			Claims:   &authnapi.Claims{SubjectId: authnapi.SubjectId("reporter-service"), AuthType: authnapi.AuthTypeXRhIdentity},
+			Decision: authnapi.Allow,
+		},
+	}
+}
+
+func makeReportReq(resourceType, reporterType, instanceId, localResourceId, hostname string) *pb.ReportResourceRequest {
+	return &pb.ReportResourceRequest{
+		Type:               resourceType,
+		ReporterType:       reporterType,
+		ReporterInstanceId: instanceId,
+		Representations: &pb.ResourceRepresentations{
+			Metadata: &pb.RepresentationMetadata{
+				LocalResourceId: localResourceId,
+				ApiHref:         "https://api.example.com/hosts/" + localResourceId,
+			},
+			Common: &structpb.Struct{
+				Fields: map[string]*structpb.Value{
+					"hostname": structpb.NewStringValue(hostname),
+				},
+			},
+		},
+	}
+}
+
+// --- Normalization tests ---
+
+func TestInventoryService_CaseInsensitiveTypes(t *testing.T) {
+	t.Parallel()
+
+	t.Run("Report", func(t *testing.T) {
+		t.Parallel()
+		// Resource and reporter types are normalized to lowercase by the service layer.
+		cases := []struct {
+			name         string
+			resourceType string
+			reporterType string
+		}{
+			{"lowercase types", "host", "hbi"},
+			{"uppercase resource type", "HOST", "hbi"},
+			{"uppercase reporter type", "host", "HBI"},
+			{"all uppercase", "HOST", "HBI"},
+		}
+
+		for _, tc := range cases {
+			t.Run(tc.name, func(t *testing.T) {
+				t.Parallel()
+				runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
+					return makeReportConfig(t), func(t *testing.T, tr *Transport) {
+						res := tr.Invoke(context.Background(), withBody(
+							makeReportReq(tc.resourceType, tc.reporterType, "instance-001", "my-host-123", "example-host"),
+							ReportResource, httpEndpoint("POST /api/kessel/v1beta2/resources")))
+						Assert(t, res, requireSuccess())
+					}
+				})
+			})
+		}
+	})
+
+	t.Run("ReportUpdate", func(t *testing.T) {
+		t.Parallel()
+		cases := []struct {
+			name           string
+			createType     string
+			createReporter string
+			updateType     string
+			updateReporter string
+		}{
+			{"create uppercase, update lowercase", "HOST", "HBI", "host", "hbi"},
+			{"create lowercase, update uppercase", "host", "hbi", "HOST", "HBI"},
+			{"create mixed, update lowercase", "Host", "Hbi", "host", "hbi"},
+		}
+
+		for _, tc := range cases {
+			t.Run(tc.name, func(t *testing.T) {
+				t.Parallel()
+				runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
+					return makeReportConfig(t), func(t *testing.T, tr *Transport) {
+						ctx := context.Background()
+						res1 := tr.Invoke(ctx, withBody(
+							makeReportReq(tc.createType, tc.createReporter, "instance-001", "my-host-123", "original-host"),
+							ReportResource, httpEndpoint("POST /api/kessel/v1beta2/resources")))
+						Assert(t, res1, requireSuccess())
+
+						res2 := tr.Invoke(ctx, withBody(
+							makeReportReq(tc.updateType, tc.updateReporter, "instance-001", "my-host-123", "updated-host"),
+							ReportResource, httpEndpoint("POST /api/kessel/v1beta2/resources")))
+						Assert(t, res2, requireSuccess())
+					}
+				})
+			})
+		}
+	})
+
+	t.Run("Delete", func(t *testing.T) {
+		t.Parallel()
+		cases := []struct {
+			name           string
+			reportType     string
+			reportReporter string
+			deleteType     string
+			deleteReporter string
+		}{
+			{"report uppercase, delete lowercase", "HOST", "HBI", "host", "hbi"},
+			{"report lowercase, delete uppercase", "host", "hbi", "HOST", "HBI"},
+		}
+
+		for _, tc := range cases {
+			t.Run(tc.name, func(t *testing.T) {
+				t.Parallel()
+				runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
+					instanceId := "instance-001"
+					return makeReportConfig(t), func(t *testing.T, tr *Transport) {
+						ctx := context.Background()
+						res1 := tr.Invoke(ctx, withBody(
+							makeReportReq(tc.reportType, tc.reportReporter, instanceId, "my-host-123", "example-host"),
+							ReportResource, httpEndpoint("POST /api/kessel/v1beta2/resources")))
+						Assert(t, res1, requireSuccess())
+
+						res2 := tr.Invoke(ctx, withBody(&pb.DeleteResourceRequest{
+							Reference: &pb.ResourceReference{
+								ResourceType: tc.deleteType,
+								ResourceId:   "my-host-123",
+								Reporter: &pb.ReporterReference{
+									Type:       tc.deleteReporter,
+									InstanceId: &instanceId,
+								},
+							},
+						}, DeleteResource, httpEndpoint("DELETE /api/kessel/v1beta2/resources")))
+						Assert(t, res2, requireSuccess())
+					}
+				})
+			})
+		}
+	})
+
+	t.Run("Check", func(t *testing.T) {
+		t.Parallel()
+		for _, tc := range caseVariants {
+			t.Run(tc.name, func(t *testing.T) {
+				t.Parallel()
+				runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
+					authz := data.NewSimpleRelationsRepository()
+					authz.Grant("subject-456", "view", "hbi", "host", "resource-abc")
+					return makeAuthzConfig(t, authz, "user-123"), func(t *testing.T, tr *Transport) {
+						res := tr.Invoke(context.Background(), withBody(&pb.CheckRequest{
+							Relation: "view",
+							Object:   makeResourceRef("resource-abc", tc.resourceType, tc.reporterType),
+							Subject:  makeSubjectRef("subject-456"),
+						}, Check, httpEndpoint("POST /api/kessel/v1beta2/check")))
+						resp := Extract(t, res, expectSuccess(func() *pb.CheckResponse { return &pb.CheckResponse{} }))
+						require.NotEmpty(t, resp.ConsistencyToken.GetToken())
+						assertProtoEqual(t, &pb.CheckResponse{
+							Allowed:          pb.Allowed_ALLOWED_TRUE,
+							ConsistencyToken: resp.ConsistencyToken,
+						}, resp)
+					}
+				})
+			})
+		}
+	})
+
+	t.Run("CheckForUpdate", func(t *testing.T) {
+		t.Parallel()
+		for _, tc := range caseVariants {
+			t.Run(tc.name, func(t *testing.T) {
+				t.Parallel()
+				runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
+					authz := data.NewSimpleRelationsRepository()
+					authz.Grant("subject-789", "edit", "hbi", "host", "resource-xyz")
+					return makeAuthzConfig(t, authz, "user-123"), func(t *testing.T, tr *Transport) {
+						res := tr.Invoke(context.Background(), withBody(&pb.CheckForUpdateRequest{
+							Relation: "edit",
+							Object:   makeResourceRef("resource-xyz", tc.resourceType, tc.reporterType),
+							Subject:  makeSubjectRef("subject-789"),
+						}, CheckForUpdate, httpEndpoint("POST /api/kessel/v1beta2/checkforupdate")))
+						resp := Extract(t, res, expectSuccess(func() *pb.CheckForUpdateResponse { return &pb.CheckForUpdateResponse{} }))
+						require.NotEmpty(t, resp.ConsistencyToken.GetToken())
+						assertProtoEqual(t, &pb.CheckForUpdateResponse{
+							Allowed:          pb.Allowed_ALLOWED_TRUE,
+							ConsistencyToken: resp.ConsistencyToken,
+						}, resp)
+					}
+				})
+			})
+		}
+	})
+
+	t.Run("CheckSelf", func(t *testing.T) {
+		t.Parallel()
+		for _, tc := range caseVariants {
+			t.Run(tc.name, func(t *testing.T) {
+				t.Parallel()
+				runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
+					authz := data.NewSimpleRelationsRepository()
+					authz.Grant("user-123", "view", "hbi", "host", "resource-abc")
+					return makeAuthzConfig(t, authz, "user-123"), func(t *testing.T, tr *Transport) {
+						res := tr.Invoke(context.Background(), withBody(&pb.CheckSelfRequest{
+							Relation: "view",
+							Object:   makeResourceRef("resource-abc", tc.resourceType, tc.reporterType),
+						}, CheckSelf, httpEndpoint("POST /api/kessel/v1beta2/checkself")))
+						resp := Extract(t, res, expectSuccess(func() *pb.CheckSelfResponse { return &pb.CheckSelfResponse{} }))
+						require.NotEmpty(t, resp.ConsistencyToken.GetToken())
+						assertProtoEqual(t, &pb.CheckSelfResponse{
+							Allowed:          pb.Allowed_ALLOWED_TRUE,
+							ConsistencyToken: resp.ConsistencyToken,
+						}, resp)
+					}
+				})
+			})
+		}
+	})
+
+	t.Run("CheckBulk", func(t *testing.T) {
+		t.Parallel()
+		for _, tc := range caseVariants {
+			t.Run(tc.name, func(t *testing.T) {
+				t.Parallel()
+				runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
+					authz := data.NewSimpleRelationsRepository()
+					authz.Grant("subject-a", "view", "hbi", "host", "resource-1")
+					items := []*pb.CheckBulkRequestItem{
+						{Object: makeResourceRef("resource-1", tc.resourceType, tc.reporterType), Subject: makeSubjectRef("subject-a"), Relation: "view"},
+						{Object: makeResourceRef("resource-2", tc.resourceType, tc.reporterType), Subject: makeSubjectRef("subject-b"), Relation: "edit"},
+					}
+					return makeAuthzConfig(t, authz, "user-123"), func(t *testing.T, tr *Transport) {
+						res := tr.Invoke(context.Background(), withBody(&pb.CheckBulkRequest{Items: items},
+							CheckBulk, httpEndpoint("POST /api/kessel/v1beta2/checkbulk")))
+						resp := Extract(t, res, expectSuccess(func() *pb.CheckBulkResponse { return &pb.CheckBulkResponse{} }))
+						require.NotEmpty(t, resp.ConsistencyToken.GetToken())
+						assertProtoEqual(t, &pb.CheckBulkResponse{
+							Pairs: []*pb.CheckBulkResponsePair{
+								{Request: items[0], Response: &pb.CheckBulkResponsePair_Item{Item: &pb.CheckBulkResponseItem{Allowed: pb.Allowed_ALLOWED_TRUE}}},
+								{Request: items[1], Response: &pb.CheckBulkResponsePair_Item{Item: &pb.CheckBulkResponseItem{Allowed: pb.Allowed_ALLOWED_FALSE}}},
+							},
+							ConsistencyToken: resp.ConsistencyToken,
+						}, resp)
+					}
+				})
+			})
+		}
+	})
+
+	t.Run("CheckForUpdateBulk", func(t *testing.T) {
+		t.Parallel()
+		for _, tc := range caseVariants {
+			t.Run(tc.name, func(t *testing.T) {
+				t.Parallel()
+				runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
+					authz := data.NewSimpleRelationsRepository()
+					authz.Grant("subject-a", "update", "hbi", "host", "resource-1")
+					items := []*pb.CheckBulkRequestItem{
+						{Object: makeResourceRef("resource-1", tc.resourceType, tc.reporterType), Subject: makeSubjectRef("subject-a"), Relation: "update"},
+						{Object: makeResourceRef("resource-2", tc.resourceType, tc.reporterType), Subject: makeSubjectRef("subject-b"), Relation: "update"},
+					}
+					return makeAuthzConfig(t, authz, "user-123"), func(t *testing.T, tr *Transport) {
+						res := tr.Invoke(context.Background(), withBody(&pb.CheckForUpdateBulkRequest{Items: items},
+							CheckForUpdateBulk, httpEndpoint("POST /api/kessel/v1beta2/checkforupdatebulk")))
+						resp := Extract(t, res, expectSuccess(func() *pb.CheckForUpdateBulkResponse { return &pb.CheckForUpdateBulkResponse{} }))
+						require.NotEmpty(t, resp.ConsistencyToken.GetToken())
+						assertProtoEqual(t, &pb.CheckForUpdateBulkResponse{
+							Pairs: []*pb.CheckForUpdateBulkResponsePair{
+								{Request: items[0], Response: &pb.CheckForUpdateBulkResponsePair_Item{Item: &pb.CheckForUpdateBulkResponseItem{Allowed: pb.Allowed_ALLOWED_TRUE}}},
+								{Request: items[1], Response: &pb.CheckForUpdateBulkResponsePair_Item{Item: &pb.CheckForUpdateBulkResponseItem{Allowed: pb.Allowed_ALLOWED_FALSE}}},
+							},
+							ConsistencyToken: resp.ConsistencyToken,
+						}, resp)
+					}
+				})
+			})
+		}
+	})
+
+	t.Run("CheckSelfBulk", func(t *testing.T) {
+		t.Parallel()
+		for _, tc := range caseVariants {
+			t.Run(tc.name, func(t *testing.T) {
+				t.Parallel()
+				runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
+					authz := data.NewSimpleRelationsRepository()
+					authz.Grant("user-123", "view", "hbi", "host", "resource-1")
+					items := []*pb.CheckSelfBulkRequestItem{
+						{Object: makeResourceRef("resource-1", tc.resourceType, tc.reporterType), Relation: "view"},
+						{Object: makeResourceRef("resource-2", tc.resourceType, tc.reporterType), Relation: "edit"},
+					}
+					return makeAuthzConfig(t, authz, "user-123"), func(t *testing.T, tr *Transport) {
+						res := tr.Invoke(context.Background(), withBody(&pb.CheckSelfBulkRequest{Items: items},
+							CheckSelfBulk, httpEndpoint("POST /api/kessel/v1beta2/checkselfbulk")))
+						resp := Extract(t, res, expectSuccess(func() *pb.CheckSelfBulkResponse { return &pb.CheckSelfBulkResponse{} }))
+						require.NotEmpty(t, resp.ConsistencyToken.GetToken())
+						assertProtoEqual(t, &pb.CheckSelfBulkResponse{
+							Pairs: []*pb.CheckSelfBulkResponsePair{
+								{Request: items[0], Response: &pb.CheckSelfBulkResponsePair_Item{Item: &pb.CheckSelfBulkResponseItem{Allowed: pb.Allowed_ALLOWED_TRUE}}},
+								{Request: items[1], Response: &pb.CheckSelfBulkResponsePair_Item{Item: &pb.CheckSelfBulkResponseItem{Allowed: pb.Allowed_ALLOWED_FALSE}}},
+							},
+							ConsistencyToken: resp.ConsistencyToken,
+						}, resp)
+					}
+				})
+			})
+		}
+	})
+
+	t.Run("StreamedListObjects", func(t *testing.T) {
+		t.Parallel()
+		for _, tc := range caseVariants {
+			t.Run(tc.name, func(t *testing.T) {
+				t.Parallel()
+				authz := data.NewSimpleRelationsRepository()
+				authz.Grant("subject-xyz", "view", "hbi", "host", "host-1")
+				authz.Grant("subject-xyz", "view", "hbi", "host", "host-2")
+
+				reporterType := tc.reporterType
+				client := newTestServer(t, makeAuthzConfig(t, authz, "user-abc"))
+				stream, err := client.StreamedListObjects(context.Background(), &pb.StreamedListObjectsRequest{
+					ObjectType: &pb.RepresentationType{
+						ReporterType: &reporterType,
+						ResourceType: tc.resourceType,
+					},
+					Relation: "view",
+					Subject:  makeSubjectRef("subject-xyz"),
+				})
+				require.NoError(t, err)
+
+				var objects []*pb.ResourceReference
+				for {
+					resp, err := stream.Recv()
+					if err == io.EOF {
+						break
+					}
+					require.NoError(t, err)
+					objects = append(objects, resp.Object)
+				}
+
+				slices.SortFunc(objects, func(a, b *pb.ResourceReference) int {
+					if a.ResourceId < b.ResourceId {
+						return -1
+					}
+					if a.ResourceId > b.ResourceId {
+						return 1
+					}
+					return 0
+				})
+				require.Len(t, objects, 2)
+				assertProtoEqual(t, makeResourceRef("host-1", "host", "hbi"), objects[0])
+				assertProtoEqual(t, makeResourceRef("host-2", "host", "hbi"), objects[1])
+			})
+		}
+	})
+
+	t.Run("StreamedListSubjects", func(t *testing.T) {
+		t.Parallel()
+		for _, tc := range caseVariants {
+			t.Run(tc.name, func(t *testing.T) {
+				t.Parallel()
+				authz := data.NewSimpleRelationsRepository()
+				authz.Grant("user-1", "view", "hbi", "host", "host-1")
+				authz.Grant("user-2", "view", "hbi", "host", "host-1")
+
+				reporterType := tc.reporterType
+				subjectReporterType := "rbac"
+				client := newTestServer(t, makeAuthzConfig(t, authz, "user-abc"))
+				stream, err := client.StreamedListSubjects(context.Background(), &pb.StreamedListSubjectsRequest{
+					Resource: &pb.ResourceReference{
+						ResourceType: tc.resourceType,
+						ResourceId:   "host-1",
+						Reporter:     &pb.ReporterReference{Type: reporterType},
+					},
+					Relation: "view",
+					SubjectType: &pb.RepresentationType{
+						ResourceType: "principal",
+						ReporterType: &subjectReporterType,
+					},
+				})
+				require.NoError(t, err)
+
+				var subjects []*pb.SubjectReference
+				for {
+					resp, err := stream.Recv()
+					if err == io.EOF {
+						break
+					}
+					require.NoError(t, err)
+					subjects = append(subjects, resp.Subject)
+				}
+
+				slices.SortFunc(subjects, func(a, b *pb.SubjectReference) int {
+					if a.Resource.ResourceId < b.Resource.ResourceId {
+						return -1
+					}
+					if a.Resource.ResourceId > b.Resource.ResourceId {
+						return 1
+					}
+					return 0
+				})
+				require.Len(t, subjects, 2)
+				assertProtoEqual(t, makeSubjectRef("user-1"), subjects[0])
+				assertProtoEqual(t, makeSubjectRef("user-2"), subjects[1])
+			})
+		}
+	})
+
+	t.Run("ReportEmptyType", func(t *testing.T) {
+		t.Parallel()
+		cases := []struct {
+			name         string
+			resourceType string
+			reporterType string
+		}{
+			{"empty resource type", "", "hbi"},
+			{"empty reporter type", "host", ""},
+			{"whitespace resource type", "   ", "hbi"},
+			{"whitespace reporter type", "host", "   "},
+		}
+		for _, tc := range cases {
+			t.Run(tc.name, func(t *testing.T) {
+				t.Parallel()
+				runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
+					return makeReportConfig(t), func(t *testing.T, tr *Transport) {
+						res := tr.Invoke(context.Background(), withBody(
+							makeReportReq(tc.resourceType, tc.reporterType, "instance-001", "my-host-123", "example-host"),
+							ReportResource, httpEndpoint("POST /api/kessel/v1beta2/resources")))
+						Assert(t, res, requireError(codes.InvalidArgument))
+					}
+				})
+			})
+		}
+	})
+}

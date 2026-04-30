@@ -274,6 +274,159 @@ services:
     networks:
       - kessel
 
+  ### ---------- RBAC Stack (profile: rbac) ----------
+
+  rbac-database:
+    image: postgres:16
+    profiles: ["rbac"]
+    ports:
+      - "15432:5432"
+    environment:
+      - POSTGRES_DB=postgres
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 15
+    networks:
+      - kessel
+
+  redis:
+    image: redis:5.0.4
+    profiles: ["rbac"]
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping | grep PONG"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - kessel
+
+  rbac-migrate:
+    image: "${RBAC_IMAGE}"
+    profiles: ["rbac"]
+    entrypoint: ["bash", "/opt/rbac/deploy/init-container-setup.sh"]
+    environment:
+      - MIGRATE_AND_SEED_ON_INIT=True
+      - DATABASE_NAME=postgres
+      - DATABASE_USER=postgres
+      - DATABASE_PASSWORD=postgres
+      - DATABASE_HOST=rbac-database
+      - DATABASE_PORT=5432
+      - PGSSLMODE=disable
+      - ACCESS_CACHE_CONNECT_SIGNALS=False
+    restart: "on-failure"
+    depends_on:
+      rbac-database:
+        condition: service_healthy
+    networks:
+      - kessel
+
+  rbac-worker:
+    image: "${RBAC_IMAGE}"
+    profiles: ["rbac"]
+    working_dir: /opt/rbac/rbac
+    entrypoint: ["celery", "--broker=redis://redis:6379/0", "-A", "rbac.celery", "worker", "--loglevel=INFO"]
+    environment:
+      - DJANGO_SETTINGS_MODULE=rbac.settings
+      - DATABASE_HOST=rbac-database
+      - DATABASE_PORT=5432
+      - DATABASE_NAME=postgres
+      - DATABASE_USER=postgres
+      - DATABASE_PASSWORD=postgres
+      - PGSSLMODE=disable
+      - REDIS_HOST=redis
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "celery --broker=redis://redis:6379/0 -A rbac.celery status"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: "always"
+    networks:
+      - kessel
+
+  rbac-scheduler:
+    image: "${RBAC_IMAGE}"
+    profiles: ["rbac"]
+    working_dir: /opt/rbac/rbac
+    entrypoint: ["celery", "--broker=redis://redis:6379/0", "-A", "rbac.celery", "beat", "--loglevel=INFO"]
+    environment:
+      - DJANGO_SETTINGS_MODULE=rbac.settings
+      - DATABASE_HOST=rbac-database
+      - DATABASE_PORT=5432
+      - DATABASE_NAME=postgres
+      - DATABASE_USER=postgres
+      - DATABASE_PASSWORD=postgres
+      - PGSSLMODE=disable
+      - REDIS_HOST=redis
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "celery --broker=redis://redis:6379/0 -A rbac.celery status"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: "always"
+    networks:
+      - kessel
+
+  rbac-server:
+    image: "${RBAC_IMAGE}"
+    profiles: ["rbac"]
+    ports:
+      - "9080:8080"
+    environment:
+      - DATABASE_NAME=postgres
+      - DATABASE_USER=postgres
+      - DATABASE_PASSWORD=postgres
+      - DATABASE_HOST=rbac-database
+      - DATABASE_PORT=5432
+      - PGSSLMODE=disable
+      - REDIS_HOST=redis
+      - DJANGO_DEBUG=True
+      - DJANGO_LOG_HANDLERS=console
+      - API_PATH_PREFIX=/api/rbac
+      - V2_APIS_ENABLED=True
+      - V2_READ_ONLY_API_MODE=False
+      - V2_BOOTSTRAP_TENANT=True
+      - RELATION_API_SERVER=relations-api:9000
+      - INVENTORY_API_SERVER=inventory-api:9081
+      - INVENTORY_API_LOCAL=True
+      - REPLICATION_TO_RELATION_ENABLED=True
+      - KAFKA_ENABLED=false
+      - BYPASS_BOP_VERIFICATION=True
+      - PRINCIPAL_USER_DOMAIN=redhat
+      - WORKSPACE_HIERARCHY_DEPTH_LIMIT=5
+      - WORKSPACE_ORG_CREATION_LIMIT=20000000
+      - SYSTEM_DEFAULT_ROOT_WORKSPACE_ROLE_UUID=23592f00-71f7-482d-be2c-e82eeb704406
+      - SYSTEM_DEFAULT_TENANT_ROLE_UUID=d8e9d8c6-1edf-41b8-951d-805e9e701f49
+      - SYSTEM_ADMIN_ROOT_WORKSPACE_ROLE_UUID=411ef1a0-75a8-4765-8e9f-377297e8ee28
+      - SYSTEM_ADMIN_TENANT_ROLE_UUID=a62b9113-593d-471b-96aa-971d6e748a9b
+      - ROLE_CREATE_ALLOW_LIST=catalog,catalog_local_test,cost-management,remediations,inventory,drift,policies,advisor,approval,vulnerability,compliance,automation-analytics,notifications,patch,integrations,ros,staleness
+    depends_on:
+      rbac-migrate:
+        condition: service_completed_successfully
+      rbac-worker:
+        condition: service_healthy
+      rbac-scheduler:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -q http://localhost:8080/metrics"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+    restart: "always"
+    networks:
+      - kessel
+
   ### ---------- Monitoring Stack (profile: monitoring) ----------
 
   prometheus:

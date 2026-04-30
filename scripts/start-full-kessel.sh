@@ -31,6 +31,6 @@ else
 fi
 
 ${DOCKER} compose --env-file "${ENV_FILE}" \
-  --profile relations --profile consumer "$@" \
+  --profile relations --profile consumer --profile rbac "$@" \
   -f "${COMPOSE_DIR}/docker-compose.yaml" \
   up -d

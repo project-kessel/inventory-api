@@ -5,6 +5,7 @@
 | Make Target | What It Starts | Use Case |
 |---|---|---|
 | `make kessel-up` | Full Kessel suite (all services, pre-built images) | Most common -- test the full stack |
+| `make kessel-test` | Runs integration tests against running stack | Verify all services integrate correctly |
 | `make kessel-up-monitoring` | Full Kessel + Prometheus/Grafana/Alertmanager | Metrics and dashboard development |
 | `make inventory-up` | Inventory API only (built from source) | Developing Inventory API code |
 | `make inventory-up-relations-ready` | Inventory API (built from source, x-rh-identity auth) | Testing with external Relations API |
@@ -14,7 +15,7 @@
 | `make inventory-up-split-relations-ready` | Infra only (relations-compatible ports) | Debugging with local binary + Relations |
 | `make monitoring-only` | Prometheus/Grafana/Alertmanager for ephemeral | Monitoring an ephemeral namespace |
 
-All setups are stopped with `make inventory-down` except Full Kessel which uses `make kessel-down`.
+All setups are stopped with `make inventory-down` except Full Kessel which uses `make kessel-down`. To run the end-to-end integration test against the full Kessel stack, use `make kessel-test`.
 
 > NOTE: Setups that include Kafka infrastructure can take about a minute before the full Kafka stack is ready.
 
@@ -22,7 +23,7 @@ All setups are stopped with `make inventory-down` except Full Kessel which uses 
 
 ## Full Kessel Stack (Recommended)
 
-Deploy the entire Kessel suite locally with a single command: Inventory API, Relations API + SpiceDB, Inventory Consumer, Kafka, and Kafka Connect. Uses pre-built images so no other repos need to be cloned.
+Deploy the entire Kessel suite locally with a single command: Inventory API, Relations API + SpiceDB, Inventory Consumer, RBAC, Kafka, and Kafka Connect. Uses pre-built images so no other repos need to be cloned.
 
 ```shell
 make kessel-up
@@ -43,6 +44,9 @@ This starts all services using the compose file at `development/full-kessel/dock
 | 9092 | Kafka |
 | 5432 | Relations DB (postgres) |
 | 5433 | Inventory DB (postgres) |
+| 9080 | RBAC Server (HTTP, rbac profile) |
+| 15432 | RBAC DB (postgres, rbac profile) |
+| 6379 | Redis (rbac profile) |
 | 9050 | Prometheus (monitoring profile) |
 | 9093 | Alertmanager (monitoring profile) |
 | 3000 | Grafana (monitoring profile) |
@@ -55,6 +59,7 @@ Edit `development/full-kessel/.env` to use custom images for development:
 INVENTORY_API_IMAGE=localhost/kessel-inventory:dev
 RELATIONS_API_IMAGE=quay.io/redhat-services-prod/project-kessel-tenant/kessel-relations/relations-api:latest
 INVENTORY_CONSUMER_IMAGE=quay.io/redhat-services-prod/project-kessel-tenant/kessel-inventory-consumer/inventory-consumer:latest
+RBAC_IMAGE=quay.io/redhat-services-prod/hcc-accessmanagement-tenant/insights-rbac:latest
 ```
 
 ### Using a Custom SpiceDB Schema
@@ -79,9 +84,34 @@ To include Prometheus, Grafana, and Alertmanager:
 make kessel-up-monitoring
 ```
 
-Grafana is pre-loaded with a local Prometheus datasource and the current dashboards from the [dashboards folder](../../dashboards/). Prometheus is configured to scrape all Kessel services (Inventory API, Relations API, Consumer, and Kafka Connect).
+Grafana is pre-loaded with a local Prometheus datasource and the current dashboards from the [dashboards folder](../../dashboards/). Prometheus is configured to scrape all Kessel services (Inventory API, Relations API, Consumer, RBAC, and Kafka Connect).
 
 See [Monitoring Info](#monitoring-info) for URLs and login details.
+
+### RBAC Integration
+
+The full Kessel stack includes [insights-rbac](https://github.com/RedHatInsights/insights-rbac) for role-based access control testing. RBAC connects to both Relations API (gRPC) and Inventory API (gRPC) automatically. The V2 APIs are enabled by default.
+
+RBAC is available at `http://localhost:9080/api/rbac/v1/`. Metrics are served at `http://localhost:9080/metrics`.
+
+### Integration Test
+
+Run end-to-end integration tests that exercise the full service flow: RBAC tenant bootstrap, simulated HBI host events via Kafka, Inventory Consumer processing, Relations API tuple verification, and resource deletion.
+
+```shell
+make kessel-test
+```
+
+Requires `kcat`, `grpcurl`, and `jq` to be installed locally. The script will print install instructions if any are missing.
+
+The test flow:
+1. Verifies all services are healthy
+2. Bootstraps a tenant via RBAC V2 API (creates workspace hierarchy in Relations API)
+3. Publishes a simulated HBI host event to Kafka using the real workspace ID
+4. Verifies the Inventory Consumer processes the event and the resource appears in Inventory API
+5. Confirms the resource-to-workspace authorization tuple exists in Relations API
+6. Validates RBAC V2 roles and workspaces for the tenant
+7. Deletes the resource and verifies tuple cleanup
 
 ### Teardown
 

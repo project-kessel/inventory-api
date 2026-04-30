@@ -57,8 +57,10 @@ func TestToCreateTuplesCommand(t *testing.T) {
 
 		require.NoError(t, err)
 		require.NotNil(t, cmd.FencingCheck)
-		assert.Equal(t, "lock-1", cmd.FencingCheck.LockId)
-		assert.Equal(t, "token-1", cmd.FencingCheck.LockToken)
+		expectedLockId := model.DeserializeLockId("lock-1")
+		expectedLockToken := model.DeserializeLockToken("token-1")
+		assert.Equal(t, expectedLockId, cmd.FencingCheck.LockId)
+		assert.Equal(t, expectedLockToken, cmd.FencingCheck.LockToken)
 	})
 
 	t.Run("invalid relationship - bad resource ID", func(t *testing.T) {
@@ -127,7 +129,10 @@ func TestToDeleteTuplesCommand(t *testing.T) {
 
 		require.NoError(t, err)
 		require.NotNil(t, cmd.FencingCheck)
-		assert.Equal(t, "lock-2", cmd.FencingCheck.LockId)
+		expectedLockId := model.DeserializeLockId("lock-2")
+		expectedLockToken := model.DeserializeLockToken("token-2")
+		assert.Equal(t, expectedLockId, cmd.FencingCheck.LockId)
+		assert.Equal(t, expectedLockToken, cmd.FencingCheck.LockToken)
 	})
 }
 
@@ -171,9 +176,11 @@ func TestToAcquireLockCommand(t *testing.T) {
 		LockId: "lock-123",
 	}
 
-	cmd := toAcquireLockCommand(req)
+	cmd, err := toAcquireLockCommand(req)
 
-	assert.Equal(t, "lock-123", cmd.LockId)
+	require.NoError(t, err)
+	expectedLockId := model.DeserializeLockId("lock-123")
+	assert.Equal(t, expectedLockId, cmd.LockId)
 }
 
 func TestRelationshipToRelationsTuple(t *testing.T) {
@@ -462,8 +469,8 @@ func TestReadTuplesItemToProto(t *testing.T) {
 			object,
 			model.DeserializeRelation("member"),
 			model.NewSubjectReferenceWithoutRelation(subRes),
-			"",
-			"",
+			model.DeserializeContinuationToken(""),
+			model.DeserializeConsistencyToken(""),
 		)
 
 		result := readTuplesItemToProto(item)
@@ -497,8 +504,8 @@ func TestReadTuplesItemToProto(t *testing.T) {
 			object,
 			model.DeserializeRelation("member"),
 			model.NewSubjectReference(subRes, &r),
-			"",
-			"",
+			model.DeserializeContinuationToken(""),
+			model.DeserializeConsistencyToken(""),
 		)
 
 		result := readTuplesItemToProto(item)
@@ -524,7 +531,7 @@ func TestReadTuplesItemToProto(t *testing.T) {
 			object,
 			model.DeserializeRelation("member"),
 			model.NewSubjectReferenceWithoutRelation(subRes),
-			"page-token-abc",
+			model.DeserializeContinuationToken("page-token-abc"),
 			model.DeserializeConsistencyToken("ct-123"),
 		)
 

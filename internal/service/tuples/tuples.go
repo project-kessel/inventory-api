@@ -90,7 +90,10 @@ func (s *TupleService) ReadTuples(req *pb.ReadTuplesRequest, stream pb.KesselTup
 // AcquireLock acquires a distributed lock (DEPRECATED).
 // This endpoint exists only for RBAC backward compatibility.
 func (s *TupleService) AcquireLock(ctx context.Context, req *pb.AcquireLockRequest) (*pb.AcquireLockResponse, error) {
-	cmd := toAcquireLockCommand(req)
+	cmd, err := toAcquireLockCommand(req)
+	if err != nil {
+		return nil, err
+	}
 
 	result, err := s.Ctl.AcquireLock(ctx, cmd)
 	if err != nil {
@@ -98,7 +101,7 @@ func (s *TupleService) AcquireLock(ctx context.Context, req *pb.AcquireLockReque
 	}
 
 	return &pb.AcquireLockResponse{
-		LockToken: result.LockToken,
+		LockToken: result.LockToken.String(),
 	}, nil
 }
 
@@ -116,9 +119,18 @@ func toCreateTuplesCommand(req *pb.CreateTuplesRequest) (tuplesctl.CreateTuplesC
 	}
 
 	if req.GetFencingCheck() != nil {
+		fc := req.GetFencingCheck()
+		lockId, err := model.NewLockId(fc.GetLockId())
+		if err != nil {
+			return tuplesctl.CreateTuplesCommand{}, fmt.Errorf("invalid fencing lock id: %w", err)
+		}
+		lockToken, err := model.NewLockToken(fc.GetLockToken())
+		if err != nil {
+			return tuplesctl.CreateTuplesCommand{}, fmt.Errorf("invalid fencing lock token: %w", err)
+		}
 		cmd.FencingCheck = &tuplesctl.FencingCheck{
-			LockId:    req.GetFencingCheck().GetLockId(),
-			LockToken: req.GetFencingCheck().GetLockToken(),
+			LockId:    lockId,
+			LockToken: lockToken,
 		}
 	}
 
@@ -131,9 +143,18 @@ func toDeleteTuplesCommand(req *pb.DeleteTuplesRequest) (tuplesctl.DeleteTuplesC
 	}
 
 	if req.GetFencingCheck() != nil {
+		fc := req.GetFencingCheck()
+		lockId, err := model.NewLockId(fc.GetLockId())
+		if err != nil {
+			return tuplesctl.DeleteTuplesCommand{}, fmt.Errorf("invalid fencing lock id: %w", err)
+		}
+		lockToken, err := model.NewLockToken(fc.GetLockToken())
+		if err != nil {
+			return tuplesctl.DeleteTuplesCommand{}, fmt.Errorf("invalid fencing lock token: %w", err)
+		}
 		cmd.FencingCheck = &tuplesctl.FencingCheck{
-			LockId:    req.GetFencingCheck().GetLockId(),
-			LockToken: req.GetFencingCheck().GetLockToken(),
+			LockId:    lockId,
+			LockToken: lockToken,
 		}
 	}
 
@@ -148,10 +169,12 @@ func toReadTuplesCommand(req *pb.ReadTuplesRequest) (tuplesctl.ReadTuplesCommand
 	}, nil
 }
 
-func toAcquireLockCommand(req *pb.AcquireLockRequest) tuplesctl.AcquireLockCommand {
-	return tuplesctl.AcquireLockCommand{
-		LockId: req.GetLockId(),
+func toAcquireLockCommand(req *pb.AcquireLockRequest) (tuplesctl.AcquireLockCommand, error) {
+	lockId, err := model.NewLockId(req.GetLockId())
+	if err != nil {
+		return tuplesctl.AcquireLockCommand{}, fmt.Errorf("invalid lock id: %w", err)
 	}
+	return tuplesctl.AcquireLockCommand{LockId: lockId}, nil
 }
 
 // --- proto → domain helpers ---

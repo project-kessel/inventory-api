@@ -30,6 +30,8 @@ make kessel-up
 
 This starts all services using the compose file at `development/full-kessel/docker-compose.yaml`. The SpiceDB schema is automatically downloaded from the [stage rbac-config repo](https://raw.githubusercontent.com/RedHatInsights/rbac-config/refs/heads/master/configs/stage/schemas/schema.zed) at startup.
 
+> NOTE: If you previously ran `make db/setup` for the Quick Start workflow, tear it down first with `make db/teardown` — the standalone postgres container holds port 5435 which conflicts with the HBI database in the full-kessel stack.
+
 ### Ports
 
 | Port | Service |

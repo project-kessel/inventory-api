@@ -19,6 +19,13 @@ if [[ -z "${NETWORK_CHECK}" || "${NETWORK_CHECK}" == "[]" ]]; then
   ${DOCKER} network create kessel
 fi
 
+# Check for port conflicts with standalone dev database (make db/setup)
+if ${DOCKER} ps --format '{{.Names}}' 2>/dev/null | grep -q '^psql-inventory$'; then
+  echo "Error: 'psql-inventory' container is running and will conflict with the full-kessel stack (port 5435)."
+  echo "Run 'make db/teardown' first, then retry."
+  exit 1
+fi
+
 # Fetch or copy schema.zed for SpiceDB
 SCHEMA_DEST="${COMPOSE_DIR}/configs/schema.zed"
 if [ -n "${SCHEMA_ZED_FILE}" ]; then

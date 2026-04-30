@@ -79,6 +79,9 @@ services:
       bin/kafka-topics.sh --bootstrap-server kafka:9093 --create --if-not-exists --topic host-inventory.hbi.hosts --replication-factor 1 --partitions 6
       bin/kafka-topics.sh --bootstrap-server kafka:9093 --create --if-not-exists --topic outbox.event.hbi.hosts --replication-factor 1 --partitions 1
 
+      # RBAC outbox topic (Debezium CDC from RBAC → Relations API)
+      bin/kafka-topics.sh --bootstrap-server kafka:9093 --create --if-not-exists --topic outbox.event.relations-replication-event --replication-factor 1 --partitions 1
+
       echo -e 'Successfully created the following topics:'
       bin/kafka-topics.sh --bootstrap-server kafka:9093 --list
       "
@@ -178,10 +181,11 @@ services:
         condition: service_healthy
     command: [
       "/bin/sh", "-c",
-      "curl -sf -d @/debezium-connector.json -H 'Content-Type: application/json' -X POST http://kafka-connect:8083/connectors || curl -sf -X GET http://kafka-connect:8083/connectors/debezium-connector"
+      "curl -sf -d @/debezium-connector.json -H 'Content-Type: application/json' -X POST http://kafka-connect:8083/connectors || curl -sf -X GET http://kafka-connect:8083/connectors/debezium-connector && curl -sf -d @/rbac-debezium-connector.json -H 'Content-Type: application/json' -X POST http://kafka-connect:8083/connectors || curl -sf -X GET http://kafka-connect:8083/connectors/rbac-outbox-connector"
     ]
     volumes:
       - ../configs/debezium-connector.json:/debezium-connector.json:ro,z
+      - ./configs/rbac-debezium-connector.json:/rbac-debezium-connector.json:ro,z
     restart: on-failure:10
     networks:
       - kessel
@@ -278,6 +282,7 @@ services:
 
   rbac-database:
     image: postgres:16
+    command: -c wal_level=logical
     profiles: ["rbac"]
     ports:
       - "15432:5432"
@@ -340,6 +345,9 @@ services:
       - DATABASE_PASSWORD=postgres
       - PGSSLMODE=disable
       - REDIS_HOST=redis
+      - DEVELOPMENT=True
+      - RELATION_API_SERVER=relations-api:9000
+      - REPLICATION_TO_RELATION_ENABLED=True
     depends_on:
       redis:
         condition: service_healthy
@@ -391,6 +399,7 @@ services:
       - DATABASE_PORT=5432
       - PGSSLMODE=disable
       - REDIS_HOST=redis
+      - DEVELOPMENT=True
       - DJANGO_DEBUG=True
       - DJANGO_LOG_HANDLERS=console
       - API_PATH_PREFIX=/api/rbac
@@ -423,6 +432,55 @@ services:
       interval: 10s
       timeout: 5s
       retries: 15
+    restart: "always"
+    networks:
+      - kessel
+
+  rbac-consumer-offset-reset:
+    image: quay.io/strimzi/kafka:latest-kafka-3.8.0
+    profiles: ["rbac"]
+    command: [
+      "sh", "-c",
+      "echo 'Resetting rbac-consumer-group offset to latest...' && bin/kafka-consumer-groups.sh --bootstrap-server kafka:9093 --group rbac-consumer-group --reset-offsets --to-latest --topic outbox.event.relations-replication-event --execute 2>&1 || true && echo 'Offset reset complete.'"
+    ]
+    depends_on:
+      kafka:
+        condition: service_healthy
+      rbac-server:
+        condition: service_healthy
+    networks:
+      - kessel
+
+  rbac-kafka-consumer:
+    image: "${RBAC_IMAGE}"
+    profiles: ["rbac"]
+    working_dir: /opt/rbac/rbac
+    entrypoint: ["python", "/opt/rbac/rbac/manage.py", "launch-rbac-kafka-consumer"]
+    environment:
+      - DJANGO_SETTINGS_MODULE=rbac.settings
+      - DATABASE_HOST=rbac-database
+      - DATABASE_PORT=5432
+      - DATABASE_NAME=postgres
+      - DATABASE_USER=postgres
+      - DATABASE_PASSWORD=postgres
+      - PGSSLMODE=disable
+      - REDIS_HOST=redis
+      - DEVELOPMENT=True
+      - KAFKA_ENABLED=True
+      - RBAC_KAFKA_CONSUMER_TOPIC=outbox.event.relations-replication-event
+      - RBAC_KAFKA_CUSTOM_CONSUMER_BROKER=kafka:9093
+      - RELATION_API_SERVER=relations-api:9000
+      - REPLICATION_TO_RELATION_ENABLED=True
+      - ACG_CONFIG=/acg-config.json
+    volumes:
+      - ./configs/rbac-consumer-acg.json:/acg-config.json:ro,z
+    depends_on:
+      rbac-consumer-offset-reset:
+        condition: service_completed_successfully
+      kafka:
+        condition: service_healthy
+      rbac-server:
+        condition: service_healthy
     restart: "always"
     networks:
       - kessel

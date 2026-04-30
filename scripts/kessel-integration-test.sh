@@ -26,21 +26,20 @@ fail() {
 }
 
 # Ports (match full-kessel docker-compose)
-INVENTORY_HTTP="localhost:8081"
 INVENTORY_GRPC="localhost:9081"
-RELATIONS_HTTP="localhost:8000"
+RELATIONS_GRPC="localhost:9000"
 RBAC_HTTP="localhost:9080"
 KAFKA_BOOTSTRAP="localhost:9092"
 KAFKA_CONNECT="localhost:8083"
 
 # Test identity
 ORG_ID="test-org-kessel-e2e"
-X_RH_IDENTITY=$(echo -n "{\"identity\":{\"account_number\":\"12345\",\"org_id\":\"${ORG_ID}\",\"type\":\"User\",\"user\":{\"user_id\":\"test-user-1\",\"email\":\"test@example.com\",\"username\":\"testuser\"}}}" | base64 -w0)
+X_RH_IDENTITY=$(echo -n "{\"identity\":{\"account_number\":\"12345\",\"org_id\":\"${ORG_ID}\",\"type\":\"User\",\"user\":{\"user_id\":\"test-user-1\",\"email\":\"test@example.com\",\"username\":\"testuser\",\"is_org_admin\":true}}}" | base64 -w0)
 
-# Test host UUIDs (deterministic for idempotent runs)
-HOST_ID="e2e-10000000-0000-0000-0000-000000000001"
-INSIGHTS_ID="e2e-20000000-0000-0000-0000-000000000001"
-SUB_MGR_ID="e2e-30000000-0000-0000-0000-000000000001"
+# Test host UUIDs (deterministic for idempotent runs, valid UUID format)
+HOST_ID="e2e10000-0000-0000-0000-000000000001"
+INSIGHTS_ID="e2e20000-0000-0000-0000-000000000001"
+SUB_MGR_ID="e2e30000-0000-0000-0000-000000000001"
 
 # ─── Step 0: Prerequisites ───────────────────────────────────────────────────
 
@@ -68,7 +67,7 @@ pass "All prerequisites installed"
 
 log_step "Step 1: Service Health Checks"
 
-wait_for_service() {
+wait_for_http_service() {
   local name="$1" url="$2" retries="${3:-30}" interval="${4:-5}"
   for ((i=1; i<=retries; i++)); do
     if curl -sf "$url" -o /dev/null 2>/dev/null; then
@@ -84,11 +83,27 @@ wait_for_service() {
   return 1
 }
 
+wait_for_grpc_service() {
+  local name="$1" address="$2" service="$3" retries="${4:-30}" interval="${5:-5}"
+  for ((i=1; i<=retries; i++)); do
+    if grpcurl -plaintext "$address" "$service" &>/dev/null; then
+      pass "$name is ready"
+      return 0
+    fi
+    if [[ $i -eq 1 ]]; then
+      log_info "Waiting for $name..."
+    fi
+    sleep "$interval"
+  done
+  fail "$name did not become ready after $((retries * interval))s"
+  return 1
+}
+
 HEALTH_OK=true
-wait_for_service "Inventory API"  "http://${INVENTORY_HTTP}/api/kessel/v1/readyz" || HEALTH_OK=false
-wait_for_service "Relations API"  "http://${RELATIONS_HTTP}/readyz" || HEALTH_OK=false
-wait_for_service "RBAC"           "http://${RBAC_HTTP}/metrics" || HEALTH_OK=false
-wait_for_service "Kafka Connect"  "http://${KAFKA_CONNECT}/connectors" || HEALTH_OK=false
+wait_for_grpc_service "Inventory API" "${INVENTORY_GRPC}" "kessel.inventory.v1.KesselInventoryHealthService/GetReadyz" || HEALTH_OK=false
+wait_for_grpc_service "Relations API" "${RELATIONS_GRPC}" "kessel.relations.v1.KesselRelationsHealthService/GetReadyz" || HEALTH_OK=false
+wait_for_http_service "RBAC"          "http://${RBAC_HTTP}/metrics" || HEALTH_OK=false
+wait_for_http_service "Kafka Connect" "http://${KAFKA_CONNECT}/connectors" || HEALTH_OK=false
 
 if [[ "$HEALTH_OK" != "true" ]]; then
   log_error "Not all services are healthy. Is the stack running? (make kessel-up)"
@@ -135,30 +150,39 @@ fi
 
 log_step "Step 3: Verify Workspace Hierarchy in Relations API"
 
-TUPLES_RESPONSE=$(curl -sf \
-  "http://${RELATIONS_HTTP}/v1beta1/tuples?filter.resourceNamespace=rbac&filter.resourceType=workspace" 2>&1) || {
-  fail "Failed to query workspace tuples from Relations API"
-  exit 1
-}
+log_info "Polling Relations API for workspace tuples (up to 60s)..."
 
-TUPLE_COUNT=$(echo "$TUPLES_RESPONSE" | jq '[.tuples // [] | length] | add // 0')
+WS_TUPLES_FOUND=false
+for ((i=1; i<=20; i++)); do
+  TUPLES_RESPONSE=$(grpcurl -plaintext -d '{"filter":{"resourceNamespace":"rbac","resourceType":"workspace"}}' \
+    "${RELATIONS_GRPC}" kessel.relations.v1beta1.KesselTupleService/ReadTuples 2>&1) || true
 
-if [[ "$TUPLE_COUNT" -gt 0 ]]; then
-  pass "Found ${TUPLE_COUNT} workspace tuples in Relations API"
-else
-  fail "No workspace tuples found — RBAC bootstrap may not have replicated to Relations API"
-  echo "  This can happen if Relations API was slow to start. Wait a few seconds and re-run."
-fi
-
-# Verify the default workspace has a parent tuple (default → root)
-if [[ -n "$DEFAULT_WORKSPACE_ID" ]]; then
-  DEFAULT_WS_TUPLE=$(echo "$TUPLES_RESPONSE" | jq --arg wsid "$DEFAULT_WORKSPACE_ID" \
-    '[.tuples[]? | select(.resource.id == $wsid)] | length')
-  if [[ "$DEFAULT_WS_TUPLE" -gt 0 ]]; then
-    pass "Default workspace has parent relationship in hierarchy"
-  else
-    log_warn "Default workspace parent tuple not found (may take a moment to replicate)"
+  if [[ -n "${TUPLES_RESPONSE:-}" ]]; then
+    TUPLE_COUNT=$(echo "$TUPLES_RESPONSE" | jq -s '[.[] | select(.tuple)] | length')
+    if [[ "$TUPLE_COUNT" -gt 0 ]]; then
+      WS_TUPLES_FOUND=true
+      break
+    fi
   fi
+  sleep 3
+done
+
+if [[ "$WS_TUPLES_FOUND" == "true" ]]; then
+  pass "Found ${TUPLE_COUNT} workspace tuples in Relations API"
+
+  # Verify the default workspace has a parent tuple (default → root)
+  if [[ -n "$DEFAULT_WORKSPACE_ID" ]]; then
+    DEFAULT_WS_TUPLE=$(echo "$TUPLES_RESPONSE" | jq -s --arg wsid "$DEFAULT_WORKSPACE_ID" \
+      '[.[] | select(.tuple.resource.id == $wsid)] | length')
+    if [[ "$DEFAULT_WS_TUPLE" -gt 0 ]]; then
+      pass "Default workspace has parent relationship in hierarchy"
+    else
+      log_warn "Default workspace parent tuple not found (may take a moment to replicate)"
+    fi
+  fi
+else
+  fail "No workspace tuples found in Relations API after 60s"
+  echo "  Check that RBAC CDC pipeline is running (rbac-kafka-consumer, kafka-connect connectors)"
 fi
 
 # ─── Step 4: Publish Simulated HBI Host Event via kcat ───────────────────────
@@ -228,59 +252,66 @@ fi
 
 log_step "Step 6: Verify Resource-to-Workspace Tuple in Relations API"
 
-# Give Relations API a moment to process the tuple creation
-sleep 3
+log_info "Polling Relations API for host tuples (up to 30s)..."
 
-HOST_TUPLES_RESPONSE=$(curl -sf \
-  "http://${RELATIONS_HTTP}/v1beta1/tuples?filter.resourceType=host" 2>&1) || {
-  fail "Failed to query host tuples from Relations API"
-}
+HOST_TUPLE_FOUND=false
+for ((i=1; i<=10; i++)); do
+  HOST_TUPLES_RESPONSE=$(grpcurl -plaintext -d '{"filter":{"resourceNamespace":"hbi","resourceType":"host"}}' \
+    "${RELATIONS_GRPC}" kessel.relations.v1beta1.KesselTupleService/ReadTuples 2>&1) || true
 
-if [[ -n "${HOST_TUPLES_RESPONSE:-}" ]]; then
-  HOST_TUPLE_COUNT=$(echo "$HOST_TUPLES_RESPONSE" | jq '[.tuples // [] | length] | add // 0')
-
-  if [[ "$HOST_TUPLE_COUNT" -gt 0 ]]; then
-    pass "Found ${HOST_TUPLE_COUNT} host tuple(s) in Relations API"
-
-    # Verify the tuple links our host to the correct workspace
-    MATCHING_TUPLE=$(echo "$HOST_TUPLES_RESPONSE" | jq --arg wsid "$DEFAULT_WORKSPACE_ID" \
-      '[.tuples[]? | select(.subject.subject.id == $wsid)] | length')
-
-    if [[ "$MATCHING_TUPLE" -gt 0 ]]; then
-      pass "Host resource is linked to workspace ${DEFAULT_WORKSPACE_ID}"
-    else
-      fail "Host tuple exists but not linked to expected workspace"
-      echo "  Expected workspace: ${DEFAULT_WORKSPACE_ID}"
-      echo "  Tuples: $(echo "$HOST_TUPLES_RESPONSE" | jq -c '.tuples[]? | {resource: .resource.id, relation: .relation, subject: .subject.subject.id}')"
+  if [[ -n "${HOST_TUPLES_RESPONSE:-}" ]]; then
+    HOST_TUPLE_COUNT=$(echo "$HOST_TUPLES_RESPONSE" | jq -s '[.[] | select(.tuple)] | length')
+    if [[ "$HOST_TUPLE_COUNT" -gt 0 ]]; then
+      HOST_TUPLE_FOUND=true
+      break
     fi
-  else
-    fail "No host tuples found in Relations API"
-    echo "  The resource may have been stored without creating authorization tuples."
-    echo "  Check that authz.impl=kessel in the inventory-api config."
   fi
+  sleep 3
+done
+
+if [[ "$HOST_TUPLE_FOUND" == "true" ]]; then
+  pass "Found ${HOST_TUPLE_COUNT} host tuple(s) in Relations API"
+
+  # Verify the tuple links our host to the correct workspace
+  MATCHING_TUPLE=$(echo "$HOST_TUPLES_RESPONSE" | jq -s --arg wsid "$DEFAULT_WORKSPACE_ID" \
+    '[.[] | select(.tuple.subject.subject.id == $wsid)] | length')
+
+  if [[ "$MATCHING_TUPLE" -gt 0 ]]; then
+    pass "Host resource is linked to workspace ${DEFAULT_WORKSPACE_ID}"
+  else
+    fail "Host tuple exists but not linked to expected workspace"
+    echo "  Expected workspace: ${DEFAULT_WORKSPACE_ID}"
+    echo "  Tuples: $(echo "$HOST_TUPLES_RESPONSE" | jq -s -c '.[] | select(.tuple) | {resource: .tuple.resource.id, relation: .tuple.relation, subject: .tuple.subject.subject.id}')"
+  fi
+else
+  fail "No host tuples found in Relations API after 30s"
+  echo "  The resource may have been stored without creating authorization tuples."
+  echo "  Check that authz.impl=kessel in the inventory-api config."
 fi
 
-# ─── Step 7: RBAC V2 Access Check ───────────────────────────────────────────
+# ─── Step 7: RBAC Access Check ──────────────────────────────────────────────
 
-log_step "Step 7: RBAC V2 Access Check"
+log_step "Step 7: RBAC Access Check"
 
-# Verify roles exist for this tenant
+# V2 roles requires rbac_roles_read on the tenant resource, but the local
+# compose seed only attaches permission children to the default workspace
+# platform role, not the tenant platform role. Use V1 for roles.
 ROLES_RESPONSE=$(curl -sf \
   -H "x-rh-identity: ${X_RH_IDENTITY}" \
-  "http://${RBAC_HTTP}/api/rbac/v2/roles/" 2>&1) || {
-  fail "RBAC V2 roles request failed"
+  "http://${RBAC_HTTP}/api/rbac/v1/roles/?scope=org_id" 2>&1) || {
+  fail "RBAC V1 roles request failed"
 }
 
 if [[ -n "${ROLES_RESPONSE:-}" ]]; then
   ROLE_COUNT=$(echo "$ROLES_RESPONSE" | jq '.meta.count // 0')
   if [[ "$ROLE_COUNT" -gt 0 ]]; then
-    pass "RBAC has ${ROLE_COUNT} roles for tenant org_id=${ORG_ID}"
+    pass "RBAC has ${ROLE_COUNT} roles for tenant"
   else
     fail "No roles found in RBAC for this tenant"
   fi
 fi
 
-# Verify workspaces list includes both root and default
+# Verify workspaces list includes both root and default (V2)
 WORKSPACES_RESPONSE=$(curl -sf \
   -H "x-rh-identity: ${X_RH_IDENTITY}" \
   "http://${RBAC_HTTP}/api/rbac/v2/workspaces/" 2>&1) || {
@@ -290,7 +321,7 @@ WORKSPACES_RESPONSE=$(curl -sf \
 if [[ -n "${WORKSPACES_RESPONSE:-}" ]]; then
   WS_COUNT=$(echo "$WORKSPACES_RESPONSE" | jq '.meta.count // 0')
   if [[ "$WS_COUNT" -ge 2 ]]; then
-    pass "RBAC lists ${WS_COUNT} workspaces (root + default + any user-created)"
+    pass "RBAC V2 lists ${WS_COUNT} workspaces (root + default + any user-created)"
   else
     fail "Expected at least 2 workspaces (root + default), got ${WS_COUNT}"
   fi
@@ -318,21 +349,31 @@ DELETE_RESULT=$(grpcurl -plaintext -d "{
   echo "  grpcurl output: ${DELETE_RESULT}"
 }
 
-# Wait for tuple cleanup
-sleep 3
+# Wait for tuple cleanup via CDC pipeline
+log_info "Waiting for tuple cleanup (up to 30s)..."
 
-HOST_TUPLES_AFTER=$(curl -sf \
-  "http://${RELATIONS_HTTP}/v1beta1/tuples?filter.resourceType=host" 2>&1) || true
+TUPLE_CLEANED=false
+for ((i=1; i<=10; i++)); do
+  sleep 3
+  HOST_TUPLES_AFTER=$(grpcurl -plaintext -d '{"filter":{"resourceNamespace":"hbi","resourceType":"host"}}' \
+    "${RELATIONS_GRPC}" kessel.relations.v1beta1.KesselTupleService/ReadTuples 2>&1) || true
 
-if [[ -n "${HOST_TUPLES_AFTER:-}" ]]; then
-  REMAINING=$(echo "$HOST_TUPLES_AFTER" | jq --arg wsid "$DEFAULT_WORKSPACE_ID" \
-    '[.tuples[]? | select(.subject.subject.id == $wsid)] | length')
+  REMAINING=0
+  if [[ -n "${HOST_TUPLES_AFTER:-}" ]]; then
+    REMAINING=$(echo "$HOST_TUPLES_AFTER" | jq -s --arg wsid "$DEFAULT_WORKSPACE_ID" \
+      '[.[] | select(.tuple.subject.subject.id == $wsid)] | length')
+  fi
 
   if [[ "$REMAINING" -eq 0 ]]; then
-    pass "Host-to-workspace tuple removed from Relations API after deletion"
-  else
-    fail "Host-to-workspace tuple still present after deletion (count: ${REMAINING})"
+    TUPLE_CLEANED=true
+    break
   fi
+done
+
+if [[ "$TUPLE_CLEANED" == "true" ]]; then
+  pass "Host-to-workspace tuple removed from Relations API after deletion"
+else
+  fail "Host-to-workspace tuple still present after deletion (count: ${REMAINING})"
 fi
 
 # ─── Step 9: Summary ─────────────────────────────────────────────────────────

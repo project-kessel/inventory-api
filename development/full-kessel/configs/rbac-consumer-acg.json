@@ -1,0 +1,4 @@
+{
+  "metricsPort": 9006,
+  "metricsPath": "/metrics"
+}

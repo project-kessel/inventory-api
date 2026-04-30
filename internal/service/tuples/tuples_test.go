@@ -147,7 +147,8 @@ func TestToReadTuplesCommand(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, cmd.Pagination)
 		assert.Equal(t, uint32(10), cmd.Pagination.Limit)
-		assert.Equal(t, &token, cmd.Pagination.Continuation)
+		expectedCT := model.DeserializeContinuationToken(token)
+		assert.Equal(t, &expectedCT, cmd.Pagination.Continuation)
 	})
 
 	t.Run("with consistency", func(t *testing.T) {
@@ -335,7 +336,7 @@ func TestPaginationFromProto(t *testing.T) {
 		require.NotNil(t, result)
 		assert.Equal(t, uint32(25), result.Limit)
 		require.NotNil(t, result.Continuation)
-		assert.Equal(t, token, *result.Continuation)
+		assert.Equal(t, model.DeserializeContinuationToken(token), *result.Continuation)
 	})
 
 	t.Run("without continuation token", func(t *testing.T) {

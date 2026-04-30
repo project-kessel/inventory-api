@@ -247,9 +247,14 @@ func paginationFromProto(p *pb.RequestPagination) *model.Pagination {
 	if p == nil {
 		return nil
 	}
+	var continuation *model.ContinuationToken
+	if p.ContinuationToken != nil {
+		ct := model.DeserializeContinuationToken(*p.ContinuationToken)
+		continuation = &ct
+	}
 	return &model.Pagination{
 		Limit:        p.Limit,
-		Continuation: p.ContinuationToken,
+		Continuation: continuation,
 	}
 }
 
@@ -332,7 +337,8 @@ func readTuplesItemToProto(item model.ReadTuplesItem) *pb.ReadTuplesResponse {
 	}
 
 	if item.ContinuationToken() != "" {
-		resp.Pagination = &pb.ResponsePagination{ContinuationToken: item.ContinuationToken()}
+		ct := item.ContinuationToken().String()
+		resp.Pagination = &pb.ResponsePagination{ContinuationToken: ct}
 	}
 
 	if item.ConsistencyToken() != "" {

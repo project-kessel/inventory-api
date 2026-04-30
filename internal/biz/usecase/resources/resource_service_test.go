@@ -1121,9 +1121,10 @@ func TestGetCurrentAndPreviousWorkspaceID(t *testing.T) {
 
 // Helper function to create a Representations for testing
 func createTestRep(t *testing.T, version uint, data map[string]interface{}) *model.Representations {
+	v := model.NewVersion(version)
 	rep, err := model.NewRepresentations(
 		model.Representation(data),
-		&version,
+		&v,
 		nil,
 		nil,
 	)

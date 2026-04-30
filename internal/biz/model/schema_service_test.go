@@ -85,19 +85,21 @@ func TestCalculateTuples(t *testing.T) {
 			if tt.currentWorkspaceID != "" {
 				currentData = map[string]interface{}{"workspace_id": tt.currentWorkspaceID}
 			}
+			ver := model.NewVersion(tt.version)
 			current, err = model.NewRepresentations(
 				model.Representation(currentData),
-				&tt.version,
+				&ver,
 				nil,
 				nil,
 			)
 			require.NoError(t, err)
 
 			if tt.previousWorkspaceID != "" {
-				prevVer := uint(0)
+				prevUint := uint(0)
 				if tt.version > 0 {
-					prevVer = tt.version - 1
+					prevUint = tt.version - 1
 				}
+				prevVer := model.NewVersion(prevUint)
 				previous, err = model.NewRepresentations(
 					model.Representation(map[string]interface{}{"workspace_id": tt.previousWorkspaceID}),
 					&prevVer,
@@ -158,18 +160,18 @@ func TestGetWorkspaceVersions(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	version := uint(1)
+	ver := model.NewVersion(1)
 	current, err := model.NewRepresentations(
 		model.Representation(map[string]interface{}{"workspace_id": "ws-current"}),
-		&version,
+		&ver,
 		nil,
 		nil,
 	)
 	require.NoError(t, err)
-	prevVersion := version - 1
+	prevVer := model.NewVersion(0)
 	previous, err := model.NewRepresentations(
 		model.Representation(map[string]interface{}{"workspace_id": "ws-prev"}),
-		&prevVersion,
+		&prevVer,
 		nil,
 		nil,
 	)
@@ -253,19 +255,19 @@ func TestDetermineTupleOperations(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	version2 := uint(2)
+	ver2 := model.NewVersion(2)
 	current, err := model.NewRepresentations(
 		model.Representation(map[string]interface{}{"workspace_id": "workspace-new"}),
-		&version2,
+		&ver2,
 		nil,
 		nil,
 	)
 	require.NoError(t, err)
 
-	version1 := uint(1)
+	ver1 := model.NewVersion(1)
 	previous, err := model.NewRepresentations(
 		model.Representation(map[string]interface{}{"workspace_id": "workspace-old"}),
-		&version1,
+		&ver1,
 		nil,
 		nil,
 	)
@@ -343,9 +345,10 @@ func TestCalculateTuples_OperationTypeScenarios(t *testing.T) {
 			// Build current representation
 			if tc.currentWorkspaceID != "" {
 				currentData := map[string]interface{}{"workspace_id": tc.currentWorkspaceID}
+				curVer := model.NewVersion(tc.version)
 				currentRep, err := model.NewRepresentations(
 					model.Representation(currentData),
-					&tc.version,
+					&curVer,
 					nil,
 					nil,
 				)
@@ -358,10 +361,11 @@ func TestCalculateTuples_OperationTypeScenarios(t *testing.T) {
 
 			// Build previous representation
 			if tc.previousWorkspaceID != "" {
-				prevVer := uint(0)
+				prevUint := uint(0)
 				if tc.version > 0 {
-					prevVer = tc.version - 1
+					prevUint = tc.version - 1
 				}
+				prevVer := model.NewVersion(prevUint)
 				previous, err = model.NewRepresentations(
 					model.Representation(map[string]interface{}{"workspace_id": tc.previousWorkspaceID}),
 					&prevVer,

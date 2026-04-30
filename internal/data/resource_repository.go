@@ -286,7 +286,7 @@ func (r *resourceRepository) GetTransactionManager() bizmodel.TransactionManager
 	return r.transactionManager
 }
 
-func (r *resourceRepository) FindCurrentAndPreviousVersionedRepresentations(tx *gorm.DB, key bizmodel.ReporterResourceKey, currentCommonVersion *uint, operationType bizmodel.EventOperationType) (*bizmodel.Representations, *bizmodel.Representations, error) {
+func (r *resourceRepository) FindCurrentAndPreviousVersionedRepresentations(tx *gorm.DB, key bizmodel.ReporterResourceKey, currentCommonVersion *bizmodel.Version, operationType bizmodel.EventOperationType) (*bizmodel.Representations, *bizmodel.Representations, error) {
 	if currentCommonVersion == nil {
 		return nil, nil, nil
 	}
@@ -310,11 +310,11 @@ func (r *resourceRepository) FindCurrentAndPreviousVersionedRepresentations(tx *
 
 	query = r.buildReporterResourceKeyQuery(query, key)
 
+	cv := currentCommonVersion.Uint()
 	if operationType.OperationType() == bizmodel.OperationTypeCreated {
-		query = query.Where("cr.version = ?", *currentCommonVersion)
+		query = query.Where("cr.version = ?", cv)
 	} else {
-		query = query.Where("(cr.version = ? OR cr.version = ?)", *currentCommonVersion, *currentCommonVersion-1)
-
+		query = query.Where("(cr.version = ? OR cr.version = ?)", cv, cv-1)
 	}
 
 	err := query.Find(&results).Error
@@ -324,14 +324,15 @@ func (r *resourceRepository) FindCurrentAndPreviousVersionedRepresentations(tx *
 
 	var current, previous *bizmodel.Representations
 	for _, row := range results {
-		rep, err := bizmodel.NewRepresentations(bizmodel.Representation(row.Data), &row.Version, nil, nil)
+		v := bizmodel.NewVersion(row.Version)
+		rep, err := bizmodel.NewRepresentations(bizmodel.Representation(row.Data), &v, nil, nil)
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to create representation: %w", err)
 		}
 
-		if row.Version == *currentCommonVersion {
+		if row.Version == cv {
 			current = rep
-		} else if *currentCommonVersion > 0 && row.Version == *currentCommonVersion-1 {
+		} else if cv > 0 && row.Version == cv-1 {
 			previous = rep
 		}
 	}
@@ -358,10 +359,10 @@ func (r *resourceRepository) FindLatestRepresentations(tx *gorm.DB, key bizmodel
 		return nil, fmt.Errorf("failed to find latest representations: %w", err)
 	}
 
-	// Convert to Representations
+	v := bizmodel.NewVersion(result.Version)
 	rep, err := bizmodel.NewRepresentations(
 		bizmodel.Representation(result.Data),
-		&result.Version,
+		&v,
 		nil,
 		nil,
 	)

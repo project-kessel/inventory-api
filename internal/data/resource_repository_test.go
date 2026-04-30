@@ -19,9 +19,9 @@ import (
 	"github.com/project-kessel/inventory-api/internal/testutil"
 )
 
-// Helper function to create a pointer to a uint
-func ptrUint(v uint) *uint {
-	return &v
+func ptrVersion(v uint) *bizmodel.Version {
+	ver := bizmodel.NewVersion(v)
+	return &ver
 }
 
 func TestResourceRepositoryContract(t *testing.T) {
@@ -2145,7 +2145,7 @@ func TestFindLatestRepresentations(t *testing.T) {
 
 			// Both implementations should return the latest version (version 2)
 			assert.Equal(t, "workspace-v2-latest", result.CommonData()["workspace_id"])
-			assert.Equal(t, uint(2), *result.CommonVersion())
+			assert.Equal(t, bizmodel.NewVersion(2), *result.CommonVersion())
 
 			// Verify it contains the latest data
 			assert.Equal(t, "production", result.CommonData()["environment"])
@@ -2217,7 +2217,7 @@ func TestFindCurrentAndPreviousVersionedRepresentations(t *testing.T) {
 				require.NoError(t, repo.Save(db, resource, bizmodel.OperationTypeUpdated, "tx-ws-update"))
 
 				// Get current and previous versions
-				version := uint(1)
+				version := bizmodel.NewVersion(1)
 				cur, prev, err := repo.FindCurrentAndPreviousVersionedRepresentations(db, key, &version, bizmodel.OperationTypeUpdated)
 				require.NoError(t, err)
 
@@ -2238,7 +2238,7 @@ func TestFindCurrentAndPreviousVersionedRepresentations(t *testing.T) {
 				require.NoError(t, err)
 
 				// Get version 0 representations
-				version := uint(0)
+				version := bizmodel.NewVersion(0)
 				cur, prev, err := repo.FindCurrentAndPreviousVersionedRepresentations(db, key, &version, bizmodel.OperationTypeCreated)
 				require.NoError(t, err)
 
@@ -2258,13 +2258,13 @@ func TestFindCurrentAndPreviousVersionedRepresentations(t *testing.T) {
 				// Test the function directly with invalid data
 				current, _ := bizmodel.NewRepresentations(
 					bizmodel.Representation(map[string]interface{}{"workspace_id": 123}), // non-string
-					ptrUint(1),
+					ptrVersion(1),
 					nil,
 					nil,
 				)
 				previous, _ := bizmodel.NewRepresentations(
 					bizmodel.Representation(map[string]interface{}{"other_field": "value"}), // missing workspace_id
-					ptrUint(0),
+					ptrVersion(0),
 					nil,
 					nil,
 				)

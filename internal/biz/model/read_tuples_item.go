@@ -5,11 +5,11 @@ type ReadTuplesItem struct {
 	object            ResourceReference
 	relation          Relation
 	subject           SubjectReference
-	continuationToken string
+	continuationToken ContinuationToken
 	consistencyToken  ConsistencyToken
 }
 
-func NewReadTuplesItem(object ResourceReference, relation Relation, subject SubjectReference, continuationToken string, consistencyToken ConsistencyToken) ReadTuplesItem {
+func NewReadTuplesItem(object ResourceReference, relation Relation, subject SubjectReference, continuationToken ContinuationToken, consistencyToken ConsistencyToken) ReadTuplesItem {
 	return ReadTuplesItem{
 		object:            object,
 		relation:          relation,
@@ -19,8 +19,8 @@ func NewReadTuplesItem(object ResourceReference, relation Relation, subject Subj
 	}
 }
 
-func (i ReadTuplesItem) Object() ResourceReference          { return i.object }
-func (i ReadTuplesItem) Relation() Relation                 { return i.relation }
-func (i ReadTuplesItem) Subject() SubjectReference          { return i.subject }
-func (i ReadTuplesItem) ContinuationToken() string          { return i.continuationToken }
-func (i ReadTuplesItem) ConsistencyToken() ConsistencyToken { return i.consistencyToken }
+func (i ReadTuplesItem) Object() ResourceReference            { return i.object }
+func (i ReadTuplesItem) Relation() Relation                   { return i.relation }
+func (i ReadTuplesItem) Subject() SubjectReference            { return i.subject }
+func (i ReadTuplesItem) ContinuationToken() ContinuationToken { return i.continuationToken }
+func (i ReadTuplesItem) ConsistencyToken() ConsistencyToken   { return i.consistencyToken }

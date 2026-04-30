@@ -99,6 +99,25 @@ func DeserializeConsistencyToken(value string) ConsistencyToken {
 	return Deserialize[ConsistencyToken](value)
 }
 
+// ContinuationToken is an opaque pagination cursor from clients or authz backends.
+type ContinuationToken string
+
+func NewContinuationToken(token string) (ContinuationToken, error) {
+	return ContinuationToken(token), nil
+}
+
+func (ct ContinuationToken) String() string {
+	return string(ct)
+}
+
+func (ct ContinuationToken) Serialize() string {
+	return SerializeString(ct)
+}
+
+func DeserializeContinuationToken(value string) ContinuationToken {
+	return Deserialize[ContinuationToken](value)
+}
+
 func DeserializeGeneration(value uint) Generation {
 	return DeserializeUint[Generation](value)
 }
@@ -243,6 +262,17 @@ func (rt ResourceType) String() string {
 func (rt ResourceType) Serialize() string {
 	str := SerializeString(rt)
 	return strings.ToLower(str)
+}
+
+// SchemaRepositoryKey returns the canonical key used for schema repository storage and lookups
+// (lowercase; forward slashes replaced with underscores). This matches historical path and cache normalization.
+func (rt ResourceType) SchemaRepositoryKey() string {
+	s := strings.TrimSpace(rt.String())
+	if s == "" {
+		return ""
+	}
+	s = strings.ReplaceAll(s, "/", "_")
+	return strings.ToLower(s)
 }
 
 type ReporterType string

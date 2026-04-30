@@ -79,7 +79,10 @@ func TestInMemorySchemaRepository_GetResource(t *testing.T) {
 
 			retrieved, err := repo.GetResourceSchema(ctx, tc.lookupType)
 			assert.NoError(t, err)
-			assert.Equal(t, tc.expectedType, retrieved.ResourceType)
+			assert.Equal(t, bizmodel.ResourceSchema{
+				ResourceType:     tc.expectedType,
+				ValidationSchema: validateSchemaTypeObject,
+			}, retrieved)
 		})
 	}
 }
@@ -210,8 +213,11 @@ func TestInMemorySchemaRepository_CreateResourceReporter(t *testing.T) {
 
 			retrieved, err := repo.GetReporterSchema(ctx, "host", tc.lookupReporterType)
 			assert.NoError(t, err)
-			assert.Equal(t, "host", retrieved.ResourceType)
-			assert.Equal(t, tc.expectedReporterType, retrieved.ReporterType)
+			assert.Equal(t, bizmodel.ReporterSchema{
+				ResourceType:     "host",
+				ReporterType:     tc.expectedReporterType,
+				ValidationSchema: reporterValidation,
+			}, retrieved)
 		})
 	}
 }

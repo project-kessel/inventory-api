@@ -3918,6 +3918,13 @@ func newFakeSchemaRepository(t *testing.T) model.SchemaRepository {
 	return schemaRepository
 }
 
+func assertProtoEqual(t *testing.T, expected, actual proto.Message) {
+	t.Helper()
+	if !proto.Equal(expected, actual) {
+		t.Errorf("proto mismatch\nwant: %v\n got: %v", expected, actual)
+	}
+}
+
 // --- Case-insensitive test helpers ---
 
 type caseVariant struct {
@@ -4113,7 +4120,11 @@ func TestInventoryService_CaseInsensitiveTypes(t *testing.T) {
 							Subject:  makeSubjectRef("subject-456"),
 						}, Check, httpEndpoint("POST /api/kessel/v1beta2/check")))
 						resp := Extract(t, res, expectSuccess(func() *pb.CheckResponse { return &pb.CheckResponse{} }))
-						assert.Equal(t, pb.Allowed_ALLOWED_TRUE, resp.Allowed)
+						require.NotEmpty(t, resp.ConsistencyToken.GetToken())
+						assertProtoEqual(t, &pb.CheckResponse{
+							Allowed:          pb.Allowed_ALLOWED_TRUE,
+							ConsistencyToken: resp.ConsistencyToken,
+						}, resp)
 					}
 				})
 			})
@@ -4135,7 +4146,11 @@ func TestInventoryService_CaseInsensitiveTypes(t *testing.T) {
 							Subject:  makeSubjectRef("subject-789"),
 						}, CheckForUpdate, httpEndpoint("POST /api/kessel/v1beta2/checkforupdate")))
 						resp := Extract(t, res, expectSuccess(func() *pb.CheckForUpdateResponse { return &pb.CheckForUpdateResponse{} }))
-						assert.Equal(t, pb.Allowed_ALLOWED_TRUE, resp.Allowed)
+						require.NotEmpty(t, resp.ConsistencyToken.GetToken())
+						assertProtoEqual(t, &pb.CheckForUpdateResponse{
+							Allowed:          pb.Allowed_ALLOWED_TRUE,
+							ConsistencyToken: resp.ConsistencyToken,
+						}, resp)
 					}
 				})
 			})
@@ -4156,7 +4171,11 @@ func TestInventoryService_CaseInsensitiveTypes(t *testing.T) {
 							Object:   makeResourceRef("resource-abc", tc.resourceType, tc.reporterType),
 						}, CheckSelf, httpEndpoint("POST /api/kessel/v1beta2/checkself")))
 						resp := Extract(t, res, expectSuccess(func() *pb.CheckSelfResponse { return &pb.CheckSelfResponse{} }))
-						assert.Equal(t, pb.Allowed_ALLOWED_TRUE, resp.Allowed)
+						require.NotEmpty(t, resp.ConsistencyToken.GetToken())
+						assertProtoEqual(t, &pb.CheckSelfResponse{
+							Allowed:          pb.Allowed_ALLOWED_TRUE,
+							ConsistencyToken: resp.ConsistencyToken,
+						}, resp)
 					}
 				})
 			})
@@ -4171,17 +4190,22 @@ func TestInventoryService_CaseInsensitiveTypes(t *testing.T) {
 				runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
 					authz := data.NewSimpleRelationsRepository()
 					authz.Grant("subject-a", "view", "hbi", "host", "resource-1")
+					items := []*pb.CheckBulkRequestItem{
+						{Object: makeResourceRef("resource-1", tc.resourceType, tc.reporterType), Subject: makeSubjectRef("subject-a"), Relation: "view"},
+						{Object: makeResourceRef("resource-2", tc.resourceType, tc.reporterType), Subject: makeSubjectRef("subject-b"), Relation: "edit"},
+					}
 					return makeAuthzConfig(t, authz, "user-123"), func(t *testing.T, tr *Transport) {
-						res := tr.Invoke(context.Background(), withBody(&pb.CheckBulkRequest{
-							Items: []*pb.CheckBulkRequestItem{
-								{Object: makeResourceRef("resource-1", tc.resourceType, tc.reporterType), Subject: makeSubjectRef("subject-a"), Relation: "view"},
-								{Object: makeResourceRef("resource-2", tc.resourceType, tc.reporterType), Subject: makeSubjectRef("subject-b"), Relation: "edit"},
-							},
-						}, CheckBulk, httpEndpoint("POST /api/kessel/v1beta2/checkbulk")))
+						res := tr.Invoke(context.Background(), withBody(&pb.CheckBulkRequest{Items: items},
+							CheckBulk, httpEndpoint("POST /api/kessel/v1beta2/checkbulk")))
 						resp := Extract(t, res, expectSuccess(func() *pb.CheckBulkResponse { return &pb.CheckBulkResponse{} }))
-						require.Len(t, resp.Pairs, 2)
-						assert.Equal(t, pb.Allowed_ALLOWED_TRUE, resp.Pairs[0].GetItem().Allowed)
-						assert.Equal(t, pb.Allowed_ALLOWED_FALSE, resp.Pairs[1].GetItem().Allowed)
+						require.NotEmpty(t, resp.ConsistencyToken.GetToken())
+						assertProtoEqual(t, &pb.CheckBulkResponse{
+							Pairs: []*pb.CheckBulkResponsePair{
+								{Request: items[0], Response: &pb.CheckBulkResponsePair_Item{Item: &pb.CheckBulkResponseItem{Allowed: pb.Allowed_ALLOWED_TRUE}}},
+								{Request: items[1], Response: &pb.CheckBulkResponsePair_Item{Item: &pb.CheckBulkResponseItem{Allowed: pb.Allowed_ALLOWED_FALSE}}},
+							},
+							ConsistencyToken: resp.ConsistencyToken,
+						}, resp)
 					}
 				})
 			})
@@ -4196,17 +4220,22 @@ func TestInventoryService_CaseInsensitiveTypes(t *testing.T) {
 				runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
 					authz := data.NewSimpleRelationsRepository()
 					authz.Grant("subject-a", "update", "hbi", "host", "resource-1")
+					items := []*pb.CheckBulkRequestItem{
+						{Object: makeResourceRef("resource-1", tc.resourceType, tc.reporterType), Subject: makeSubjectRef("subject-a"), Relation: "update"},
+						{Object: makeResourceRef("resource-2", tc.resourceType, tc.reporterType), Subject: makeSubjectRef("subject-b"), Relation: "update"},
+					}
 					return makeAuthzConfig(t, authz, "user-123"), func(t *testing.T, tr *Transport) {
-						res := tr.Invoke(context.Background(), withBody(&pb.CheckForUpdateBulkRequest{
-							Items: []*pb.CheckBulkRequestItem{
-								{Object: makeResourceRef("resource-1", tc.resourceType, tc.reporterType), Subject: makeSubjectRef("subject-a"), Relation: "update"},
-								{Object: makeResourceRef("resource-2", tc.resourceType, tc.reporterType), Subject: makeSubjectRef("subject-b"), Relation: "update"},
-							},
-						}, CheckForUpdateBulk, httpEndpoint("POST /api/kessel/v1beta2/checkforupdatebulk")))
+						res := tr.Invoke(context.Background(), withBody(&pb.CheckForUpdateBulkRequest{Items: items},
+							CheckForUpdateBulk, httpEndpoint("POST /api/kessel/v1beta2/checkforupdatebulk")))
 						resp := Extract(t, res, expectSuccess(func() *pb.CheckForUpdateBulkResponse { return &pb.CheckForUpdateBulkResponse{} }))
-						require.Len(t, resp.Pairs, 2)
-						assert.Equal(t, pb.Allowed_ALLOWED_TRUE, resp.Pairs[0].GetItem().Allowed)
-						assert.Equal(t, pb.Allowed_ALLOWED_FALSE, resp.Pairs[1].GetItem().Allowed)
+						require.NotEmpty(t, resp.ConsistencyToken.GetToken())
+						assertProtoEqual(t, &pb.CheckForUpdateBulkResponse{
+							Pairs: []*pb.CheckForUpdateBulkResponsePair{
+								{Request: items[0], Response: &pb.CheckForUpdateBulkResponsePair_Item{Item: &pb.CheckForUpdateBulkResponseItem{Allowed: pb.Allowed_ALLOWED_TRUE}}},
+								{Request: items[1], Response: &pb.CheckForUpdateBulkResponsePair_Item{Item: &pb.CheckForUpdateBulkResponseItem{Allowed: pb.Allowed_ALLOWED_FALSE}}},
+							},
+							ConsistencyToken: resp.ConsistencyToken,
+						}, resp)
 					}
 				})
 			})
@@ -4221,17 +4250,22 @@ func TestInventoryService_CaseInsensitiveTypes(t *testing.T) {
 				runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
 					authz := data.NewSimpleRelationsRepository()
 					authz.Grant("user-123", "view", "hbi", "host", "resource-1")
+					items := []*pb.CheckSelfBulkRequestItem{
+						{Object: makeResourceRef("resource-1", tc.resourceType, tc.reporterType), Relation: "view"},
+						{Object: makeResourceRef("resource-2", tc.resourceType, tc.reporterType), Relation: "edit"},
+					}
 					return makeAuthzConfig(t, authz, "user-123"), func(t *testing.T, tr *Transport) {
-						res := tr.Invoke(context.Background(), withBody(&pb.CheckSelfBulkRequest{
-							Items: []*pb.CheckSelfBulkRequestItem{
-								{Object: makeResourceRef("resource-1", tc.resourceType, tc.reporterType), Relation: "view"},
-								{Object: makeResourceRef("resource-2", tc.resourceType, tc.reporterType), Relation: "edit"},
-							},
-						}, CheckSelfBulk, httpEndpoint("POST /api/kessel/v1beta2/checkselfbulk")))
+						res := tr.Invoke(context.Background(), withBody(&pb.CheckSelfBulkRequest{Items: items},
+							CheckSelfBulk, httpEndpoint("POST /api/kessel/v1beta2/checkselfbulk")))
 						resp := Extract(t, res, expectSuccess(func() *pb.CheckSelfBulkResponse { return &pb.CheckSelfBulkResponse{} }))
-						require.Len(t, resp.Pairs, 2)
-						assert.Equal(t, pb.Allowed_ALLOWED_TRUE, resp.Pairs[0].GetItem().Allowed)
-						assert.Equal(t, pb.Allowed_ALLOWED_FALSE, resp.Pairs[1].GetItem().Allowed)
+						require.NotEmpty(t, resp.ConsistencyToken.GetToken())
+						assertProtoEqual(t, &pb.CheckSelfBulkResponse{
+							Pairs: []*pb.CheckSelfBulkResponsePair{
+								{Request: items[0], Response: &pb.CheckSelfBulkResponsePair_Item{Item: &pb.CheckSelfBulkResponseItem{Allowed: pb.Allowed_ALLOWED_TRUE}}},
+								{Request: items[1], Response: &pb.CheckSelfBulkResponsePair_Item{Item: &pb.CheckSelfBulkResponseItem{Allowed: pb.Allowed_ALLOWED_FALSE}}},
+							},
+							ConsistencyToken: resp.ConsistencyToken,
+						}, resp)
 					}
 				})
 			})
@@ -4259,20 +4293,28 @@ func TestInventoryService_CaseInsensitiveTypes(t *testing.T) {
 				})
 				require.NoError(t, err)
 
-				var resourceIDs []string
+				var objects []*pb.ResourceReference
 				for {
 					resp, err := stream.Recv()
 					if err == io.EOF {
 						break
 					}
 					require.NoError(t, err)
-					assert.Equal(t, "host", resp.Object.ResourceType)
-					assert.Equal(t, "hbi", resp.Object.Reporter.Type)
-					resourceIDs = append(resourceIDs, resp.Object.ResourceId)
+					objects = append(objects, resp.Object)
 				}
 
-				slices.Sort(resourceIDs)
-				assert.Equal(t, []string{"host-1", "host-2"}, resourceIDs)
+				slices.SortFunc(objects, func(a, b *pb.ResourceReference) int {
+					if a.ResourceId < b.ResourceId {
+						return -1
+					}
+					if a.ResourceId > b.ResourceId {
+						return 1
+					}
+					return 0
+				})
+				require.Len(t, objects, 2)
+				assertProtoEqual(t, makeResourceRef("host-1", "host", "hbi"), objects[0])
+				assertProtoEqual(t, makeResourceRef("host-2", "host", "hbi"), objects[1])
 			})
 		}
 	})
@@ -4303,20 +4345,28 @@ func TestInventoryService_CaseInsensitiveTypes(t *testing.T) {
 				})
 				require.NoError(t, err)
 
-				var subjectIDs []string
+				var subjects []*pb.SubjectReference
 				for {
 					resp, err := stream.Recv()
 					if err == io.EOF {
 						break
 					}
 					require.NoError(t, err)
-					assert.Equal(t, "principal", resp.Subject.Resource.ResourceType)
-					assert.Equal(t, "rbac", resp.Subject.Resource.Reporter.Type)
-					subjectIDs = append(subjectIDs, resp.Subject.Resource.ResourceId)
+					subjects = append(subjects, resp.Subject)
 				}
 
-				slices.Sort(subjectIDs)
-				assert.Equal(t, []string{"user-1", "user-2"}, subjectIDs)
+				slices.SortFunc(subjects, func(a, b *pb.SubjectReference) int {
+					if a.Resource.ResourceId < b.Resource.ResourceId {
+						return -1
+					}
+					if a.Resource.ResourceId > b.Resource.ResourceId {
+						return 1
+					}
+					return 0
+				})
+				require.Len(t, subjects, 2)
+				assertProtoEqual(t, makeSubjectRef("user-1"), subjects[0])
+				assertProtoEqual(t, makeSubjectRef("user-2"), subjects[1])
 			})
 		}
 	})

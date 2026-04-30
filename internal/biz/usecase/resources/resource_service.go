@@ -150,7 +150,7 @@ func (uc *Usecase) ReportResource(ctx context.Context, cmd ReportResourceCommand
 	// provides the actual correctness guarantee, if a duplicate sneaks past this
 	// advisory check due to a concurrent commit.
 	if uc.Config.IdempotencyCheckEnabled && cmd.TransactionId != nil {
-		alreadyProcessed, err := uc.resourceRepository.HasTransactionIdBeenProcessed(uc.resourceRepository.GetDB(), cmd.TransactionId.String())
+		alreadyProcessed, err := uc.resourceRepository.HasTransactionIdBeenProcessed(uc.resourceRepository.GetDB(), *cmd.TransactionId)
 		if err != nil {
 			return fmt.Errorf("failed to check transaction ID: %w", err)
 		}
@@ -174,12 +174,12 @@ func (uc *Usecase) ReportResource(ctx context.Context, cmd ReportResourceCommand
 				if err == nil && res != nil {
 					log.Info("Resource already exists, updating: ")
 					operationType = model.OperationTypeUpdated
-					return uc.updateResource(tx, cmd, res, txid.String())
+					return uc.updateResource(tx, cmd, res, txid)
 				}
 
 				log.Info("Creating new resource")
 				operationType = model.OperationTypeCreated
-				return uc.createResource(tx, cmd, txid.String())
+				return uc.createResource(tx, cmd, txid)
 			},
 		)
 	}
@@ -237,7 +237,7 @@ func (uc *Usecase) ReportResource(ctx context.Context, cmd ReportResourceCommand
 	return nil
 }
 
-func (uc *Usecase) createResource(tx *gorm.DB, cmd ReportResourceCommand, txidStr string) error {
+func (uc *Usecase) createResource(tx *gorm.DB, cmd ReportResourceCommand, txid model.TransactionId) error {
 	resourceId, err := uc.resourceRepository.NextResourceId()
 	if err != nil {
 		return err
@@ -266,10 +266,10 @@ func (uc *Usecase) createResource(tx *gorm.DB, cmd ReportResourceCommand, txidSt
 		return err
 	}
 
-	return uc.resourceRepository.Save(tx, resource, model.OperationTypeCreated, txidStr)
+	return uc.resourceRepository.Save(tx, resource, model.OperationTypeCreated, txid)
 }
 
-func (uc *Usecase) updateResource(tx *gorm.DB, cmd ReportResourceCommand, existingResource *model.Resource, txidStr string) error {
+func (uc *Usecase) updateResource(tx *gorm.DB, cmd ReportResourceCommand, existingResource *model.Resource, txid model.TransactionId) error {
 	reporterResourceKey, err := model.NewReporterResourceKey(
 		cmd.LocalResourceId,
 		cmd.ResourceType,
@@ -293,7 +293,7 @@ func (uc *Usecase) updateResource(tx *gorm.DB, cmd ReportResourceCommand, existi
 		return fmt.Errorf("failed to update resource: %w", err)
 	}
 
-	return uc.resourceRepository.Save(tx, *existingResource, model.OperationTypeUpdated, txidStr)
+	return uc.resourceRepository.Save(tx, *existingResource, model.OperationTypeUpdated, txid)
 }
 
 func (uc *Usecase) Delete(ctx context.Context, reporterResourceKey model.ReporterResourceKey) error {
@@ -322,7 +322,7 @@ func (uc *Usecase) Delete(ctx context.Context, reporterResourceKey model.Reporte
 				if err != nil {
 					return fmt.Errorf("failed to delete resource: %w", err)
 				}
-				return uc.resourceRepository.Save(tx, *res, model.OperationTypeDeleted, txid.String())
+				return uc.resourceRepository.Save(tx, *res, model.OperationTypeDeleted, txid)
 			} else {
 				if errors.Is(err, gorm.ErrRecordNotFound) {
 					return ErrResourceNotFound

@@ -74,7 +74,7 @@ func (f *fakeResourceRepository) NextReporterResourceId() (bizmodel.ReporterReso
 	return bizmodel.NewReporterResourceId(uuidV7)
 }
 
-func (f *fakeResourceRepository) Save(tx *gorm.DB, resource bizmodel.Resource, operationType bizmodel.EventOperationType, txid string) error {
+func (f *fakeResourceRepository) Save(tx *gorm.DB, resource bizmodel.Resource, operationType bizmodel.EventOperationType, txid bizmodel.TransactionId) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
@@ -394,15 +394,10 @@ func cloneJsonObject(src internal.JsonObject) internal.JsonObject {
 
 // HasTransactionIdBeenProcessed checks if a transaction ID has been processed before
 // Returns true if the transaction has already been processed, false otherwise
-func (f *fakeResourceRepository) HasTransactionIdBeenProcessed(tx *gorm.DB, transactionId string) (bool, error) {
-	if transactionId == "" {
-		return false, nil
-	}
-
+func (f *fakeResourceRepository) HasTransactionIdBeenProcessed(tx *gorm.DB, transactionId bizmodel.TransactionId) (bool, error) {
 	f.mu.RLock()
 	defer f.mu.RUnlock()
 
-	// Check if this transaction ID has been processed before
-	_, exists := f.processedTransactionIds[transactionId]
+	_, exists := f.processedTransactionIds[transactionId.String()]
 	return exists, nil
 }

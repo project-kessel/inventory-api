@@ -130,7 +130,7 @@ func (r *resourceRepository) NextReporterResourceId() (bizmodel.ReporterResource
 	return bizmodel.NewReporterResourceId(uuidV7)
 }
 
-func (r *resourceRepository) Save(tx *gorm.DB, resource bizmodel.Resource, operationType bizmodel.EventOperationType, txid string) error {
+func (r *resourceRepository) Save(tx *gorm.DB, resource bizmodel.Resource, operationType bizmodel.EventOperationType, txid bizmodel.TransactionId) error {
 	resourceSnapshot, reporterResourceSnapshot, reporterRepresentationSnapshot, commonRepresentationSnapshot, err := resource.Serialize()
 	if err != nil {
 		return fmt.Errorf("failed to serialize resource: %w", err)
@@ -187,7 +187,7 @@ func (r *resourceRepository) Save(tx *gorm.DB, resource bizmodel.Resource, opera
 	return nil
 }
 
-func (r *resourceRepository) handleOutboxEvents(tx *gorm.DB, resourceEvent bizmodel.ResourceEvent, operationType bizmodel.EventOperationType, txid string) error {
+func (r *resourceRepository) handleOutboxEvents(tx *gorm.DB, resourceEvent bizmodel.ResourceEvent, operationType bizmodel.EventOperationType, txid bizmodel.TransactionId) error {
 	resourceMessage, tupleMessage, err := model_legacy.NewOutboxEventsFromResourceEvent(resourceEvent, operationType, txid)
 	if err != nil {
 		return err
@@ -375,11 +375,8 @@ func (r *resourceRepository) FindLatestRepresentations(tx *gorm.DB, key bizmodel
 // HasTransactionIdBeenProcessed checks if a transaction ID exists in either the
 // reporter_representations or common_representations tables.
 // Returns true if the transaction has already been processed, false otherwise.
-func (r *resourceRepository) HasTransactionIdBeenProcessed(tx *gorm.DB, transactionId string) (bool, error) {
-	if transactionId == "" {
-		return false, nil
-	}
-	// Check representations tables using lightweight EXISTS query
+func (r *resourceRepository) HasTransactionIdBeenProcessed(tx *gorm.DB, transactionId bizmodel.TransactionId) (bool, error) {
+	tid := transactionId.String()
 	var exists bool
 	err := tx.Raw(`
 	SELECT EXISTS (
@@ -388,7 +385,7 @@ func (r *resourceRepository) HasTransactionIdBeenProcessed(tx *gorm.DB, transact
 	OR EXISTS (
 		SELECT 1 FROM common_representations  WHERE transaction_id = ?
 	)
-	`, transactionId, transactionId).Scan(&exists).Error
+	`, tid, tid).Scan(&exists).Error
 
 	if err != nil {
 		return false, fmt.Errorf("failed to check representations for the transaction_id: %w", err)

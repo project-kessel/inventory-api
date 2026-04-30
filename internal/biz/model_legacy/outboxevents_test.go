@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-const txid = "txid"
+var txid = bizmodel.NewTransactionId("txid")
 
 func createTestResourceReportEvent() bizmodel.ResourceReportEvent {
 	resourceIdUUID := uuid.MustParse("550e8400-e29b-41d4-a716-446655440001")
@@ -101,7 +101,7 @@ func TestNewOutboxEventsFromResourceEventDeleted(t *testing.T) {
 
 func assertTupleEventFromDomainEvent(t *testing.T, resourceEvent bizmodel.ResourceReportEvent, event *OutboxEvent) {
 	assert.NotNil(t, event)
-	assert.Equal(t, txid, event.TxId)
+	assert.Equal(t, txid.String(), event.TxId)
 	assert.Equal(t, TupleAggregateType, event.AggregateType)
 	assert.Equal(t, resourceEvent.Id().String(), event.AggregateID)
 

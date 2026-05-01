@@ -297,7 +297,7 @@ func (i *InventoryConsumer) ProcessMessage(headers map[string]string, relationsE
 	case string(model.OperationTypeCreated):
 		if relationsEnabled {
 			return i.processRelationsOperation(operation, txid, msg, operationConfig{
-				fetchRepresentations: func(i *InventoryConsumer, key model.ReporterResourceKey, version *uint) (*model.Representations, *model.Representations, error) {
+				fetchRepresentations: func(i *InventoryConsumer, key model.ReporterResourceKey, version *model.Version) (*model.Representations, *model.Representations, error) {
 					return i.ResourceRepository.FindCurrentAndPreviousVersionedRepresentations(nil, key, version, model.OperationTypeCreated)
 				},
 				executeSpiceDB: func(i *InventoryConsumer, tuples model.TuplesToReplicate) (string, error) {
@@ -310,7 +310,7 @@ func (i *InventoryConsumer) ProcessMessage(headers map[string]string, relationsE
 	case string(model.OperationTypeUpdated):
 		if relationsEnabled {
 			return i.processRelationsOperation(operation, txid, msg, operationConfig{
-				fetchRepresentations: func(i *InventoryConsumer, key model.ReporterResourceKey, version *uint) (*model.Representations, *model.Representations, error) {
+				fetchRepresentations: func(i *InventoryConsumer, key model.ReporterResourceKey, version *model.Version) (*model.Representations, *model.Representations, error) {
 					return i.ResourceRepository.FindCurrentAndPreviousVersionedRepresentations(nil, key, version, model.OperationTypeUpdated)
 				},
 				executeSpiceDB: func(i *InventoryConsumer, tuples model.TuplesToReplicate) (string, error) {
@@ -322,7 +322,7 @@ func (i *InventoryConsumer) ProcessMessage(headers map[string]string, relationsE
 	case string(model.OperationTypeDeleted):
 		if relationsEnabled {
 			return i.processRelationsOperation(operation, txid, msg, operationConfig{
-				fetchRepresentations: func(i *InventoryConsumer, key model.ReporterResourceKey, version *uint) (*model.Representations, *model.Representations, error) {
+				fetchRepresentations: func(i *InventoryConsumer, key model.ReporterResourceKey, version *model.Version) (*model.Representations, *model.Representations, error) {
 					previous, err := i.ResourceRepository.FindLatestRepresentations(nil, key)
 					return nil, previous, err
 				},
@@ -342,7 +342,7 @@ func (i *InventoryConsumer) ProcessMessage(headers map[string]string, relationsE
 }
 
 type operationConfig struct {
-	fetchRepresentations func(i *InventoryConsumer, key model.ReporterResourceKey, version *uint) (*model.Representations, *model.Representations, error)
+	fetchRepresentations func(i *InventoryConsumer, key model.ReporterResourceKey, version *model.Version) (*model.Representations, *model.Representations, error)
 	executeSpiceDB       func(i *InventoryConsumer, tuples model.TuplesToReplicate) (string, error)
 	metricName           string
 }
@@ -365,13 +365,7 @@ func (i *InventoryConsumer) processRelationsOperation(
 
 	key := tupleEvent.ReporterResourceKey()
 
-	var currentVersion *uint
-	if tupleEvent.CommonVersion() != nil {
-		version := tupleEvent.CommonVersion().Uint()
-		currentVersion = &version
-	}
-
-	current, previous, err := config.fetchRepresentations(i, key, currentVersion)
+	current, previous, err := config.fetchRepresentations(i, key, tupleEvent.CommonVersion())
 	if err != nil {
 		metricscollector.Incr(i.MetricsCollector.MsgProcessFailures, "FindRepresentations")
 		i.Logger.Errorf("failed to find representations: %v", err)

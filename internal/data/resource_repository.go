@@ -130,7 +130,7 @@ func (r *resourceRepository) NextReporterResourceId() (bizmodel.ReporterResource
 	return bizmodel.NewReporterResourceId(uuidV7)
 }
 
-func (r *resourceRepository) Save(tx *gorm.DB, resource bizmodel.Resource, operationType bizmodel.EventOperationType, txid string) error {
+func (r *resourceRepository) Save(tx *gorm.DB, resource bizmodel.Resource, operationType bizmodel.EventOperationType, txid bizmodel.TransactionId) error {
 	resourceSnapshot, reporterResourceSnapshot, reporterRepresentationSnapshot, commonRepresentationSnapshot, err := resource.Serialize()
 	if err != nil {
 		return fmt.Errorf("failed to serialize resource: %w", err)
@@ -187,7 +187,7 @@ func (r *resourceRepository) Save(tx *gorm.DB, resource bizmodel.Resource, opera
 	return nil
 }
 
-func (r *resourceRepository) handleOutboxEvents(tx *gorm.DB, resourceEvent bizmodel.ResourceEvent, operationType bizmodel.EventOperationType, txid string) error {
+func (r *resourceRepository) handleOutboxEvents(tx *gorm.DB, resourceEvent bizmodel.ResourceEvent, operationType bizmodel.EventOperationType, txid bizmodel.TransactionId) error {
 	resourceMessage, tupleMessage, err := model_legacy.NewOutboxEventsFromResourceEvent(resourceEvent, operationType, txid)
 	if err != nil {
 		return err
@@ -286,7 +286,7 @@ func (r *resourceRepository) GetTransactionManager() bizmodel.TransactionManager
 	return r.transactionManager
 }
 
-func (r *resourceRepository) FindCurrentAndPreviousVersionedRepresentations(tx *gorm.DB, key bizmodel.ReporterResourceKey, currentCommonVersion *uint, operationType bizmodel.EventOperationType) (*bizmodel.Representations, *bizmodel.Representations, error) {
+func (r *resourceRepository) FindCurrentAndPreviousVersionedRepresentations(tx *gorm.DB, key bizmodel.ReporterResourceKey, currentCommonVersion *bizmodel.Version, operationType bizmodel.EventOperationType) (*bizmodel.Representations, *bizmodel.Representations, error) {
 	if currentCommonVersion == nil {
 		return nil, nil, nil
 	}
@@ -310,11 +310,11 @@ func (r *resourceRepository) FindCurrentAndPreviousVersionedRepresentations(tx *
 
 	query = r.buildReporterResourceKeyQuery(query, key)
 
+	cv := currentCommonVersion.Uint()
 	if operationType.OperationType() == bizmodel.OperationTypeCreated {
-		query = query.Where("cr.version = ?", *currentCommonVersion)
+		query = query.Where("cr.version = ?", cv)
 	} else {
-		query = query.Where("(cr.version = ? OR cr.version = ?)", *currentCommonVersion, *currentCommonVersion-1)
-
+		query = query.Where("(cr.version = ? OR cr.version = ?)", cv, cv-1)
 	}
 
 	err := query.Find(&results).Error
@@ -324,14 +324,15 @@ func (r *resourceRepository) FindCurrentAndPreviousVersionedRepresentations(tx *
 
 	var current, previous *bizmodel.Representations
 	for _, row := range results {
-		rep, err := bizmodel.NewRepresentations(bizmodel.Representation(row.Data), &row.Version, nil, nil)
+		v := bizmodel.NewVersion(row.Version)
+		rep, err := bizmodel.NewRepresentations(bizmodel.Representation(row.Data), &v, nil, nil)
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to create representation: %w", err)
 		}
 
-		if row.Version == *currentCommonVersion {
+		if row.Version == cv {
 			current = rep
-		} else if *currentCommonVersion > 0 && row.Version == *currentCommonVersion-1 {
+		} else if cv > 0 && row.Version == cv-1 {
 			previous = rep
 		}
 	}
@@ -358,10 +359,10 @@ func (r *resourceRepository) FindLatestRepresentations(tx *gorm.DB, key bizmodel
 		return nil, fmt.Errorf("failed to find latest representations: %w", err)
 	}
 
-	// Convert to Representations
+	v := bizmodel.NewVersion(result.Version)
 	rep, err := bizmodel.NewRepresentations(
 		bizmodel.Representation(result.Data),
-		&result.Version,
+		&v,
 		nil,
 		nil,
 	)
@@ -374,11 +375,8 @@ func (r *resourceRepository) FindLatestRepresentations(tx *gorm.DB, key bizmodel
 // HasTransactionIdBeenProcessed checks if a transaction ID exists in either the
 // reporter_representations or common_representations tables.
 // Returns true if the transaction has already been processed, false otherwise.
-func (r *resourceRepository) HasTransactionIdBeenProcessed(tx *gorm.DB, transactionId string) (bool, error) {
-	if transactionId == "" {
-		return false, nil
-	}
-	// Check representations tables using lightweight EXISTS query
+func (r *resourceRepository) HasTransactionIdBeenProcessed(tx *gorm.DB, transactionId bizmodel.TransactionId) (bool, error) {
+	tid := transactionId.String()
 	var exists bool
 	err := tx.Raw(`
 	SELECT EXISTS (
@@ -387,7 +385,7 @@ func (r *resourceRepository) HasTransactionIdBeenProcessed(tx *gorm.DB, transact
 	OR EXISTS (
 		SELECT 1 FROM common_representations  WHERE transaction_id = ?
 	)
-	`, transactionId, transactionId).Scan(&exists).Error
+	`, tid, tid).Scan(&exists).Error
 
 	if err != nil {
 		return false, fmt.Errorf("failed to check representations for the transaction_id: %w", err)

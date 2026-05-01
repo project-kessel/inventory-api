@@ -200,7 +200,7 @@ func convertResourceToTupleEvent(reporterResourceKey bizmodel.ReporterResourceKe
 	return payload, nil
 }
 
-func NewOutboxEventsFromResourceEvent(domainResourceEvent bizmodel.ResourceEvent, operationType bizmodel.EventOperationType, txid string) (*OutboxEvent, *OutboxEvent, error) {
+func NewOutboxEventsFromResourceEvent(domainResourceEvent bizmodel.ResourceEvent, operationType bizmodel.EventOperationType, txid bizmodel.TransactionId) (*OutboxEvent, *OutboxEvent, error) {
 	var payload internal.JsonObject
 	var tuplePayload internal.JsonObject
 	var err error
@@ -238,7 +238,7 @@ func NewOutboxEventsFromResourceEvent(domainResourceEvent bizmodel.ResourceEvent
 		Operation:     operationType,
 		AggregateType: TupleAggregateType,
 		AggregateID:   domainResourceEvent.Id().String(),
-		TxId:          txid,
+		TxId:          txid.String(),
 		Payload:       tuplePayload,
 	}
 

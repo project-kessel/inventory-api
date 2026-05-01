@@ -157,6 +157,15 @@ func (v Version) Increment() Version {
 	return Version(uint(v) + 1)
 }
 
+// Decrement returns a new Version with the value decremented by 1.
+// Returns 0 if the current value is already 0 (prevents underflow).
+func (v Version) Decrement() Version {
+	if uint(v) == 0 {
+		return Version(0)
+	}
+	return Version(uint(v) - 1)
+}
+
 func (v Version) Serialize() uint {
 	return SerializeUint(v)
 }

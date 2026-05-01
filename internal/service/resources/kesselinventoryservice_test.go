@@ -3225,7 +3225,7 @@ func TestInventoryService_ReportResource_AllOptionalMetadataFields(t *testing.T)
 				require.NotNil(t, reps)
 				assert.Equal(t, "ws-all-optional", string(reps.CommonData()["workspace_id"].(string)))
 
-				processed, err := repo.HasTransactionIdBeenProcessed(db, txId)
+				processed, err := repo.HasTransactionIdBeenProcessed(db, model.NewTransactionId(txId))
 				require.NoError(t, err)
 				assert.True(t, processed, "transaction_id should be recorded as processed")
 			}
@@ -3742,7 +3742,7 @@ func TestInventoryService_ReportResource_TransactionIdIdempotency(t *testing.T) 
 				res1 := tr.Invoke(ctx, withBody(makeReq("https://api.example.com/v1"), ReportResource, httpEndpoint("POST /api/kessel/v1beta2/resources")))
 				Assert(t, res1, requireSuccess())
 
-				processed, err := repo.HasTransactionIdBeenProcessed(db, txId)
+				processed, err := repo.HasTransactionIdBeenProcessed(db, model.NewTransactionId(txId))
 				require.NoError(t, err)
 				assert.True(t, processed, "transaction_id should be recorded after first report")
 

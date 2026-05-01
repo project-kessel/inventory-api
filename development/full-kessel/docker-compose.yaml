@@ -324,6 +324,8 @@ services:
       - DATABASE_PORT=5432
       - PGSSLMODE=disable
       - ACCESS_CACHE_CONNECT_SIGNALS=False
+    volumes:
+      - ./configs/rbac-role-definitions:/opt/rbac/rbac/management/role/definitions:ro,z
     restart: "on-failure"
     depends_on:
       rbac-database:
@@ -419,7 +421,12 @@ services:
       - SYSTEM_DEFAULT_TENANT_ROLE_UUID=d8e9d8c6-1edf-41b8-951d-805e9e701f49
       - SYSTEM_ADMIN_ROOT_WORKSPACE_ROLE_UUID=411ef1a0-75a8-4765-8e9f-377297e8ee28
       - SYSTEM_ADMIN_TENANT_ROLE_UUID=a62b9113-593d-471b-96aa-971d6e748a9b
+      - ROOT_SCOPE_PERMISSIONS=advisor:*:*,patch:*:*,staleness:*:*
+      - TENANT_SCOPE_PERMISSIONS=rbac:*:*,subscriptions:*:*
+      - DEFAULT_SCOPE_PERMISSIONS=rbac:role_binding:*,subscriptions:reports:*,subscriptions:manifests:*,subscriptions:cloud_access:*
       - ROLE_CREATE_ALLOW_LIST=catalog,catalog_local_test,cost-management,remediations,inventory,drift,policies,advisor,approval,vulnerability,compliance,automation-analytics,notifications,patch,integrations,ros,staleness
+    volumes:
+      - ./configs/rbac-role-definitions:/opt/rbac/rbac/management/role/definitions:ro,z
     depends_on:
       rbac-migrate:
         condition: service_completed_successfully
@@ -433,21 +440,6 @@ services:
       timeout: 5s
       retries: 15
     restart: "always"
-    networks:
-      - kessel
-
-  rbac-consumer-offset-reset:
-    image: quay.io/strimzi/kafka:latest-kafka-3.8.0
-    profiles: ["rbac"]
-    command: [
-      "sh", "-c",
-      "echo 'Resetting rbac-consumer-group offset to latest...' && bin/kafka-consumer-groups.sh --bootstrap-server kafka:9093 --group rbac-consumer-group --reset-offsets --to-latest --topic outbox.event.relations-replication-event --execute 2>&1 && echo 'Offset reset complete.'"
-    ]
-    depends_on:
-      kafka:
-        condition: service_healthy
-      rbac-server:
-        condition: service_healthy
     networks:
       - kessel
 
@@ -475,8 +467,6 @@ services:
     volumes:
       - ./configs/rbac-consumer-acg.json:/acg-config.json:ro,z
     depends_on:
-      rbac-consumer-offset-reset:
-        condition: service_completed_successfully
       kafka:
         condition: service_healthy
       rbac-server:

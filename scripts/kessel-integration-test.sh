@@ -36,10 +36,13 @@ KAFKA_CONNECT="localhost:8083"
 ORG_ID="test-org-kessel-e2e"
 X_RH_IDENTITY=$(echo -n "{\"identity\":{\"account_number\":\"12345\",\"org_id\":\"${ORG_ID}\",\"type\":\"User\",\"user\":{\"user_id\":\"test-user-1\",\"email\":\"test@example.com\",\"username\":\"testuser\",\"is_org_admin\":true}}}" | base64 | tr -d '\n')
 
-# Test host UUIDs (deterministic for idempotent runs, valid UUID format)
-HOST_ID="e2e10000-0000-0000-0000-000000000001"
-INSIGHTS_ID="e2e20000-0000-0000-0000-000000000001"
-SUB_MGR_ID="e2e30000-0000-0000-0000-000000000001"
+# Test host UUIDs — unique per run to avoid tombstone conflicts on re-run.
+# DeleteResource soft-deletes (tombstone=true), and re-reporting a tombstoned
+# resource is an update that doesn't re-create the Relations API tuple.
+RUN_ID=$(uuidgen | tr -d '-' | head -c 12)
+HOST_ID="e2e10000-0000-0000-0000-${RUN_ID}"
+INSIGHTS_ID="e2e20000-0000-0000-0000-${RUN_ID}"
+SUB_MGR_ID="e2e30000-0000-0000-0000-${RUN_ID}"
 
 # ─── Step 0: Prerequisites ───────────────────────────────────────────────────
 
@@ -252,10 +255,10 @@ fi
 
 log_step "Step 6: Verify Resource-to-Workspace Tuple in Relations API"
 
-log_info "Polling Relations API for host tuples (up to 30s)..."
+log_info "Polling Relations API for host tuples (up to 60s)..."
 
 HOST_TUPLE_FOUND=false
-for ((i=1; i<=10; i++)); do
+for ((i=1; i<=20; i++)); do
   HOST_TUPLES_RESPONSE=$(grpcurl -plaintext -d '{"filter":{"resourceNamespace":"hbi","resourceType":"host"}}' \
     "${RELATIONS_GRPC}" kessel.relations.v1beta1.KesselTupleService/ReadTuples 2>&1) || true
 
@@ -284,7 +287,7 @@ if [[ "$HOST_TUPLE_FOUND" == "true" ]]; then
     echo "  Tuples: $(echo "$HOST_TUPLES_RESPONSE" | jq -s -c '.[] | select(.tuple) | {resource: .tuple.resource.id, relation: .tuple.relation, subject: .tuple.subject.subject.id}')"
   fi
 else
-  fail "No host tuples found in Relations API after 30s"
+  fail "No host tuples found in Relations API after 60s"
   echo "  The resource may have been stored without creating authorization tuples."
   echo "  Check that authz.impl=kessel in the inventory-api config."
 fi
@@ -293,22 +296,28 @@ fi
 
 log_step "Step 7: RBAC Access Check"
 
-# V2 roles requires rbac_roles_read on the tenant resource, but the local
-# compose seed only attaches permission children to the default workspace
-# platform role, not the tenant platform role. Use V1 for roles.
-ROLES_RESPONSE=$(curl -sf \
-  -H "x-rh-identity: ${X_RH_IDENTITY}" \
-  "http://${RBAC_HTTP}/api/rbac/v1/roles/?scope=org_id" 2>&1) || {
-  fail "RBAC V1 roles request failed"
-}
+log_info "Polling RBAC V2 roles (up to 60s for CDC replication)..."
 
-if [[ -n "${ROLES_RESPONSE:-}" ]]; then
-  ROLE_COUNT=$(echo "$ROLES_RESPONSE" | jq '.meta.count // 0')
-  if [[ "$ROLE_COUNT" -gt 0 ]]; then
-    pass "RBAC has ${ROLE_COUNT} roles for tenant"
-  else
-    fail "No roles found in RBAC for this tenant"
+ROLES_FOUND=false
+for ((i=1; i<=20; i++)); do
+  ROLES_RESPONSE=$(curl -sf \
+    -H "x-rh-identity: ${X_RH_IDENTITY}" \
+    "http://${RBAC_HTTP}/api/rbac/v2/roles/" 2>&1) || true
+
+  if [[ -n "${ROLES_RESPONSE:-}" ]]; then
+    ROLE_COUNT=$(echo "$ROLES_RESPONSE" | jq '.data | length')
+    if [[ "$ROLE_COUNT" -gt 0 ]]; then
+      ROLES_FOUND=true
+      break
+    fi
   fi
+  sleep 3
+done
+
+if [[ "$ROLES_FOUND" == "true" ]]; then
+  pass "RBAC V2 has ${ROLE_COUNT} roles for tenant"
+else
+  fail "No roles found via RBAC V2 after 60s"
 fi
 
 # Verify workspaces list includes both root and default (V2)

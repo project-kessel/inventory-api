@@ -5,7 +5,7 @@
 | Make Target | What It Starts | Use Case |
 |---|---|---|
 | `make kessel-up` | Full Kessel suite (all services, pre-built images) | Most common -- test the full stack |
-| `make kessel-test` | Runs integration tests against running stack | Verify all services integrate correctly |
+| `make kessel-compose-integration-test` | Runs integration tests against running stack | Verify all services integrate correctly |
 | `make kessel-up-monitoring` | Full Kessel + Prometheus/Grafana/Alertmanager | Metrics and dashboard development |
 | `make inventory-up` | Inventory API only (built from source) | Developing Inventory API code |
 | `make inventory-up-relations-ready` | Inventory API (built from source, x-rh-identity auth) | Testing with external Relations API |
@@ -15,7 +15,7 @@
 | `make inventory-up-split-relations-ready` | Infra only (relations-compatible ports) | Debugging with local binary + Relations |
 | `make monitoring-only` | Prometheus/Grafana/Alertmanager for ephemeral | Monitoring an ephemeral namespace |
 
-All setups are stopped with `make inventory-down` except Full Kessel which uses `make kessel-down`. To run the end-to-end integration test against the full Kessel stack, use `make kessel-test`.
+All setups are stopped with `make inventory-down` except Full Kessel which uses `make kessel-down`. To run the end-to-end integration test against the full Kessel stack, use `make kessel-compose-integration-test`.
 
 > NOTE: Setups that include Kafka infrastructure can take about a minute before the full Kafka stack is ready.
 
@@ -92,14 +92,14 @@ See [Monitoring Info](#monitoring-info) for URLs and login details.
 
 The full Kessel stack includes [insights-rbac](https://github.com/RedHatInsights/insights-rbac) for role-based access control testing. RBAC connects to both Relations API (gRPC) and Inventory API (gRPC) automatically. The V2 APIs are enabled by default.
 
-RBAC is available at `http://localhost:9080/api/rbac/v1/`. Metrics are served at `http://localhost:9080/metrics`.
+RBAC is available at `http://localhost:9080/api/rbac/v2/`. Metrics are served at `http://localhost:9080/metrics`.
 
 ### Integration Test
 
 Run end-to-end integration tests that exercise the full service flow: RBAC tenant bootstrap, simulated HBI host events via Kafka, Inventory Consumer processing, Relations API tuple verification, and resource deletion.
 
 ```shell
-make kessel-test
+make kessel-compose-integration-test
 ```
 
 Requires `kcat`, `grpcurl`, and `jq` to be installed locally. The script will print install instructions if any are missing.

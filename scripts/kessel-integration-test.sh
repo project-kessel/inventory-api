@@ -39,7 +39,7 @@ X_RH_IDENTITY=$(echo -n "{\"identity\":{\"account_number\":\"12345\",\"org_id\":
 # Test host UUIDs — unique per run to avoid tombstone conflicts on re-run.
 # DeleteResource soft-deletes (tombstone=true), and re-reporting a tombstoned
 # resource is an update that doesn't re-create the Relations API tuple.
-RUN_ID=$(uuidgen | tr -d '-' | head -c 12)
+RUN_ID=$(uuidgen | tr '[:upper:]' '[:lower:]' | tr -d '-' | head -c 12)
 HOST_ID="e2e10000-0000-0000-0000-${RUN_ID}"
 INSIGHTS_ID="e2e20000-0000-0000-0000-${RUN_ID}"
 SUB_MGR_ID="e2e30000-0000-0000-0000-${RUN_ID}"

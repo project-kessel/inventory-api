@@ -164,7 +164,7 @@ func TestGetWorkspaceVersions(t *testing.T) {
 		nil,
 	)
 	require.NoError(t, err)
-	prevVer := model.NewVersion(0)
+	prevVer := ver.Decrement()
 	previous, err := model.NewRepresentations(
 		model.Representation(map[string]interface{}{"workspace_id": "ws-prev"}),
 		&prevVer,

@@ -13,6 +13,16 @@ if [ -f "${ENV_FILE}" ]; then
   set +a
 fi
 
+# Check yq is installed (needed to extract RBAC role definitions from configmap YAML)
+if ! command -v yq &>/dev/null; then
+  echo "Error: yq is required but not installed."
+  echo "  Install with:"
+  echo "    go install github.com/mikefarah/yq/v4@latest"
+  echo "    brew install yq"
+  echo "    dnf install yq"
+  exit 1
+fi
+
 # Create kessel network if it doesn't exist
 NETWORK_CHECK=$(${DOCKER} network ls --filter name=kessel --format json)
 if [[ -z "${NETWORK_CHECK}" || "${NETWORK_CHECK}" == "[]" ]]; then
@@ -30,7 +40,27 @@ else
   curl -fsSL -o "${SCHEMA_DEST}" "${SCHEMA_URL}"
 fi
 
+# Fetch RBAC role definitions from stage configmap (replaces baked-in definitions
+# that include poisoned approval_* roles not in the SpiceDB schema)
+RBAC_DEFS_DIR="${COMPOSE_DIR}/configs/rbac-role-definitions"
+mkdir -p "${RBAC_DEFS_DIR}"
+rm -f "${RBAC_DEFS_DIR}"/*.json 2>/dev/null
+if [ -n "${RBAC_CONFIG_FILE}" ]; then
+  echo "Using local RBAC config: ${RBAC_CONFIG_FILE}"
+  RBAC_CONFIG_SRC="${RBAC_CONFIG_FILE}"
+else
+  RBAC_CONFIG_URL="${RBAC_CONFIG_URL:-https://raw.githubusercontent.com/RedHatInsights/rbac-config/refs/heads/master/_private/configmaps/stage/rbac-config.yml}"
+  RBAC_CONFIG_SRC=$(mktemp)
+  trap "rm -f ${RBAC_CONFIG_SRC}" EXIT
+  echo "Downloading RBAC role definitions from ${RBAC_CONFIG_URL}"
+  curl -fsSL -o "${RBAC_CONFIG_SRC}" "${RBAC_CONFIG_URL}"
+fi
+for key in $(yq '.objects[0].data | keys | .[]' "${RBAC_CONFIG_SRC}"); do
+  yq -r ".objects[0].data[\"${key}\"]" "${RBAC_CONFIG_SRC}" > "${RBAC_DEFS_DIR}/${key}"
+done
+echo "Extracted $(ls "${RBAC_DEFS_DIR}"/*.json 2>/dev/null | wc -l) RBAC role definition files"
+
 ${DOCKER} compose --env-file "${ENV_FILE}" \
-  --profile relations --profile consumer "$@" \
+  --profile relations --profile consumer --profile rbac "$@" \
   -f "${COMPOSE_DIR}/docker-compose.yaml" \
   up -d

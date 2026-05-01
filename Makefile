@@ -231,6 +231,10 @@ kessel-up:
 kessel-up-monitoring:
 	./scripts/start-full-kessel.sh --profile monitoring
 
+.PHONY: kessel-compose-integration-test
+kessel-compose-integration-test:
+	./scripts/kessel-integration-test.sh
+
 .PHONY: kessel-down
 kessel-down:
 	./scripts/stop-full-kessel.sh

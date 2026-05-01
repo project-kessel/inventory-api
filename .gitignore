@@ -53,3 +53,4 @@ scripts/kubeconfig-global-hub
 
 development/configs/monitoring/ephemeral-prometheus.yml
 development/full-kessel/configs/schema.zed
+development/full-kessel/configs/rbac-role-definitions/

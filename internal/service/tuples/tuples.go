@@ -118,21 +118,11 @@ func toCreateTuplesCommand(req *pb.CreateTuplesRequest) (tuplesctl.CreateTuplesC
 		Upsert: req.GetUpsert(),
 	}
 
-	if req.GetFencingCheck() != nil {
-		fc := req.GetFencingCheck()
-		lockId, err := model.NewLockId(fc.GetLockId())
-		if err != nil {
-			return tuplesctl.CreateTuplesCommand{}, fmt.Errorf("invalid fencing lock id: %w", err)
-		}
-		lockToken, err := model.NewLockToken(fc.GetLockToken())
-		if err != nil {
-			return tuplesctl.CreateTuplesCommand{}, fmt.Errorf("invalid fencing lock token: %w", err)
-		}
-		cmd.FencingCheck = &tuplesctl.FencingCheck{
-			LockId:    lockId,
-			LockToken: lockToken,
-		}
+	fc, err := fencingCheckFromProto(req.GetFencingCheck())
+	if err != nil {
+		return tuplesctl.CreateTuplesCommand{}, err
 	}
+	cmd.FencingCheck = fc
 
 	return cmd, nil
 }
@@ -142,21 +132,11 @@ func toDeleteTuplesCommand(req *pb.DeleteTuplesRequest) (tuplesctl.DeleteTuplesC
 		Filter: tupleFilterFromProto(req.GetFilter()),
 	}
 
-	if req.GetFencingCheck() != nil {
-		fc := req.GetFencingCheck()
-		lockId, err := model.NewLockId(fc.GetLockId())
-		if err != nil {
-			return tuplesctl.DeleteTuplesCommand{}, fmt.Errorf("invalid fencing lock id: %w", err)
-		}
-		lockToken, err := model.NewLockToken(fc.GetLockToken())
-		if err != nil {
-			return tuplesctl.DeleteTuplesCommand{}, fmt.Errorf("invalid fencing lock token: %w", err)
-		}
-		cmd.FencingCheck = &tuplesctl.FencingCheck{
-			LockId:    lockId,
-			LockToken: lockToken,
-		}
+	fc, err := fencingCheckFromProto(req.GetFencingCheck())
+	if err != nil {
+		return tuplesctl.DeleteTuplesCommand{}, err
 	}
+	cmd.FencingCheck = fc
 
 	return cmd, nil
 }
@@ -178,6 +158,24 @@ func toAcquireLockCommand(req *pb.AcquireLockRequest) (tuplesctl.AcquireLockComm
 }
 
 // --- proto → domain helpers ---
+
+func fencingCheckFromProto(fc *pb.RelationFencingCheck) (*tuplesctl.FencingCheck, error) {
+	if fc == nil {
+		return nil, nil
+	}
+	lockId, err := model.NewLockId(fc.GetLockId())
+	if err != nil {
+		return nil, fmt.Errorf("invalid fencing lock id: %w", err)
+	}
+	lockToken, err := model.NewLockToken(fc.GetLockToken())
+	if err != nil {
+		return nil, fmt.Errorf("invalid fencing lock token: %w", err)
+	}
+	return &tuplesctl.FencingCheck{
+		LockId:    lockId,
+		LockToken: lockToken,
+	}, nil
+}
 
 func relationshipsToRelationsTuples(rels []*pb.Relationship) ([]model.RelationsTuple, error) {
 	tuples := make([]model.RelationsTuple, len(rels))

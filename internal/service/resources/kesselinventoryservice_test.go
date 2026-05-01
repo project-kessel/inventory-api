@@ -477,7 +477,7 @@ func TestToLookupObjectsResponse(t *testing.T) {
 			model.DeserializeLocalResourceId("abc123"),
 			&rep,
 		),
-		"next-page-token",
+		model.DeserializeContinuationToken("next-page-token"),
 	)
 
 	expected := &pb.StreamedListObjectsResponse{
@@ -3963,31 +3963,40 @@ func newFakeSchemaRepository(t *testing.T) model.SchemaRepository {
 		}
 	}`)
 
-	err := schemaRepository.CreateResourceSchema(context.Background(), model.ResourceSchema{
-		ResourceType:     "k8s_cluster",
-		ValidationSchema: withWorkspaceValidationSchema,
-	})
-	assert.NoError(t, err)
-
-	err = schemaRepository.CreateReporterSchema(context.Background(), model.ReporterSchema{
-		ResourceType:     "k8s_cluster",
-		ReporterType:     "ocm",
-		ValidationSchema: emptyValidationSchema,
-	})
-	assert.NoError(t, err)
+	k8sCluster, err := model.NewResourceType("k8s_cluster")
+	require.NoError(t, err)
+	host, err := model.NewResourceType("host")
+	require.NoError(t, err)
+	ocm, err := model.NewReporterType("ocm")
+	require.NoError(t, err)
+	hbi, err := model.NewReporterType("hbi")
+	require.NoError(t, err)
 
 	err = schemaRepository.CreateResourceSchema(context.Background(), model.ResourceSchema{
-		ResourceType:     "host",
+		ResourceType:     k8sCluster,
 		ValidationSchema: withWorkspaceValidationSchema,
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	err = schemaRepository.CreateReporterSchema(context.Background(), model.ReporterSchema{
-		ResourceType:     "host",
-		ReporterType:     "hbi",
+		ResourceType:     k8sCluster,
+		ReporterType:     ocm,
 		ValidationSchema: emptyValidationSchema,
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
+
+	err = schemaRepository.CreateResourceSchema(context.Background(), model.ResourceSchema{
+		ResourceType:     host,
+		ValidationSchema: withWorkspaceValidationSchema,
+	})
+	require.NoError(t, err)
+
+	err = schemaRepository.CreateReporterSchema(context.Background(), model.ReporterSchema{
+		ResourceType:     host,
+		ReporterType:     hbi,
+		ValidationSchema: emptyValidationSchema,
+	})
+	require.NoError(t, err)
 
 	return schemaRepository
 }

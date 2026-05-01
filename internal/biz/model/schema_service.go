@@ -52,7 +52,7 @@ func (sc *SchemaService) CalculateTuples(currentRepresentation, previousRepresen
 }
 
 // IsReporterForResource validates the resourceType and reporterType combination is valid. i.e. that there is a reporter that reports said resource.
-func (sc *SchemaService) IsReporterForResource(ctx context.Context, resourceType string, reporterType string) (bool, error) {
+func (sc *SchemaService) IsReporterForResource(ctx context.Context, resourceType ResourceType, reporterType ReporterType) (bool, error) {
 	if _, err := sc.schemaRepository.GetReporterSchema(ctx, resourceType, reporterType); err != nil {
 		if errors.Is(err, ResourceSchemaNotFound) || errors.Is(err, ReporterSchemaNotFound) {
 			return false, nil
@@ -65,14 +65,14 @@ func (sc *SchemaService) IsReporterForResource(ctx context.Context, resourceType
 }
 
 // CommonShallowValidate validates the common representation for a given resourceType.
-func (sc *SchemaService) CommonShallowValidate(ctx context.Context, resourceType string, commonRepresentation map[string]interface{}) error {
+func (sc *SchemaService) CommonShallowValidate(ctx context.Context, resourceType ResourceType, commonRepresentation map[string]interface{}) error {
 	resource, err := sc.schemaRepository.GetResourceSchema(ctx, resourceType)
 	if err != nil {
-		return fmt.Errorf("failed to load common representation schema for '%s': %w", resourceType, err)
+		return fmt.Errorf("failed to load common representation schema for '%s': %w", resourceType.String(), err)
 	}
 
 	if resource.ValidationSchema == nil {
-		return fmt.Errorf("no schema found for '%s'", resourceType)
+		return fmt.Errorf("no schema found for '%s'", resourceType.String())
 	}
 
 	hasCommonRepresentationData := len(commonRepresentation) > 0
@@ -85,14 +85,14 @@ func (sc *SchemaService) CommonShallowValidate(ctx context.Context, resourceType
 		if hasCommonRepresentationData {
 			return err
 		}
-		return fmt.Errorf("missing 'common' field in payload - schema for '%s' has required fields: %w", resourceType, err)
+		return fmt.Errorf("missing 'common' field in payload - schema for '%s' has required fields: %w", resourceType.String(), err)
 	}
 
 	return nil
 }
 
 // ReporterShallowValidate validates the specific reporter representation for a given resourceType/reporterType.
-func (sc *SchemaService) ReporterShallowValidate(ctx context.Context, resourceType string, reporterType string, reporterRepresentation map[string]interface{}) error {
+func (sc *SchemaService) ReporterShallowValidate(ctx context.Context, resourceType ResourceType, reporterType ReporterType, reporterRepresentation map[string]interface{}) error {
 	reporter, err := sc.schemaRepository.GetReporterSchema(ctx, resourceType, reporterType)
 	if err != nil {
 		return err
@@ -101,9 +101,9 @@ func (sc *SchemaService) ReporterShallowValidate(ctx context.Context, resourceTy
 	// Case 1: No schema found for resourceType:reporterType
 	if reporter.ValidationSchema == nil {
 		if len(reporterRepresentation) > 0 {
-			return fmt.Errorf("no schema found for '%s:%s', but reporter representation was provided. Submission is not allowed", resourceType, reporterType)
+			return fmt.Errorf("no schema found for '%s:%s', but reporter representation was provided. Submission is not allowed", resourceType.String(), reporterType.String())
 		}
-		sc.Log.Debugf("no schema found for %s:%s, treating as abstract reporter representation", resourceType, reporterType)
+		sc.Log.Debugf("no schema found for %s:%s, treating as abstract reporter representation", resourceType.String(), reporterType.String())
 		return nil
 	}
 
@@ -119,7 +119,7 @@ func (sc *SchemaService) ReporterShallowValidate(ctx context.Context, resourceTy
 		}
 
 		// If schema has validation errors but reporterRepresentation is nil/empty, that's an error
-		return fmt.Errorf("missing 'reporter' field in payload - schema for '%s:%s' has required fields: %w", resourceType, reporterType, err)
+		return fmt.Errorf("missing 'reporter' field in payload - schema for '%s:%s' has required fields: %w", resourceType.String(), reporterType.String(), err)
 	}
 
 	return nil

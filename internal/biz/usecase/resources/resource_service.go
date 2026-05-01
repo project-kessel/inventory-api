@@ -588,33 +588,23 @@ func (uc *Usecase) enforceMetaAuthzObject(ctx context.Context, relation metaauth
 // It checks that the reporter is allowed for the resource type,
 // and validates both reporter and common representations.
 func (uc *Usecase) validateReportResourceCommand(ctx context.Context, cmd ReportResourceCommand) error {
-	resourceType := cmd.ResourceType.String()
-	reporterType := cmd.ReporterType.String()
-
-	if resourceType == "" {
-		return fmt.Errorf("missing 'type' field")
-	}
-	if reporterType == "" {
-		return fmt.Errorf("missing 'reporterType' field")
-	}
-
-	if isReporter, err := uc.schemaService.IsReporterForResource(ctx, resourceType, reporterType); !isReporter {
+	if isReporter, err := uc.schemaService.IsReporterForResource(ctx, cmd.ResourceType, cmd.ReporterType); !isReporter {
 		if err != nil {
 			return err
 		}
-		return fmt.Errorf("reporter %s does not report resource types: %s", reporterType, resourceType)
+		return fmt.Errorf("reporter %s does not report resource types: %s", cmd.ReporterType.String(), cmd.ResourceType.String())
 	}
 
 	if cmd.ReporterRepresentation != nil {
 		sanitizedReporterRepresentation := removeNulls(map[string]interface{}(*cmd.ReporterRepresentation))
-		if err := uc.schemaService.ReporterShallowValidate(ctx, resourceType, reporterType, sanitizedReporterRepresentation); err != nil {
+		if err := uc.schemaService.ReporterShallowValidate(ctx, cmd.ResourceType, cmd.ReporterType, sanitizedReporterRepresentation); err != nil {
 			return err
 		}
 	}
 
 	if cmd.CommonRepresentation != nil {
 		commonRepresentation := map[string]interface{}(*cmd.CommonRepresentation)
-		if err := uc.schemaService.CommonShallowValidate(ctx, resourceType, commonRepresentation); err != nil {
+		if err := uc.schemaService.CommonShallowValidate(ctx, cmd.ResourceType, commonRepresentation); err != nil {
 			return err
 		}
 	}

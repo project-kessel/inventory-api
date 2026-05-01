@@ -113,8 +113,8 @@ func assertTupleEventFromDomainEvent(t *testing.T, resourceEvent bizmodel.Resour
 	assert.Nil(t, err)
 
 	key := tupleEvent.ReporterResourceKey()
-	assert.Equal(t, resourceEvent.ResourceType(), key.ResourceType().String())
-	assert.Equal(t, resourceEvent.ReporterType(), key.ReporterType().String())
+	assert.Equal(t, resourceEvent.ResourceType(), key.ResourceType())
+	assert.Equal(t, resourceEvent.ReporterType(), key.ReporterType())
 	assert.Equal(t, resourceEvent.ReporterInstanceId(), key.ReporterInstanceId().String())
 	assert.Equal(t, resourceEvent.LocalResourceId(), key.LocalResourceId().String())
 
@@ -146,10 +146,10 @@ func assertResourceEventFromDomainEvent(t *testing.T, operation bizmodel.EventOp
 	var data EventResourceData
 	err = json.Unmarshal(dataBytes, &data)
 	assert.Nil(t, err)
-	assert.Equal(t, resourceEvent.ResourceType(), data.Metadata.ResourceType)
+	assert.Equal(t, resourceEvent.ResourceType().String(), data.Metadata.ResourceType)
 	assert.Equal(t, resourceEvent.WorkspaceId(), data.Metadata.WorkspaceId)
 	assert.Equal(t, resourceEvent.ReporterInstanceId(), data.ReporterData.ReporterInstanceId)
-	assert.Equal(t, resourceEvent.ReporterType(), data.ReporterData.ReporterType)
+	assert.Equal(t, resourceEvent.ReporterType().String(), data.ReporterData.ReporterType)
 	assert.Equal(t, bizmodel.SerializeStringPtr(resourceEvent.ConsoleHref()), data.ReporterData.ConsoleHref)
 	assert.Equal(t, resourceEvent.ApiHref(), data.ReporterData.ApiHref)
 	assert.Equal(t, resourceEvent.LocalResourceId(), data.ReporterData.LocalResourceId)

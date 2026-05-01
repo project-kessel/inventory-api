@@ -302,10 +302,12 @@ func paginationFromProto(p *pb.RequestPagination) *model.Pagination {
 	if p == nil {
 		return nil
 	}
-	return &model.Pagination{
-		Limit:        p.Limit,
-		Continuation: p.ContinuationToken,
+	pagination := &model.Pagination{Limit: p.Limit}
+	if p.ContinuationToken != nil {
+		ct, _ := model.NewContinuationToken(*p.ContinuationToken)
+		pagination.Continuation = &ct
 	}
+	return pagination
 }
 
 // checkBulkResultItemToProtoFields derives the proto Allowed enum and, if the result carries an
@@ -574,7 +576,7 @@ func ToLookupObjectsResponse(item model.LookupObjectsItem) *pb.StreamedListObjec
 			ResourceType: obj.ResourceType().String(),
 		},
 		Pagination: &pb.ResponsePagination{
-			ContinuationToken: item.ContinuationToken(),
+			ContinuationToken: item.ContinuationToken().String(),
 		},
 	}
 	if obj.HasReporter() {
@@ -646,7 +648,7 @@ func ToLookupSubjectsResponse(item model.LookupSubjectsItem) *pb.StreamedListSub
 	return &pb.StreamedListSubjectsResponse{
 		Subject: subRef,
 		Pagination: &pb.ResponsePagination{
-			ContinuationToken: item.ContinuationToken(),
+			ContinuationToken: item.ContinuationToken().String(),
 		},
 	}
 }

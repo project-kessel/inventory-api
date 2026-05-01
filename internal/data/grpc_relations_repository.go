@@ -445,7 +445,8 @@ func paginationToV1Beta1(pagination *model.Pagination) *kesselapi.RequestPaginat
 		Limit: pagination.Limit,
 	}
 	if pagination.Continuation != nil {
-		result.ContinuationToken = pagination.Continuation
+		s := pagination.Continuation.String()
+		result.ContinuationToken = &s
 	}
 	return result
 }
@@ -566,7 +567,7 @@ func (s *lookupObjectsStream) Recv() (model.LookupObjectsItem, error) {
 		model.DeserializeLocalResourceId(resp.GetResource().GetId()),
 		&reporter,
 	)
-	return model.NewLookupObjectsItem(object, resp.GetPagination().GetContinuationToken()), nil
+	return model.NewLookupObjectsItem(object, model.DeserializeContinuationToken(resp.GetPagination().GetContinuationToken())), nil
 }
 
 type lookupSubjectsStream struct {
@@ -597,7 +598,7 @@ func (s *lookupSubjectsStream) Recv() (model.LookupSubjectsItem, error) {
 		subjectRef = model.NewSubjectReferenceWithoutRelation(subResource)
 	}
 
-	return model.NewLookupSubjectsItem(subjectRef, resp.GetPagination().GetContinuationToken()), nil
+	return model.NewLookupSubjectsItem(subjectRef, model.DeserializeContinuationToken(resp.GetPagination().GetContinuationToken())), nil
 }
 
 type emptyLookupObjectsStream struct{}
@@ -655,7 +656,7 @@ func (s *readTuplesStream) Recv() (model.ReadTuplesItem, error) {
 		object,
 		model.DeserializeRelation(tuple.GetRelation()),
 		subjectRef,
-		resp.GetPagination().GetContinuationToken(),
+		model.DeserializeContinuationToken(resp.GetPagination().GetContinuationToken()),
 		consistencyToken,
 	), nil
 }

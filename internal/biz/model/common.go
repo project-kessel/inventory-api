@@ -99,6 +99,25 @@ func DeserializeConsistencyToken(value string) ConsistencyToken {
 	return Deserialize[ConsistencyToken](value)
 }
 
+// ContinuationToken is an opaque pagination cursor from clients or authz backends.
+type ContinuationToken string
+
+func NewContinuationToken(token string) (ContinuationToken, error) {
+	return ContinuationToken(token), nil
+}
+
+func (ct ContinuationToken) String() string {
+	return string(ct)
+}
+
+func (ct ContinuationToken) Serialize() string {
+	return SerializeString(ct)
+}
+
+func DeserializeContinuationToken(value string) ContinuationToken {
+	return Deserialize[ContinuationToken](value)
+}
+
 func DeserializeGeneration(value uint) Generation {
 	return DeserializeUint[Generation](value)
 }

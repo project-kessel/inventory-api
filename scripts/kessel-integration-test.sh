@@ -34,7 +34,7 @@ KAFKA_CONNECT="localhost:8083"
 
 # Test identity
 ORG_ID="test-org-kessel-e2e"
-X_RH_IDENTITY=$(echo -n "{\"identity\":{\"account_number\":\"12345\",\"org_id\":\"${ORG_ID}\",\"type\":\"User\",\"user\":{\"user_id\":\"test-user-1\",\"email\":\"test@example.com\",\"username\":\"testuser\",\"is_org_admin\":true}}}" | base64 -w0)
+X_RH_IDENTITY=$(echo -n "{\"identity\":{\"account_number\":\"12345\",\"org_id\":\"${ORG_ID}\",\"type\":\"User\",\"user\":{\"user_id\":\"test-user-1\",\"email\":\"test@example.com\",\"username\":\"testuser\",\"is_org_admin\":true}}}" | base64 | tr -d '\n')
 
 # Test host UUIDs (deterministic for idempotent runs, valid UUID format)
 HOST_ID="e2e10000-0000-0000-0000-000000000001"
@@ -171,11 +171,11 @@ if [[ "$WS_TUPLES_FOUND" == "true" ]]; then
   pass "Found ${TUPLE_COUNT} workspace tuples in Relations API"
 
   # Verify the default workspace has a parent tuple (default → root)
-  if [[ -n "$DEFAULT_WORKSPACE_ID" ]]; then
-    DEFAULT_WS_TUPLE=$(echo "$TUPLES_RESPONSE" | jq -s --arg wsid "$DEFAULT_WORKSPACE_ID" \
-      '[.[] | select(.tuple.resource.id == $wsid)] | length')
+  if [[ -n "$DEFAULT_WORKSPACE_ID" && -n "$ROOT_WORKSPACE_ID" ]]; then
+    DEFAULT_WS_TUPLE=$(echo "$TUPLES_RESPONSE" | jq -s --arg wsid "$DEFAULT_WORKSPACE_ID" --arg root "$ROOT_WORKSPACE_ID" \
+      '[.[] | select(.tuple.resource.id == $wsid and .tuple.subject.subject.id == $root)] | length')
     if [[ "$DEFAULT_WS_TUPLE" -gt 0 ]]; then
-      pass "Default workspace has parent relationship in hierarchy"
+      pass "Default workspace has parent relationship to root workspace"
     else
       log_warn "Default workspace parent tuple not found (may take a moment to replicate)"
     fi

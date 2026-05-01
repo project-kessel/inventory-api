@@ -181,7 +181,7 @@ services:
         condition: service_healthy
     command: [
       "/bin/sh", "-c",
-      "curl -sf -d @/debezium-connector.json -H 'Content-Type: application/json' -X POST http://kafka-connect:8083/connectors || curl -sf -X GET http://kafka-connect:8083/connectors/debezium-connector && curl -sf -d @/rbac-debezium-connector.json -H 'Content-Type: application/json' -X POST http://kafka-connect:8083/connectors || curl -sf -X GET http://kafka-connect:8083/connectors/rbac-outbox-connector"
+      "(curl -sf -d @/debezium-connector.json -H 'Content-Type: application/json' -X POST http://kafka-connect:8083/connectors || curl -sf -X GET http://kafka-connect:8083/connectors/debezium-connector) && (curl -sf -d @/rbac-debezium-connector.json -H 'Content-Type: application/json' -X POST http://kafka-connect:8083/connectors || curl -sf -X GET http://kafka-connect:8083/connectors/rbac-outbox-connector)"
     ]
     volumes:
       - ../configs/debezium-connector.json:/debezium-connector.json:ro,z
@@ -428,7 +428,7 @@ services:
       rbac-scheduler:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "curl -q http://localhost:8080/metrics"]
+      test: ["CMD-SHELL", "curl -f -sS http://localhost:8080/metrics || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 15
@@ -441,7 +441,7 @@ services:
     profiles: ["rbac"]
     command: [
       "sh", "-c",
-      "echo 'Resetting rbac-consumer-group offset to latest...' && bin/kafka-consumer-groups.sh --bootstrap-server kafka:9093 --group rbac-consumer-group --reset-offsets --to-latest --topic outbox.event.relations-replication-event --execute 2>&1 || true && echo 'Offset reset complete.'"
+      "echo 'Resetting rbac-consumer-group offset to latest...' && bin/kafka-consumer-groups.sh --bootstrap-server kafka:9093 --group rbac-consumer-group --reset-offsets --to-latest --topic outbox.event.relations-replication-event --execute 2>&1 && echo 'Offset reset complete.'"
     ]
     depends_on:
       kafka:

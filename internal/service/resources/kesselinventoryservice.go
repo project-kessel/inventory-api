@@ -302,12 +302,12 @@ func paginationFromProto(p *pb.RequestPagination) *model.Pagination {
 	if p == nil {
 		return nil
 	}
-	out := &model.Pagination{Limit: p.Limit}
+	pagination := &model.Pagination{Limit: p.Limit}
 	if p.ContinuationToken != nil {
 		ct, _ := model.NewContinuationToken(*p.ContinuationToken)
-		out.Continuation = &ct
+		pagination.Continuation = &ct
 	}
-	return out
+	return pagination
 }
 
 // checkBulkResultItemToProtoFields derives the proto Allowed enum and, if the result carries an

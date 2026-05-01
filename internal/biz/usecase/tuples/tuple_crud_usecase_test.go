@@ -267,7 +267,7 @@ func TestAcquireLock_Success(t *testing.T) {
 	uc := New(&data.AllowAllRelationsRepository{}, meta, log.DefaultLogger)
 
 	cmd := AcquireLockCommand{
-		LockId: "lock-123",
+		LockId: model.DeserializeLockId("lock-123"),
 	}
 
 	result, err := uc.AcquireLock(ctx, cmd)
@@ -283,7 +283,7 @@ func TestAcquireLock_UsesAcquireLockRelation(t *testing.T) {
 	uc := New(&data.AllowAllRelationsRepository{}, meta, log.DefaultLogger)
 
 	cmd := AcquireLockCommand{
-		LockId: "lock-123",
+		LockId: model.DeserializeLockId("lock-123"),
 	}
 
 	_, _ = uc.AcquireLock(ctx, cmd)
@@ -298,7 +298,7 @@ func TestAcquireLock_MetaAuthzDenied(t *testing.T) {
 	uc := New(&data.AllowAllRelationsRepository{}, meta, log.DefaultLogger)
 
 	cmd := AcquireLockCommand{
-		LockId: "lock-123",
+		LockId: model.DeserializeLockId("lock-123"),
 	}
 
 	_, err := uc.AcquireLock(ctx, cmd)
@@ -312,7 +312,7 @@ func TestAcquireLock_MetaAuthzContextMissing(t *testing.T) {
 	uc := New(&data.AllowAllRelationsRepository{}, meta, log.DefaultLogger)
 
 	cmd := AcquireLockCommand{
-		LockId: "lock-123",
+		LockId: model.DeserializeLockId("lock-123"),
 	}
 
 	_, err := uc.AcquireLock(context.Background(), cmd)
@@ -528,7 +528,7 @@ func TestWhitelistMetaAuthorizer_Integration_AllOperations(t *testing.T) {
 	})
 
 	t.Run("AcquireLock", func(t *testing.T) {
-		cmd := AcquireLockCommand{LockId: "lock-123"}
+		cmd := AcquireLockCommand{LockId: model.DeserializeLockId("lock-123")}
 		_, err := uc.AcquireLock(ctx, cmd)
 		require.NoError(t, err)
 	})

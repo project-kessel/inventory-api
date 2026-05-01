@@ -264,17 +264,6 @@ func (rt ResourceType) Serialize() string {
 	return strings.ToLower(str)
 }
 
-// SchemaRepositoryKey returns the canonical key used for schema repository storage and lookups
-// (lowercase; forward slashes replaced with underscores). This matches historical path and cache normalization.
-func (rt ResourceType) SchemaRepositoryKey() string {
-	s := strings.TrimSpace(rt.String())
-	if s == "" {
-		return ""
-	}
-	s = strings.ReplaceAll(s, "/", "_")
-	return strings.ToLower(s)
-}
-
 type ReporterType string
 
 func NewReporterType(reporterType string) (ReporterType, error) {

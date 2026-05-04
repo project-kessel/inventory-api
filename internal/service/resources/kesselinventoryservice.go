@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 
-
 	"github.com/go-kratos/kratos/v2/log"
 	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
@@ -562,7 +561,6 @@ func ToLookupObjectsCommand(request *pb.StreamedListObjectsRequest) (resources.L
 		Consistency: consistencyFromProto(request.GetConsistency()),
 	}, nil
 }
-
 
 func ToLookupObjectsResponse(item model.LookupObjectsItem) *pb.StreamedListObjectsResponse {
 	obj := item.Object()

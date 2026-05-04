@@ -348,7 +348,6 @@ func loadCommonResourceDataSchema(resourceType bizmodel.ResourceType, baseSchema
 	return string(data), nil
 }
 
-
 func findResourceTypeFromJsonKey(jsonKey string, resourceTypes []bizmodel.ResourceType) (bizmodel.ResourceType, bool) {
 	for _, rt := range resourceTypes {
 		if strings.HasPrefix(jsonKey, rt.String()+":") {

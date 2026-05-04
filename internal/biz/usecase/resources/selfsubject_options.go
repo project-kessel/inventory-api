@@ -99,5 +99,9 @@ func (o *SelfSubjectOptions) Build() SelfSubjectStrategy {
 		return nil
 	}
 
-	return NewRedHatRbacSelfSubjectStrategy(o.RedHatRbac)
+	return NewRedHatRbacSelfSubjectStrategy(RedHatRbacSelfSubjectStrategyConfig{
+		Enabled:             o.RedHatRbac.Enabled,
+		XRhIdentityDomain:   o.RedHatRbac.XRhIdentityDomain,
+		OIDCIssuerDomainMap: o.RedHatRbac.OIDCIssuerDomainMap,
+	})
 }

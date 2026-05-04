@@ -8,7 +8,7 @@ import (
 )
 
 func TestRedHatRbacSelfSubjectStrategy_XRhIdentity_User(t *testing.T) {
-	strategy := NewRedHatRbacSelfSubjectStrategy(&RedHatRbacOptions{
+	strategy := NewRedHatRbacSelfSubjectStrategy(RedHatRbacSelfSubjectStrategyConfig{
 		Enabled:           true,
 		XRhIdentityDomain: "redhat",
 	})
@@ -26,7 +26,7 @@ func TestRedHatRbacSelfSubjectStrategy_XRhIdentity_User(t *testing.T) {
 }
 
 func TestRedHatRbacSelfSubjectStrategy_OIDC_IssuerMap(t *testing.T) {
-	strategy := NewRedHatRbacSelfSubjectStrategy(&RedHatRbacOptions{
+	strategy := NewRedHatRbacSelfSubjectStrategy(RedHatRbacSelfSubjectStrategyConfig{
 		Enabled: true,
 		OIDCIssuerDomainMap: map[string]string{
 			"https://sso.redhat.com/auth/realms/redhat-external": "redhat",
@@ -45,7 +45,7 @@ func TestRedHatRbacSelfSubjectStrategy_OIDC_IssuerMap(t *testing.T) {
 }
 
 func TestRedHatRbacSelfSubjectStrategy_OIDC_Issuer_IsExact(t *testing.T) {
-	strategy := NewRedHatRbacSelfSubjectStrategy(&RedHatRbacOptions{
+	strategy := NewRedHatRbacSelfSubjectStrategy(RedHatRbacSelfSubjectStrategyConfig{
 		Enabled: true,
 		OIDCIssuerDomainMap: map[string]string{
 			"sso.redhat.com": "redhat",
@@ -63,7 +63,7 @@ func TestRedHatRbacSelfSubjectStrategy_OIDC_Issuer_IsExact(t *testing.T) {
 }
 
 func TestRedHatRbacSelfSubjectStrategy_OIDC_NormalizedHostNotSupported(t *testing.T) {
-	strategy := NewRedHatRbacSelfSubjectStrategy(&RedHatRbacOptions{
+	strategy := NewRedHatRbacSelfSubjectStrategy(RedHatRbacSelfSubjectStrategyConfig{
 		Enabled: true,
 		OIDCIssuerDomainMap: map[string]string{
 			"sso-redhat-com": "redhat",
@@ -82,7 +82,7 @@ func TestRedHatRbacSelfSubjectStrategy_OIDC_NormalizedHostNotSupported(t *testin
 }
 
 func TestRedHatRbacSelfSubjectStrategy_OIDC_MissingIssuer(t *testing.T) {
-	strategy := NewRedHatRbacSelfSubjectStrategy(&RedHatRbacOptions{
+	strategy := NewRedHatRbacSelfSubjectStrategy(RedHatRbacSelfSubjectStrategyConfig{
 		Enabled: true,
 	})
 

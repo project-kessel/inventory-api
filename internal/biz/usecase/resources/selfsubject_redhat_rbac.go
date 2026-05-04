@@ -16,7 +16,7 @@ type RedHatRbacSelfSubjectStrategy struct {
 }
 
 // NewRedHatRbacSelfSubjectStrategy constructs the strategy from config.
-func NewRedHatRbacSelfSubjectStrategy(cfg *RedHatRbacOptions) *RedHatRbacSelfSubjectStrategy {
+func NewRedHatRbacSelfSubjectStrategy(cfg RedHatRbacSelfSubjectStrategyConfig) *RedHatRbacSelfSubjectStrategy {
 	return &RedHatRbacSelfSubjectStrategy{
 		enabled:           cfg.Enabled,
 		xRhIdentityDomain: cfg.XRhIdentityDomain,

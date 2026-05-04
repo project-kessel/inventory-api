@@ -458,28 +458,37 @@ func newFakeSchemaRepository(t *testing.T) model.SchemaRepository {
 		"required": ["workspace_id"]
 	}`)
 
-	err := schemaRepository.CreateResourceSchema(context.Background(), model.ResourceSchema{
-		ResourceType:     "k8s_cluster",
+	k8sCluster, err := model.NewResourceType("k8s_cluster")
+	require.NoError(t, err)
+	host, err := model.NewResourceType("host")
+	require.NoError(t, err)
+	ocm, err := model.NewReporterType("ocm")
+	require.NoError(t, err)
+	hbi, err := model.NewReporterType("hbi")
+	require.NoError(t, err)
+
+	err = schemaRepository.CreateResourceSchema(context.Background(), model.ResourceSchema{
+		ResourceType:     k8sCluster,
 		ValidationSchema: withWorkspaceValidationSchema,
 	})
 	assert.NoError(t, err)
 
 	err = schemaRepository.CreateReporterSchema(context.Background(), model.ReporterSchema{
-		ResourceType:     "k8s_cluster",
-		ReporterType:     "ocm",
+		ResourceType:     k8sCluster,
+		ReporterType:     ocm,
 		ValidationSchema: emptyValidationSchema,
 	})
 	assert.NoError(t, err)
 
 	err = schemaRepository.CreateResourceSchema(context.Background(), model.ResourceSchema{
-		ResourceType:     "host",
+		ResourceType:     host,
 		ValidationSchema: withWorkspaceValidationSchema,
 	})
 	assert.NoError(t, err)
 
 	err = schemaRepository.CreateReporterSchema(context.Background(), model.ReporterSchema{
-		ResourceType:     "host",
-		ReporterType:     "hbi",
+		ResourceType:     host,
+		ReporterType:     hbi,
 		ValidationSchema: emptyValidationSchema,
 	})
 	assert.NoError(t, err)
@@ -1297,24 +1306,6 @@ func TestReportResource_ValidationErrors(t *testing.T) {
 		expectError string
 	}{
 		{
-			name: "missing type",
-			cmd: func() ReportResourceCommand {
-				cmd := fixture(t).Basic("host", "hbi", "instance-1", "test-host", "ws-123")
-				cmd.ResourceType = ""
-				return cmd
-			}(),
-			expectError: "missing 'type' field",
-		},
-		{
-			name: "missing reporterType",
-			cmd: func() ReportResourceCommand {
-				cmd := fixture(t).Basic("host", "hbi", "instance-1", "test-host", "ws-123")
-				cmd.ReporterType = ""
-				return cmd
-			}(),
-			expectError: "missing 'reporterType' field",
-		},
-		{
 			name:        "reporter type not allowed for resource type",
 			cmd:         fixture(t).Basic("host", "unknown_reporter", "instance-1", "test-host", "ws-123"),
 			expectError: "reporter unknown_reporter does not report resource types: host",
@@ -1484,15 +1475,20 @@ func TestReportResource_SchemaValidation(t *testing.T) {
 			ctx := testAuthzContext()
 			schemaRepository := data.NewInMemorySchemaRepository()
 
-			err := schemaRepository.CreateResourceSchema(context.Background(), model.ResourceSchema{
-				ResourceType:     tc.resourceType,
+			rt, err := model.NewResourceType(tc.resourceType)
+			require.NoError(t, err)
+			rpt, err := model.NewReporterType(tc.reporterType)
+			require.NoError(t, err)
+
+			err = schemaRepository.CreateResourceSchema(context.Background(), model.ResourceSchema{
+				ResourceType:     rt,
 				ValidationSchema: model.NewJsonSchemaValidatorFromString(tc.commonSchema),
 			})
 			require.NoError(t, err)
 
 			err = schemaRepository.CreateReporterSchema(context.Background(), model.ReporterSchema{
-				ResourceType:     tc.resourceType,
-				ReporterType:     tc.reporterType,
+				ResourceType:     rt,
+				ReporterType:     rpt,
 				ValidationSchema: model.NewJsonSchemaValidatorFromString(tc.reporterSchema),
 			})
 			require.NoError(t, err)
@@ -1565,24 +1561,6 @@ func TestReportResource_ValidationErrorFormat(t *testing.T) {
 		cmd            ReportResourceCommand
 		expectErrorMsg string
 	}{
-		{
-			name: "missing type field",
-			cmd: func() ReportResourceCommand {
-				cmd := fixture(t).Basic("host", "hbi", "instance-1", "test-host", "ws-123")
-				cmd.ResourceType = ""
-				return cmd
-			}(),
-			expectErrorMsg: "failed validation for report resource: missing 'type' field",
-		},
-		{
-			name: "missing reporterType field",
-			cmd: func() ReportResourceCommand {
-				cmd := fixture(t).Basic("host", "hbi", "instance-1", "test-host", "ws-123")
-				cmd.ReporterType = ""
-				return cmd
-			}(),
-			expectErrorMsg: "failed validation for report resource: missing 'reporterType' field",
-		},
 		{
 			name:           "unknown reporter for resource type",
 			cmd:            fixture(t).Basic("host", "unknown_reporter", "instance-1", "test-host", "ws-123"),

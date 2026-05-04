@@ -2,8 +2,8 @@ package model
 
 type ResourceEvent interface {
 	Id() ResourceId
-	ResourceType() string
-	ReporterType() string
+	ResourceType() ResourceType
+	ReporterType() ReporterType
 	ReporterInstanceId() string
 	LocalResourceId() string
 	WorkspaceId() *string

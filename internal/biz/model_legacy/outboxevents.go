@@ -132,16 +132,16 @@ func newResourceEvent(operationType bizmodel.EventOperationType, resourceEvent *
 
 	return &ResourceEvent{
 		Specversion:     "1.0",
-		Type:            makeEventType(eventType, resourceEvent.ResourceType(), string(operationType.OperationType())),
+		Type:            makeEventType(eventType, resourceEvent.ResourceType().String(), string(operationType.OperationType())),
 		Source:          "", // TODO: inventory uri
 		Id:              eventId.String(),
-		Subject:         makeEventSubject(eventType, resourceEvent.ResourceType(), resourceEvent.Id().String()),
+		Subject:         makeEventSubject(eventType, resourceEvent.ResourceType().String(), resourceEvent.Id().String()),
 		Time:            reportedTime,
 		DataContentType: "application/json",
 		Data: EventResourceData{
 			Metadata: EventResourceMetadata{
 				Id:           resourceEvent.Id().String(),
-				ResourceType: resourceEvent.ResourceType(),
+				ResourceType: resourceEvent.ResourceType().String(),
 				CreatedAt:    createdAt,
 				UpdatedAt:    updatedAt,
 				DeletedAt:    deletedAt,
@@ -149,7 +149,7 @@ func newResourceEvent(operationType bizmodel.EventOperationType, resourceEvent *
 			},
 			ReporterData: EventResourceReporter{
 				ReporterInstanceId: resourceEvent.ReporterInstanceId(),
-				ReporterType:       resourceEvent.ReporterType(),
+				ReporterType:       resourceEvent.ReporterType().String(),
 				ConsoleHref:        bizmodel.SerializeStringPtr(resourceEvent.ConsoleHref()),
 				ApiHref:            resourceEvent.ApiHref(),
 				LocalResourceId:    resourceEvent.LocalResourceId(),

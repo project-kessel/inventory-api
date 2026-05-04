@@ -58,12 +58,12 @@ func (re ResourceReportEvent) UpdatedAt() *time.Time {
 	return &re.updatedAt
 }
 
-func (re ResourceReportEvent) ResourceType() string {
-	return re.resourceType.String()
+func (re ResourceReportEvent) ResourceType() ResourceType {
+	return re.resourceType
 }
 
-func (re ResourceReportEvent) ReporterType() string {
-	return re.reporterId.reporterType.String()
+func (re ResourceReportEvent) ReporterType() ReporterType {
+	return re.reporterId.reporterType
 }
 
 func (re ResourceReportEvent) ReporterInstanceId() string {

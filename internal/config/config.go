@@ -17,9 +17,9 @@ import (
 	"github.com/project-kessel/inventory-api/internal/consumer"
 	"github.com/project-kessel/inventory-api/internal/metricscollector"
 	"github.com/project-kessel/inventory-api/internal/server"
+	resources "github.com/project-kessel/inventory-api/internal/biz/usecase/resources"
 	"github.com/project-kessel/inventory-api/internal/service"
 	"github.com/project-kessel/inventory-api/internal/storage"
-	"github.com/project-kessel/inventory-api/internal/subject/selfsubject"
 )
 
 // OptionsConfig contains the settings for each configuration option
@@ -34,7 +34,7 @@ type OptionsConfig struct {
 	Consistency         *consistency.Options
 	Service             *service.Options
 	Schema              *schema.Options
-	SelfSubjectStrategy *selfsubject.Options
+	SelfSubjectStrategy *resources.SelfSubjectOptions
 	BusinessMetrics     *metricscollector.Options `mapstructure:"business-metrics"`
 	MetaAuthorizer      *metaauthorizer.Options   `mapstructure:"metaauthorizer"`
 }
@@ -50,7 +50,7 @@ func NewOptionsConfig() *OptionsConfig {
 		Consistency:         consistency.NewOptions(),
 		Service:             service.NewOptions(),
 		Schema:              schema.NewOptions(),
-		SelfSubjectStrategy: selfsubject.NewOptions(),
+		SelfSubjectStrategy: resources.NewSelfSubjectOptions(),
 		BusinessMetrics:     metricscollector.NewOptions(),
 		MetaAuthorizer:      metaauthorizer.NewOptions(),
 	}

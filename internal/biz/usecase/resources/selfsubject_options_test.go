@@ -1,4 +1,4 @@
-package selfsubject
+package resources
 
 import (
 	"testing"
@@ -6,24 +6,24 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestNewOptions_ReturnsDefaults(t *testing.T) {
-	opts := NewOptions()
+func TestNewSelfSubjectOptions_ReturnsDefaults(t *testing.T) {
+	opts := NewSelfSubjectOptions()
 
 	assert.NotNil(t, opts)
 	assert.NotNil(t, opts.RedHatRbac)
 	assert.False(t, opts.RedHatRbac.Enabled)
 }
 
-func TestOptions_Validate_DisabledPasses(t *testing.T) {
-	opts := NewOptions()
+func TestSelfSubjectOptions_Validate_DisabledPasses(t *testing.T) {
+	opts := NewSelfSubjectOptions()
 	opts.RedHatRbac.Enabled = false
 
 	errs := opts.Validate()
 	assert.Empty(t, errs)
 }
 
-func TestOptions_Validate_EnabledRequiresDomain(t *testing.T) {
-	opts := NewOptions()
+func TestSelfSubjectOptions_Validate_EnabledRequiresDomain(t *testing.T) {
+	opts := NewSelfSubjectOptions()
 	opts.RedHatRbac.Enabled = true
 	opts.RedHatRbac.XRhIdentityDomain = ""
 
@@ -33,8 +33,8 @@ func TestOptions_Validate_EnabledRequiresDomain(t *testing.T) {
 	assert.Contains(t, errs[1].Error(), "oidcIssuerDomains is required")
 }
 
-func TestOptions_Validate_EnabledRequiresOIDCIssuerDomains(t *testing.T) {
-	opts := NewOptions()
+func TestSelfSubjectOptions_Validate_EnabledRequiresOIDCIssuerDomains(t *testing.T) {
+	opts := NewSelfSubjectOptions()
 	opts.RedHatRbac.Enabled = true
 	opts.RedHatRbac.XRhIdentityDomain = "redhat"
 	opts.RedHatRbac.OIDCIssuerDomainMap = nil
@@ -45,8 +45,8 @@ func TestOptions_Validate_EnabledRequiresOIDCIssuerDomains(t *testing.T) {
 	assert.Contains(t, errs[0].Error(), "oidcIssuerDomains is required")
 }
 
-func TestOptions_Validate_EnabledWithDomainPasses(t *testing.T) {
-	opts := NewOptions()
+func TestSelfSubjectOptions_Validate_EnabledWithDomainPasses(t *testing.T) {
+	opts := NewSelfSubjectOptions()
 	opts.RedHatRbac.Enabled = true
 	opts.RedHatRbac.XRhIdentityDomain = "redhat"
 	opts.RedHatRbac.OIDCIssuerDomainMap = map[string]string{
@@ -57,16 +57,16 @@ func TestOptions_Validate_EnabledWithDomainPasses(t *testing.T) {
 	assert.Empty(t, errs)
 }
 
-func TestOptions_Build_DisabledReturnsNil(t *testing.T) {
-	opts := NewOptions()
+func TestSelfSubjectOptions_Build_DisabledReturnsNil(t *testing.T) {
+	opts := NewSelfSubjectOptions()
 	opts.RedHatRbac.Enabled = false
 
 	strategy := opts.Build()
 	assert.Nil(t, strategy)
 }
 
-func TestOptions_Build_EnabledReturnsStrategy(t *testing.T) {
-	opts := NewOptions()
+func TestSelfSubjectOptions_Build_EnabledReturnsStrategy(t *testing.T) {
+	opts := NewSelfSubjectOptions()
 	opts.RedHatRbac.Enabled = true
 	opts.RedHatRbac.XRhIdentityDomain = "redhat"
 
@@ -74,8 +74,8 @@ func TestOptions_Build_EnabledReturnsStrategy(t *testing.T) {
 	assert.NotNil(t, strategy)
 }
 
-func TestOptions_Build_PassesIssuerDomainMap(t *testing.T) {
-	opts := NewOptions()
+func TestSelfSubjectOptions_Build_PassesIssuerDomainMap(t *testing.T) {
+	opts := NewSelfSubjectOptions()
 	opts.RedHatRbac.Enabled = true
 	opts.RedHatRbac.XRhIdentityDomain = "redhat"
 	opts.RedHatRbac.OIDCIssuerDomainMap = map[string]string{
@@ -94,8 +94,8 @@ func TestOptions_Build_PassesIssuerDomainMap(t *testing.T) {
 	assert.Equal(t, "example", rbacStrategy.oidcIssuerDomains["https://login.example.com"])
 }
 
-func TestOptions_Complete_UsesIssuerDomainsList(t *testing.T) {
-	opts := NewOptions()
+func TestSelfSubjectOptions_Complete_UsesIssuerDomainsList(t *testing.T) {
+	opts := NewSelfSubjectOptions()
 	opts.RedHatRbac.Enabled = true
 	opts.RedHatRbac.XRhIdentityDomain = "redhat"
 	opts.RedHatRbac.OIDCIssuerDomains = []OIDCIssuerDomainEntry{

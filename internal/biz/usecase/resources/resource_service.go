@@ -15,7 +15,6 @@ import (
 	"github.com/project-kessel/inventory-api/internal/biz/usecase/metaauthorizer"
 	"github.com/project-kessel/inventory-api/internal/metricscollector"
 	"github.com/project-kessel/inventory-api/internal/pubsub"
-	"github.com/project-kessel/inventory-api/internal/subject/selfsubject"
 	"github.com/sony/gobreaker/v2"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -72,12 +71,12 @@ type Usecase struct {
 	ListenManager       pubsub.ListenManagerImpl
 	Config              *UsecaseConfig
 	MetricsCollector    *metricscollector.MetricsCollector
-	SelfSubjectStrategy selfsubject.SelfSubjectStrategy
+	SelfSubjectStrategy SelfSubjectStrategy
 }
 
 func New(resourceRepository model.ResourceRepository, schemaRepository model.SchemaRepository,
 	relations model.RelationsRepository, namespace string, logger log.Logger,
-	listenManager pubsub.ListenManagerImpl, waitForNotifBreaker *gobreaker.CircuitBreaker[any], usecaseConfig *UsecaseConfig, metricsCollector *metricscollector.MetricsCollector, metaAuthorizer metaauthorizer.MetaAuthorizer, selfSubjectStrategy selfsubject.SelfSubjectStrategy) *Usecase {
+	listenManager pubsub.ListenManagerImpl, waitForNotifBreaker *gobreaker.CircuitBreaker[any], usecaseConfig *UsecaseConfig, metricsCollector *metricscollector.MetricsCollector, metaAuthorizer metaauthorizer.MetaAuthorizer, selfSubjectStrategy SelfSubjectStrategy) *Usecase {
 	if metaAuthorizer == nil {
 		metaAuthorizer = metaauthorizer.NewSimpleMetaAuthorizer()
 	}

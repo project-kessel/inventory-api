@@ -1,4 +1,4 @@
-package selfsubject
+package resources
 
 import (
 	authnapi "github.com/project-kessel/inventory-api/internal/authn/api"

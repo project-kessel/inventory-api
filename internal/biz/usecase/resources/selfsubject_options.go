@@ -1,4 +1,4 @@
-package selfsubject
+package resources
 
 import (
 	"fmt"
@@ -6,8 +6,8 @@ import (
 	"github.com/spf13/pflag"
 )
 
-// Options holds settings for self-subject derivation strategies.
-type Options struct {
+// SelfSubjectOptions holds settings for self-subject derivation strategies.
+type SelfSubjectOptions struct {
 	RedHatRbac *RedHatRbacOptions `mapstructure:"redhatRbacSelfSubjectStrategy"`
 }
 
@@ -25,15 +25,15 @@ type OIDCIssuerDomainEntry struct {
 	Domain string `mapstructure:"domain"`
 }
 
-// NewOptions returns a new Options with default values.
-func NewOptions() *Options {
-	return &Options{
+// NewSelfSubjectOptions returns a new SelfSubjectOptions with default values.
+func NewSelfSubjectOptions() *SelfSubjectOptions {
+	return &SelfSubjectOptions{
 		RedHatRbac: &RedHatRbacOptions{},
 	}
 }
 
 // AddFlags registers CLI flags for self-subject options.
-func (o *Options) AddFlags(fs *pflag.FlagSet, prefix string) {
+func (o *SelfSubjectOptions) AddFlags(fs *pflag.FlagSet, prefix string) {
 	if prefix != "" {
 		prefix = prefix + "."
 	}
@@ -43,7 +43,7 @@ func (o *Options) AddFlags(fs *pflag.FlagSet, prefix string) {
 }
 
 // Validate checks that the configuration is valid.
-func (o *Options) Validate() []error {
+func (o *SelfSubjectOptions) Validate() []error {
 	var errs []error
 
 	if o.RedHatRbac != nil && o.RedHatRbac.Enabled {
@@ -59,7 +59,7 @@ func (o *Options) Validate() []error {
 }
 
 // Complete finalizes the configuration.
-func (o *Options) Complete() []error {
+func (o *SelfSubjectOptions) Complete() []error {
 	if o == nil || o.RedHatRbac == nil {
 		return nil
 	}
@@ -94,14 +94,10 @@ func buildOIDCIssuerDomainMap(entries []OIDCIssuerDomainEntry) (map[string]strin
 }
 
 // Build constructs the configured SelfSubjectStrategy or returns nil when disabled.
-func (o *Options) Build() SelfSubjectStrategy {
+func (o *SelfSubjectOptions) Build() SelfSubjectStrategy {
 	if o == nil || o.RedHatRbac == nil || !o.RedHatRbac.Enabled {
 		return nil
 	}
 
-	return NewRedHatRbacSelfSubjectStrategy(RedHatRbacSelfSubjectStrategyConfig{
-		Enabled:             o.RedHatRbac.Enabled,
-		XRhIdentityDomain:   o.RedHatRbac.XRhIdentityDomain,
-		OIDCIssuerDomainMap: o.RedHatRbac.OIDCIssuerDomainMap,
-	})
+	return NewRedHatRbacSelfSubjectStrategy(o.RedHatRbac)
 }

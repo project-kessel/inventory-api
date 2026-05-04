@@ -1,4 +1,4 @@
-package selfsubject
+package resources
 
 import (
 	"fmt"
@@ -16,7 +16,7 @@ type RedHatRbacSelfSubjectStrategy struct {
 }
 
 // NewRedHatRbacSelfSubjectStrategy constructs the strategy from config.
-func NewRedHatRbacSelfSubjectStrategy(cfg RedHatRbacSelfSubjectStrategyConfig) *RedHatRbacSelfSubjectStrategy {
+func NewRedHatRbacSelfSubjectStrategy(cfg *RedHatRbacOptions) *RedHatRbacSelfSubjectStrategy {
 	return &RedHatRbacSelfSubjectStrategy{
 		enabled:           cfg.Enabled,
 		xRhIdentityDomain: cfg.XRhIdentityDomain,

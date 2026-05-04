@@ -73,7 +73,7 @@ func TestCalculateTuples(t *testing.T) {
 			key, err := model.NewReporterResourceKey(
 				model.LocalResourceId("test-resource"),
 				model.ResourceType("host"),
-				model.ReporterType("HBI"),
+				model.ReporterType("hbi"),
 				model.ReporterInstanceId("test-instance"),
 			)
 			require.NoError(t, err)
@@ -151,7 +151,7 @@ func TestGetWorkspaceVersions(t *testing.T) {
 	key, err := model.NewReporterResourceKey(
 		model.LocalResourceId("test-resource"),
 		model.ResourceType("host"),
-		model.ReporterType("HBI"),
+		model.ReporterType("hbi"),
 		model.ReporterInstanceId("test-instance"),
 	)
 	require.NoError(t, err)
@@ -181,7 +181,7 @@ func TestCreateWorkspaceTuple(t *testing.T) {
 	key, err := model.NewReporterResourceKey(
 		model.LocalResourceId("test-resource"),
 		model.ResourceType("host"),
-		model.ReporterType("HBI"),
+		model.ReporterType("hbi"),
 		model.ReporterInstanceId("test-instance"),
 	)
 	require.NoError(t, err)
@@ -246,7 +246,7 @@ func TestDetermineTupleOperations(t *testing.T) {
 	key, err := model.NewReporterResourceKey(
 		model.LocalResourceId("test-resource"),
 		model.ResourceType("host"),
-		model.ReporterType("HBI"),
+		model.ReporterType("hbi"),
 		model.ReporterInstanceId("test-instance"),
 	)
 	require.NoError(t, err)
@@ -330,7 +330,7 @@ func TestCalculateTuples_OperationTypeScenarios(t *testing.T) {
 			key, err := model.NewReporterResourceKey(
 				model.LocalResourceId("test-resource"),
 				model.ResourceType("host"),
-				model.ReporterType("HBI"),
+				model.ReporterType("hbi"),
 				model.ReporterInstanceId("test-instance"),
 			)
 			require.NoError(t, err)

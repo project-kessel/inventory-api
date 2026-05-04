@@ -2,7 +2,7 @@ package model
 
 import (
 	"fmt"
-	"strings"
+
 	"time"
 
 	"github.com/go-kratos/kratos/v2/log"
@@ -312,14 +312,14 @@ func (r *Resource) findReporterResourceToUpdateByKey(key ReporterResourceKey) (*
 		reporter := &r.reporterResources[i]
 		storedKey := reporter.Key()
 
-		if strings.EqualFold(storedKey.LocalResourceId().Serialize(), key.LocalResourceId().Serialize()) &&
-			strings.EqualFold(storedKey.ResourceType().Serialize(), key.ResourceType().Serialize()) &&
-			strings.EqualFold(storedKey.ReporterType().Serialize(), key.ReporterType().Serialize()) {
+		if storedKey.LocalResourceId().Serialize() == key.LocalResourceId().Serialize() &&
+			storedKey.ResourceType().Serialize() == key.ResourceType().Serialize() &&
+			storedKey.ReporterType().Serialize() == key.ReporterType().Serialize() {
 
 			searchReporterInstanceId := key.ReporterInstanceId().Serialize()
 			storedReporterInstanceId := storedKey.ReporterInstanceId().Serialize()
 
-			if searchReporterInstanceId == "" || strings.EqualFold(storedReporterInstanceId, searchReporterInstanceId) {
+			if searchReporterInstanceId == "" || storedReporterInstanceId == searchReporterInstanceId {
 				return reporter, nil
 			}
 		}

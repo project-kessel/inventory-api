@@ -13,7 +13,6 @@ import (
 
 	"github.com/project-kessel/inventory-api/cmd/common"
 	bizmodel "github.com/project-kessel/inventory-api/internal/biz/model"
-	"github.com/project-kessel/inventory-api/internal/data"
 )
 
 var schemaDir = "data/schema/resources"
@@ -46,7 +45,7 @@ func normalizeYAMLResourceType(yamlContent []byte) ([]byte, error) {
 		if err != nil {
 			return nil, fmt.Errorf("invalid resource type in YAML: %w", err)
 		}
-		yamlData["type"] = data.NormalizeResourceType(rt).String()
+		yamlData["type"] = rt.String()
 	}
 
 	// Convert back to YAML format
@@ -91,7 +90,7 @@ func preloadSchemas() error {
 		if err != nil {
 			continue
 		}
-		resourceType := data.NormalizeResourceType(rt).String()
+		resourceType := rt.String()
 		resourcePath := filepath.Join(schemaDir, resource.Name())
 
 		// Load common resource data schema
@@ -122,7 +121,7 @@ func preloadSchemas() error {
 				if err != nil {
 					continue
 				}
-				reporterType := data.NormalizeReporterType(rpt).String()
+				reporterType := rpt.String()
 				reporterPath := filepath.Join(reportersPath, reporter.Name())
 
 				// Encode reporter's config.yaml

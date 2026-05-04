@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"strings"
+
 
 	"github.com/go-kratos/kratos/v2/log"
 	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2"
@@ -536,11 +536,11 @@ func ToLookupObjectsCommand(request *pb.StreamedListObjectsRequest) (resources.L
 	if request == nil {
 		return resources.LookupObjectsCommand{}, fmt.Errorf("request is nil")
 	}
-	resourceType, err := model.NewResourceType(NormalizeType(request.ObjectType.GetResourceType()))
+	resourceType, err := model.NewResourceType(request.ObjectType.GetResourceType())
 	if err != nil {
 		return resources.LookupObjectsCommand{}, fmt.Errorf("invalid resource type: %w", err)
 	}
-	reporterType, err := model.NewReporterType(NormalizeType(request.ObjectType.GetReporterType()))
+	reporterType, err := model.NewReporterType(request.ObjectType.GetReporterType())
 	if err != nil {
 		return resources.LookupObjectsCommand{}, fmt.Errorf("invalid reporter type: %w", err)
 	}
@@ -563,10 +563,6 @@ func ToLookupObjectsCommand(request *pb.StreamedListObjectsRequest) (resources.L
 	}, nil
 }
 
-func NormalizeType(val string) string {
-	normalized := strings.ToLower(val)
-	return normalized
-}
 
 func ToLookupObjectsResponse(item model.LookupObjectsItem) *pb.StreamedListObjectsResponse {
 	obj := item.Object()
@@ -600,11 +596,11 @@ func ToLookupSubjectsCommand(request *pb.StreamedListSubjectsRequest) (resources
 	if err != nil {
 		return resources.LookupSubjectsCommand{}, fmt.Errorf("invalid relation: %w", err)
 	}
-	subjectResType, err := model.NewResourceType(NormalizeType(request.SubjectType.GetResourceType()))
+	subjectResType, err := model.NewResourceType(request.SubjectType.GetResourceType())
 	if err != nil {
 		return resources.LookupSubjectsCommand{}, fmt.Errorf("invalid subject type: %w", err)
 	}
-	subjectReporter, err := model.NewReporterType(NormalizeType(request.SubjectType.GetReporterType()))
+	subjectReporter, err := model.NewReporterType(request.SubjectType.GetReporterType())
 	if err != nil {
 		return resources.LookupSubjectsCommand{}, fmt.Errorf("invalid subject reporter: %w", err)
 	}

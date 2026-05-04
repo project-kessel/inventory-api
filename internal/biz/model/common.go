@@ -252,6 +252,7 @@ func NewResourceType(resourceType string) (ResourceType, error) {
 	if resourceType == "" {
 		return ResourceType(""), fmt.Errorf("%w: ResourceType", ErrEmpty)
 	}
+	resourceType = strings.ToLower(strings.ReplaceAll(resourceType, "/", "_"))
 	return ResourceType(resourceType), nil
 }
 
@@ -259,10 +260,7 @@ func (rt ResourceType) String() string {
 	return string(rt)
 }
 
-func (rt ResourceType) Serialize() string {
-	str := SerializeString(rt)
-	return strings.ToLower(str)
-}
+func (rt ResourceType) Serialize() string { return SerializeString(rt) }
 
 type ReporterType string
 
@@ -271,17 +269,14 @@ func NewReporterType(reporterType string) (ReporterType, error) {
 	if reporterType == "" {
 		return ReporterType(""), fmt.Errorf("%w: ReporterType", ErrEmpty)
 	}
-	return ReporterType(reporterType), nil
+	return ReporterType(strings.ToLower(reporterType)), nil
 }
 
 func (rt ReporterType) String() string {
 	return string(rt)
 }
 
-func (rt ReporterType) Serialize() string {
-	str := SerializeString(rt)
-	return strings.ToLower(str)
-}
+func (rt ReporterType) Serialize() string { return SerializeString(rt) }
 
 type ReporterInstanceId string
 
@@ -290,17 +285,14 @@ func NewReporterInstanceId(reporterInstanceId string) (ReporterInstanceId, error
 	if reporterInstanceId == "" {
 		return ReporterInstanceId(""), fmt.Errorf("%w: ReporterInstanceId", ErrEmpty)
 	}
-	return ReporterInstanceId(reporterInstanceId), nil
+	return ReporterInstanceId(strings.ToLower(reporterInstanceId)), nil
 }
 
 func (ri ReporterInstanceId) String() string {
 	return string(ri)
 }
 
-func (ri ReporterInstanceId) Serialize() string {
-	str := SerializeString(ri)
-	return strings.ToLower(str)
-}
+func (ri ReporterInstanceId) Serialize() string { return SerializeString(ri) }
 
 type ConsistencyToken string
 

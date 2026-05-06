@@ -29,7 +29,6 @@ import (
 	usecase "github.com/project-kessel/inventory-api/internal/biz/usecase/resources"
 	"github.com/project-kessel/inventory-api/internal/mocks"
 	svc "github.com/project-kessel/inventory-api/internal/service/resources"
-	"github.com/project-kessel/inventory-api/internal/subject/selfsubject"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
@@ -90,7 +89,7 @@ func buildTestSubjectReference(subjectID string) (model.SubjectReference, error)
 	return model.NewSubjectReferenceWithoutRelation(resourceRefFromKey(key)), nil
 }
 
-func newTestSelfSubjectStrategy() selfsubject.SelfSubjectStrategy {
+func newTestSelfSubjectStrategy() usecase.SelfSubjectStrategy {
 	return testSelfSubjectStrategy{}
 }
 

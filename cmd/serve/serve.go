@@ -26,7 +26,6 @@ import (
 	"github.com/project-kessel/inventory-api/internal/consumer"
 	"github.com/project-kessel/inventory-api/internal/data"
 	"github.com/project-kessel/inventory-api/internal/pubsub"
-	"github.com/project-kessel/inventory-api/internal/subject/selfsubject"
 
 	//v1beta2
 	resourcesvc "github.com/project-kessel/inventory-api/internal/service/resources"
@@ -59,7 +58,7 @@ func NewCommand(
 	consumerOptions *consumer.Options,
 	consistencyOptions *consistency.Options,
 	serviceOptions *service.Options,
-	selfSubjectOptions *selfsubject.Options,
+	selfSubjectOptions *resourcesctl.SelfSubjectOptions,
 	loggerOptions common.LoggerOptions,
 	schemaOptions *schema.Options,
 	businessMetricsOptions *metricscollector.Options,

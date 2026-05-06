@@ -19,7 +19,6 @@ import (
 	"github.com/project-kessel/inventory-api/internal/biz/usecase/metaauthorizer"
 	"github.com/project-kessel/inventory-api/internal/data"
 	"github.com/project-kessel/inventory-api/internal/metricscollector"
-	"github.com/project-kessel/inventory-api/internal/subject/selfsubject"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -168,7 +167,7 @@ func resourceRefFromKey(key model.ReporterResourceKey) model.ResourceReference {
 	return model.NewResourceReference(key.ResourceType(), key.LocalResourceId(), &reporter)
 }
 
-func newTestSelfSubjectStrategy() selfsubject.SelfSubjectStrategy {
+func newTestSelfSubjectStrategy() SelfSubjectStrategy {
 	return testSelfSubjectStrategy{}
 }
 

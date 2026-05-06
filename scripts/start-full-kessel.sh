@@ -6,11 +6,18 @@ source ./scripts/check_docker_podman.sh
 COMPOSE_DIR="development/full-kessel"
 ENV_FILE="${COMPOSE_DIR}/.env"
 
-# Load .env for schema handling
+# Load .env defaults without overriding caller's environment
 if [ -f "${ENV_FILE}" ]; then
+  saved_schema_zed_file_set="${SCHEMA_ZED_FILE+x}"
+  saved_schema_zed_file="${SCHEMA_ZED_FILE:-}"
+  saved_rbac_config_file_set="${RBAC_CONFIG_FILE+x}"
+  saved_rbac_config_file="${RBAC_CONFIG_FILE:-}"
   set -a
   source "${ENV_FILE}"
   set +a
+  [ -n "${saved_schema_zed_file_set}" ] && SCHEMA_ZED_FILE="${saved_schema_zed_file}"
+  [ -n "${saved_rbac_config_file_set}" ] && RBAC_CONFIG_FILE="${saved_rbac_config_file}"
+  unset saved_schema_zed_file saved_rbac_config_file saved_schema_zed_file_set saved_rbac_config_file_set
 fi
 
 # Check yq is installed (needed to extract RBAC role definitions from configmap YAML)

@@ -45,6 +45,7 @@ See `common.go` for the full pattern and generic helpers.
 
 **Struct value objects**: Use unexported fields, a `New*` constructor, and minimal getters. Each struct type gets its own file for a flat view of the domain (e.g., `relationship.go`, `fencing_check.go`). Tightly coupled types may share a file.
 
+- **Use meaningful variable names** for domain types -- `resourceType`, `reporterType`, `reporterInstanceId`, not cryptic abbreviations like `rt`, `rpt`, `ri`.
 - **All domain types must use unexported fields** initialized through constructor functions (`New*`).
 - **Constructors must validate invariants** (non-empty IDs, required fields, etc.) and return `(T, error)` when validation can fail. Do not silently discard constructor errors.
 - **Add getters only when they are actually used** by callers outside the package. Do not add speculative getters.

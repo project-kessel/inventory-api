@@ -33,7 +33,15 @@ This is the Kessel Inventory API, a Go-based microservice that provides resource
 ### Domain Model Conventions (`internal/biz/model`)
 Prefer **value objects** (private fields, constructors, getters) over plain data containers (exported fields).
 
-**Tiny types**: Use Go defined types on primitives (`type LockId string`, `type Version uint`, `type ResourceId uuid.UUID`) -- not structs with a single field. Tiny types make interfaces self-documenting, prevent argument transposition, and provide a home for domain-specific methods. Each tiny type gets a `New*` constructor (with invariant validation), a `Serialize()` method (using the generic helpers `SerializeString`, `SerializeUint`, `SerializeUUID`, `SerializeBool` from `common.go`), and a `String()` method where appropriate. A corresponding `Deserialize*` function bypasses validation for reconstruction from trusted sources. See `common.go` for the full pattern and generic helpers.
+**Tiny types** (e.g., `LockId`, `Version`, `ResourceId`, `ResourceType`, `ReporterType`) make interfaces self-documenting, prevent argument transposition, and provide a home for domain-specific methods like validation and normalization. Always create tiny type values through their `New*` constructor -- never via direct type conversion (e.g., `ReporterType("HBI")`). Direct conversion bypasses validation and normalization (such as lowercasing). Use `NewReporterType("HBI")` instead, which returns the validated, normalized value.
+
+Each tiny type gets:
+- A `New*` constructor that validates invariants and normalizes the value
+- A `Serialize()` method (using the generic helpers `SerializeString`, `SerializeUint`, `SerializeUUID`, `SerializeBool` from `common.go`)
+- A `String()` method where appropriate
+- A corresponding `Deserialize*` function that reconstructs the domain type from stored/wire representations (e.g., database rows, protobuf fields) — analogous to how Jackson deserializes JSON into Java objects. The stored value is assumed to be already validated and normalized.
+
+See `common.go` for the full pattern and generic helpers.
 
 **Struct value objects**: Use unexported fields, a `New*` constructor, and minimal getters. Each struct type gets its own file for a flat view of the domain (e.g., `relationship.go`, `fencing_check.go`). Tightly coupled types may share a file.
 

@@ -75,7 +75,7 @@ When creating or updating Jira issues, always use **Jira markup**, NOT Markdown:
 
 ### Keeping Context Fresh
 
-**Last initiative plan read**: 2026-05-05
+**Last initiative plan read**: 2026-05-11
 
 When reading this file:
 1. Check the "Last initiative plan read" date above
@@ -128,8 +128,9 @@ When instructed to add a comment to a Jira issue:
 
 ## Currently Active Work
 
+- **RHCLOUD-45308** - Phase 2: Embed SpiceDB repository and tests in inventory-api (Mark McLaughlin, Code Review)
 - **RHCLOUD-46116** - Phase 2: Track and assist customer migration to inventory-api endpoints (Mark McLaughlin, In Progress)
-- **RHCLOUD-47111** - Phase 2: Configure tuple CRUD allowlist for stage environment (Mark McLaughlin, In Progress)
+- **RHCLOUD-47724** - Phase 2: Enable OIDC authentication for only tuple CRUD gRPC endpoints (Mark McLaughlin, New)
 
 **Note**: For all issues related to this initiative, query Jira using parent epic [RHCLOUD-44628](https://issues.redhat.com/browse/RHCLOUD-44628).
 

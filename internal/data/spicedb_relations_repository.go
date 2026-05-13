@@ -40,6 +40,7 @@ type SpiceDBRelationsRepository struct {
 	Logger                   *log.Helper
 	successCounter           metric.Int64Counter
 	failureCounter           metric.Int64Counter
+	cleanup                  func()
 }
 
 // NewSpiceDBRelationsRepository creates a new SpiceDB repository instance.
@@ -108,10 +109,15 @@ func NewSpiceDBRelationsRepository(config *SpiceDBConfig, logger log.Logger) (*S
 	}
 
 	cleanup := func() {
-		logHelper.Info("spicedb connection cleanup requested (nothing to clean up)")
+		if err := client.Close(); err != nil {
+			logHelper.Errorf("error closing spicedb client: %v", err)
+		}
+		if err := conn.Close(); err != nil {
+			logHelper.Errorf("error closing spicedb health connection: %v", err)
+		}
 	}
 
-	return &SpiceDBRelationsRepository{
+	repo := &SpiceDBRelationsRepository{
 		client:                   client,
 		healthClient:             healthClient,
 		schemaFilePath:           config.SchemaFile,
@@ -120,7 +126,10 @@ func NewSpiceDBRelationsRepository(config *SpiceDBConfig, logger log.Logger) (*S
 		Logger:                   logHelper,
 		successCounter:           successCounter,
 		failureCounter:           failureCounter,
-	}, cleanup, nil
+		cleanup:                  cleanup,
+	}
+
+	return repo, cleanup, nil
 }
 
 func (s *SpiceDBRelationsRepository) incrFailureCounter(method string) {
@@ -153,6 +162,13 @@ func (s *SpiceDBRelationsRepository) initialize() error {
 
 	s.isInitialized = true
 	return nil
+}
+
+// Close closes the SpiceDB client connections.
+func (s *SpiceDBRelationsRepository) Close() {
+	if s.cleanup != nil {
+		s.cleanup()
+	}
 }
 
 // Health checks the health of the SpiceDB backend.
@@ -920,22 +936,18 @@ func (s *spicedbLookupObjectsStream) Recv() (model.LookupObjectsItem, error) {
 		return model.LookupObjectsItem{}, err
 	}
 
-	resourceRef, err := spiceDBTypeToResourceReference(msg.ResourceObjectId, msg.ResourceObjectId)
-	if err != nil {
-		// Fallback: use objectType from request
-		reporter := s.objectType.ReporterType()
-		resourceRef = model.NewResourceReference(
-			s.objectType.ResourceType(),
-			model.DeserializeLocalResourceId(msg.ResourceObjectId),
-			func() *model.ReporterReference {
-				if reporter != nil {
-					r := model.NewReporterReference(*reporter, nil)
-					return &r
-				}
-				return nil
-			}(),
-		)
+	// LookupResourcesResponse only returns the object id; the resource type is
+	// fixed by the request, so build the reference from s.objectType.
+	var reporterRef *model.ReporterReference
+	if rt := s.objectType.ReporterType(); rt != nil {
+		r := model.NewReporterReference(*rt, nil)
+		reporterRef = &r
 	}
+	resourceRef := model.NewResourceReference(
+		s.objectType.ResourceType(),
+		model.DeserializeLocalResourceId(msg.ResourceObjectId),
+		reporterRef,
+	)
 
 	var continuation model.ContinuationToken
 	if msg.AfterResultCursor != nil {

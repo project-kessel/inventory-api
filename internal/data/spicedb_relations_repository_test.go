@@ -1401,6 +1401,16 @@ func collectObjectIds(t *testing.T, stream model.ResultStream[model.LookupObject
 			}
 			t.Fatalf("Error receiving resources: %v", err)
 		}
+		// Verify ResourceType is correct (not corrupted to be the same as ResourceId)
+		assert.Equal(t, "widget", item.Object().ResourceType().String(),
+			"ResourceType should be 'widget', not the resource ID")
+		// Verify Reporter is set correctly
+		assert.NotNil(t, item.Object().Reporter(),
+			"Reporter should not be nil for widget resources")
+		if item.Object().Reporter() != nil {
+			assert.Equal(t, "rbac", item.Object().Reporter().ReporterType().String(),
+				"ReporterType should be 'rbac'")
+		}
 		foundResources[item.Object().ResourceId().String()] = true
 	}
 	return foundResources

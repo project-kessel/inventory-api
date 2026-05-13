@@ -176,21 +176,26 @@ func (l *LocalSpiceDbContainer) CreateSpiceDbRepository() (*SpiceDBRelationsRepo
 	if err != nil {
 		return nil, err
 	}
-	err = os.WriteFile(tmpFile.Name(), []byte(randomKey), 0666)
+	tmpFileName := tmpFile.Name()
+	if err := tmpFile.Close(); err != nil {
+		return nil, err
+	}
+
+	err = os.WriteFile(tmpFileName, []byte(randomKey), 0600)
 	if err != nil {
 		return nil, err
 	}
 
 	defer func() {
 		if err := os.RemoveAll(tmpDir); err != nil {
-			log.NewHelper(l.logger).Errorf("error removing temporary directory: %w", err)
+			log.NewHelper(l.logger).Errorf("error removing temporary directory: %v", err)
 		}
 	}()
 
 	config := &SpiceDBConfig{
 		UseTLS:          false,
 		Endpoint:        "localhost:" + l.port,
-		TokenFile:       tmpFile.Name(),
+		TokenFile:       tmpFileName,
 		SchemaFile:      l.schemaLocation,
 		FullyConsistent: FullyConsistent,
 	}
@@ -206,7 +211,7 @@ func (l *LocalSpiceDbContainer) CreateSpiceDbRepository() (*SpiceDBRelationsRepo
 // Close terminates the container
 func (l *LocalSpiceDbContainer) Close() {
 	if err := testcontainers.TerminateContainer(l.container); err != nil {
-		log.NewHelper(l.logger).Error("Could not terminate SpiceDB container. Please remove manually.")
+		log.NewHelper(l.logger).Errorf("Could not terminate SpiceDB container, please remove manually: %v", err)
 	}
 }
 

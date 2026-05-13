@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
@@ -35,7 +36,8 @@ type SpiceDBRelationsRepository struct {
 	client                   *authzed.Client
 	healthClient             grpc_health_v1.HealthClient
 	schemaFilePath           string
-	isInitialized            bool
+	initOnce                 sync.Once
+	initErr                  error
 	fullyConsistentAsDefault bool
 	Logger                   *log.Helper
 	successCounter           metric.Int64Counter
@@ -121,7 +123,6 @@ func NewSpiceDBRelationsRepository(config *SpiceDBConfig, logger log.Logger) (*S
 		client:                   client,
 		healthClient:             healthClient,
 		schemaFilePath:           config.SchemaFile,
-		isInitialized:            false,
 		fullyConsistentAsDefault: config.FullyConsistent,
 		Logger:                   logHelper,
 		successCounter:           successCounter,
@@ -142,26 +143,22 @@ func (s *SpiceDBRelationsRepository) incrSuccessCounter(method string) {
 	s.successCounter.Add(context.Background(), 1, metric.WithAttributes(attribute.String("method", method)))
 }
 
-func (s *SpiceDBRelationsRepository) initialize() error {
-	if s.isInitialized {
-		return nil
-	}
+func (s *SpiceDBRelationsRepository) initialize(ctx context.Context) error {
+	s.initOnce.Do(func() {
+		schema, err := readFile(s.schemaFilePath)
+		if err != nil {
+			s.initErr = fmt.Errorf("failed to load schema file: %w", err)
+			return
+		}
 
-	schema, err := readFile(s.schemaFilePath)
-	if err != nil {
-		return fmt.Errorf("failed to load schema file: %w", err)
-	}
-
-	_, err = s.client.WriteSchema(context.TODO(), &v1.WriteSchemaRequest{
-		Schema: schema,
+		_, err = s.client.WriteSchema(ctx, &v1.WriteSchemaRequest{
+			Schema: schema,
+		})
+		if err != nil {
+			s.initErr = err
+		}
 	})
-
-	if err != nil {
-		return err
-	}
-
-	s.isInitialized = true
-	return nil
+	return s.initErr
 }
 
 // Close closes the SpiceDB client connections.
@@ -205,7 +202,7 @@ func (s *SpiceDBRelationsRepository) Health(ctx context.Context) (model.HealthRe
 
 // Check performs a single permission check.
 func (s *SpiceDBRelationsRepository) Check(ctx context.Context, rel model.Relationship, consistency model.Consistency) (model.CheckResult, error) {
-	if err := s.initialize(); err != nil {
+	if err := s.initialize(ctx); err != nil {
 		s.incrFailureCounter("Check")
 		return model.CheckResult{}, err
 	}
@@ -247,7 +244,7 @@ func (s *SpiceDBRelationsRepository) Check(ctx context.Context, rel model.Relati
 
 // CheckForUpdate performs a strongly-consistent permission check.
 func (s *SpiceDBRelationsRepository) CheckForUpdate(ctx context.Context, rel model.Relationship) (model.CheckResult, error) {
-	if err := s.initialize(); err != nil {
+	if err := s.initialize(ctx); err != nil {
 		s.incrFailureCounter("CheckForUpdate")
 		return model.CheckResult{}, err
 	}
@@ -286,7 +283,7 @@ func (s *SpiceDBRelationsRepository) CheckForUpdate(ctx context.Context, rel mod
 
 // CheckBulk performs multiple permission checks in one request.
 func (s *SpiceDBRelationsRepository) CheckBulk(ctx context.Context, rels []model.Relationship, consistency model.Consistency) (model.CheckBulkResult, error) {
-	if err := s.initialize(); err != nil {
+	if err := s.initialize(ctx); err != nil {
 		s.incrFailureCounter("CheckBulk")
 		return model.CheckBulkResult{}, err
 	}
@@ -321,7 +318,7 @@ func (s *SpiceDBRelationsRepository) CheckBulk(ctx context.Context, rels []model
 
 // CheckForUpdateBulk performs multiple strongly-consistent permission checks.
 func (s *SpiceDBRelationsRepository) CheckForUpdateBulk(ctx context.Context, rels []model.Relationship) (model.CheckBulkResult, error) {
-	if err := s.initialize(); err != nil {
+	if err := s.initialize(ctx); err != nil {
 		s.incrFailureCounter("CheckForUpdateBulk")
 		return model.CheckBulkResult{}, err
 	}
@@ -363,7 +360,7 @@ func (s *SpiceDBRelationsRepository) LookupObjects(
 	pagination *model.Pagination,
 	consistency model.Consistency,
 ) (model.ResultStream[model.LookupObjectsItem], error) {
-	if err := s.initialize(); err != nil {
+	if err := s.initialize(ctx); err != nil {
 		s.incrFailureCounter("LookupObjects")
 		return nil, err
 	}
@@ -412,7 +409,7 @@ func (s *SpiceDBRelationsRepository) LookupSubjects(
 	pagination *model.Pagination,
 	consistency model.Consistency,
 ) (model.ResultStream[model.LookupSubjectsItem], error) {
-	if err := s.initialize(); err != nil {
+	if err := s.initialize(ctx); err != nil {
 		s.incrFailureCounter("LookupSubjects")
 		return nil, err
 	}
@@ -457,7 +454,7 @@ func (s *SpiceDBRelationsRepository) CreateTuples(
 	upsert bool,
 	fencing *model.FencingCheck,
 ) (model.TuplesResult, error) {
-	if err := s.initialize(); err != nil {
+	if err := s.initialize(ctx); err != nil {
 		s.incrFailureCounter("CreateTuples")
 		return model.TuplesResult{}, err
 	}
@@ -516,7 +513,7 @@ func (s *SpiceDBRelationsRepository) DeleteTuples(
 	filter model.TupleFilter,
 	fencing *model.FencingCheck,
 ) (model.TuplesResult, error) {
-	if err := s.initialize(); err != nil {
+	if err := s.initialize(ctx); err != nil {
 		s.incrFailureCounter("DeleteTuples")
 		return model.TuplesResult{}, err
 	}
@@ -566,7 +563,7 @@ func (s *SpiceDBRelationsRepository) ReadTuples(
 	pagination *model.Pagination,
 	consistency model.Consistency,
 ) (model.ResultStream[model.ReadTuplesItem], error) {
-	if err := s.initialize(); err != nil {
+	if err := s.initialize(ctx); err != nil {
 		s.incrFailureCounter("ReadTuples")
 		return nil, err
 	}
@@ -606,7 +603,7 @@ func (s *SpiceDBRelationsRepository) ReadTuples(
 
 // AcquireLock acquires a distributed lock.
 func (s *SpiceDBRelationsRepository) AcquireLock(ctx context.Context, lockId model.LockId) (model.AcquireLockResult, error) {
-	if err := s.initialize(); err != nil {
+	if err := s.initialize(ctx); err != nil {
 		s.incrFailureCounter("AcquireLock")
 		return model.AcquireLockResult{}, err
 	}

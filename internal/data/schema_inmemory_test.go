@@ -727,71 +727,32 @@ func TestLoadCommonResourceDataSchema(t *testing.T) {
 	}
 }
 
-func TestNormalizeResourceType(t *testing.T) {
+func TestNewResourceType_Normalization(t *testing.T) {
 	tests := []struct {
-		name     string
-		input    string
-		expected string
+		name      string
+		input     string
+		expected  string
+		expectErr bool
 	}{
-		{
-			name:     "Resource type with forward slash",
-			input:    "rhel/host",
-			expected: "rhel_host",
-		},
-		{
-			name:     "Resource type without forward slash",
-			input:    "k8s_cluster",
-			expected: "k8s_cluster",
-		},
-		{
-			name:     "Resource type with multiple forward slashes",
-			input:    "org/team/resource",
-			expected: "org_team_resource",
-		},
-		{
-			name:     "Empty string",
-			input:    "",
-			expected: "",
-		},
-		{
-			name:     "Resource type already normalized",
-			input:    "host",
-			expected: "host",
-		},
-		{
-			name:     "K8s_CLUSTER",
-			input:    "K8s_CLUSTER",
-			expected: "k8s_cluster",
-		},
-		{
-			name:     "rhel/host",
-			input:    "rhel/host",
-			expected: "rhel_host",
-		},
-		{
-			name:     "TEST/RESOURCE",
-			input:    "TEST/RESOURCE",
-			expected: "test_resource",
-		},
-		{
-			name:     "resource",
-			input:    "resource",
-			expected: "resource",
-		},
+		{name: "forward slash replaced", input: "rhel/host", expected: "rhel_host"},
+		{name: "underscore preserved", input: "k8s_cluster", expected: "k8s_cluster"},
+		{name: "multiple slashes", input: "org/team/resource", expected: "org_team_resource"},
+		{name: "empty string", input: "", expectErr: true},
+		{name: "already normalized", input: "host", expected: "host"},
+		{name: "mixed case lowered", input: "K8s_CLUSTER", expected: "k8s_cluster"},
+		{name: "mixed case with slash", input: "TEST/RESOURCE", expected: "test_resource"},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var input bizmodel.ResourceType
-			if tt.input == "" {
-				input = bizmodel.ResourceType("")
-			} else {
-				var err error
-				input, err = bizmodel.NewResourceType(tt.input)
-				require.NoError(t, err)
+			rt, err := bizmodel.NewResourceType(tt.input)
+			if tt.expectErr {
+				assert.Error(t, err)
+				return
 			}
-			result := NormalizeResourceType(input).String()
-			assert.Equal(t, tt.expected, result)
+			require.NoError(t, err)
+			assert.Equal(t, tt.expected, rt.String())
+			assert.Equal(t, tt.expected, rt.Serialize(), "Serialize() should return already-normalized value")
 		})
 	}
 }

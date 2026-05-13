@@ -70,11 +70,15 @@ func TestCalculateTuples(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			sc := model.NewSchemaService(data.NewInMemorySchemaRepository(), log.NewHelper(log.DefaultLogger))
+			resourceType, err := model.NewResourceType("host")
+			require.NoError(t, err)
+			reporterType, err := model.NewReporterType("HBI")
+			require.NoError(t, err)
+			reporterInstanceId, err := model.NewReporterInstanceId("test-instance")
+			require.NoError(t, err)
 			key, err := model.NewReporterResourceKey(
 				model.LocalResourceId("test-resource"),
-				model.ResourceType("host"),
-				model.ReporterType("HBI"),
-				model.ReporterInstanceId("test-instance"),
+				resourceType, reporterType, reporterInstanceId,
 			)
 			require.NoError(t, err)
 
@@ -148,11 +152,15 @@ func TestCalculateTuples(t *testing.T) {
 func TestGetWorkspaceVersions(t *testing.T) {
 	sc := model.NewSchemaService(data.NewInMemorySchemaRepository(), log.NewHelper(log.DefaultLogger))
 
+	resourceType, err := model.NewResourceType("host")
+	require.NoError(t, err)
+	reporterType, err := model.NewReporterType("HBI")
+	require.NoError(t, err)
+	reporterInstanceId, err := model.NewReporterInstanceId("test-instance")
+	require.NoError(t, err)
 	key, err := model.NewReporterResourceKey(
 		model.LocalResourceId("test-resource"),
-		model.ResourceType("host"),
-		model.ReporterType("HBI"),
-		model.ReporterInstanceId("test-instance"),
+		resourceType, reporterType, reporterInstanceId,
 	)
 	require.NoError(t, err)
 
@@ -178,11 +186,15 @@ func TestGetWorkspaceVersions(t *testing.T) {
 }
 
 func TestCreateWorkspaceTuple(t *testing.T) {
+	resourceType, err := model.NewResourceType("host")
+	require.NoError(t, err)
+	reporterType, err := model.NewReporterType("HBI")
+	require.NoError(t, err)
+	reporterInstanceId, err := model.NewReporterInstanceId("test-instance")
+	require.NoError(t, err)
 	key, err := model.NewReporterResourceKey(
 		model.LocalResourceId("test-resource"),
-		model.ResourceType("host"),
-		model.ReporterType("HBI"),
-		model.ReporterInstanceId("test-instance"),
+		resourceType, reporterType, reporterInstanceId,
 	)
 	require.NoError(t, err)
 
@@ -243,11 +255,15 @@ func TestCreateWorkspaceTuple(t *testing.T) {
 func TestDetermineTupleOperations(t *testing.T) {
 	sc := model.NewSchemaService(data.NewInMemorySchemaRepository(), log.NewHelper(log.DefaultLogger))
 
+	resourceType, err := model.NewResourceType("host")
+	require.NoError(t, err)
+	reporterType, err := model.NewReporterType("HBI")
+	require.NoError(t, err)
+	reporterInstanceId, err := model.NewReporterInstanceId("test-instance")
+	require.NoError(t, err)
 	key, err := model.NewReporterResourceKey(
 		model.LocalResourceId("test-resource"),
-		model.ResourceType("host"),
-		model.ReporterType("HBI"),
-		model.ReporterInstanceId("test-instance"),
+		resourceType, reporterType, reporterInstanceId,
 	)
 	require.NoError(t, err)
 
@@ -327,11 +343,15 @@ func TestCalculateTuples_OperationTypeScenarios(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			sc := model.NewSchemaService(data.NewInMemorySchemaRepository(), log.NewHelper(log.DefaultLogger))
 
+			resourceType, err := model.NewResourceType("host")
+			require.NoError(t, err)
+			reporterType, err := model.NewReporterType("HBI")
+			require.NoError(t, err)
+			reporterInstanceId, err := model.NewReporterInstanceId("test-instance")
+			require.NoError(t, err)
 			key, err := model.NewReporterResourceKey(
 				model.LocalResourceId("test-resource"),
-				model.ResourceType("host"),
-				model.ReporterType("HBI"),
-				model.ReporterInstanceId("test-instance"),
+				resourceType, reporterType, reporterInstanceId,
 			)
 			require.NoError(t, err)
 

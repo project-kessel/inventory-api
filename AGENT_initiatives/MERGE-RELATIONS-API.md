@@ -120,6 +120,15 @@ When instructed to add a comment to a Jira issue:
 - Headings: `h1. Heading`, `h2. Heading`, etc.
 - Lists: `*` or `#` for bullet/numbered lists (same as Markdown)
 
+### Running SpiceDB Integration Tests
+
+**With Podman**, disable Ryuk reaper to avoid bridge network issues:
+```bash
+TESTCONTAINERS_RYUK_DISABLED=true go test -v ./internal/data -run TestSpiceDb
+```
+
+**Note:** `make test` skips these tests by default (uses `-short` flag).
+
 ## Next Phases (Future Work)
 
 - **Phase 3**: Functional testing and performance

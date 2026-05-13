@@ -51,7 +51,6 @@ func NewSpiceDBRelationsRepository(config *SpiceDBConfig, logger log.Logger) (*S
 	logHelper.Info("creating spicedb connection")
 
 	var opts []grpc.DialOption
-	opts = append(opts, grpc.EmptyDialOption{})
 
 	var token string
 	var err error
@@ -73,9 +72,11 @@ func NewSpiceDBRelationsRepository(config *SpiceDBConfig, logger log.Logger) (*S
 		opts = append(opts, grpcutil.WithInsecureBearerToken(token))
 		opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	} else {
-		tlsConfig, _ := grpcutil.WithSystemCerts(grpcutil.VerifyCA)
-		opts = append(opts, grpcutil.WithBearerToken(token))
-		opts = append(opts, tlsConfig)
+		tlsConfig, err := grpcutil.WithSystemCerts(grpcutil.VerifyCA)
+		if err != nil {
+			return nil, nil, fmt.Errorf("error loading system CA certs for spicedb client: %w", err)
+		}
+		opts = append(opts, grpcutil.WithBearerToken(token), tlsConfig)
 	}
 
 	client, err := authzed.NewClient(

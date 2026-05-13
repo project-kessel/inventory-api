@@ -23,13 +23,17 @@ import (
 var container *LocalSpiceDbContainer
 
 func TestMain(m *testing.M) {
+	os.Exit(run(m))
+}
+
+func run(m *testing.M) int {
 	flag.Parse()
 
 	// Skip SpiceDB integration tests when running with -short flag
 	// These tests require Docker and testcontainers
 	if testing.Short() {
 		fmt.Println("Skipping SpiceDB integration tests in short mode (use 'go test -v' without -short to run)")
-		os.Exit(0)
+		return 0
 	}
 
 	var err error
@@ -46,13 +50,11 @@ func TestMain(m *testing.M) {
 
 	if err != nil {
 		fmt.Printf("Error initializing Docker container: %s", err)
-		os.Exit(-1)
+		return -1
 	}
+	defer container.Close()
 
-	result := m.Run()
-
-	container.Close()
-	os.Exit(result)
+	return m.Run()
 }
 
 func TestCreateRelationship(t *testing.T) {

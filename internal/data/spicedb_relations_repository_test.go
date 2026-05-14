@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -15,9 +16,9 @@ import (
 	"github.com/go-kratos/kratos/v2/middleware/tracing"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
 	"github.com/stretchr/testify/assert"
+	rpcstatus "google.golang.org/genproto/googleapis/rpc/status"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	rpcstatus "google.golang.org/genproto/googleapis/rpc/status"
 )
 
 var container *LocalSpiceDbContainer
@@ -29,46 +30,64 @@ func TestMain(m *testing.M) {
 func run(m *testing.M) int {
 	flag.Parse()
 
-	// Skip SpiceDB integration tests when running with -short flag
-	// These tests require Docker and testcontainers
-	if testing.Short() {
-		fmt.Println("Skipping SpiceDB integration tests in short mode (use 'go test -v' without -short to run)")
-		return 0
+	// Only set up SpiceDB container if not in short mode
+	// Individual tests will skip themselves in short mode
+	if !testing.Short() {
+		var err error
+		logger := log.With(log.NewStdLogger(os.Stdout),
+			"ts", log.DefaultTimestamp,
+			"caller", log.DefaultCaller,
+			"trace.id", tracing.TraceID(),
+			"span.id", tracing.SpanID(),
+		)
+
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+		defer cancel()
+		container, err = CreateContainer(ctx, &ContainerOptions{Logger: logger})
+
+		if err != nil {
+			fmt.Printf("Error initializing Docker container: %s", err)
+			return -1
+		}
+		defer container.Close()
 	}
-
-	var err error
-	logger := log.With(log.NewStdLogger(os.Stdout),
-		"ts", log.DefaultTimestamp,
-		"caller", log.DefaultCaller,
-		"trace.id", tracing.TraceID(),
-		"span.id", tracing.SpanID(),
-	)
-
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
-	defer cancel()
-	container, err = CreateContainer(ctx, &ContainerOptions{Logger: logger})
-
-	if err != nil {
-		fmt.Printf("Error initializing Docker container: %s", err)
-		return -1
-	}
-	defer container.Close()
 
 	return m.Run()
 }
 
+// requireSpiceDBIntegration skips the test if running in short mode or if container is not available
+func requireSpiceDBIntegration(t *testing.T) {
+	t.Helper()
+	if testing.Short() {
+		t.Skip("Skipping SpiceDB integration test in short mode")
+	}
+	if container == nil {
+		t.Fatal("SpiceDB container not initialized")
+	}
+}
+
+// uniqueID generates a unique identifier for the test by combining the base ID with the test name
+func uniqueID(t *testing.T, baseID string) string {
+	t.Helper()
+	// Use a short hash of test name to keep IDs readable
+	testName := strings.ReplaceAll(t.Name(), "/", "_")
+	return fmt.Sprintf("%s_%s", baseID, testName)
+}
+
 func TestCreateRelationship(t *testing.T) {
+	requireSpiceDBIntegration(t)
+
 	t.Parallel()
 
 	ctx := context.Background()
 	spiceDbRepo, err := container.CreateSpiceDbRepository()
 	assert.NoError(t, err)
 
-	preExisting := CheckForRelationship(spiceDbRepo, "bob", "rbac", "principal", "", "member", "rbac", "group", "bob_club", model.NewConsistencyUnspecified())
+	preExisting := CheckForRelationship(spiceDbRepo, "bob", "rbac", "principal", "", "member", "rbac", "group", uniqueID(t, "bob_club"), model.NewConsistencyUnspecified())
 	assert.False(t, preExisting)
 
 	tuples := []model.RelationsTuple{
-		createRelationship("rbac", "group", "bob_club", "member", "rbac", "principal", "bob", ""),
+		createRelationship("rbac", "group", uniqueID(t, "bob_club"), "member", "rbac", "principal", "bob", ""),
 	}
 
 	_, err = spiceDbRepo.CreateTuples(ctx, tuples, false, nil)
@@ -76,46 +95,50 @@ func TestCreateRelationship(t *testing.T) {
 
 	container.WaitForQuantizationInterval()
 
-	exists := CheckForRelationship(spiceDbRepo, "bob", "rbac", "principal", "", "member", "rbac", "group", "bob_club", model.NewConsistencyUnspecified())
+	exists := CheckForRelationship(spiceDbRepo, "bob", "rbac", "principal", "", "member", "rbac", "group", uniqueID(t, "bob_club"), model.NewConsistencyUnspecified())
 	assert.True(t, exists)
 }
 
 func TestCreateRelationshipWithConsistencyToken(t *testing.T) {
+	requireSpiceDBIntegration(t)
+
 	t.Parallel()
 
 	ctx := context.Background()
 	spiceDbRepo, err := container.CreateSpiceDbRepository()
 	assert.NoError(t, err)
 
-	preExisting := CheckForRelationship(spiceDbRepo, "bob", "rbac", "principal", "", "member", "rbac", "group", "bob_club", model.NewConsistencyUnspecified())
+	preExisting := CheckForRelationship(spiceDbRepo, "bob", "rbac", "principal", "", "member", "rbac", "group", uniqueID(t, "bob_club"), model.NewConsistencyUnspecified())
 	assert.False(t, preExisting)
 
 	tuples := []model.RelationsTuple{
-		createRelationship("rbac", "group", "bob_club", "member", "rbac", "principal", "bob", ""),
+		createRelationship("rbac", "group", uniqueID(t, "bob_club"), "member", "rbac", "principal", "bob", ""),
 	}
 
 	resp, err := spiceDbRepo.CreateTuples(ctx, tuples, false, nil)
 	assert.NoError(t, err)
 
-	exists := CheckForRelationship(spiceDbRepo, "bob", "rbac", "principal", "", "member", "rbac", "group", "bob_club",
+	exists := CheckForRelationship(spiceDbRepo, "bob", "rbac", "principal", "", "member", "rbac", "group", uniqueID(t, "bob_club"),
 		model.NewConsistencyAtLeastAsFresh(resp.ConsistencyToken()))
 	assert.True(t, exists)
 }
 
 func TestCreateRelationshipWithSubjectRelation(t *testing.T) {
+	requireSpiceDBIntegration(t)
+
 	t.Parallel()
 
 	ctx := context.Background()
 	spiceDbRepo, err := container.CreateSpiceDbRepository()
 	assert.NoError(t, err)
 
-	preExisting := CheckForRelationship(spiceDbRepo, "bob", "rbac", "principal", "", "member", "rbac", "group", "bob_club", model.NewConsistencyUnspecified())
+	preExisting := CheckForRelationship(spiceDbRepo, "bob", "rbac", "principal", "", "member", "rbac", "group", uniqueID(t, "bob_club"), model.NewConsistencyUnspecified())
 	assert.False(t, preExisting)
 
 	tuples := []model.RelationsTuple{
-		createRelationship("rbac", "group", "bob_club", "member", "rbac", "principal", "bob", ""),
+		createRelationship("rbac", "group", uniqueID(t, "bob_club"), "member", "rbac", "principal", "bob", ""),
 		createRelationship("rbac", "role_binding", "fan_binding", "granted", "rbac", "role", "fan", ""),
-		createRelationship("rbac", "role_binding", "fan_binding", "subject", "rbac", "group", "bob_club", "member"),
+		createRelationship("rbac", "role_binding", "fan_binding", "subject", "rbac", "group", uniqueID(t, "bob_club"), "member"),
 		createRelationship("rbac", "role", "fan", "view_widget", "rbac", "principal", "*", ""),
 	}
 
@@ -124,10 +147,10 @@ func TestCreateRelationshipWithSubjectRelation(t *testing.T) {
 
 	container.WaitForQuantizationInterval()
 
-	exists := CheckForRelationship(spiceDbRepo, "bob", "rbac", "principal", "", "member", "rbac", "group", "bob_club", model.NewConsistencyUnspecified())
+	exists := CheckForRelationship(spiceDbRepo, "bob", "rbac", "principal", "", "member", "rbac", "group", uniqueID(t, "bob_club"), model.NewConsistencyUnspecified())
 	assert.True(t, exists)
 
-	exists = CheckForRelationship(spiceDbRepo, "bob_club", "rbac", "group", "member", "subject", "rbac", "role_binding", "fan_binding", model.NewConsistencyUnspecified())
+	exists = CheckForRelationship(spiceDbRepo, uniqueID(t, "bob_club"), "rbac", "group", "member", "subject", "rbac", "role_binding", "fan_binding", model.NewConsistencyUnspecified())
 	assert.True(t, exists)
 
 	// zed permission check rbac/role_binding:fan_binding subject rbac/principal:bob
@@ -156,17 +179,19 @@ func TestCreateRelationshipWithSubjectRelation(t *testing.T) {
 }
 
 func TestSecondCreateRelationshipFailsWithUpsertFalse(t *testing.T) {
+	requireSpiceDBIntegration(t)
+
 	t.Parallel()
 
 	ctx := context.Background()
 	spiceDbRepo, err := container.CreateSpiceDbRepository()
 	assert.NoError(t, err)
 
-	preExisting := CheckForRelationship(spiceDbRepo, "bob", "rbac", "principal", "", "member", "rbac", "group", "bob_club", model.NewConsistencyUnspecified())
+	preExisting := CheckForRelationship(spiceDbRepo, "bob", "rbac", "principal", "", "member", "rbac", "group", uniqueID(t, "bob_club"), model.NewConsistencyUnspecified())
 	assert.False(t, preExisting)
 
 	tuples := []model.RelationsTuple{
-		createRelationship("rbac", "group", "bob_club", "member", "rbac", "principal", "bob", ""),
+		createRelationship("rbac", "group", uniqueID(t, "bob_club"), "member", "rbac", "principal", "bob", ""),
 	}
 
 	_, err = spiceDbRepo.CreateTuples(ctx, tuples, false, nil)
@@ -178,22 +203,24 @@ func TestSecondCreateRelationshipFailsWithUpsertFalse(t *testing.T) {
 
 	container.WaitForQuantizationInterval()
 
-	exists := CheckForRelationship(spiceDbRepo, "bob", "rbac", "principal", "", "member", "rbac", "group", "bob_club", model.NewConsistencyUnspecified())
+	exists := CheckForRelationship(spiceDbRepo, "bob", "rbac", "principal", "", "member", "rbac", "group", uniqueID(t, "bob_club"), model.NewConsistencyUnspecified())
 	assert.True(t, exists)
 }
 
 func TestSecondCreateRelationshipSucceedsWithUpsertTrue(t *testing.T) {
+	requireSpiceDBIntegration(t)
+
 	t.Parallel()
 
 	ctx := context.Background()
 	spiceDbRepo, err := container.CreateSpiceDbRepository()
 	assert.NoError(t, err)
 
-	preExisting := CheckForRelationship(spiceDbRepo, "bob", "rbac", "principal", "", "member", "rbac", "group", "bob_club", model.NewConsistencyUnspecified())
+	preExisting := CheckForRelationship(spiceDbRepo, "bob", "rbac", "principal", "", "member", "rbac", "group", uniqueID(t, "bob_club"), model.NewConsistencyUnspecified())
 	assert.False(t, preExisting)
 
 	tuples := []model.RelationsTuple{
-		createRelationship("rbac", "group", "bob_club", "member", "rbac", "principal", "bob", ""),
+		createRelationship("rbac", "group", uniqueID(t, "bob_club"), "member", "rbac", "principal", "bob", ""),
 	}
 
 	_, err = spiceDbRepo.CreateTuples(ctx, tuples, false, nil)
@@ -204,11 +231,13 @@ func TestSecondCreateRelationshipSucceedsWithUpsertTrue(t *testing.T) {
 
 	container.WaitForQuantizationInterval()
 
-	exists := CheckForRelationship(spiceDbRepo, "bob", "rbac", "principal", "", "member", "rbac", "group", "bob_club", model.NewConsistencyUnspecified())
+	exists := CheckForRelationship(spiceDbRepo, "bob", "rbac", "principal", "", "member", "rbac", "group", uniqueID(t, "bob_club"), model.NewConsistencyUnspecified())
 	assert.True(t, exists)
 }
 
 func TestIsBackendAvailable(t *testing.T) {
+	requireSpiceDBIntegration(t)
+
 	t.Parallel()
 
 	spiceDbrepo, err := container.CreateSpiceDbRepository()
@@ -220,6 +249,8 @@ func TestIsBackendAvailable(t *testing.T) {
 }
 
 func TestIsBackendUnavailable(t *testing.T) {
+	requireSpiceDBIntegration(t)
+
 	t.Parallel()
 
 	config := &SpiceDBConfig{
@@ -236,6 +267,8 @@ func TestIsBackendUnavailable(t *testing.T) {
 }
 
 func TestDoesNotCreateRelationshipWithSlashInSubjectType(t *testing.T) {
+	requireSpiceDBIntegration(t)
+
 	t.Parallel()
 
 	ctx := context.Background()
@@ -245,7 +278,7 @@ func TestDoesNotCreateRelationshipWithSlashInSubjectType(t *testing.T) {
 	badSubjectType := "special/user"
 
 	tuples := []model.RelationsTuple{
-		createRelationship("rbac", "group", "bob_club", "member", "rbac", badSubjectType, "bob", ""),
+		createRelationship("rbac", "group", uniqueID(t, "bob_club"), "member", "rbac", badSubjectType, "bob", ""),
 	}
 
 	_, err = spiceDbRepo.CreateTuples(ctx, tuples, false, nil)
@@ -253,6 +286,8 @@ func TestDoesNotCreateRelationshipWithSlashInSubjectType(t *testing.T) {
 }
 
 func TestDoesNotCreateRelationshipWithSlashInObjectType(t *testing.T) {
+	requireSpiceDBIntegration(t)
+
 	t.Parallel()
 
 	ctx := context.Background()
@@ -262,7 +297,7 @@ func TestDoesNotCreateRelationshipWithSlashInObjectType(t *testing.T) {
 	badResourceType := "my/group"
 
 	tuples := []model.RelationsTuple{
-		createRelationship("rbac", badResourceType, "bob_club", "member", "rbac", "principal", "bob", ""),
+		createRelationship("rbac", badResourceType, uniqueID(t, "bob_club"), "member", "rbac", "principal", "bob", ""),
 	}
 
 	_, err = spiceDbRepo.CreateTuples(ctx, tuples, false, nil)
@@ -270,6 +305,8 @@ func TestDoesNotCreateRelationshipWithSlashInObjectType(t *testing.T) {
 }
 
 func TestCreateRelationshipFailsWithBadSubjectType(t *testing.T) {
+	requireSpiceDBIntegration(t)
+
 	t.Parallel()
 
 	ctx := context.Background()
@@ -279,7 +316,7 @@ func TestCreateRelationshipFailsWithBadSubjectType(t *testing.T) {
 	badSubjectType := "not_a_user"
 
 	tuples := []model.RelationsTuple{
-		createRelationship("rbac", "group", "bob_club", "member", "rbac", badSubjectType, "bob", ""),
+		createRelationship("rbac", "group", uniqueID(t, "bob_club"), "member", "rbac", badSubjectType, "bob", ""),
 	}
 
 	_, err = spiceDbRepo.CreateTuples(ctx, tuples, false, nil)
@@ -290,6 +327,8 @@ func TestCreateRelationshipFailsWithBadSubjectType(t *testing.T) {
 }
 
 func TestCreateRelationshipFailsWithBadObjectType(t *testing.T) {
+	requireSpiceDBIntegration(t)
+
 	t.Parallel()
 
 	ctx := context.Background()
@@ -299,7 +338,7 @@ func TestCreateRelationshipFailsWithBadObjectType(t *testing.T) {
 	badObjectType := "not_an_object"
 
 	tuples := []model.RelationsTuple{
-		createRelationship("rbac", badObjectType, "bob_club", "member", "rbac", "principal", "bob", ""),
+		createRelationship("rbac", badObjectType, uniqueID(t, "bob_club"), "member", "rbac", "principal", "bob", ""),
 	}
 
 	_, err = spiceDbRepo.CreateTuples(ctx, tuples, false, nil)
@@ -310,6 +349,8 @@ func TestCreateRelationshipFailsWithBadObjectType(t *testing.T) {
 }
 
 func TestSupportedNsTypeTupleFilterCombinationsInReadRelationships(t *testing.T) {
+	requireSpiceDBIntegration(t)
+
 	t.Parallel()
 
 	ctx := context.Background()
@@ -320,7 +361,7 @@ func TestSupportedNsTypeTupleFilterCombinationsInReadRelationships(t *testing.T)
 
 	// Test 1: Has resource type but missing resource namespace - should error
 	filter := model.NewTupleFilter().
-		WithObjectId(model.DeserializeLocalResourceId("bob_club")).
+		WithObjectId(model.DeserializeLocalResourceId(uniqueID(t, "bob_club"))).
 		WithObjectType(model.DeserializeResourceType("group")).
 		WithRelation(model.DeserializeRelation("member")).
 		WithSubject(model.NewTupleSubjectFilter().
@@ -333,7 +374,7 @@ func TestSupportedNsTypeTupleFilterCombinationsInReadRelationships(t *testing.T)
 
 	// Test 2: Has resource namespace but missing resource type - should error
 	filter = model.NewTupleFilter().
-		WithObjectId(model.DeserializeLocalResourceId("bob_club")).
+		WithObjectId(model.DeserializeLocalResourceId(uniqueID(t, "bob_club"))).
 		WithReporterType(model.DeserializeReporterType("rbac")).
 		WithRelation(model.DeserializeRelation("member")).
 		WithSubject(model.NewTupleSubjectFilter().
@@ -346,7 +387,7 @@ func TestSupportedNsTypeTupleFilterCombinationsInReadRelationships(t *testing.T)
 
 	// Test 3: Has subject type but missing subject namespace - should error
 	filter = model.NewTupleFilter().
-		WithObjectId(model.DeserializeLocalResourceId("bob_club")).
+		WithObjectId(model.DeserializeLocalResourceId(uniqueID(t, "bob_club"))).
 		WithReporterType(model.DeserializeReporterType("rbac")).
 		WithObjectType(model.DeserializeResourceType("group")).
 		WithRelation(model.DeserializeRelation("member")).
@@ -359,7 +400,7 @@ func TestSupportedNsTypeTupleFilterCombinationsInReadRelationships(t *testing.T)
 
 	// Test 4: Has subject namespace but missing subject type - should error
 	filter = model.NewTupleFilter().
-		WithObjectId(model.DeserializeLocalResourceId("bob_club")).
+		WithObjectId(model.DeserializeLocalResourceId(uniqueID(t, "bob_club"))).
 		WithReporterType(model.DeserializeReporterType("rbac")).
 		WithObjectType(model.DeserializeResourceType("group")).
 		WithRelation(model.DeserializeRelation("member")).
@@ -372,7 +413,7 @@ func TestSupportedNsTypeTupleFilterCombinationsInReadRelationships(t *testing.T)
 
 	// Test 5: All required fields present - should succeed
 	filter = model.NewTupleFilter().
-		WithObjectId(model.DeserializeLocalResourceId("bob_club")).
+		WithObjectId(model.DeserializeLocalResourceId(uniqueID(t, "bob_club"))).
 		WithReporterType(model.DeserializeReporterType("rbac")).
 		WithObjectType(model.DeserializeResourceType("group")).
 		WithRelation(model.DeserializeRelation("member")).
@@ -386,7 +427,7 @@ func TestSupportedNsTypeTupleFilterCombinationsInReadRelationships(t *testing.T)
 
 	// Test 6: Optional resource type missing (only ID and relation) - should succeed
 	filter = model.NewTupleFilter().
-		WithObjectId(model.DeserializeLocalResourceId("bob_club")).
+		WithObjectId(model.DeserializeLocalResourceId(uniqueID(t, "bob_club"))).
 		WithRelation(model.DeserializeRelation("member")).
 		WithSubject(model.NewTupleSubjectFilter().
 			WithSubjectId(model.DeserializeLocalResourceId("bob")).
@@ -398,7 +439,7 @@ func TestSupportedNsTypeTupleFilterCombinationsInReadRelationships(t *testing.T)
 
 	// Test 7: Optional subject type and namespace missing - should succeed
 	filter = model.NewTupleFilter().
-		WithObjectId(model.DeserializeLocalResourceId("bob_club")).
+		WithObjectId(model.DeserializeLocalResourceId(uniqueID(t, "bob_club"))).
 		WithReporterType(model.DeserializeReporterType("rbac")).
 		WithObjectType(model.DeserializeResourceType("group")).
 		WithRelation(model.DeserializeRelation("member")).
@@ -410,7 +451,7 @@ func TestSupportedNsTypeTupleFilterCombinationsInReadRelationships(t *testing.T)
 
 	// Test 8: Minimal filter (only ID and relation) - should succeed
 	filter = model.NewTupleFilter().
-		WithObjectId(model.DeserializeLocalResourceId("bob_club")).
+		WithObjectId(model.DeserializeLocalResourceId(uniqueID(t, "bob_club"))).
 		WithRelation(model.DeserializeRelation("member")).
 		WithSubject(model.NewTupleSubjectFilter().
 			WithSubjectId(model.DeserializeLocalResourceId("bob")))
@@ -420,7 +461,7 @@ func TestSupportedNsTypeTupleFilterCombinationsInReadRelationships(t *testing.T)
 
 	// Test 9: With full type info but without subject ID - should succeed
 	filter = model.NewTupleFilter().
-		WithObjectId(model.DeserializeLocalResourceId("bob_club")).
+		WithObjectId(model.DeserializeLocalResourceId(uniqueID(t, "bob_club"))).
 		WithReporterType(model.DeserializeReporterType("rbac")).
 		WithObjectType(model.DeserializeResourceType("group")).
 		WithSubject(model.NewTupleSubjectFilter().
@@ -431,6 +472,8 @@ func TestSupportedNsTypeTupleFilterCombinationsInReadRelationships(t *testing.T)
 }
 
 func TestWriteAndReadBackRelationships(t *testing.T) {
+	requireSpiceDBIntegration(t)
+
 	t.Parallel()
 
 	ctx := context.Background()
@@ -440,7 +483,7 @@ func TestWriteAndReadBackRelationships(t *testing.T) {
 	}
 
 	tuples := []model.RelationsTuple{
-		createRelationship("rbac", "group", "bob_club", "member", "rbac", "principal", "bob", ""),
+		createRelationship("rbac", "group", uniqueID(t, "bob_club"), "member", "rbac", "principal", "bob", ""),
 	}
 
 	_, err = spiceDbRepo.CreateTuples(ctx, tuples, true, nil)
@@ -451,7 +494,7 @@ func TestWriteAndReadBackRelationships(t *testing.T) {
 	container.WaitForQuantizationInterval()
 
 	filter := model.NewTupleFilter().
-		WithObjectId(model.DeserializeLocalResourceId("bob_club")).
+		WithObjectId(model.DeserializeLocalResourceId(uniqueID(t, "bob_club"))).
 		WithReporterType(model.DeserializeReporterType("rbac")).
 		WithObjectType(model.DeserializeResourceType("group")).
 		WithRelation(model.DeserializeRelation("member")).
@@ -470,6 +513,8 @@ func TestWriteAndReadBackRelationships(t *testing.T) {
 }
 
 func TestWriteReadBackDeleteAndReadBackRelationships(t *testing.T) {
+	requireSpiceDBIntegration(t)
+
 	t.Parallel()
 
 	ctx := context.Background()
@@ -479,7 +524,7 @@ func TestWriteReadBackDeleteAndReadBackRelationships(t *testing.T) {
 	}
 
 	tuples := []model.RelationsTuple{
-		createRelationship("rbac", "group", "bob_club", "member", "rbac", "principal", "bob", ""),
+		createRelationship("rbac", "group", uniqueID(t, "bob_club"), "member", "rbac", "principal", "bob", ""),
 	}
 
 	_, err = spiceDbRepo.CreateTuples(ctx, tuples, true, nil)
@@ -490,7 +535,7 @@ func TestWriteReadBackDeleteAndReadBackRelationships(t *testing.T) {
 	container.WaitForQuantizationInterval()
 
 	filter := model.NewTupleFilter().
-		WithObjectId(model.DeserializeLocalResourceId("bob_club")).
+		WithObjectId(model.DeserializeLocalResourceId(uniqueID(t, "bob_club"))).
 		WithReporterType(model.DeserializeReporterType("rbac")).
 		WithObjectType(model.DeserializeResourceType("group")).
 		WithRelation(model.DeserializeRelation("member")).
@@ -524,6 +569,8 @@ func TestWriteReadBackDeleteAndReadBackRelationships(t *testing.T) {
 }
 
 func TestWriteReadBackDeleteAndReadBackRelationships_WithConsistencyToken(t *testing.T) {
+	requireSpiceDBIntegration(t)
+
 	t.Parallel()
 
 	ctx := context.Background()
@@ -533,7 +580,7 @@ func TestWriteReadBackDeleteAndReadBackRelationships_WithConsistencyToken(t *tes
 	}
 
 	tuples := []model.RelationsTuple{
-		createRelationship("rbac", "group", "bob_club", "member", "rbac", "principal", "bob", ""),
+		createRelationship("rbac", "group", uniqueID(t, "bob_club"), "member", "rbac", "principal", "bob", ""),
 	}
 
 	respCreate, err := spiceDbRepo.CreateTuples(ctx, tuples, true, nil)
@@ -542,7 +589,7 @@ func TestWriteReadBackDeleteAndReadBackRelationships_WithConsistencyToken(t *tes
 	}
 
 	filter := model.NewTupleFilter().
-		WithObjectId(model.DeserializeLocalResourceId("bob_club")).
+		WithObjectId(model.DeserializeLocalResourceId(uniqueID(t, "bob_club"))).
 		WithReporterType(model.DeserializeReporterType("rbac")).
 		WithObjectType(model.DeserializeResourceType("group")).
 		WithRelation(model.DeserializeRelation("member")).
@@ -576,6 +623,8 @@ func TestWriteReadBackDeleteAndReadBackRelationships_WithConsistencyToken(t *tes
 }
 
 func TestSpiceDbRepository_CheckPermission_WithConsistencyToken(t *testing.T) {
+	requireSpiceDBIntegration(t)
+
 	t.Parallel()
 
 	ctx := context.Background()
@@ -585,8 +634,8 @@ func TestSpiceDbRepository_CheckPermission_WithConsistencyToken(t *testing.T) {
 	}
 
 	tuples := []model.RelationsTuple{
-		createRelationship("rbac", "group", "bob_club", "member", "rbac", "principal", "bob", ""),
-		createRelationship("rbac", "workspace", "test", "user_grant", "rbac", "role_binding", "rb_test", ""),
+		createRelationship("rbac", "group", uniqueID(t, "bob_club"), "member", "rbac", "principal", "bob", ""),
+		createRelationship("rbac", "workspace", uniqueID(t, "test"), "user_grant", "rbac", "role_binding", "rb_test", ""),
 		createRelationship("rbac", "role_binding", "rb_test", "granted", "rbac", "role", "rl1", ""),
 		createRelationship("rbac", "role_binding", "rb_test", "subject", "rbac", "principal", "bob", ""),
 		createRelationship("rbac", "role", "rl1", "view_widget", "rbac", "principal", "*", ""),
@@ -598,7 +647,7 @@ func TestSpiceDbRepository_CheckPermission_WithConsistencyToken(t *testing.T) {
 	}
 
 	subject := createSubjectReference("rbac", "principal", "bob")
-	resource := createResourceReference("rbac", "workspace", "test")
+	resource := createResourceReference("rbac", "workspace", uniqueID(t, "test"))
 
 	// no wait, immediately read after write.
 	// zed permission check rbac/workspace:test view_widget rbac/principal:bob --explain
@@ -614,6 +663,8 @@ func TestSpiceDbRepository_CheckPermission_WithConsistencyToken(t *testing.T) {
 }
 
 func TestSpiceDbRepository_CheckForUpdatePermission(t *testing.T) {
+	requireSpiceDBIntegration(t)
+
 	t.Parallel()
 
 	ctx := context.Background()
@@ -623,8 +674,8 @@ func TestSpiceDbRepository_CheckForUpdatePermission(t *testing.T) {
 	}
 
 	tuples := []model.RelationsTuple{
-		createRelationship("rbac", "group", "bob_club", "member", "rbac", "principal", "bob", ""),
-		createRelationship("rbac", "workspace", "test", "user_grant", "rbac", "role_binding", "rb_test", ""),
+		createRelationship("rbac", "group", uniqueID(t, "bob_club"), "member", "rbac", "principal", "bob", ""),
+		createRelationship("rbac", "workspace", uniqueID(t, "test"), "user_grant", "rbac", "role_binding", "rb_test", ""),
 		createRelationship("rbac", "role_binding", "rb_test", "granted", "rbac", "role", "rl1", ""),
 		createRelationship("rbac", "role_binding", "rb_test", "subject", "rbac", "principal", "bob", ""),
 		createRelationship("rbac", "role", "rl1", "view_widget", "rbac", "principal", "*", ""),
@@ -636,7 +687,7 @@ func TestSpiceDbRepository_CheckForUpdatePermission(t *testing.T) {
 	}
 
 	subject := createSubjectReference("rbac", "principal", "bob")
-	resource := createResourceReference("rbac", "workspace", "test")
+	resource := createResourceReference("rbac", "workspace", uniqueID(t, "test"))
 
 	// no wait, immediately read after write.
 	// zed permission check rbac/workspace:test view_widget rbac/principal:bob --explain
@@ -651,6 +702,8 @@ func TestSpiceDbRepository_CheckForUpdatePermission(t *testing.T) {
 }
 
 func TestSpiceDbRepository_CheckPermission(t *testing.T) {
+	requireSpiceDBIntegration(t)
+
 	t.Parallel()
 
 	ctx := context.Background()
@@ -660,8 +713,8 @@ func TestSpiceDbRepository_CheckPermission(t *testing.T) {
 	}
 
 	tuples := []model.RelationsTuple{
-		createRelationship("rbac", "group", "bob_club", "member", "rbac", "principal", "bob", ""),
-		createRelationship("rbac", "workspace", "test", "user_grant", "rbac", "role_binding", "rb_test", ""),
+		createRelationship("rbac", "group", uniqueID(t, "bob_club"), "member", "rbac", "principal", "bob", ""),
+		createRelationship("rbac", "workspace", uniqueID(t, "test"), "user_grant", "rbac", "role_binding", "rb_test", ""),
 		createRelationship("rbac", "role_binding", "rb_test", "granted", "rbac", "role", "rl1", ""),
 		createRelationship("rbac", "role_binding", "rb_test", "subject", "rbac", "principal", "bob", ""),
 		createRelationship("rbac", "role", "rl1", "view_widget", "rbac", "principal", "*", ""),
@@ -675,7 +728,7 @@ func TestSpiceDbRepository_CheckPermission(t *testing.T) {
 	container.WaitForQuantizationInterval()
 
 	subject := createSubjectReference("rbac", "principal", "bob")
-	resource := createResourceReference("rbac", "workspace", "test")
+	resource := createResourceReference("rbac", "workspace", uniqueID(t, "test"))
 
 	// zed permission check rbac/workspace:test view_widget rbac/principal:bob --explain
 	rel := model.NewRelationship(resource, model.DeserializeRelation("view_widget"), subject)
@@ -714,6 +767,8 @@ func TestSpiceDbRepository_CheckPermission(t *testing.T) {
 }
 
 func TestSpiceDbRepository_NewEnemyProblem_Success(t *testing.T) {
+	requireSpiceDBIntegration(t)
+
 	t.Parallel()
 
 	ctx := context.Background()
@@ -723,8 +778,8 @@ func TestSpiceDbRepository_NewEnemyProblem_Success(t *testing.T) {
 	}
 
 	tuples := []model.RelationsTuple{
-		createRelationship("rbac", "group", "bob_club", "member", "rbac", "principal", "bob", ""),
-		createRelationship("rbac", "workspace", "test", "user_grant", "rbac", "role_binding", "rb_test", ""),
+		createRelationship("rbac", "group", uniqueID(t, "bob_club"), "member", "rbac", "principal", "bob", ""),
+		createRelationship("rbac", "workspace", uniqueID(t, "test"), "user_grant", "rbac", "role_binding", "rb_test", ""),
 		createRelationship("rbac", "role_binding", "rb_test", "granted", "rbac", "role", "rl1", ""),
 		createRelationship("rbac", "role_binding", "rb_test", "subject", "rbac", "principal", "u1", ""),
 		createRelationship("rbac", "role_binding", "rb_test", "subject", "rbac", "principal", "u2", ""),
@@ -736,7 +791,7 @@ func TestSpiceDbRepository_NewEnemyProblem_Success(t *testing.T) {
 		return
 	}
 
-	resource := createResourceReference("rbac", "workspace", "test")
+	resource := createResourceReference("rbac", "workspace", uniqueID(t, "test"))
 	consistency := model.NewConsistencyAtLeastAsFresh(relationshipResp.ConsistencyToken())
 
 	// u1
@@ -805,6 +860,8 @@ func TestSpiceDbRepository_NewEnemyProblem_Success(t *testing.T) {
 }
 
 func TestSpiceDbRepository_CheckPermission_MinimizeLatency(t *testing.T) {
+	requireSpiceDBIntegration(t)
+
 	t.Parallel()
 
 	ctx := context.Background()
@@ -814,8 +871,8 @@ func TestSpiceDbRepository_CheckPermission_MinimizeLatency(t *testing.T) {
 	}
 
 	tuples := []model.RelationsTuple{
-		createRelationship("rbac", "group", "bob_club", "member", "rbac", "principal", "bob", ""),
-		createRelationship("rbac", "workspace", "test", "user_grant", "rbac", "role_binding", "rb_test", ""),
+		createRelationship("rbac", "group", uniqueID(t, "bob_club"), "member", "rbac", "principal", "bob", ""),
+		createRelationship("rbac", "workspace", uniqueID(t, "test"), "user_grant", "rbac", "role_binding", "rb_test", ""),
 		createRelationship("rbac", "role_binding", "rb_test", "granted", "rbac", "role", "rl1", ""),
 		createRelationship("rbac", "role_binding", "rb_test", "subject", "rbac", "principal", "bob", ""),
 		createRelationship("rbac", "role", "rl1", "view_widget", "rbac", "principal", "*", ""),
@@ -829,7 +886,7 @@ func TestSpiceDbRepository_CheckPermission_MinimizeLatency(t *testing.T) {
 	container.WaitForQuantizationInterval()
 
 	subject := createSubjectReference("rbac", "principal", "bob")
-	resource := createResourceReference("rbac", "workspace", "test")
+	resource := createResourceReference("rbac", "workspace", uniqueID(t, "test"))
 
 	// Test with minimize_latency = True.
 
@@ -861,6 +918,8 @@ func TestSpiceDbRepository_CheckPermission_MinimizeLatency(t *testing.T) {
 }
 
 func TestSpiceDbRepository_CheckBulk(t *testing.T) {
+	requireSpiceDBIntegration(t)
+
 	t.Parallel()
 
 	ctx := context.Background()
@@ -870,8 +929,8 @@ func TestSpiceDbRepository_CheckBulk(t *testing.T) {
 	}
 
 	tuples := []model.RelationsTuple{
-		createRelationship("rbac", "group", "bob_club", "member", "rbac", "principal", "bob", ""),
-		createRelationship("rbac", "workspace", "test", "user_grant", "rbac", "role_binding", "rb_test", ""),
+		createRelationship("rbac", "group", uniqueID(t, "bob_club"), "member", "rbac", "principal", "bob", ""),
+		createRelationship("rbac", "workspace", uniqueID(t, "test"), "user_grant", "rbac", "role_binding", "rb_test", ""),
 		createRelationship("rbac", "role_binding", "rb_test", "granted", "rbac", "role", "rl1", ""),
 		createRelationship("rbac", "role_binding", "rb_test", "subject", "rbac", "principal", "bob", ""),
 		createRelationship("rbac", "role", "rl1", "view_widget", "rbac", "principal", "*", ""),
@@ -884,7 +943,7 @@ func TestSpiceDbRepository_CheckBulk(t *testing.T) {
 
 	container.WaitForQuantizationInterval()
 
-	resource := createResourceReference("rbac", "workspace", "test")
+	resource := createResourceReference("rbac", "workspace", uniqueID(t, "test"))
 	bobSubject := createSubjectReference("rbac", "principal", "bob")
 	aliceSubject := createSubjectReference("rbac", "principal", "alice")
 
@@ -912,6 +971,8 @@ func TestSpiceDbRepository_CheckBulk(t *testing.T) {
 }
 
 func TestSpiceDbRepository_CheckForUpdateBulk(t *testing.T) {
+	requireSpiceDBIntegration(t)
+
 	t.Parallel()
 
 	// Unique IDs so this test does not collide with CheckBulk or other tests
@@ -966,13 +1027,16 @@ func TestSpiceDbRepository_CheckForUpdateBulk(t *testing.T) {
 }
 
 func TestSpiceDbRepository_CreateRelationships_WithFencing(t *testing.T) {
+	requireSpiceDBIntegration(t)
+
 	t.Parallel()
+
 	ctx := context.Background()
 	spiceDbRepo, err := container.CreateSpiceDbRepository()
 	assert.NoError(t, err)
 
 	// Acquire a lock to get a fencing token
-	lockId, _ := model.NewLockId("test-lock-1")
+	lockId, _ := model.NewLockId(uniqueID(t, "test-lock"))
 	lockResp, err := spiceDbRepo.AcquireLock(ctx, lockId)
 	assert.NoError(t, err)
 	fencingToken := lockResp.LockToken()
@@ -1010,13 +1074,16 @@ func TestSpiceDbRepository_CreateRelationships_WithFencing(t *testing.T) {
 }
 
 func TestSpiceDbRepository_DeleteRelationships_WithFencing(t *testing.T) {
+	requireSpiceDBIntegration(t)
+
 	t.Parallel()
+
 	ctx := context.Background()
 	spiceDbRepo, err := container.CreateSpiceDbRepository()
 	assert.NoError(t, err)
 
 	// Acquire a lock to get a fencing token
-	lockId, _ := model.NewLockId("test-lock-1")
+	lockId, _ := model.NewLockId(uniqueID(t, "test-lock"))
 	lockResp, err := spiceDbRepo.AcquireLock(ctx, lockId)
 	assert.NoError(t, err)
 	fencingToken := lockResp.LockToken()
@@ -1068,6 +1135,8 @@ func TestSpiceDbRepository_DeleteRelationships_WithFencing(t *testing.T) {
 }
 
 func TestSpiceDbRepository_AcquireLock_NewLock(t *testing.T) {
+	requireSpiceDBIntegration(t)
+
 	t.Parallel()
 
 	ctx := context.Background()
@@ -1076,7 +1145,7 @@ func TestSpiceDbRepository_AcquireLock_NewLock(t *testing.T) {
 		return
 	}
 
-	lockId, _ := model.NewLockId("test-lock-1")
+	lockId, _ := model.NewLockId(uniqueID(t, "test-lock"))
 
 	// Acquire a new lock
 	resp, err := spiceDbRepo.AcquireLock(ctx, lockId)
@@ -1085,13 +1154,15 @@ func TestSpiceDbRepository_AcquireLock_NewLock(t *testing.T) {
 }
 
 func TestSpiceDbRepository_AcquireLock_ReplaceExistingLock(t *testing.T) {
+	requireSpiceDBIntegration(t)
+
 	t.Parallel()
 
 	ctx := context.Background()
 	spiceDbRepo, err := container.CreateSpiceDbRepository()
 	assert.NoError(t, err)
 
-	lockId, _ := model.NewLockId("test-lock-1")
+	lockId, _ := model.NewLockId(uniqueID(t, "test-lock"))
 
 	// Acquire initial lock
 	resp1, err := spiceDbRepo.AcquireLock(ctx, lockId)
@@ -1106,6 +1177,8 @@ func TestSpiceDbRepository_AcquireLock_ReplaceExistingLock(t *testing.T) {
 }
 
 func TestSpiceDbRepository_AcquireLock_EmptyIdentifier(t *testing.T) {
+	requireSpiceDBIntegration(t)
+
 	t.Parallel()
 
 	// Try to acquire lock with an empty identifier (will fail at NewLockId)
@@ -1114,6 +1187,8 @@ func TestSpiceDbRepository_AcquireLock_EmptyIdentifier(t *testing.T) {
 }
 
 func TestSpiceDbRepository_LookupResources(t *testing.T) {
+	requireSpiceDBIntegration(t)
+
 	t.Parallel()
 
 	ctx := context.Background()
@@ -1129,8 +1204,8 @@ func TestSpiceDbRepository_LookupResources(t *testing.T) {
 	// - widget4 is in workspace2
 	tuples := []model.RelationsTuple{
 		// Workspace grants
-		createRelationship("rbac", "workspace", "workspace1", "user_grant", "rbac", "role_binding", "binding1", ""),
-		createRelationship("rbac", "workspace", "workspace2", "user_grant", "rbac", "role_binding", "binding2", ""),
+		createRelationship("rbac", "workspace", uniqueID(t, "workspace1"), "user_grant", "rbac", "role_binding", "binding1", ""),
+		createRelationship("rbac", "workspace", uniqueID(t, "workspace2"), "user_grant", "rbac", "role_binding", "binding2", ""),
 
 		// Role binding to role
 		createRelationship("rbac", "role_binding", "binding1", "granted", "rbac", "role", "viewer", ""),
@@ -1144,10 +1219,10 @@ func TestSpiceDbRepository_LookupResources(t *testing.T) {
 		createRelationship("rbac", "role", "viewer", "view_widget", "rbac", "principal", "*", ""),
 
 		// Widgets in workspaces
-		createRelationship("rbac", "widget", "widget1", "workspace", "rbac", "workspace", "workspace1", ""),
-		createRelationship("rbac", "widget", "widget2", "workspace", "rbac", "workspace", "workspace1", ""),
-		createRelationship("rbac", "widget", "widget3", "workspace", "rbac", "workspace", "workspace1", ""),
-		createRelationship("rbac", "widget", "widget4", "workspace", "rbac", "workspace", "workspace2", ""),
+		createRelationship("rbac", "widget", uniqueID(t, "widget1"), "workspace", "rbac", "workspace", uniqueID(t, "workspace1"), ""),
+		createRelationship("rbac", "widget", uniqueID(t, "widget2"), "workspace", "rbac", "workspace", uniqueID(t, "workspace1"), ""),
+		createRelationship("rbac", "widget", uniqueID(t, "widget3"), "workspace", "rbac", "workspace", uniqueID(t, "workspace1"), ""),
+		createRelationship("rbac", "widget", uniqueID(t, "widget4"), "workspace", "rbac", "workspace", uniqueID(t, "workspace2"), ""),
 	}
 
 	relationshipResp, err := spiceDbRepo.CreateTuples(ctx, tuples, true, nil)
@@ -1177,10 +1252,10 @@ func TestSpiceDbRepository_LookupResources(t *testing.T) {
 	// Collect all resources from the stream
 	foundResources := collectObjectIds(t, stream)
 	// alice should see widget1, widget2, widget3 from workspace1
-	assert.True(t, foundResources["widget1"], "alice should have view permission on widget1")
-	assert.True(t, foundResources["widget2"], "alice should have view permission on widget2")
-	assert.True(t, foundResources["widget3"], "alice should have view permission on widget3")
-	assert.False(t, foundResources["widget4"], "alice should not have view permission on widget4")
+	assert.True(t, foundResources[uniqueID(t, "widget1")], "alice should have view permission on widget1")
+	assert.True(t, foundResources[uniqueID(t, "widget2")], "alice should have view permission on widget2")
+	assert.True(t, foundResources[uniqueID(t, "widget3")], "alice should have view permission on widget3")
+	assert.False(t, foundResources[uniqueID(t, "widget4")], "alice should not have view permission on widget4")
 	assert.Equal(t, 3, len(foundResources), "alice should find exactly 3 widgets with view permission")
 
 	// Test 2: LookupObjects to find all widgets that charlie can view
@@ -1201,14 +1276,16 @@ func TestSpiceDbRepository_LookupResources(t *testing.T) {
 
 	foundResources2 := collectObjectIds(t, stream2)
 	// charlie should only see widget4 from workspace2
-	assert.False(t, foundResources2["widget1"], "charlie should not have view permission on widget1")
-	assert.False(t, foundResources2["widget2"], "charlie should not have view permission on widget2")
-	assert.False(t, foundResources2["widget3"], "charlie should not have view permission on widget3")
-	assert.True(t, foundResources2["widget4"], "charlie should have view permission on widget4")
+	assert.False(t, foundResources2[uniqueID(t, "widget1")], "charlie should not have view permission on widget1")
+	assert.False(t, foundResources2[uniqueID(t, "widget2")], "charlie should not have view permission on widget2")
+	assert.False(t, foundResources2[uniqueID(t, "widget3")], "charlie should not have view permission on widget3")
+	assert.True(t, foundResources2[uniqueID(t, "widget4")], "charlie should have view permission on widget4")
 	assert.Equal(t, 1, len(foundResources2), "charlie should find exactly 1 widget with view permission")
 }
 
 func TestSpiceDbRepository_LookupSubjects(t *testing.T) {
+	requireSpiceDBIntegration(t)
+
 	t.Parallel()
 
 	ctx := context.Background()
@@ -1232,8 +1309,8 @@ func TestSpiceDbRepository_LookupSubjects(t *testing.T) {
 		createRelationship("rbac", "group", "viewers", "member", "rbac", "principal", "charlie", ""),
 
 		// Workspace grants
-		createRelationship("rbac", "workspace", "test", "user_grant", "rbac", "role_binding", "admin_binding", ""),
-		createRelationship("rbac", "workspace", "test", "user_grant", "rbac", "role_binding", "viewer_binding", ""),
+		createRelationship("rbac", "workspace", uniqueID(t, "test"), "user_grant", "rbac", "role_binding", "admin_binding", ""),
+		createRelationship("rbac", "workspace", uniqueID(t, "test"), "user_grant", "rbac", "role_binding", "viewer_binding", ""),
 
 		// Role binding to role
 		createRelationship("rbac", "role_binding", "admin_binding", "granted", "rbac", "role", "admin", ""),
@@ -1258,7 +1335,7 @@ func TestSpiceDbRepository_LookupSubjects(t *testing.T) {
 	subjectType := model.NewRepresentationTypeRequired(
 		model.DeserializeResourceType("principal"),
 		model.DeserializeReporterType("rbac"))
-	resource := createResourceReference("rbac", "workspace", "test")
+	resource := createResourceReference("rbac", "workspace", uniqueID(t, "test"))
 
 	stream, err := spiceDbRepo.LookupSubjects(
 		ctx,
@@ -1419,6 +1496,8 @@ func collectObjectIds(t *testing.T, stream model.ResultStream[model.LookupObject
 }
 
 func TestFromSpicePair_WithError(t *testing.T) {
+	requireSpiceDBIntegration(t)
+
 	t.Parallel()
 
 	// Build a SpiceDB pair that contains an error instead of an item
@@ -1487,6 +1566,8 @@ func TestFromSpicePair_WithError(t *testing.T) {
 }
 
 func TestTupleFilterToSpiceDBFilter_SubjectRelationNil(t *testing.T) {
+	requireSpiceDBIntegration(t)
+
 	t.Parallel()
 
 	// Test case 1: subjectFilter.Relation is nil
@@ -1507,6 +1588,8 @@ func TestTupleFilterToSpiceDBFilter_SubjectRelationNil(t *testing.T) {
 }
 
 func TestTupleFilterToSpiceDBFilter_SubjectRelationEmptyString(t *testing.T) {
+	requireSpiceDBIntegration(t)
+
 	t.Parallel()
 
 	// Test case 2: subjectFilter.Relation is an empty string (via Deserialize)
@@ -1529,6 +1612,8 @@ func TestTupleFilterToSpiceDBFilter_SubjectRelationEmptyString(t *testing.T) {
 }
 
 func TestTupleFilterToSpiceDBFilter_SubjectRelationWithValue(t *testing.T) {
+	requireSpiceDBIntegration(t)
+
 	t.Parallel()
 
 	// Test case 3: subjectFilter.Relation has an actual value

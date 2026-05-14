@@ -1,9 +1,12 @@
 package middleware
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/go-kratos/kratos/v2/errors"
+	"github.com/go-kratos/kratos/v2/log"
+	"github.com/go-kratos/kratos/v2/transport"
 
 	authnapi "github.com/project-kessel/inventory-api/internal/authn/api"
 )
@@ -28,4 +31,23 @@ func validateAuthDecision(decision authnapi.Decision, claims *authnapi.Claims) e
 		return errors.Unauthorized(reason, "Invalid claims: authenticator returned Allow with nil claims")
 	}
 	return nil
+}
+
+// logAuthenticationFailure logs authentication failures for security monitoring.
+func logAuthenticationFailure(ctx context.Context, decision authnapi.Decision, reason string) {
+	logger := log.NewHelper(log.DefaultLogger)
+
+	endpoint := "unknown"
+	if t, ok := transport.FromServerContext(ctx); ok {
+		endpoint = t.Operation()
+	}
+
+	// Auth failure - SEC-MON-REQ-1 compliance (#7 invalid_login)
+	logger.Warnw(
+		"event", "authentication_failure",
+		"endpoint", endpoint,
+		"reason", reason,
+		"decision", string(decision),
+		"outcome", "failure",
+	)
 }

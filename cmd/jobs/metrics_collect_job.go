@@ -68,10 +68,24 @@ func collectMetricsWithDB(db *gorm.DB, logHelper *log.Helper, retentionDays int)
 	metrics := internal.JsonObject{}
 
 	if err := collectResourcesPerWorkspaceJob(db, logHelper, metrics); err != nil {
+		// Job failure - SEC-MON-REQ-1 compliance (#3 admin_action, #11 warnings_or_errors)
+		logHelper.Errorw(
+			"action", "COLLECT_METRICS",
+			"principal", "system:job:metrics-collect",
+			"outcome", "failure",
+			"error", err.Error(),
+		)
 		return err
 	}
 
 	if err := collectResourceCountJob(db, logHelper, metrics); err != nil {
+		// Job failure - SEC-MON-REQ-1 compliance (#3 admin_action, #11 warnings_or_errors)
+		logHelper.Errorw(
+			"action", "COLLECT_METRICS",
+			"principal", "system:job:metrics-collect",
+			"outcome", "failure",
+			"error", err.Error(),
+		)
 		return err
 	}
 
@@ -83,7 +97,13 @@ func collectMetricsWithDB(db *gorm.DB, logHelper *log.Helper, retentionDays int)
 
 	insertStart := time.Now()
 	if err := db.Session(&gorm.Session{Logger: db.Logger.LogMode(gormlogger.Silent)}).Create(&summary).Error; err != nil {
-		logHelper.Errorf("failed to write metrics summary: %v", err)
+		// Job failure - SEC-MON-REQ-1 compliance (#3 admin_action, #11 warnings_or_errors)
+		logHelper.Errorw(
+			"action", "COLLECT_METRICS",
+			"principal", "system:job:metrics-collect",
+			"outcome", "failure",
+			"error", err.Error(),
+		)
 		return err
 	}
 
@@ -97,12 +117,23 @@ func collectMetricsWithDB(db *gorm.DB, logHelper *log.Helper, retentionDays int)
 	cutoff := time.Now().UTC().AddDate(0, 0, -retentionDays)
 	result := db.Where("collected_at < ?", cutoff).Delete(&model.MetricsSummary{})
 	if result.Error != nil {
-		logHelper.Errorf("failed to clean up old metrics summaries: %v", result.Error)
+		// Job failure - SEC-MON-REQ-1 compliance (#3 admin_action, #11 warnings_or_errors)
+		logHelper.Errorw(
+			"action", "COLLECT_METRICS",
+			"principal", "system:job:metrics-collect",
+			"outcome", "failure",
+			"error", result.Error.Error(),
+		)
 		return result.Error
 	}
 	logHelper.Infof("Cleaned up %d metrics summaries older than %d days", result.RowsAffected, retentionDays)
 
-	logHelper.Info("Metrics collection job completed successfully")
+	// Job success - SEC-MON-REQ-1 compliance (#3 admin_action)
+	logHelper.Infow(
+		"action", "COLLECT_METRICS",
+		"principal", "system:job:metrics-collect",
+		"outcome", "success",
+	)
 	return nil
 }
 

@@ -13,6 +13,7 @@ import (
 type TupleCrudUseCase struct {
 	Authz          model.RelationsRepository
 	MetaAuthorizer metaauthorizer.MetaAuthorizer
+	logger         log.Logger
 	Log            *log.Helper
 }
 
@@ -21,6 +22,7 @@ func New(authz model.RelationsRepository, metaAuthorizer metaauthorizer.MetaAuth
 	return &TupleCrudUseCase{
 		Authz:          authz,
 		MetaAuthorizer: metaAuthorizer,
+		logger:         logger,
 		Log:            log.NewHelper(logger),
 	}
 }
@@ -30,7 +32,7 @@ func New(authz model.RelationsRepository, metaAuthorizer metaauthorizer.MetaAuth
 func (uc *TupleCrudUseCase) CreateTuples(ctx context.Context, cmd CreateTuplesCommand) (*CreateTuplesResult, error) {
 	uc.Log.Info("DEPRECATED: CreateTuples called - this endpoint is for RBAC-only backward compatibility")
 
-	if err := metaauthorizer.EnforceMetaAuthzObject(ctx, uc.MetaAuthorizer, metaauthorizer.RelationCreateTuples, metaauthorizer.NewTupleSystem()); err != nil {
+	if err := metaauthorizer.EnforceMetaAuthzObject(ctx, uc.MetaAuthorizer, metaauthorizer.RelationCreateTuples, metaauthorizer.NewTupleSystem(), uc.logger); err != nil {
 		return nil, err
 	}
 
@@ -55,7 +57,7 @@ func (uc *TupleCrudUseCase) CreateTuples(ctx context.Context, cmd CreateTuplesCo
 func (uc *TupleCrudUseCase) DeleteTuples(ctx context.Context, cmd DeleteTuplesCommand) (*DeleteTuplesResult, error) {
 	uc.Log.Info("DEPRECATED: DeleteTuples called - this endpoint is for RBAC-only backward compatibility")
 
-	if err := metaauthorizer.EnforceMetaAuthzObject(ctx, uc.MetaAuthorizer, metaauthorizer.RelationDeleteTuples, metaauthorizer.NewTupleSystem()); err != nil {
+	if err := metaauthorizer.EnforceMetaAuthzObject(ctx, uc.MetaAuthorizer, metaauthorizer.RelationDeleteTuples, metaauthorizer.NewTupleSystem(), uc.logger); err != nil {
 		return nil, err
 	}
 
@@ -80,7 +82,7 @@ func (uc *TupleCrudUseCase) DeleteTuples(ctx context.Context, cmd DeleteTuplesCo
 func (uc *TupleCrudUseCase) ReadTuples(ctx context.Context, cmd ReadTuplesCommand) (model.ResultStream[model.ReadTuplesItem], error) {
 	uc.Log.Info("DEPRECATED: ReadTuples called - this endpoint is for RBAC-only backward compatibility")
 
-	if err := metaauthorizer.EnforceMetaAuthzObject(ctx, uc.MetaAuthorizer, metaauthorizer.RelationReadTuples, metaauthorizer.NewTupleSystem()); err != nil {
+	if err := metaauthorizer.EnforceMetaAuthzObject(ctx, uc.MetaAuthorizer, metaauthorizer.RelationReadTuples, metaauthorizer.NewTupleSystem(), uc.logger); err != nil {
 		return nil, err
 	}
 
@@ -92,7 +94,7 @@ func (uc *TupleCrudUseCase) ReadTuples(ctx context.Context, cmd ReadTuplesComman
 func (uc *TupleCrudUseCase) AcquireLock(ctx context.Context, cmd AcquireLockCommand) (*AcquireLockResult, error) {
 	uc.Log.Info("DEPRECATED: AcquireLock called - this endpoint is for RBAC-only backward compatibility")
 
-	if err := metaauthorizer.EnforceMetaAuthzObject(ctx, uc.MetaAuthorizer, metaauthorizer.RelationAcquireLock, metaauthorizer.NewTupleSystem()); err != nil {
+	if err := metaauthorizer.EnforceMetaAuthzObject(ctx, uc.MetaAuthorizer, metaauthorizer.RelationAcquireLock, metaauthorizer.NewTupleSystem(), uc.logger); err != nil {
 		return nil, err
 	}
 

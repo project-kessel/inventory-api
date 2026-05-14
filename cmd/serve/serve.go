@@ -178,6 +178,18 @@ func NewCommand(
 				return errors.NewAggregate(errs)
 			}
 
+			// Service startup - SEC-MON-REQ-1 compliance (#5 process_status)
+			logHelper := log.NewHelper(logger)
+			logHelper.Infow(
+				"event", "startup",
+				"version", loggerOptions.ServiceVersion,
+				"config.storage.database", storageOptions.Database,
+				"config.consumer.enabled", consumerOptions.Enabled,
+				"config.authz.impl", authzOptions.Authz,
+				"config.server.name", serverOptions.Name,
+				"outcome", "success",
+			)
+
 			// construct storage
 			db, err := storage.New(storageConfig, log.NewHelper(log.With(logger, "subsystem", "storage")))
 			if err != nil {
@@ -392,13 +404,20 @@ func NewCommand(
 // including the HTTP server, pprof server, consumer, and database connections.
 func shutdown(db *gorm.DB, srv *server.Server, pprofSrv *pprof.Server, cm *consumer.InventoryConsumer, logger *log.Helper) func(reason interface{}) {
 	return func(reason interface{}) {
-		log.Info(fmt.Sprintf("Server Shutdown: %s", reason))
+		// Shutdown initiation - SEC-MON-REQ-1 compliance (#5 process_status)
+		logger.Infow(
+			"event", "shutdown",
+			"reason", fmt.Sprintf("%v", reason),
+		)
+
+		hasErrors := false
 
 		timeout := srv.HttpServer.ReadTimeout
 		ctx, cancel := context.WithTimeout(context.Background(), timeout)
 		defer cancel()
 		if err := srv.Shutdown(ctx); err != nil {
 			logger.Error(fmt.Sprintf("Error Gracefully Shutting Down API: %v", err))
+			hasErrors = true
 		}
 
 		if pprofSrv != nil {
@@ -406,6 +425,7 @@ func shutdown(db *gorm.DB, srv *server.Server, pprofSrv *pprof.Server, cm *consu
 			defer cancel()
 			if err := pprofSrv.Shutdown(ctx); err != nil {
 				logger.Error(fmt.Sprintf("Error Gracefully Shutting Down pprof: %v", err))
+				hasErrors = true
 			}
 		}
 
@@ -417,6 +437,7 @@ func shutdown(db *gorm.DB, srv *server.Server, pprofSrv *pprof.Server, cm *consu
 						logger.Warn("error shutting down consumer, consumer already closed")
 					} else {
 						logger.Error(fmt.Sprintf("Error Gracefully Shutting Down Consumer: %v", err))
+						hasErrors = true
 					}
 				}
 			}()
@@ -424,12 +445,24 @@ func shutdown(db *gorm.DB, srv *server.Server, pprofSrv *pprof.Server, cm *consu
 
 		if sqlDB, err := db.DB(); err != nil {
 			logger.Error(fmt.Sprintf("Error Gracefully Shutting Down Storage: %v", err))
+			hasErrors = true
 		} else {
 			defer func() {
 				if err := sqlDB.Close(); err != nil {
 					fmt.Printf("failed to close consumer: %v", err)
+					hasErrors = true
 				}
 			}()
 		}
+
+		// Shutdown completion - SEC-MON-REQ-1 compliance (#5 process_status)
+		outcome := "success"
+		if hasErrors {
+			outcome = "failure"
+		}
+		logger.Infow(
+			"event", "shutdown",
+			"outcome", outcome,
+		)
 	}
 }

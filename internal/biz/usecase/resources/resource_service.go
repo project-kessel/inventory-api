@@ -67,6 +67,7 @@ type Usecase struct {
 	Relations           model.RelationsRepository
 	MetaAuthorizer      metaauthorizer.MetaAuthorizer
 	Namespace           string
+	logger              log.Logger
 	Log                 *log.Helper
 	ListenManager       pubsub.ListenManagerImpl
 	Config              *UsecaseConfig
@@ -88,6 +89,7 @@ func New(resourceRepository model.ResourceRepository, schemaRepository model.Sch
 		Relations:           relations,
 		MetaAuthorizer:      metaAuthorizer,
 		Namespace:           namespace,
+		logger:              logger,
 		Log:                 log.NewHelper(logger),
 		ListenManager:       listenManager,
 		Config:              usecaseConfig,
@@ -195,8 +197,52 @@ func (uc *Usecase) ReportResource(ctx context.Context, cmd ReportResourceCommand
 	}
 
 	if err != nil {
+		// Determine action for logging
+		action := "REPORT"
+		if operationType != nil {
+			if operationType.OperationType() == "created" {
+				action = "CREATE"
+			} else if operationType.OperationType() == "updated" {
+				action = "UPDATE"
+			}
+		}
+
+		// REPORT failure - SEC-MON-REQ-1 compliance (#1 pii_manipulation, #11 warnings_or_errors)
+		uc.Log.Errorw(
+			"action", action,
+			"resource_type", cmd.ResourceType.String(),
+			"resource_id", cmd.LocalResourceId.String(),
+			"reporter_type", cmd.ReporterType.String(),
+			"org_id", string(authzCtx.Subject.OrganizationId),
+			"user_id", string(authzCtx.Subject.SubjectId),
+			"client_id", string(authzCtx.Subject.ClientID),
+			"outcome", "failure",
+			"error", err.Error(),
+		)
 		return err
 	}
+
+	// Determine action for success logging
+	action := "REPORT"
+	if operationType != nil {
+		if operationType.OperationType() == "created" {
+			action = "CREATE"
+		} else if operationType.OperationType() == "updated" {
+			action = "UPDATE"
+		}
+	}
+
+	// REPORT success - SEC-MON-REQ-1 compliance (#1 pii_manipulation)
+	uc.Log.Infow(
+		"action", action,
+		"resource_type", cmd.ResourceType.String(),
+		"resource_id", cmd.LocalResourceId.String(),
+		"reporter_type", cmd.ReporterType.String(),
+		"org_id", string(authzCtx.Subject.OrganizationId),
+		"user_id", string(authzCtx.Subject.SubjectId),
+		"client_id", string(authzCtx.Subject.ClientID),
+		"outcome", "success",
+	)
 
 	// Increment outbox metrics only after successful transaction commit
 	if operationType != nil {
@@ -300,13 +346,15 @@ func (uc *Usecase) Delete(ctx context.Context, reporterResourceKey model.Reporte
 		return err
 	}
 
+	// Get authz context for logging
+	authzCtx, ok := authnapi.FromAuthzContext(ctx)
+	if !ok || authzCtx.Subject == nil {
+		return status.Error(codes.Unauthenticated, "authentication required")
+	}
+
 	txid, err := getNextTransactionID()
 	if err != nil {
 		return err
-	}
-	// Log client_id if available (from OIDC authentication)
-	if authzCtx, ok := authnapi.FromAuthzContext(ctx); ok && authzCtx.Subject != nil && authzCtx.Subject.ClientID != "" {
-		log.Infof("Deleting resource %v from client_id: %s", reporterResourceKey, authzCtx.Subject.ClientID)
 	}
 
 	err = uc.resourceRepository.GetTransactionManager().HandleSerializableTransaction(
@@ -332,8 +380,32 @@ func (uc *Usecase) Delete(ctx context.Context, reporterResourceKey model.Reporte
 	)
 
 	if err != nil {
+		// DELETE failure - SEC-MON-REQ-1 compliance (#1 pii_manipulation, #11 warnings_or_errors)
+		uc.Log.Errorw(
+			"action", "DELETE",
+			"resource_type", reporterResourceKey.ResourceType().String(),
+			"resource_id", reporterResourceKey.LocalResourceId().String(),
+			"reporter_type", reporterResourceKey.ReporterType().String(),
+			"org_id", string(authzCtx.Subject.OrganizationId),
+			"user_id", string(authzCtx.Subject.SubjectId),
+			"client_id", string(authzCtx.Subject.ClientID),
+			"outcome", "failure",
+			"error", err.Error(),
+		)
 		return err
 	}
+
+	// DELETE success - SEC-MON-REQ-1 compliance (#1 pii_manipulation)
+	uc.Log.Infow(
+		"action", "DELETE",
+		"resource_type", reporterResourceKey.ResourceType().String(),
+		"resource_id", reporterResourceKey.LocalResourceId().String(),
+		"reporter_type", reporterResourceKey.ReporterType().String(),
+		"org_id", string(authzCtx.Subject.OrganizationId),
+		"user_id", string(authzCtx.Subject.SubjectId),
+		"client_id", string(authzCtx.Subject.ClientID),
+		"outcome", "success",
+	)
 
 	// Increment outbox metrics only after successful transaction commit
 	metricscollector.Incr(uc.MetricsCollector.OutboxEventWrites, string(model.OperationTypeDeleted.OperationType()))
@@ -580,7 +652,7 @@ func (uc *Usecase) selfSubjectFromContext(ctx context.Context) (model.SubjectRef
 
 // enforceMetaAuthzObject calls the MetaAuthorizer to validate access using a MetaObject.
 func (uc *Usecase) enforceMetaAuthzObject(ctx context.Context, relation metaauthorizer.Relation, metaObject metaauthorizer.MetaObject) error {
-	return metaauthorizer.EnforceMetaAuthzObject(ctx, uc.MetaAuthorizer, relation, metaObject)
+	return metaauthorizer.EnforceMetaAuthzObject(ctx, uc.MetaAuthorizer, relation, metaObject, uc.logger)
 }
 
 // validateReportResourceCommand validates a ReportResourceCommand against schemas.

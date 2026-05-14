@@ -172,7 +172,9 @@ func (i *StreamAuthInterceptor) Interceptor() grpc.StreamServerInterceptor {
 		}
 
 		if err := validateAuthDecision(decision, claims); err != nil {
-			// Log at appropriate level based on decision
+			// Log authentication failure for security monitoring
+			logAuthenticationFailure(newCtx, decision, err.Error())
+			// Log at appropriate level based on decision (existing diagnostics)
 			if decision == authnapi.Deny || decision == authnapi.Ignore {
 				logHelper.Warnf("Stream authentication failed for %s: %v", info.FullMethod, err)
 			} else {

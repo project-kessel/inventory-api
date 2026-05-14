@@ -29,6 +29,8 @@ func Authentication(authenticator authnapi.Authenticator) func(middleware.Handle
 
 				claims, decision := authenticator.Authenticate(ctx, t)
 				if err := validateAuthDecision(decision, claims); err != nil {
+					// Log authentication failure for security monitoring
+					logAuthenticationFailure(ctx, decision, err.Error())
 					return nil, err
 				}
 

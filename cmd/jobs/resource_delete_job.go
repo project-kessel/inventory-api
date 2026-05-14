@@ -76,6 +76,15 @@ func deleteResources(storageOptions *storage.Options, loggerOptions common.Logge
 	// Delete ReporterResource records in batches (CASCADE will automatically delete ReporterRepresentation)
 	totalReporterResources, err := deleteBatchedReporterResources(db, logHelper, dryRun, resourceType, reporterType, batchSize, batchDelayMs)
 	if err != nil {
+		// Job failure - SEC-MON-REQ-1 compliance (#3 admin_action, #1 pii_manipulation, #11 warnings_or_errors)
+		logHelper.Errorw(
+			"action", "BULK_DELETE",
+			"resource_type", resourceType,
+			"reporter_type", reporterType,
+			"principal", "system:job:resource-delete",
+			"outcome", "failure",
+			"error", err.Error(),
+		)
 		return err
 	}
 	logDeleteResult(logHelper, dryRun, "ReporterResource records (ReporterRepresentation cascade deleted)", totalReporterResources)
@@ -83,6 +92,15 @@ func deleteResources(storageOptions *storage.Options, loggerOptions common.Logge
 	// Delete CommonRepresentation records in batches
 	totalCommonRepresentations, err := deleteBatchedCommonRepresentations(db, logHelper, dryRun, reporterType, batchSize, batchDelayMs)
 	if err != nil {
+		// Job failure - SEC-MON-REQ-1 compliance (#3 admin_action, #1 pii_manipulation, #11 warnings_or_errors)
+		logHelper.Errorw(
+			"action", "BULK_DELETE",
+			"resource_type", resourceType,
+			"reporter_type", reporterType,
+			"principal", "system:job:resource-delete",
+			"outcome", "failure",
+			"error", err.Error(),
+		)
 		return err
 	}
 	logDeleteResult(logHelper, dryRun, "CommonRepresentation records", totalCommonRepresentations)
@@ -90,6 +108,15 @@ func deleteResources(storageOptions *storage.Options, loggerOptions common.Logge
 	// Delete Resource records in batches
 	totalResources, err := deleteBatchedResources(db, logHelper, dryRun, resourceType, batchSize, batchDelayMs)
 	if err != nil {
+		// Job failure - SEC-MON-REQ-1 compliance (#3 admin_action, #1 pii_manipulation, #11 warnings_or_errors)
+		logHelper.Errorw(
+			"action", "BULK_DELETE",
+			"resource_type", resourceType,
+			"reporter_type", reporterType,
+			"principal", "system:job:resource-delete",
+			"outcome", "failure",
+			"error", err.Error(),
+		)
 		return err
 	}
 	logDeleteResult(logHelper, dryRun, "Resource records", totalResources)
@@ -99,8 +126,15 @@ func deleteResources(storageOptions *storage.Options, loggerOptions common.Logge
 			totalReporterResources, totalCommonRepresentations, totalResources)
 		logHelper.Info("[DRY-RUN] No data was modified")
 	} else {
-		logHelper.Infof("Resource deletion job completed successfully. Total records deleted: ReporterResource=%d, CommonRepresentation=%d, Resource=%d",
-			totalReporterResources, totalCommonRepresentations, totalResources)
+		// Job success - SEC-MON-REQ-1 compliance (#3 admin_action, #1 pii_manipulation)
+		logHelper.Infow(
+			"action", "BULK_DELETE",
+			"resource_type", resourceType,
+			"reporter_type", reporterType,
+			"principal", "system:job:resource-delete",
+			"deleted_count", totalReporterResources+totalCommonRepresentations+totalResources,
+			"outcome", "success",
+		)
 	}
 
 	return nil

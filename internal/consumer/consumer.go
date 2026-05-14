@@ -369,6 +369,16 @@ func (i *InventoryConsumer) processRelationsOperation(
 	if err != nil {
 		metricscollector.Incr(i.MetricsCollector.MsgProcessFailures, "FindRepresentations")
 		i.Logger.Errorf("failed to find representations: %v", err)
+		// Consumer CDC failure - SEC-MON-REQ-1 compliance (#1 pii_manipulation, #3 admin_action, #11 warnings_or_errors)
+		i.Logger.Errorw(
+			"action", operation,
+			"resource_type", key.ResourceType().String(),
+			"resource_id", key.LocalResourceId().String(),
+			"reporter_type", key.ReporterType().String(),
+			"principal", "system:consumer:debezium",
+			"outcome", "failure",
+			"error", err.Error(),
+		)
 		return "", err
 	}
 
@@ -376,6 +386,16 @@ func (i *InventoryConsumer) processRelationsOperation(
 	if err != nil {
 		metricscollector.Incr(i.MetricsCollector.MsgProcessFailures, "CalculateTuples")
 		i.Logger.Errorf("failed to calculate tuples: %v", err)
+		// Consumer CDC failure - SEC-MON-REQ-1 compliance (#1 pii_manipulation, #3 admin_action, #11 warnings_or_errors)
+		i.Logger.Errorw(
+			"action", operation,
+			"resource_type", key.ResourceType().String(),
+			"resource_id", key.LocalResourceId().String(),
+			"reporter_type", key.ReporterType().String(),
+			"principal", "system:consumer:debezium",
+			"outcome", "failure",
+			"error", err.Error(),
+		)
 		return "", err
 	}
 
@@ -389,8 +409,28 @@ func (i *InventoryConsumer) processRelationsOperation(
 	if err != nil {
 		metricscollector.Incr(i.MetricsCollector.MsgProcessFailures, config.metricName)
 		i.Logger.Errorf("failed to %s: %v", config.metricName, err)
+		// Consumer CDC failure - SEC-MON-REQ-1 compliance (#1 pii_manipulation, #3 admin_action, #11 warnings_or_errors)
+		i.Logger.Errorw(
+			"action", operation,
+			"resource_type", key.ResourceType().String(),
+			"resource_id", key.LocalResourceId().String(),
+			"reporter_type", key.ReporterType().String(),
+			"principal", "system:consumer:debezium",
+			"outcome", "failure",
+			"error", err.Error(),
+		)
 		return "", err
 	}
+
+	// Consumer CDC success - SEC-MON-REQ-1 compliance (#1 pii_manipulation, #3 admin_action)
+	i.Logger.Infow(
+		"action", operation,
+		"resource_type", key.ResourceType().String(),
+		"resource_id", key.LocalResourceId().String(),
+		"reporter_type", key.ReporterType().String(),
+		"principal", "system:consumer:debezium",
+		"outcome", "success",
+	)
 
 	return resp, nil
 }
@@ -686,14 +726,32 @@ func (i *InventoryConsumer) Retry(operation func() (string, error), metricCounte
 			attempts++
 			if i.RetryOptions.OperationMaxRetries == -1 || attempts < i.RetryOptions.OperationMaxRetries {
 				backoff := min(time.Duration(i.RetryOptions.BackoffFactor*attempts*300)*time.Millisecond, time.Duration(i.RetryOptions.MaxBackoffSeconds)*time.Second)
-				i.Logger.Errorf("retrying in %v", backoff)
+
+				// Consumer retry tracking - SEC-MON-REQ-1 compliance (#3 admin_action, #11 warnings_or_errors)
+				i.Logger.Warnw(
+					"event", "consumer_retry",
+					"attempt", attempts,
+					"backoff_ms", backoff.Milliseconds(),
+					"error", err.Error(),
+					"principal", "system:consumer:debezium",
+				)
+
 				time.Sleep(backoff)
 			}
 			continue
 		}
 		return fmt.Sprintf("%s", resp), nil
 	}
-	i.Logger.Errorf("Error processing request (max attempts reached: %v): %v", attempts, err)
+
+	// Consumer max retries reached - SEC-MON-REQ-1 compliance (#3 admin_action, #11 warnings_or_errors)
+	i.Logger.Errorw(
+		"event", "consumer_max_retries",
+		"attempts", attempts,
+		"error", err.Error(),
+		"principal", "system:consumer:debezium",
+		"outcome", "failure",
+	)
+
 	return "", ErrMaxRetries
 }
 

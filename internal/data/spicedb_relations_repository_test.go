@@ -81,8 +81,8 @@ func TestCreateRelationship(t *testing.T) {
 
 	ctx := context.Background()
 	spiceDbRepo, err := container.CreateSpiceDbRepository()
-	defer spiceDbRepo.Close()
 	assert.NoError(t, err)
+	defer spiceDbRepo.Close()
 
 	preExisting := CheckForRelationship(spiceDbRepo, "bob", "rbac", "principal", "", "member", "rbac", "group", uniqueID(t, "bob_club"), model.NewConsistencyUnspecified())
 	assert.False(t, preExisting)
@@ -107,8 +107,8 @@ func TestCreateRelationshipWithConsistencyToken(t *testing.T) {
 
 	ctx := context.Background()
 	spiceDbRepo, err := container.CreateSpiceDbRepository()
-	defer spiceDbRepo.Close()
 	assert.NoError(t, err)
+	defer spiceDbRepo.Close()
 
 	preExisting := CheckForRelationship(spiceDbRepo, "bob", "rbac", "principal", "", "member", "rbac", "group", uniqueID(t, "bob_club"), model.NewConsistencyUnspecified())
 	assert.False(t, preExisting)
@@ -132,8 +132,8 @@ func TestCreateRelationshipWithSubjectRelation(t *testing.T) {
 
 	ctx := context.Background()
 	spiceDbRepo, err := container.CreateSpiceDbRepository()
-	defer spiceDbRepo.Close()
 	assert.NoError(t, err)
+	defer spiceDbRepo.Close()
 
 	preExisting := CheckForRelationship(spiceDbRepo, "bob", "rbac", "principal", "", "member", "rbac", "group", uniqueID(t, "bob_club"), model.NewConsistencyUnspecified())
 	assert.False(t, preExisting)
@@ -188,8 +188,8 @@ func TestSecondCreateRelationshipFailsWithUpsertFalse(t *testing.T) {
 
 	ctx := context.Background()
 	spiceDbRepo, err := container.CreateSpiceDbRepository()
-	defer spiceDbRepo.Close()
 	assert.NoError(t, err)
+	defer spiceDbRepo.Close()
 
 	preExisting := CheckForRelationship(spiceDbRepo, "bob", "rbac", "principal", "", "member", "rbac", "group", uniqueID(t, "bob_club"), model.NewConsistencyUnspecified())
 	assert.False(t, preExisting)
@@ -218,8 +218,8 @@ func TestSecondCreateRelationshipSucceedsWithUpsertTrue(t *testing.T) {
 
 	ctx := context.Background()
 	spiceDbRepo, err := container.CreateSpiceDbRepository()
-	defer spiceDbRepo.Close()
 	assert.NoError(t, err)
+	defer spiceDbRepo.Close()
 
 	preExisting := CheckForRelationship(spiceDbRepo, "bob", "rbac", "principal", "", "member", "rbac", "group", uniqueID(t, "bob_club"), model.NewConsistencyUnspecified())
 	assert.False(t, preExisting)
@@ -246,8 +246,8 @@ func TestIsBackendAvailable(t *testing.T) {
 	t.Parallel()
 
 	spiceDbrepo, err := container.CreateSpiceDbRepository()
-	defer spiceDbrepo.Close()
 	assert.NoError(t, err)
+	defer spiceDbrepo.Close()
 
 	healthResult, err := spiceDbrepo.Health(context.Background())
 	assert.NoError(t, err)
@@ -279,8 +279,8 @@ func TestDoesNotCreateRelationshipWithSlashInSubjectType(t *testing.T) {
 
 	ctx := context.Background()
 	spiceDbRepo, err := container.CreateSpiceDbRepository()
-	defer spiceDbRepo.Close()
 	assert.NoError(t, err)
+	defer spiceDbRepo.Close()
 
 	badSubjectType := "special/user"
 
@@ -299,8 +299,8 @@ func TestDoesNotCreateRelationshipWithSlashInObjectType(t *testing.T) {
 
 	ctx := context.Background()
 	spiceDbRepo, err := container.CreateSpiceDbRepository()
-	defer spiceDbRepo.Close()
 	assert.NoError(t, err)
+	defer spiceDbRepo.Close()
 
 	badResourceType := "my/group"
 
@@ -319,8 +319,8 @@ func TestCreateRelationshipFailsWithBadSubjectType(t *testing.T) {
 
 	ctx := context.Background()
 	spiceDbRepo, err := container.CreateSpiceDbRepository()
-	defer spiceDbRepo.Close()
 	assert.NoError(t, err)
+	defer spiceDbRepo.Close()
 
 	badSubjectType := "not_a_user"
 
@@ -342,8 +342,8 @@ func TestCreateRelationshipFailsWithBadObjectType(t *testing.T) {
 
 	ctx := context.Background()
 	spiceDbRepo, err := container.CreateSpiceDbRepository()
-	defer spiceDbRepo.Close()
 	assert.NoError(t, err)
+	defer spiceDbRepo.Close()
 
 	badObjectType := "not_an_object"
 
@@ -365,8 +365,8 @@ func TestSupportedNsTypeTupleFilterCombinationsInReadRelationships(t *testing.T)
 
 	ctx := context.Background()
 	spiceDbRepo, err := container.CreateSpiceDbRepository()
-	defer spiceDbRepo.Close()
 	if !assert.NoError(t, err) {
+		defer spiceDbRepo.Close()
 		return
 	}
 
@@ -489,8 +489,8 @@ func TestWriteAndReadBackRelationships(t *testing.T) {
 
 	ctx := context.Background()
 	spiceDbRepo, err := container.CreateSpiceDbRepository()
-	defer spiceDbRepo.Close()
 	if !assert.NoError(t, err) {
+		defer spiceDbRepo.Close()
 		return
 	}
 
@@ -531,8 +531,8 @@ func TestWriteReadBackDeleteAndReadBackRelationships(t *testing.T) {
 
 	ctx := context.Background()
 	spiceDbRepo, err := container.CreateSpiceDbRepository()
-	defer spiceDbRepo.Close()
 	if !assert.NoError(t, err) {
+		defer spiceDbRepo.Close()
 		return
 	}
 
@@ -588,8 +588,8 @@ func TestWriteReadBackDeleteAndReadBackRelationships_WithConsistencyToken(t *tes
 
 	ctx := context.Background()
 	spiceDbRepo, err := container.CreateSpiceDbRepository()
-	defer spiceDbRepo.Close()
 	if !assert.NoError(t, err) {
+		defer spiceDbRepo.Close()
 		return
 	}
 
@@ -643,8 +643,8 @@ func TestSpiceDbRepository_CheckPermission_WithConsistencyToken(t *testing.T) {
 
 	ctx := context.Background()
 	spiceDbRepo, err := container.CreateSpiceDbRepository()
-	defer spiceDbRepo.Close()
 	if !assert.NoError(t, err) {
+		defer spiceDbRepo.Close()
 		return
 	}
 
@@ -684,8 +684,8 @@ func TestSpiceDbRepository_CheckForUpdatePermission(t *testing.T) {
 
 	ctx := context.Background()
 	spiceDbRepo, err := container.CreateSpiceDbRepository()
-	defer spiceDbRepo.Close()
 	if !assert.NoError(t, err) {
+		defer spiceDbRepo.Close()
 		return
 	}
 
@@ -724,8 +724,8 @@ func TestSpiceDbRepository_CheckPermission(t *testing.T) {
 
 	ctx := context.Background()
 	spiceDbRepo, err := container.CreateSpiceDbRepository()
-	defer spiceDbRepo.Close()
 	if !assert.NoError(t, err) {
+		defer spiceDbRepo.Close()
 		return
 	}
 
@@ -790,8 +790,8 @@ func TestSpiceDbRepository_NewEnemyProblem_Success(t *testing.T) {
 
 	ctx := context.Background()
 	spiceDbRepo, err := container.CreateSpiceDbRepository()
-	defer spiceDbRepo.Close()
 	if !assert.NoError(t, err) {
+		defer spiceDbRepo.Close()
 		return
 	}
 
@@ -884,8 +884,8 @@ func TestSpiceDbRepository_CheckPermission_MinimizeLatency(t *testing.T) {
 
 	ctx := context.Background()
 	spiceDbRepo, err := container.CreateSpiceDbRepository()
-	defer spiceDbRepo.Close()
 	if !assert.NoError(t, err) {
+		defer spiceDbRepo.Close()
 		return
 	}
 
@@ -943,8 +943,8 @@ func TestSpiceDbRepository_CheckBulk(t *testing.T) {
 
 	ctx := context.Background()
 	spiceDbRepo, err := container.CreateSpiceDbRepository()
-	defer spiceDbRepo.Close()
 	if !assert.NoError(t, err) {
+		defer spiceDbRepo.Close()
 		return
 	}
 
@@ -998,8 +998,8 @@ func TestSpiceDbRepository_CheckForUpdateBulk(t *testing.T) {
 	// Unique IDs so this test does not collide with CheckBulk or other tests
 	ctx := context.Background()
 	spiceDbRepo, err := container.CreateSpiceDbRepository()
-	defer spiceDbRepo.Close()
 	if !assert.NoError(t, err) {
+		defer spiceDbRepo.Close()
 		return
 	}
 
@@ -1054,8 +1054,8 @@ func TestSpiceDbRepository_CreateRelationships_WithFencing(t *testing.T) {
 
 	ctx := context.Background()
 	spiceDbRepo, err := container.CreateSpiceDbRepository()
-	defer spiceDbRepo.Close()
 	assert.NoError(t, err)
+	defer spiceDbRepo.Close()
 
 	// Acquire a lock to get a fencing token
 	lockId, _ := model.NewLockId(uniqueID(t, "test-lock"))
@@ -1102,8 +1102,8 @@ func TestSpiceDbRepository_DeleteRelationships_WithFencing(t *testing.T) {
 
 	ctx := context.Background()
 	spiceDbRepo, err := container.CreateSpiceDbRepository()
-	defer spiceDbRepo.Close()
 	assert.NoError(t, err)
+	defer spiceDbRepo.Close()
 
 	// Acquire a lock to get a fencing token
 	lockId, _ := model.NewLockId(uniqueID(t, "test-lock"))
@@ -1164,8 +1164,8 @@ func TestSpiceDbRepository_AcquireLock_NewLock(t *testing.T) {
 
 	ctx := context.Background()
 	spiceDbRepo, err := container.CreateSpiceDbRepository()
-	defer spiceDbRepo.Close()
 	if !assert.NoError(t, err) {
+		defer spiceDbRepo.Close()
 		return
 	}
 
@@ -1184,8 +1184,8 @@ func TestSpiceDbRepository_AcquireLock_ReplaceExistingLock(t *testing.T) {
 
 	ctx := context.Background()
 	spiceDbRepo, err := container.CreateSpiceDbRepository()
-	defer spiceDbRepo.Close()
 	assert.NoError(t, err)
+	defer spiceDbRepo.Close()
 
 	lockId, _ := model.NewLockId(uniqueID(t, "test-lock"))
 
@@ -1218,8 +1218,8 @@ func TestSpiceDbRepository_LookupResources(t *testing.T) {
 
 	ctx := context.Background()
 	spiceDbRepo, err := container.CreateSpiceDbRepository()
-	defer spiceDbRepo.Close()
 	if !assert.NoError(t, err) {
+		defer spiceDbRepo.Close()
 		return
 	}
 
@@ -1316,8 +1316,8 @@ func TestSpiceDbRepository_LookupSubjects(t *testing.T) {
 
 	ctx := context.Background()
 	spiceDbRepo, err := container.CreateSpiceDbRepository()
-	defer spiceDbRepo.Close()
 	if !assert.NoError(t, err) {
+		defer spiceDbRepo.Close()
 		return
 	}
 

@@ -179,7 +179,7 @@ func (l *LocalSpiceDbContainer) CreateSpiceDbRepository() (*SpiceDBRelationsRepo
 
 	// Write token directly to the open file
 	if _, err := tmpFile.Write([]byte(randomKey)); err != nil {
-		tmpFile.Close()
+		_ = tmpFile.Close()
 		return nil, err
 	}
 	tmpFileName := tmpFile.Name()

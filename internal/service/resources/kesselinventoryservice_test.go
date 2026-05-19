@@ -3964,30 +3964,24 @@ func newFakeSchemaRepository(t *testing.T) model.SchemaRepository {
 	hbi, err := model.NewReporterType("hbi")
 	require.NoError(t, err)
 
-	err = schemaRepository.CreateResourceSchema(context.Background(), model.ResourceSchemaRepresentation{
-		ResourceType:     k8sCluster,
-		ValidationSchema: withWorkspaceValidationSchema,
-	})
+	k8sClusterSchema, err := model.NewResourceSchemaRepresentation(k8sCluster, withWorkspaceValidationSchema)
+	require.NoError(t, err)
+	err = schemaRepository.CreateResourceSchema(context.Background(), k8sClusterSchema)
 	require.NoError(t, err)
 
-	err = schemaRepository.CreateReporterSchema(context.Background(), model.ReporterSchemaRepresentation{
-		ResourceType:     k8sCluster,
-		ReporterType:     ocm,
-		ValidationSchema: emptyValidationSchema,
-	})
+	k8sClusterOcm, err := model.NewReporterSchemaRepresentation(k8sCluster, ocm, emptyValidationSchema)
+	require.NoError(t, err)
+	err = schemaRepository.CreateReporterSchema(context.Background(), k8sClusterOcm)
 	require.NoError(t, err)
 
-	err = schemaRepository.CreateResourceSchema(context.Background(), model.ResourceSchemaRepresentation{
-		ResourceType:     host,
-		ValidationSchema: withWorkspaceValidationSchema,
-	})
+	hostSchema, err := model.NewResourceSchemaRepresentation(host, withWorkspaceValidationSchema)
+	require.NoError(t, err)
+	err = schemaRepository.CreateResourceSchema(context.Background(), hostSchema)
 	require.NoError(t, err)
 
-	err = schemaRepository.CreateReporterSchema(context.Background(), model.ReporterSchemaRepresentation{
-		ResourceType:     host,
-		ReporterType:     hbi,
-		ValidationSchema: emptyValidationSchema,
-	})
+	hostHbi, err := model.NewReporterSchemaRepresentation(host, hbi, emptyValidationSchema)
+	require.NoError(t, err)
+	err = schemaRepository.CreateReporterSchema(context.Background(), hostHbi)
 	require.NoError(t, err)
 
 	return schemaRepository

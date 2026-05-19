@@ -18,12 +18,12 @@ type InMemorySchemaRepository struct {
 }
 
 type resourceEntry struct {
-	model.ResourceSchemaRepresentation
+	schema    model.ResourceSchemaRepresentation
 	reporters map[model.ReporterType]*reporterEntry
 }
 
 type reporterEntry struct {
-	model.ReporterSchemaRepresentation
+	schema model.ReporterSchemaRepresentation
 }
 
 func (o *InMemorySchemaRepository) GetResourceSchemas(ctx context.Context) ([]model.ResourceType, error) {
@@ -36,13 +36,13 @@ func (o *InMemorySchemaRepository) GetResourceSchemas(ctx context.Context) ([]mo
 }
 
 func (o *InMemorySchemaRepository) CreateResourceSchema(ctx context.Context, resource model.ResourceSchemaRepresentation) error {
-	if _, ok := o.content[resource.ResourceType]; ok {
-		return fmt.Errorf("resource %s already exists", resource.ResourceType)
+	if _, ok := o.content[resource.ResourceType()]; ok {
+		return fmt.Errorf("resource %s already exists", resource.ResourceType())
 	}
 
-	o.content[resource.ResourceType] = &resourceEntry{
-		ResourceSchemaRepresentation: resource,
-		reporters:                    map[model.ReporterType]*reporterEntry{},
+	o.content[resource.ResourceType()] = &resourceEntry{
+		schema:    resource,
+		reporters: map[model.ReporterType]*reporterEntry{},
 	}
 	return nil
 }
@@ -53,18 +53,18 @@ func (o *InMemorySchemaRepository) GetResourceSchema(ctx context.Context, resour
 		return model.ResourceSchemaRepresentation{}, model.ErrResourceSchemaNotFound
 	}
 
-	return resource.ResourceSchemaRepresentation, nil
+	return resource.schema, nil
 }
 
 func (o *InMemorySchemaRepository) UpdateResourceSchema(ctx context.Context, resource model.ResourceSchemaRepresentation) error {
-	entry, ok := o.content[resource.ResourceType]
+	entry, ok := o.content[resource.ResourceType()]
 	if !ok {
 		return model.ErrResourceSchemaNotFound
 	}
 
-	o.content[resource.ResourceType] = &resourceEntry{
-		ResourceSchemaRepresentation: resource,
-		reporters:                    entry.reporters,
+	o.content[resource.ResourceType()] = &resourceEntry{
+		schema:    resource,
+		reporters: entry.reporters,
 	}
 
 	return nil
@@ -87,24 +87,24 @@ func (o *InMemorySchemaRepository) GetReporterSchemas(ctx context.Context, resou
 
 	var reporters []model.ReporterType
 	for _, reporter := range entry.reporters {
-		reporters = append(reporters, reporter.ReporterType)
+		reporters = append(reporters, reporter.schema.ReporterType())
 	}
 
 	return reporters, nil
 }
 
 func (o *InMemorySchemaRepository) CreateReporterSchema(ctx context.Context, resourceReporter model.ReporterSchemaRepresentation) error {
-	entry, err := o.getResourceEntry(resourceReporter.ResourceType)
+	entry, err := o.getResourceEntry(resourceReporter.ResourceType())
 	if err != nil {
 		return err
 	}
 
-	if _, ok := entry.reporters[resourceReporter.ReporterType]; ok {
-		return fmt.Errorf("reporter %s for entry %s already exist", resourceReporter.ReporterType, resourceReporter.ResourceType)
+	if _, ok := entry.reporters[resourceReporter.ReporterType()]; ok {
+		return fmt.Errorf("reporter %s for entry %s already exist", resourceReporter.ReporterType(), resourceReporter.ResourceType())
 	}
 
-	entry.reporters[resourceReporter.ReporterType] = &reporterEntry{
-		resourceReporter,
+	entry.reporters[resourceReporter.ReporterType()] = &reporterEntry{
+		schema: resourceReporter,
 	}
 
 	return nil
@@ -121,21 +121,21 @@ func (o *InMemorySchemaRepository) GetReporterSchema(ctx context.Context, resour
 		return model.ReporterSchemaRepresentation{}, model.ErrReporterSchemaNotFound
 	}
 
-	return reporter.ReporterSchemaRepresentation, nil
+	return reporter.schema, nil
 }
 
 func (o *InMemorySchemaRepository) UpdateReporterSchema(ctx context.Context, resourceReporter model.ReporterSchemaRepresentation) error {
-	entry, err := o.getResourceEntry(resourceReporter.ResourceType)
+	entry, err := o.getResourceEntry(resourceReporter.ResourceType())
 	if err != nil {
 		return err
 	}
 
-	if _, ok := entry.reporters[resourceReporter.ReporterType]; !ok {
+	if _, ok := entry.reporters[resourceReporter.ReporterType()]; !ok {
 		return model.ErrReporterSchemaNotFound
 	}
 
-	entry.reporters[resourceReporter.ReporterType] = &reporterEntry{
-		resourceReporter,
+	entry.reporters[resourceReporter.ReporterType()] = &reporterEntry{
+		schema: resourceReporter,
 	}
 
 	return nil
@@ -192,11 +192,11 @@ func NewInMemorySchemaRepositoryFromDir(ctx context.Context, resourceDir string,
 
 		commonResourceSchema, err := loadCommonResourceDataSchema(resourceType.String(), resourceDir)
 		if err == nil {
-			err = repository.CreateResourceSchema(ctx, model.ResourceSchemaRepresentation{
-				ResourceType:     resourceType,
-				ValidationSchema: validationSchemaFromString(commonResourceSchema),
-			})
-
+			resourceSchema, err := model.NewResourceSchemaRepresentation(resourceType, validationSchemaFromString(commonResourceSchema))
+			if err != nil {
+				return nil, err
+			}
+			err = repository.CreateResourceSchema(ctx, resourceSchema)
 			if err != nil {
 				return nil, err
 			}
@@ -224,11 +224,11 @@ func NewInMemorySchemaRepositoryFromDir(ctx context.Context, resourceDir string,
 			}
 			reporterSchema, isReporterSchemaExists, err := loadResourceSchema(resourceType.String(), reporterType.String(), resourceDir)
 			if err == nil && isReporterSchemaExists {
-				err = repository.CreateReporterSchema(ctx, model.ReporterSchemaRepresentation{
-					ResourceType:     resourceType,
-					ReporterType:     reporterType,
-					ValidationSchema: validationSchemaFromString(reporterSchema),
-				})
+				reporterSchemaRepr, err := model.NewReporterSchemaRepresentation(resourceType, reporterType, validationSchemaFromString(reporterSchema))
+				if err != nil {
+					return nil, err
+				}
+				err = repository.CreateReporterSchema(ctx, reporterSchemaRepr)
 				if err != nil {
 					return nil, err
 				}
@@ -280,10 +280,11 @@ func NewFromJsonBytes(ctx context.Context, jsonBytes []byte, validationSchemaFro
 				log.Warnf("Skipping invalid resource type in JSON '%s': %v", resourceTypeStr, err)
 				continue
 			}
-			err = repository.CreateResourceSchema(ctx, model.ResourceSchemaRepresentation{
-				ResourceType:     resourceType,
-				ValidationSchema: validationSchemaFromString(value.(string)),
-			})
+			resourceSchema, err := model.NewResourceSchemaRepresentation(resourceType, validationSchemaFromString(value.(string)))
+			if err != nil {
+				return nil, err
+			}
+			err = repository.CreateResourceSchema(ctx, resourceSchema)
 
 			if err != nil {
 				return nil, err
@@ -308,11 +309,11 @@ func NewFromJsonBytes(ctx context.Context, jsonBytes []byte, validationSchemaFro
 			continue
 		}
 		parsedResourceType, _ := model.NewResourceType(string(resourceType))
-		err = repository.CreateReporterSchema(ctx, model.ReporterSchemaRepresentation{
-			ResourceType:     parsedResourceType,
-			ReporterType:     reporterType,
-			ValidationSchema: validationSchemaFromString(value.(string)),
-		})
+		reporterSchemaRepr, err := model.NewReporterSchemaRepresentation(parsedResourceType, reporterType, validationSchemaFromString(value.(string)))
+		if err != nil {
+			return nil, err
+		}
+		err = repository.CreateReporterSchema(ctx, reporterSchemaRepr)
 		if err != nil {
 			return nil, err
 		}

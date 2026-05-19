@@ -444,22 +444,21 @@ func TestToLookupSubjectsCommand_NoPagination(t *testing.T) {
 }
 
 func TestIsValidatedRepresentationType(t *testing.T) {
-
 	assert.True(t, IsValidType("hbi"))
 
-	// normalize then validate
-	normalized := svc.NormalizeType("HBI")
-	assert.True(t, IsValidType(normalized))
+	// constructors now normalize
+	rt, err := model.NewReporterType("HBI")
+	require.NoError(t, err)
+	assert.True(t, IsValidType(rt.String()))
+
 	// strange characters
 	assert.False(t, IsValidType("h?!!!"))
 }
 
 func TestNormalizeRepresentationType(t *testing.T) {
-	// normalize then validate
-	normalized := svc.NormalizeType("HBI")
-	assert.True(t, IsValidType(normalized))
-
-	assert.Equal(t, "hbi", normalized)
+	rt, err := model.NewReporterType("HBI")
+	require.NoError(t, err)
+	assert.Equal(t, "hbi", rt.String())
 }
 
 var typePattern = regexp.MustCompile(`^[A-Za-z0-9_]+$`)

@@ -82,7 +82,7 @@ When reading this file:
 2. If the date is > 1 day old (or not set), re-read the initiative plan at: https://docs.google.com/document/d/1_VZvitlp7Db2AQbXqoe5KnqR3o35ekXsAgJDhi1ALk4/edit
 3. Review for any changes to objectives, phases, or requirements
 4. Prompt the user to update this file and related context if changes are found
-5. Update the "Last initiative plan read" date to today's date
+5. Update the "Last initiative plan read" date to today's date (but never stage or commit these changes in git)
 6. Check Jira issues for all items listed in "Currently Active Work":
    - Read new comments from team members since the last context refresh
    - Check assignee - flag to user if it has changed, especially if it's now unassigned or assigned to someone else

@@ -240,8 +240,7 @@ func NewCommand(
 			}
 
 			// constructs schema repository
-			schemaLogger := log.NewHelper(log.With(logger, "subsystem", "schemaRepository"))
-			schemaRepository, err := newSchemaRepository(ctx, schemaConfig, schemaLogger)
+			schemaRepository, err := newSchemaRepository(ctx, schemaConfig, log.NewHelper(log.With(logger, "subsystem", "schemaRepository")))
 			if err != nil {
 				return err
 			}

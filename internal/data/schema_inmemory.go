@@ -50,7 +50,7 @@ func (o *InMemorySchemaRepository) CreateResourceSchema(ctx context.Context, res
 func (o *InMemorySchemaRepository) GetResourceSchema(ctx context.Context, resourceType model.ResourceType) (model.ResourceSchemaRepresentation, error) {
 	resource, ok := o.content[resourceType]
 	if !ok {
-		return model.ResourceSchemaRepresentation{}, model.ResourceSchemaNotFound
+		return model.ResourceSchemaRepresentation{}, model.ErrResourceSchemaNotFound
 	}
 
 	return resource.ResourceSchemaRepresentation, nil
@@ -59,7 +59,7 @@ func (o *InMemorySchemaRepository) GetResourceSchema(ctx context.Context, resour
 func (o *InMemorySchemaRepository) UpdateResourceSchema(ctx context.Context, resource model.ResourceSchemaRepresentation) error {
 	entry, ok := o.content[resource.ResourceType]
 	if !ok {
-		return model.ResourceSchemaNotFound
+		return model.ErrResourceSchemaNotFound
 	}
 
 	o.content[resource.ResourceType] = &resourceEntry{
@@ -72,7 +72,7 @@ func (o *InMemorySchemaRepository) UpdateResourceSchema(ctx context.Context, res
 
 func (o *InMemorySchemaRepository) DeleteResourceSchema(ctx context.Context, resourceType model.ResourceType) error {
 	if _, ok := o.content[resourceType]; !ok {
-		return model.ResourceSchemaNotFound
+		return model.ErrResourceSchemaNotFound
 	}
 
 	delete(o.content, resourceType)
@@ -118,7 +118,7 @@ func (o *InMemorySchemaRepository) GetReporterSchema(ctx context.Context, resour
 
 	reporter, ok := entry.reporters[reporterType]
 	if !ok {
-		return model.ReporterSchemaRepresentation{}, model.ReporterSchemaNotFound
+		return model.ReporterSchemaRepresentation{}, model.ErrReporterSchemaNotFound
 	}
 
 	return reporter.ReporterSchemaRepresentation, nil
@@ -131,7 +131,7 @@ func (o *InMemorySchemaRepository) UpdateReporterSchema(ctx context.Context, res
 	}
 
 	if _, ok := entry.reporters[resourceReporter.ReporterType]; !ok {
-		return model.ReporterSchemaNotFound
+		return model.ErrReporterSchemaNotFound
 	}
 
 	entry.reporters[resourceReporter.ReporterType] = &reporterEntry{
@@ -148,7 +148,7 @@ func (o *InMemorySchemaRepository) DeleteReporterSchema(ctx context.Context, res
 	}
 
 	if _, ok := entry.reporters[reporterType]; !ok {
-		return model.ReporterSchemaNotFound
+		return model.ErrReporterSchemaNotFound
 	}
 
 	delete(entry.reporters, reporterType)
@@ -161,7 +161,7 @@ func (o *InMemorySchemaRepository) getResourceEntry(resourceType model.ResourceT
 		return entry, nil
 	}
 
-	return nil, model.ResourceSchemaNotFound
+	return nil, model.ErrResourceSchemaNotFound
 }
 
 func NewInMemorySchemaRepository() *InMemorySchemaRepository {

@@ -106,7 +106,7 @@ func TestInMemorySchemaRepository_GetResource_NotFound(t *testing.T) {
 	resourceType, err := bizmodel.NewResourceType("nonexistent")
 	require.NoError(t, err)
 	_, err = repo.GetResourceSchema(ctx, resourceType)
-	assert.ErrorIs(t, err, bizmodel.ResourceSchemaNotFound)
+	assert.ErrorIs(t, err, bizmodel.ErrResourceSchemaNotFound)
 }
 
 func TestInMemorySchemaRepository_UpdateResource(t *testing.T) {
@@ -150,7 +150,7 @@ func TestInMemorySchemaRepository_UpdateResource_NotFound(t *testing.T) {
 	}
 
 	err = repo.UpdateResourceSchema(ctx, resource)
-	assert.ErrorIs(t, err, bizmodel.ResourceSchemaNotFound)
+	assert.ErrorIs(t, err, bizmodel.ErrResourceSchemaNotFound)
 }
 
 func TestInMemorySchemaRepository_DeleteResource(t *testing.T) {
@@ -172,7 +172,7 @@ func TestInMemorySchemaRepository_DeleteResource(t *testing.T) {
 
 	// Verify deletion
 	_, err = repo.GetResourceSchema(ctx, resourceType)
-	assert.ErrorIs(t, err, bizmodel.ResourceSchemaNotFound)
+	assert.ErrorIs(t, err, bizmodel.ErrResourceSchemaNotFound)
 }
 
 func TestInMemorySchemaRepository_GetResources(t *testing.T) {
@@ -275,7 +275,7 @@ func TestInMemorySchemaRepository_GetResourceReporter_NotFound(t *testing.T) {
 	require.NoError(t, err)
 	// Try to get non-existent reporter
 	_, err = repo.GetReporterSchema(ctx, resourceType, repNonexistent)
-	assert.ErrorIs(t, err, bizmodel.ReporterSchemaNotFound)
+	assert.ErrorIs(t, err, bizmodel.ErrReporterSchemaNotFound)
 }
 
 func TestInMemorySchemaRepository_UpdateResourceReporter(t *testing.T) {
@@ -349,7 +349,7 @@ func TestInMemorySchemaRepository_DeleteResourceReporter(t *testing.T) {
 
 	// Verify deletion
 	_, err = repo.GetReporterSchema(ctx, resourceType, repHbi)
-	assert.ErrorIs(t, err, bizmodel.ReporterSchemaNotFound)
+	assert.ErrorIs(t, err, bizmodel.ErrReporterSchemaNotFound)
 }
 
 func TestInMemorySchemaRepository_GetResourceReporters(t *testing.T) {

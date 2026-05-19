@@ -58,7 +58,7 @@ func (sc *SchemaService) CalculateTuples(currentRepresentation, previousRepresen
 // Returns true if there is a reporter that reports said resource, false otherwise.
 func (sc *SchemaService) IsReporterForResource(ctx context.Context, resourceType ResourceType, reporterType ReporterType) (bool, error) {
 	if _, err := sc.schemaRepository.GetReporterSchema(ctx, resourceType, reporterType); err != nil {
-		if errors.Is(err, ResourceSchemaNotFound) || errors.Is(err, ReporterSchemaNotFound) {
+		if errors.Is(err, ErrResourceSchemaNotFound) || errors.Is(err, ErrReporterSchemaNotFound) {
 			return false, nil
 		}
 

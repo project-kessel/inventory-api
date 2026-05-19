@@ -83,7 +83,7 @@ func New(resourceRepository model.ResourceRepository, schemaRepository model.Sch
 
 	return &Usecase{
 		resourceRepository:  resourceRepository,
-		schemaService:       model.NewSchemaService(schemaRepository, log.NewHelper(logger)),
+		schemaService:       model.NewSchemaService(schemaRepository),
 		waitForNotifBreaker: waitForNotifBreaker,
 		Relations:           relations,
 		MetaAuthorizer:      metaAuthorizer,

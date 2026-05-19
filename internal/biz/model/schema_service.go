@@ -11,14 +11,12 @@ import (
 // SchemaService is a domain service that orchestrates schema-based operations
 // such as validation and reporter verification.
 type SchemaService struct {
-	Log              *log.Helper
 	schemaRepository SchemaRepository
 }
 
-// NewSchemaService creates a new SchemaService with the given repository and logger.
-func NewSchemaService(schemaRepository SchemaRepository, logger *log.Helper) *SchemaService {
+// NewSchemaService creates a new SchemaService with the given repository.
+func NewSchemaService(schemaRepository SchemaRepository) *SchemaService {
 	return &SchemaService{
-		Log:              logger,
 		schemaRepository: schemaRepository,
 	}
 }
@@ -102,12 +100,11 @@ func (sc *SchemaService) ReporterShallowValidate(ctx context.Context, resourceTy
 		return err
 	}
 
-	// Case 1: No schema found for resourceType:reporterType
 	if reporter.ValidationSchema == nil {
 		if len(reporterRepresentation) > 0 {
 			return fmt.Errorf("no schema found for '%s:%s', but reporter representation was provided. Submission is not allowed", resourceType, reporterType)
 		}
-		sc.Log.Debugf("no schema found for %s:%s, treating as abstract reporter representation", resourceType, reporterType)
+		log.Debugf("no schema found for %s:%s, treating as abstract reporter representation", resourceType, reporterType)
 		return nil
 	}
 

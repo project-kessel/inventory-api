@@ -125,7 +125,7 @@ func (t *TestCase) TestSetup(testingT *testing.T) []error {
 	noopPublisher := data.OutboxPublisher(func(_ *gorm.DB, _ *model_legacy.OutboxEvent) error { return nil })
 	t.inv.ResourceRepository = data.NewResourceRepository(db, data.NewGormTransactionManager(t.inv.MetricsCollector, 3), noopPublisher)
 
-	t.inv.SchemaService = model.NewSchemaService(schemaRepository, t.logger)
+	t.inv.SchemaService = model.NewSchemaService(schemaRepository)
 
 	err = t.metrics.New(otel.Meter("github.com/project-kessel/inventory-api/blob/main/internal/server/otel"))
 	if err != nil {

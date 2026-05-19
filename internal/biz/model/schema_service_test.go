@@ -3,6 +3,7 @@ package model_test
 import (
 	"testing"
 
+	"github.com/go-kratos/kratos/v2/log"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
 	"github.com/project-kessel/inventory-api/internal/data"
 	"github.com/stretchr/testify/assert"
@@ -68,7 +69,7 @@ func TestCalculateTuples(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			sc := model.NewSchemaService(data.NewInMemorySchemaRepository())
+			sc := model.NewSchemaService(data.NewInMemorySchemaRepository(), log.NewHelper(log.DefaultLogger))
 			resourceType, err := model.NewResourceType("host")
 			require.NoError(t, err)
 			reporterType, err := model.NewReporterType("HBI")
@@ -149,7 +150,7 @@ func TestCalculateTuples(t *testing.T) {
 }
 
 func TestGetWorkspaceVersions(t *testing.T) {
-	sc := model.NewSchemaService(data.NewInMemorySchemaRepository())
+	sc := model.NewSchemaService(data.NewInMemorySchemaRepository(), log.NewHelper(log.DefaultLogger))
 
 	resourceType, err := model.NewResourceType("host")
 	require.NoError(t, err)
@@ -252,7 +253,7 @@ func TestCreateWorkspaceTuple(t *testing.T) {
 }
 
 func TestDetermineTupleOperations(t *testing.T) {
-	sc := model.NewSchemaService(data.NewInMemorySchemaRepository())
+	sc := model.NewSchemaService(data.NewInMemorySchemaRepository(), log.NewHelper(log.DefaultLogger))
 
 	resourceType, err := model.NewResourceType("host")
 	require.NoError(t, err)
@@ -340,7 +341,7 @@ func TestCalculateTuples_OperationTypeScenarios(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			sc := model.NewSchemaService(data.NewInMemorySchemaRepository())
+			sc := model.NewSchemaService(data.NewInMemorySchemaRepository(), log.NewHelper(log.DefaultLogger))
 
 			resourceType, err := model.NewResourceType("host")
 			require.NoError(t, err)

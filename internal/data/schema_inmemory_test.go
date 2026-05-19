@@ -12,7 +12,7 @@ import (
 	bizmodel "github.com/project-kessel/inventory-api/internal/biz/model"
 )
 
-var validateSchemaTypeObject = bizmodel.NewJsonSchemaValidatorFromString(`{"type": "object"}`)
+var validateSchemaTypeObject = NewJsonSchemaWithWorkspacesFromString(`{"type": "object"}`)
 
 func TestInMemorySchemaRepository_CreateResource(t *testing.T) {
 	repo := NewInMemorySchemaRepository()
@@ -20,7 +20,7 @@ func TestInMemorySchemaRepository_CreateResource(t *testing.T) {
 
 	resourceType, err := bizmodel.NewResourceType("host")
 	require.NoError(t, err)
-	resource := bizmodel.ResourceSchema{
+	resource := bizmodel.ResourceSchemaRepresentation{
 		ResourceType:     resourceType,
 		ValidationSchema: validateSchemaTypeObject,
 	}
@@ -41,7 +41,7 @@ func TestInMemorySchemaRepository_CreateResource_AlreadyExists(t *testing.T) {
 
 	resourceType, err := bizmodel.NewResourceType("host")
 	require.NoError(t, err)
-	resource := bizmodel.ResourceSchema{
+	resource := bizmodel.ResourceSchemaRepresentation{
 		ResourceType:     resourceType,
 		ValidationSchema: validateSchemaTypeObject,
 	}
@@ -83,7 +83,7 @@ func TestInMemorySchemaRepository_GetResource(t *testing.T) {
 			expectedType, err := bizmodel.NewResourceType(tc.expectedType)
 			require.NoError(t, err)
 
-			err = repo.CreateResourceSchema(ctx, bizmodel.ResourceSchema{
+			err = repo.CreateResourceSchema(ctx, bizmodel.ResourceSchemaRepresentation{
 				ResourceType:     createType,
 				ValidationSchema: validateSchemaTypeObject,
 			})
@@ -91,7 +91,7 @@ func TestInMemorySchemaRepository_GetResource(t *testing.T) {
 
 			retrieved, err := repo.GetResourceSchema(ctx, lookupType)
 			assert.NoError(t, err)
-			assert.Equal(t, bizmodel.ResourceSchema{
+			assert.Equal(t, bizmodel.ResourceSchemaRepresentation{
 				ResourceType:     expectedType,
 				ValidationSchema: validateSchemaTypeObject,
 			}, retrieved)
@@ -115,7 +115,7 @@ func TestInMemorySchemaRepository_UpdateResource(t *testing.T) {
 
 	resourceType, err := bizmodel.NewResourceType("host")
 	require.NoError(t, err)
-	resource := bizmodel.ResourceSchema{
+	resource := bizmodel.ResourceSchemaRepresentation{
 		ResourceType:     resourceType,
 		ValidationSchema: validateSchemaTypeObject,
 	}
@@ -124,9 +124,9 @@ func TestInMemorySchemaRepository_UpdateResource(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Update the resource
-	updatedResource := bizmodel.ResourceSchema{
+	updatedResource := bizmodel.ResourceSchemaRepresentation{
 		ResourceType:     resourceType,
-		ValidationSchema: bizmodel.NewJsonSchemaValidatorFromString(`{"type": "object", "properties": {"name": {"type": "string"}}}`),
+		ValidationSchema: NewJsonSchemaWithWorkspacesFromString(`{"type": "object", "properties": {"name": {"type": "string"}}}`),
 	}
 
 	err = repo.UpdateResourceSchema(ctx, updatedResource)
@@ -144,7 +144,7 @@ func TestInMemorySchemaRepository_UpdateResource_NotFound(t *testing.T) {
 
 	resourceType, err := bizmodel.NewResourceType("nonexistent")
 	require.NoError(t, err)
-	resource := bizmodel.ResourceSchema{
+	resource := bizmodel.ResourceSchemaRepresentation{
 		ResourceType:     resourceType,
 		ValidationSchema: validateSchemaTypeObject,
 	}
@@ -159,7 +159,7 @@ func TestInMemorySchemaRepository_DeleteResource(t *testing.T) {
 
 	resourceType, err := bizmodel.NewResourceType("host")
 	require.NoError(t, err)
-	resource := bizmodel.ResourceSchema{
+	resource := bizmodel.ResourceSchemaRepresentation{
 		ResourceType:     resourceType,
 		ValidationSchema: validateSchemaTypeObject,
 	}
@@ -186,7 +186,7 @@ func TestInMemorySchemaRepository_GetResources(t *testing.T) {
 	rtK8sPolicy, err := bizmodel.NewResourceType("k8s_policy")
 	require.NoError(t, err)
 
-	resources := []bizmodel.ResourceSchema{
+	resources := []bizmodel.ResourceSchemaRepresentation{
 		{ResourceType: rtHost, ValidationSchema: validateSchemaTypeObject},
 		{ResourceType: rtK8sCluster, ValidationSchema: validateSchemaTypeObject},
 		{ResourceType: rtK8sPolicy, ValidationSchema: validateSchemaTypeObject},
@@ -206,7 +206,7 @@ func TestInMemorySchemaRepository_GetResources(t *testing.T) {
 }
 
 func TestInMemorySchemaRepository_CreateResourceReporter(t *testing.T) {
-	reporterValidation := bizmodel.NewJsonSchemaValidatorFromString(`{"type": "object", "properties": {"satellite_id": {"type": "string"}}}`)
+	reporterValidation := NewJsonSchemaWithWorkspacesFromString(`{"type": "object", "properties": {"satellite_id": {"type": "string"}}}`)
 
 	cases := []struct {
 		name                 string
@@ -227,7 +227,7 @@ func TestInMemorySchemaRepository_CreateResourceReporter(t *testing.T) {
 
 			resourceType, err := bizmodel.NewResourceType("host")
 			require.NoError(t, err)
-			err = repo.CreateResourceSchema(ctx, bizmodel.ResourceSchema{
+			err = repo.CreateResourceSchema(ctx, bizmodel.ResourceSchemaRepresentation{
 				ResourceType:     resourceType,
 				ValidationSchema: validateSchemaTypeObject,
 			})
@@ -235,7 +235,7 @@ func TestInMemorySchemaRepository_CreateResourceReporter(t *testing.T) {
 
 			createRep, err := bizmodel.NewReporterType(tc.createReporterType)
 			require.NoError(t, err)
-			err = repo.CreateReporterSchema(ctx, bizmodel.ReporterSchema{
+			err = repo.CreateReporterSchema(ctx, bizmodel.ReporterSchemaRepresentation{
 				ResourceType:     resourceType,
 				ReporterType:     createRep,
 				ValidationSchema: reporterValidation,
@@ -248,7 +248,7 @@ func TestInMemorySchemaRepository_CreateResourceReporter(t *testing.T) {
 			assert.NoError(t, err)
 			expectedRep, err := bizmodel.NewReporterType(tc.expectedReporterType)
 			require.NoError(t, err)
-			assert.Equal(t, bizmodel.ReporterSchema{
+			assert.Equal(t, bizmodel.ReporterSchemaRepresentation{
 				ResourceType:     resourceType,
 				ReporterType:     expectedRep,
 				ValidationSchema: reporterValidation,
@@ -264,7 +264,7 @@ func TestInMemorySchemaRepository_GetResourceReporter_NotFound(t *testing.T) {
 	resourceType, err := bizmodel.NewResourceType("host")
 	require.NoError(t, err)
 	// Create resource first
-	resource := bizmodel.ResourceSchema{
+	resource := bizmodel.ResourceSchemaRepresentation{
 		ResourceType:     resourceType,
 		ValidationSchema: validateSchemaTypeObject,
 	}
@@ -288,14 +288,14 @@ func TestInMemorySchemaRepository_UpdateResourceReporter(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create resource and reporter
-	resource := bizmodel.ResourceSchema{
+	resource := bizmodel.ResourceSchemaRepresentation{
 		ResourceType:     resourceType,
 		ValidationSchema: validateSchemaTypeObject,
 	}
 	err = repo.CreateResourceSchema(ctx, resource)
 	assert.NoError(t, err)
 
-	reporter := bizmodel.ReporterSchema{
+	reporter := bizmodel.ReporterSchemaRepresentation{
 		ResourceType:     resourceType,
 		ReporterType:     repHbi,
 		ValidationSchema: validateSchemaTypeObject,
@@ -304,10 +304,10 @@ func TestInMemorySchemaRepository_UpdateResourceReporter(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Update reporter
-	updatedReporter := bizmodel.ReporterSchema{
+	updatedReporter := bizmodel.ReporterSchemaRepresentation{
 		ResourceType:     resourceType,
 		ReporterType:     repHbi,
-		ValidationSchema: bizmodel.NewJsonSchemaValidatorFromString(`{"type": "object", "properties": {"satellite_id": {"type": "string"}}}`),
+		ValidationSchema: NewJsonSchemaWithWorkspacesFromString(`{"type": "object", "properties": {"satellite_id": {"type": "string"}}}`),
 	}
 	err = repo.UpdateReporterSchema(ctx, updatedReporter)
 	assert.NoError(t, err)
@@ -328,14 +328,14 @@ func TestInMemorySchemaRepository_DeleteResourceReporter(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create resource and reporter
-	resource := bizmodel.ResourceSchema{
+	resource := bizmodel.ResourceSchemaRepresentation{
 		ResourceType:     resourceType,
 		ValidationSchema: validateSchemaTypeObject,
 	}
 	err = repo.CreateResourceSchema(ctx, resource)
 	assert.NoError(t, err)
 
-	reporter := bizmodel.ReporterSchema{
+	reporter := bizmodel.ReporterSchemaRepresentation{
 		ResourceType:     resourceType,
 		ReporterType:     repHbi,
 		ValidationSchema: validateSchemaTypeObject,
@@ -366,7 +366,7 @@ func TestInMemorySchemaRepository_GetResourceReporters(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create resource
-	resource := bizmodel.ResourceSchema{
+	resource := bizmodel.ResourceSchemaRepresentation{
 		ResourceType:     resourceType,
 		ValidationSchema: validateSchemaTypeObject,
 	}
@@ -374,7 +374,7 @@ func TestInMemorySchemaRepository_GetResourceReporters(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Create multiple reporters
-	reporters := []bizmodel.ReporterSchema{
+	reporters := []bizmodel.ReporterSchemaRepresentation{
 		{ResourceType: resourceType, ReporterType: repHbi, ValidationSchema: validateSchemaTypeObject},
 		{ResourceType: resourceType, ReporterType: repSatellite, ValidationSchema: validateSchemaTypeObject},
 		{ResourceType: resourceType, ReporterType: repInsights, ValidationSchema: validateSchemaTypeObject},
@@ -396,7 +396,7 @@ func TestInMemorySchemaRepository_GetResourceReporters(t *testing.T) {
 
 func TestNewFromDir_InvalidDirectory(t *testing.T) {
 	ctx := context.Background()
-	service, err := NewInMemorySchemaRepositoryFromDir(ctx, "/tmp/wrong/dir", bizmodel.NewJsonSchemaValidatorFromString)
+	service, err := NewInMemorySchemaRepositoryFromDir(ctx, "/tmp/wrong/dir", NewJsonSchemaWithWorkspacesFromString)
 	assert.Error(t, err)
 	assert.Nil(t, service)
 	assert.Contains(t, err.Error(), "failed to read schema directory \"/tmp/wrong/dir\"")
@@ -424,7 +424,7 @@ func TestNewFromDir_ValidDirectory(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Test NewFromDir
-	repo, err := NewInMemorySchemaRepositoryFromDir(ctx, tmpDir, bizmodel.NewJsonSchemaValidatorFromString)
+	repo, err := NewInMemorySchemaRepositoryFromDir(ctx, tmpDir, NewJsonSchemaWithWorkspacesFromString)
 	assert.NoError(t, err)
 	assert.NotNil(t, repo)
 
@@ -437,19 +437,19 @@ func TestNewFromDir_ValidDirectory(t *testing.T) {
 	resource, err := repo.GetResourceSchema(ctx, rtHost)
 	assert.NoError(t, err)
 	assert.Equal(t, rtHost, resource.ResourceType)
-	assert.Equal(t, bizmodel.NewJsonSchemaValidatorFromString(commonSchema), resource.ValidationSchema)
+	assert.Equal(t, NewJsonSchemaWithWorkspacesFromString(commonSchema), resource.ValidationSchema)
 
 	// Verify reporter was loaded
 	reporter, err := repo.GetReporterSchema(ctx, rtHost, repHbi)
 	assert.NoError(t, err)
 	assert.Equal(t, rtHost, reporter.ResourceType)
 	assert.Equal(t, repHbi, reporter.ReporterType)
-	assert.Equal(t, bizmodel.NewJsonSchemaValidatorFromString(reporterSchema), reporter.ValidationSchema)
+	assert.Equal(t, NewJsonSchemaWithWorkspacesFromString(reporterSchema), reporter.ValidationSchema)
 }
 
 func TestNewFromJsonFile_InvalidFile(t *testing.T) {
 	ctx := context.Background()
-	repo, err := NewInMemorySchemaRepositoryFromJsonFile(ctx, "/tmp/nonexistent.json", bizmodel.NewJsonSchemaValidatorFromString)
+	repo, err := NewInMemorySchemaRepositoryFromJsonFile(ctx, "/tmp/nonexistent.json", NewJsonSchemaWithWorkspacesFromString)
 	assert.Error(t, err)
 	assert.Nil(t, repo)
 	assert.Contains(t, err.Error(), "failed to read schema cache file")
@@ -469,7 +469,7 @@ func TestNewFromJsonFile_ValidFile(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Test NewFromJsonFile
-	repo, err := NewInMemorySchemaRepositoryFromJsonFile(ctx, tmpFile, bizmodel.NewJsonSchemaValidatorFromString)
+	repo, err := NewInMemorySchemaRepositoryFromJsonFile(ctx, tmpFile, NewJsonSchemaWithWorkspacesFromString)
 	assert.NoError(t, err)
 	assert.NotNil(t, repo)
 
@@ -500,7 +500,7 @@ func TestNewFromJsonBytes_ValidJSON(t *testing.T) {
 		"k8s_cluster:acm": "{\"type\": \"object\"}"
 	}`)
 
-	repo, err := NewFromJsonBytes(ctx, jsonContent, bizmodel.NewJsonSchemaValidatorFromString)
+	repo, err := NewFromJsonBytes(ctx, jsonContent, NewJsonSchemaWithWorkspacesFromString)
 	assert.NoError(t, err)
 	assert.NotNil(t, repo)
 
@@ -536,7 +536,7 @@ func TestNewFromJsonBytes_InvalidJSON(t *testing.T) {
 
 	invalidJSON := []byte(`{invalid json`)
 
-	repo, err := NewFromJsonBytes(ctx, invalidJSON, bizmodel.NewJsonSchemaValidatorFromString)
+	repo, err := NewFromJsonBytes(ctx, invalidJSON, NewJsonSchemaWithWorkspacesFromString)
 	assert.Error(t, err)
 	assert.Nil(t, repo)
 	assert.Contains(t, err.Error(), "failed to unmarshal schema cache JSON")
@@ -550,7 +550,7 @@ func TestNewFromJsonBytes_OnlyCommonSchemas(t *testing.T) {
 		"common:k8s_cluster": "{\"type\": \"object\"}"
 	}`)
 
-	repo, err := NewFromJsonBytes(ctx, jsonContent, bizmodel.NewJsonSchemaValidatorFromString)
+	repo, err := NewFromJsonBytes(ctx, jsonContent, NewJsonSchemaWithWorkspacesFromString)
 	assert.NoError(t, err)
 	assert.NotNil(t, repo)
 
@@ -641,7 +641,7 @@ func TestLoadResourceSchema(t *testing.T) {
 			reporterType, err := bizmodel.NewReporterType(tt.reporterType)
 			require.NoError(t, err)
 
-			schemaContent, exists, err := loadResourceSchema(resourceType, reporterType, tmpDir)
+			schemaContent, exists, err := loadResourceSchema(resourceType.String(), reporterType.String(), tmpDir)
 
 			if tt.expectErr {
 				assert.Error(t, err)
@@ -712,7 +712,7 @@ func TestLoadCommonResourceDataSchema(t *testing.T) {
 			resourceType, err := bizmodel.NewResourceType(tt.resourceType)
 			require.NoError(t, err)
 
-			schemaContent, err := loadCommonResourceDataSchema(resourceType, tmpDir)
+			schemaContent, err := loadCommonResourceDataSchema(resourceType.String(), tmpDir)
 
 			if tt.expectErr {
 				assert.Error(t, err)
@@ -780,7 +780,7 @@ func TestLoadResourceSchema_ComplexScenarios(t *testing.T) {
 		for _, reporter := range reporters {
 			rep, err := bizmodel.NewReporterType(reporter)
 			require.NoError(t, err)
-			schemaContent, exists, err := loadResourceSchema(rtHost, rep, tmpDir)
+			schemaContent, exists, err := loadResourceSchema(rtHost.String(), rep.String(), tmpDir)
 			assert.NoError(t, err)
 			assert.True(t, exists)
 			assert.Contains(t, schemaContent, reporter+"_id")
@@ -809,7 +809,7 @@ func TestLoadResourceSchema_ComplexScenarios(t *testing.T) {
 		for _, resource := range resources {
 			resourceType, err := bizmodel.NewResourceType(resource)
 			require.NoError(t, err)
-			schemaContent, exists, err := loadResourceSchema(resourceType, repAcm, tmpDir)
+			schemaContent, exists, err := loadResourceSchema(resourceType.String(), repAcm.String(), tmpDir)
 			assert.NoError(t, err)
 			assert.True(t, exists)
 			assert.Contains(t, schemaContent, resource+"_field")
@@ -840,7 +840,7 @@ func TestLoadCommonResourceDataSchema_ComplexScenarios(t *testing.T) {
 		for resourceTypeName, expectedSchema := range resources {
 			resourceType, err := bizmodel.NewResourceType(resourceTypeName)
 			require.NoError(t, err)
-			schemaContent, err := loadCommonResourceDataSchema(resourceType, tmpDir)
+			schemaContent, err := loadCommonResourceDataSchema(resourceType.String(), tmpDir)
 			assert.NoError(t, err)
 			assert.Equal(t, expectedSchema, schemaContent)
 		}
@@ -856,14 +856,14 @@ func TestReporterMutationsPersist(t *testing.T) {
 	repHbi, err := bizmodel.NewReporterType("hbi")
 	require.NoError(t, err)
 
-	err = repo.CreateResourceSchema(ctx, bizmodel.ResourceSchema{
+	err = repo.CreateResourceSchema(ctx, bizmodel.ResourceSchemaRepresentation{
 		ResourceType:     resourceType,
 		ValidationSchema: validateSchemaTypeObject,
 	})
 
 	assert.NoError(t, err)
 
-	err = repo.CreateReporterSchema(ctx, bizmodel.ReporterSchema{
+	err = repo.CreateReporterSchema(ctx, bizmodel.ReporterSchemaRepresentation{
 		ResourceType:     resourceType,
 		ReporterType:     repHbi,
 		ValidationSchema: validateSchemaTypeObject,

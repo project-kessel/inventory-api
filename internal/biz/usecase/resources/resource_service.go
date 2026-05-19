@@ -595,8 +595,8 @@ func (uc *Usecase) validateReportResourceCommand(ctx context.Context, cmd Report
 	}
 
 	if cmd.ReporterRepresentation != nil {
-		sanitizedReporterRepresentation := removeNulls(map[string]interface{}(*cmd.ReporterRepresentation))
-		if err := uc.schemaService.ReporterShallowValidate(ctx, cmd.ResourceType, cmd.ReporterType, sanitizedReporterRepresentation); err != nil {
+		reporterRepresentation := map[string]interface{}(*cmd.ReporterRepresentation)
+		if err := uc.schemaService.ReporterShallowValidate(ctx, cmd.ResourceType, cmd.ReporterType, reporterRepresentation); err != nil {
 			return err
 		}
 	}

@@ -17,7 +17,7 @@ COPY internal ./internal
 COPY main.go Makefile ./
 
 ARG VERSION
-RUN VERSION=${VERSION} GOARCH=${TARGETARCH} make build
+RUN VERSION=${VERSION} make build
 
 FROM registry.access.redhat.com/ubi9/ubi-minimal:9.8-1777460003
 

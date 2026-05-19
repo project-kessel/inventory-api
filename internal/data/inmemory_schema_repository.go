@@ -170,7 +170,7 @@ func NewInMemorySchemaRepository() *InMemorySchemaRepository {
 	}
 }
 
-func NewInMemorySchemaRepositoryFromDir(ctx context.Context, resourceDir string, validationSchemaFromString model.ValidationSchemaFromString) (*InMemorySchemaRepository, error) {
+func NewInMemorySchemaRepositoryFromDir(ctx context.Context, resourceDir string, schemaFromString model.SchemaFromString) (*InMemorySchemaRepository, error) {
 	resourceDirs, err := os.ReadDir(resourceDir)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read schema directory %q: %w", resourceDir, err)
@@ -191,7 +191,7 @@ func NewInMemorySchemaRepositoryFromDir(ctx context.Context, resourceDir string,
 
 		commonResourceSchema, err := loadCommonResourceDataSchema(resourceType.String(), resourceDir)
 		if err == nil {
-			resourceSchema, err := model.NewResourceSchemaRepresentation(resourceType, validationSchemaFromString(commonResourceSchema))
+			resourceSchema, err := model.NewResourceSchemaRepresentation(resourceType, schemaFromString(commonResourceSchema))
 			if err != nil {
 				return nil, err
 			}
@@ -222,7 +222,7 @@ func NewInMemorySchemaRepositoryFromDir(ctx context.Context, resourceDir string,
 			}
 			reporterSchema, isReporterSchemaExists, err := loadResourceSchema(resourceType.String(), reporterType.String(), resourceDir)
 			if err == nil && isReporterSchemaExists {
-				reporterSchemaRepr, err := model.NewReporterSchemaRepresentation(resourceType, reporterType, validationSchemaFromString(reporterSchema))
+				reporterSchemaRepr, err := model.NewReporterSchemaRepresentation(resourceType, reporterType, schemaFromString(reporterSchema))
 				if err != nil {
 					return nil, err
 				}
@@ -239,16 +239,16 @@ func NewInMemorySchemaRepositoryFromDir(ctx context.Context, resourceDir string,
 	return &repository, nil
 }
 
-func NewInMemorySchemaRepositoryFromJsonFile(ctx context.Context, jsonFile string, validationSchemaFromString model.ValidationSchemaFromString) (*InMemorySchemaRepository, error) {
+func NewInMemorySchemaRepositoryFromJsonFile(ctx context.Context, jsonFile string, schemaFromString model.SchemaFromString) (*InMemorySchemaRepository, error) {
 	jsonData, err := os.ReadFile(jsonFile)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read schema cache file: %w", err)
 	}
 
-	return NewFromJsonBytes(ctx, jsonData, validationSchemaFromString)
+	return NewFromJsonBytes(ctx, jsonData, schemaFromString)
 }
 
-func NewFromJsonBytes(ctx context.Context, jsonBytes []byte, validationSchemaFromString model.ValidationSchemaFromString) (*InMemorySchemaRepository, error) {
+func NewFromJsonBytes(ctx context.Context, jsonBytes []byte, schemaFromString model.SchemaFromString) (*InMemorySchemaRepository, error) {
 	repository := InMemorySchemaRepository{
 		content: map[model.ResourceType]*resourceEntry{},
 	}
@@ -281,7 +281,7 @@ func NewFromJsonBytes(ctx context.Context, jsonBytes []byte, validationSchemaFro
 			if !ok {
 				return nil, fmt.Errorf("expected string schema value for resource type %q, got %T", resourceTypeStr, value)
 			}
-			resourceSchema, err := model.NewResourceSchemaRepresentation(resourceType, validationSchemaFromString(s))
+			resourceSchema, err := model.NewResourceSchemaRepresentation(resourceType, schemaFromString(s))
 			if err != nil {
 				return nil, err
 			}
@@ -312,7 +312,7 @@ func NewFromJsonBytes(ctx context.Context, jsonBytes []byte, validationSchemaFro
 		if !ok {
 			return nil, fmt.Errorf("expected string schema value for reporter type %q of resource %q, got %T", remainder, resourceType, value)
 		}
-		reporterSchemaRepr, err := model.NewReporterSchemaRepresentation(resourceType, reporterType, validationSchemaFromString(s))
+		reporterSchemaRepr, err := model.NewReporterSchemaRepresentation(resourceType, reporterType, schemaFromString(s))
 		if err != nil {
 			return nil, err
 		}

@@ -54,14 +54,3 @@ scripts/kubeconfig-global-hub
 development/configs/monitoring/ephemeral-prometheus.yml
 development/full-kessel/configs/schema.zed
 development/full-kessel/configs/rbac-role-definitions/
-
-# PR Workflow state files (local only)
-.pr-workflow-state-*
-PR-PLAN-*.md
-PR-REVIEW-*.md
-PLAN-*.md
-*REVIEW*.md
-
-# Local sanity tests (not committed)
-test/e2e/sanity/
-scripts/run-sanity-tests.sh

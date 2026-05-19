@@ -372,7 +372,7 @@ func (i *InventoryConsumer) processRelationsOperation(
 		return "", err
 	}
 
-	tuplesToReplicate, err := i.SchemaService.CalculateTuples(current, previous, key)
+	tuplesToReplicate, err := i.SchemaService.CalculateTuplesForResource(context.Background(), current, previous, key)
 	if err != nil {
 		metricscollector.Incr(i.MetricsCollector.MsgProcessFailures, "CalculateTuples")
 		i.Logger.Errorf("failed to calculate tuples: %v", err)

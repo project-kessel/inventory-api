@@ -157,6 +157,9 @@ tests := []struct {
 - **State verification**: Assert state after each lifecycle step
 - **Generation/version tracking**: Critical for resource versioning logic
 
+### Assertion Style
+- **Assert full objects, not individual attributes**: When verifying a result, compare against the complete expected value using `assert.Equal(t, expectedObject, actualObject)`. Do not decompose objects and assert on individual fields -- this obscures intent, is fragile to refactoring, and misses unexpected field values. For example, use `assert.Equal(t, model.NewWorkspaceRelationsTuple("ws-1", key), tuple)` rather than separately asserting on `tuple.Object().ResourceId()`, `tuple.Subject().Resource().ResourceId()`, etc.
+
 ### Error Testing Patterns
 - **gRPC codes**: Use `codes.InvalidArgument`, `codes.NotFound`, etc.
 - **Status verification**: Check both gRPC status and HTTP status codes

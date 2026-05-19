@@ -133,8 +133,7 @@ func (uc *Usecase) ReportResource(ctx context.Context, cmd ReportResourceCommand
 		cmd.TransactionId = &txid
 	}
 
-	// Validate command against schemas
-	if err := uc.validateReportResourceCommand(ctx, cmd); err != nil {
+	if err := uc.schemaService.ValidateReportAgainstSchema(ctx, cmd.ResourceType, cmd.ReporterType, cmd.CommonRepresentation, cmd.ReporterRepresentation); err != nil {
 		return status.Errorf(codes.InvalidArgument, "failed validation for report resource: %v", err)
 	}
 
@@ -581,34 +580,6 @@ func (uc *Usecase) selfSubjectFromContext(ctx context.Context) (model.SubjectRef
 // enforceMetaAuthzObject calls the MetaAuthorizer to validate access using a MetaObject.
 func (uc *Usecase) enforceMetaAuthzObject(ctx context.Context, relation metaauthorizer.Relation, metaObject metaauthorizer.MetaObject) error {
 	return metaauthorizer.EnforceMetaAuthzObject(ctx, uc.MetaAuthorizer, relation, metaObject)
-}
-
-// validateReportResourceCommand validates a ReportResourceCommand against schemas.
-// It checks that the reporter is allowed for the resource type,
-// and validates both reporter and common representations.
-func (uc *Usecase) validateReportResourceCommand(ctx context.Context, cmd ReportResourceCommand) error {
-	if isReporter, err := uc.schemaService.IsReporterForResource(ctx, cmd.ResourceType, cmd.ReporterType); !isReporter {
-		if err != nil {
-			return err
-		}
-		return fmt.Errorf("reporter %s does not report resource types: %s", cmd.ReporterType.String(), cmd.ResourceType.String())
-	}
-
-	if cmd.ReporterRepresentation != nil {
-		reporterRepresentation := map[string]interface{}(*cmd.ReporterRepresentation)
-		if err := uc.schemaService.ReporterShallowValidate(ctx, cmd.ResourceType, cmd.ReporterType, reporterRepresentation); err != nil {
-			return err
-		}
-	}
-
-	if cmd.CommonRepresentation != nil {
-		commonRepresentation := map[string]interface{}(*cmd.CommonRepresentation)
-		if err := uc.schemaService.CommonShallowValidate(ctx, cmd.ResourceType, commonRepresentation); err != nil {
-			return err
-		}
-	}
-
-	return nil
 }
 
 func isDuplicateTransactionError(err error) bool {

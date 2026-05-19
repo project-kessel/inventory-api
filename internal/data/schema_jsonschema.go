@@ -8,13 +8,14 @@ import (
 	"github.com/xeipuuv/gojsonschema"
 )
 
-// JsonSchemaWithWorkspaces is a schema implementation that validates data using JSON Schema.
+// JsonSchemaWithWorkspaces is a Schema implementation that validates data using JSON Schema
+// and calculates workspace-based tuples for authorization.
 type JsonSchemaWithWorkspaces struct {
 	jsonSchema string
 }
 
 // NewJsonSchemaWithWorkspacesFromString creates a new JsonSchemaWithWorkspaces from a JSON schema string.
-func NewJsonSchemaWithWorkspacesFromString(jsonSchema string) model.ValidationSchema {
+func NewJsonSchemaWithWorkspacesFromString(jsonSchema string) model.Schema {
 	return JsonSchemaWithWorkspaces{
 		jsonSchema: jsonSchema,
 	}
@@ -36,4 +37,9 @@ func (jschema JsonSchemaWithWorkspaces) Validate(data interface{}) (bool, error)
 		return false, fmt.Errorf("validation failed: %s", strings.Join(errMsgs, "; "))
 	}
 	return true, nil
+}
+
+// CalculateTuples delegates to DefaultSchema for workspace-based tuple calculation.
+func (jschema JsonSchemaWithWorkspaces) CalculateTuples(currentRepresentation, previousRepresentation *model.Representations, key model.ReporterResourceKey) (model.TuplesToReplicate, error) {
+	return model.NewDefaultSchema().CalculateTuples(currentRepresentation, previousRepresentation, key)
 }

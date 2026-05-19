@@ -1,6 +1,7 @@
 package model_test
 
 import (
+	"context"
 	"testing"
 
 	"github.com/go-kratos/kratos/v2/log"
@@ -109,7 +110,7 @@ func TestCalculateTuples(t *testing.T) {
 				require.NoError(t, err)
 			}
 
-			result, err := sc.CalculateTuples(current, previous, key)
+			result, err := sc.CalculateTuplesForResource(context.Background(), current, previous, key)
 			require.NoError(t, err)
 			assert.Equal(t, tt.expectTuplesToCreate, result.HasTuplesToCreate())
 			assert.Equal(t, tt.expectTuplesToDelete, result.HasTuplesToDelete())
@@ -180,7 +181,7 @@ func TestGetWorkspaceVersions(t *testing.T) {
 		nil,
 	)
 	require.NoError(t, err)
-	result, err := sc.CalculateTuples(current, previous, key)
+	result, err := sc.CalculateTuplesForResource(context.Background(), current, previous, key)
 	require.NoError(t, err)
 	assert.True(t, result.HasTuplesToCreate() || result.HasTuplesToDelete())
 }
@@ -285,7 +286,7 @@ func TestDetermineTupleOperations(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	result, err := sc.CalculateTuples(current, previous, key)
+	result, err := sc.CalculateTuplesForResource(context.Background(), current, previous, key)
 	require.NoError(t, err)
 
 	assert.True(t, result.HasTuplesToCreate() || result.HasTuplesToDelete())
@@ -385,7 +386,7 @@ func TestCalculateTuples_OperationTypeScenarios(t *testing.T) {
 				require.NoError(t, err)
 			}
 
-			result, err := sc.CalculateTuples(current, previous, key)
+			result, err := sc.CalculateTuplesForResource(context.Background(), current, previous, key)
 			require.NoError(t, err)
 
 			// Verify tuple creation expectations
@@ -440,4 +441,76 @@ func TestCalculateTuples_OperationTypeScenarios(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestValidateReportAgainstSchema(t *testing.T) {
+	ctx := context.Background()
+
+	resourceType, err := model.NewResourceType("host")
+	require.NoError(t, err)
+	reporterType, err := model.NewReporterType("HBI")
+	require.NoError(t, err)
+	unknownReporterType, err := model.NewReporterType("UNKNOWN")
+	require.NoError(t, err)
+
+	commonSchema := data.NewJsonSchemaWithWorkspacesFromString(`{
+		"type": "object",
+		"properties": { "workspace_id": { "type": "string" } },
+		"required": ["workspace_id"]
+	}`)
+	reporterSchema := data.NewJsonSchemaWithWorkspacesFromString(`{
+		"type": "object",
+		"properties": { "satellite_id": { "type": "string" } },
+		"required": ["satellite_id"]
+	}`)
+
+	setupRepo := func() *data.InMemorySchemaRepository {
+		repo := data.NewInMemorySchemaRepository()
+		resourceRep, err := model.NewResourceSchemaRepresentation(resourceType, commonSchema)
+		require.NoError(t, err)
+		require.NoError(t, repo.CreateResourceSchema(ctx, resourceRep))
+		reporterRep, err := model.NewReporterSchemaRepresentation(resourceType, reporterType, reporterSchema)
+		require.NoError(t, err)
+		require.NoError(t, repo.CreateReporterSchema(ctx, reporterRep))
+		return repo
+	}
+
+	t.Run("reporter not allowed for resource type", func(t *testing.T) {
+		sc := model.NewSchemaService(setupRepo(), log.NewHelper(log.DefaultLogger))
+		err := sc.ValidateReportAgainstSchema(ctx, resourceType, unknownReporterType, nil, nil)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "does not report resource types")
+	})
+
+	t.Run("invalid reporter representation fails validation", func(t *testing.T) {
+		sc := model.NewSchemaService(setupRepo(), log.NewHelper(log.DefaultLogger))
+		invalidReporter := model.Representation(map[string]interface{}{"wrong_field": "value"})
+		validCommon := model.Representation(map[string]interface{}{"workspace_id": "ws-1"})
+		err := sc.ValidateReportAgainstSchema(ctx, resourceType, reporterType, &validCommon, &invalidReporter)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "satellite_id is required")
+	})
+
+	t.Run("invalid common representation fails validation", func(t *testing.T) {
+		sc := model.NewSchemaService(setupRepo(), log.NewHelper(log.DefaultLogger))
+		validReporter := model.Representation(map[string]interface{}{"satellite_id": "sat-1"})
+		invalidCommon := model.Representation(map[string]interface{}{"wrong_field": "value"})
+		err := sc.ValidateReportAgainstSchema(ctx, resourceType, reporterType, &invalidCommon, &validReporter)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "workspace_id is required")
+	})
+
+	t.Run("both representations nil passes", func(t *testing.T) {
+		sc := model.NewSchemaService(setupRepo(), log.NewHelper(log.DefaultLogger))
+		err := sc.ValidateReportAgainstSchema(ctx, resourceType, reporterType, nil, nil)
+		assert.NoError(t, err)
+	})
+
+	t.Run("both representations valid passes", func(t *testing.T) {
+		sc := model.NewSchemaService(setupRepo(), log.NewHelper(log.DefaultLogger))
+		validCommon := model.Representation(map[string]interface{}{"workspace_id": "ws-1"})
+		validReporter := model.Representation(map[string]interface{}{"satellite_id": "sat-1"})
+		err := sc.ValidateReportAgainstSchema(ctx, resourceType, reporterType, &validCommon, &validReporter)
+		assert.NoError(t, err)
+	})
 }

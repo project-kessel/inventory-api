@@ -229,11 +229,14 @@ func (uc *Usecase) ReportResource(ctx context.Context, cmd ReportResourceCommand
 	}
 
 	// Determine action based on operation type
-	action := "REPORT_RESOURCE"
-	if operationType == model.OperationTypeCreated {
+	var action string
+	switch operationType {
+	case model.OperationTypeCreated:
 		action = "CREATE"
-	} else if operationType == model.OperationTypeUpdated {
+	case model.OperationTypeUpdated:
 		action = "UPDATE"
+	default:
+		action = "REPORT_RESOURCE"
 	}
 
 	// CRUD operation - SEC-MON-REQ-1 compliance (#1 pii_manipulation)

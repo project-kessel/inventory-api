@@ -3,7 +3,6 @@ package tuples
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/go-kratos/kratos/v2/log"
 	authnapi "github.com/project-kessel/inventory-api/internal/authn/api"
@@ -31,8 +30,6 @@ func New(authz model.RelationsRepository, metaAuthorizer metaauthorizer.MetaAuth
 // CreateTuples creates relationship tuples (DEPRECATED).
 // This endpoint exists only for RBAC backward compatibility.
 func (uc *TupleCrudUseCase) CreateTuples(ctx context.Context, cmd CreateTuplesCommand) (*CreateTuplesResult, error) {
-	startTime := time.Now()
-
 	uc.Log.Info("DEPRECATED: CreateTuples called - this endpoint is for RBAC-only backward compatibility")
 
 	if err := metaauthorizer.EnforceMetaAuthzObject(ctx, uc.MetaAuthorizer, metaauthorizer.RelationCreateTuples, metaauthorizer.NewTupleSystem()); err != nil {
@@ -42,12 +39,8 @@ func (uc *TupleCrudUseCase) CreateTuples(ctx context.Context, cmd CreateTuplesCo
 	// Get authz context for logging
 	authzCtx, ok := authnapi.FromAuthzContext(ctx)
 	principal := "unknown"
-	if ok && authzCtx.Subject != nil {
-		if authzCtx.Subject.ClientID != "" {
-			principal = string(authzCtx.Subject.ClientID)
-		} else if authzCtx.Subject.SubjectId != "" {
-			principal = string(authzCtx.Subject.SubjectId)
-		}
+	if ok {
+		principal = authzCtx.ExtractPrincipal()
 	}
 
 	var fencing *model.FencingCheck
@@ -65,7 +58,6 @@ func (uc *TupleCrudUseCase) CreateTuples(ctx context.Context, cmd CreateTuplesCo
 			"resource_id", fmt.Sprintf("batch_%d_tuples", len(cmd.Tuples)),
 			"principal", principal,
 			"outcome", "failure",
-			"duration_ms", time.Since(startTime).Milliseconds(),
 			"reason", err.Error(),
 		)
 		return nil, err
@@ -78,7 +70,6 @@ func (uc *TupleCrudUseCase) CreateTuples(ctx context.Context, cmd CreateTuplesCo
 		"resource_id", fmt.Sprintf("batch_%d_tuples", len(cmd.Tuples)),
 		"principal", principal,
 		"outcome", "success",
-		"duration_ms", time.Since(startTime).Milliseconds(),
 	)
 
 	return &CreateTuplesResult{
@@ -89,8 +80,6 @@ func (uc *TupleCrudUseCase) CreateTuples(ctx context.Context, cmd CreateTuplesCo
 // DeleteTuples deletes relationship tuples (DEPRECATED).
 // This endpoint exists only for RBAC backward compatibility.
 func (uc *TupleCrudUseCase) DeleteTuples(ctx context.Context, cmd DeleteTuplesCommand) (*DeleteTuplesResult, error) {
-	startTime := time.Now()
-
 	uc.Log.Info("DEPRECATED: DeleteTuples called - this endpoint is for RBAC-only backward compatibility")
 
 	if err := metaauthorizer.EnforceMetaAuthzObject(ctx, uc.MetaAuthorizer, metaauthorizer.RelationDeleteTuples, metaauthorizer.NewTupleSystem()); err != nil {
@@ -100,12 +89,8 @@ func (uc *TupleCrudUseCase) DeleteTuples(ctx context.Context, cmd DeleteTuplesCo
 	// Get authz context for logging
 	authzCtx, ok := authnapi.FromAuthzContext(ctx)
 	principal := "unknown"
-	if ok && authzCtx.Subject != nil {
-		if authzCtx.Subject.ClientID != "" {
-			principal = string(authzCtx.Subject.ClientID)
-		} else if authzCtx.Subject.SubjectId != "" {
-			principal = string(authzCtx.Subject.SubjectId)
-		}
+	if ok {
+		principal = authzCtx.ExtractPrincipal()
 	}
 
 	var fencing *model.FencingCheck
@@ -123,7 +108,6 @@ func (uc *TupleCrudUseCase) DeleteTuples(ctx context.Context, cmd DeleteTuplesCo
 			"resource_id", "filtered_delete",
 			"principal", principal,
 			"outcome", "failure",
-			"duration_ms", time.Since(startTime).Milliseconds(),
 			"reason", err.Error(),
 		)
 		return nil, err
@@ -136,7 +120,6 @@ func (uc *TupleCrudUseCase) DeleteTuples(ctx context.Context, cmd DeleteTuplesCo
 		"resource_id", "filtered_delete",
 		"principal", principal,
 		"outcome", "success",
-		"duration_ms", time.Since(startTime).Milliseconds(),
 	)
 
 	return &DeleteTuplesResult{

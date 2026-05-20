@@ -97,8 +97,6 @@ func New(resourceRepository model.ResourceRepository, schemaRepository model.Sch
 }
 
 func (uc *Usecase) ReportResource(ctx context.Context, cmd ReportResourceCommand) error {
-	startTime := time.Now()
-
 	// Get authz context - required for authorization checks
 	authzCtx, ok := authnapi.FromAuthzContext(ctx)
 	if !ok || authzCtx.Subject == nil {
@@ -193,14 +191,7 @@ func (uc *Usecase) ReportResource(ctx context.Context, cmd ReportResourceCommand
 
 	if err != nil {
 		// Extract principal for failure logging
-		principal := "unknown"
-		if authzCtx.Subject != nil {
-			if authzCtx.Subject.ClientID != "" {
-				principal = string(authzCtx.Subject.ClientID)
-			} else if authzCtx.Subject.SubjectId != "" {
-				principal = string(authzCtx.Subject.SubjectId)
-			}
-		}
+		principal := authzCtx.ExtractPrincipal()
 
 		// CRUD operation failed - SEC-MON-REQ-1 compliance (#1 pii_manipulation, #11 warnings_or_errors)
 		uc.Log.Warnw("msg", "Resource operation failed",
@@ -211,7 +202,6 @@ func (uc *Usecase) ReportResource(ctx context.Context, cmd ReportResourceCommand
 			"reporter_instance_id", cmd.ReporterInstanceId.String(),
 			"principal", principal,
 			"outcome", "failure",
-			"duration_ms", time.Since(startTime).Milliseconds(),
 			"reason", err.Error(),
 		)
 
@@ -219,14 +209,7 @@ func (uc *Usecase) ReportResource(ctx context.Context, cmd ReportResourceCommand
 	}
 
 	// Extract principal for success logging
-	principal := "unknown"
-	if authzCtx.Subject != nil {
-		if authzCtx.Subject.ClientID != "" {
-			principal = string(authzCtx.Subject.ClientID)
-		} else if authzCtx.Subject.SubjectId != "" {
-			principal = string(authzCtx.Subject.SubjectId)
-		}
-	}
+	principal := authzCtx.ExtractPrincipal()
 
 	// Determine action based on operation type
 	var action string
@@ -248,7 +231,6 @@ func (uc *Usecase) ReportResource(ctx context.Context, cmd ReportResourceCommand
 		"reporter_instance_id", cmd.ReporterInstanceId.String(),
 		"principal", principal,
 		"outcome", "success",
-		"duration_ms", time.Since(startTime).Milliseconds(),
 	)
 
 	// Increment outbox metrics only after successful transaction commit
@@ -349,8 +331,6 @@ func (uc *Usecase) updateResource(tx *gorm.DB, cmd ReportResourceCommand, existi
 }
 
 func (uc *Usecase) Delete(ctx context.Context, reporterResourceKey model.ReporterResourceKey) error {
-	startTime := time.Now()
-
 	if err := uc.enforceMetaAuthzObject(ctx, metaauthorizer.RelationDeleteResource, metaauthorizer.NewInventoryResourceFromKey(reporterResourceKey)); err != nil {
 		return err
 	}
@@ -389,12 +369,7 @@ func (uc *Usecase) Delete(ctx context.Context, reporterResourceKey model.Reporte
 	)
 
 	// Extract principal for logging
-	principal := "unknown"
-	if authzCtx.Subject.ClientID != "" {
-		principal = string(authzCtx.Subject.ClientID)
-	} else if authzCtx.Subject.SubjectId != "" {
-		principal = string(authzCtx.Subject.SubjectId)
-	}
+	principal := authzCtx.ExtractPrincipal()
 
 	if err != nil {
 		// DELETE operation failed - SEC-MON-REQ-1 compliance (#1 pii_manipulation, #11 warnings_or_errors)
@@ -406,7 +381,6 @@ func (uc *Usecase) Delete(ctx context.Context, reporterResourceKey model.Reporte
 			"reporter_instance_id", reporterResourceKey.ReporterInstanceId().String(),
 			"principal", principal,
 			"outcome", "failure",
-			"duration_ms", time.Since(startTime).Milliseconds(),
 			"reason", err.Error(),
 		)
 		return err
@@ -421,7 +395,6 @@ func (uc *Usecase) Delete(ctx context.Context, reporterResourceKey model.Reporte
 		"reporter_instance_id", reporterResourceKey.ReporterInstanceId().String(),
 		"principal", principal,
 		"outcome", "success",
-		"duration_ms", time.Since(startTime).Milliseconds(),
 	)
 
 	// Increment outbox metrics only after successful transaction commit
@@ -431,8 +404,6 @@ func (uc *Usecase) Delete(ctx context.Context, reporterResourceKey model.Reporte
 
 // Check verifies if a subject has the specified relation/permission on a resource.
 func (uc *Usecase) Check(ctx context.Context, relation model.Relation, sub model.SubjectReference, resourceRef model.ResourceReference, consistency model.Consistency) (model.CheckResult, error) {
-	startTime := time.Now()
-
 	if err := uc.enforceMetaAuthzObject(ctx, metaauthorizer.RelationCheck, metaauthorizer.NewInventoryResource(resourceRef.Reporter().ReporterType(), resourceRef.ResourceType(), resourceRef.ResourceId())); err != nil {
 		return model.CheckResult{}, err
 	}
@@ -445,12 +416,8 @@ func (uc *Usecase) Check(ctx context.Context, relation model.Relation, sub model
 	// Get authz context for logging
 	authzCtx, ok := authnapi.FromAuthzContext(ctx)
 	principal := "unknown"
-	if ok && authzCtx.Subject != nil {
-		if authzCtx.Subject.ClientID != "" {
-			principal = string(authzCtx.Subject.ClientID)
-		} else if authzCtx.Subject.SubjectId != "" {
-			principal = string(authzCtx.Subject.SubjectId)
-		}
+	if ok {
+		principal = authzCtx.ExtractPrincipal()
 	}
 
 	if err != nil {
@@ -462,7 +429,6 @@ func (uc *Usecase) Check(ctx context.Context, relation model.Relation, sub model
 			"relation", relation.String(),
 			"principal", principal,
 			"outcome", "failure",
-			"duration_ms", time.Since(startTime).Milliseconds(),
 			"reason", err.Error(),
 		)
 		return model.CheckResult{}, err
@@ -477,7 +443,6 @@ func (uc *Usecase) Check(ctx context.Context, relation model.Relation, sub model
 		"principal", principal,
 		"check_result", result.Allowed(),
 		"outcome", "success",
-		"duration_ms", time.Since(startTime).Milliseconds(),
 	)
 
 	return result, nil
@@ -485,8 +450,6 @@ func (uc *Usecase) Check(ctx context.Context, relation model.Relation, sub model
 
 // CheckSelf verifies access for the authenticated user using the self-subject strategy.
 func (uc *Usecase) CheckSelf(ctx context.Context, relation model.Relation, resourceRef model.ResourceReference, consistency model.Consistency) (model.CheckResult, error) {
-	startTime := time.Now()
-
 	if err := uc.enforceMetaAuthzObject(ctx, metaauthorizer.RelationCheckSelf, metaauthorizer.NewInventoryResource(resourceRef.Reporter().ReporterType(), resourceRef.ResourceType(), resourceRef.ResourceId())); err != nil {
 		return model.CheckResult{}, err
 	}
@@ -503,12 +466,8 @@ func (uc *Usecase) CheckSelf(ctx context.Context, relation model.Relation, resou
 	// Get authz context for logging
 	authzCtx, ok := authnapi.FromAuthzContext(ctx)
 	principal := "unknown"
-	if ok && authzCtx.Subject != nil {
-		if authzCtx.Subject.ClientID != "" {
-			principal = string(authzCtx.Subject.ClientID)
-		} else if authzCtx.Subject.SubjectId != "" {
-			principal = string(authzCtx.Subject.SubjectId)
-		}
+	if ok {
+		principal = authzCtx.ExtractPrincipal()
 	}
 
 	if err != nil {
@@ -520,7 +479,6 @@ func (uc *Usecase) CheckSelf(ctx context.Context, relation model.Relation, resou
 			"relation", relation.String(),
 			"principal", principal,
 			"outcome", "failure",
-			"duration_ms", time.Since(startTime).Milliseconds(),
 			"reason", err.Error(),
 		)
 		return model.CheckResult{}, err
@@ -535,7 +493,6 @@ func (uc *Usecase) CheckSelf(ctx context.Context, relation model.Relation, resou
 		"principal", principal,
 		"check_result", result.Allowed(),
 		"outcome", "success",
-		"duration_ms", time.Since(startTime).Milliseconds(),
 	)
 
 	return result, nil

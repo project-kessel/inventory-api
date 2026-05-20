@@ -69,7 +69,6 @@ func (o *OAuth2Authenticator) Authenticate(ctx context.Context, t transport.Tran
 			"auth_method", "oidc",
 			"outcome", "failure",
 			"reason", "invalid_token_or_not_oidc_id_token",
-			"error", err.Error(),
 		)
 		return nil, api.Deny
 	}
@@ -79,7 +78,13 @@ func (o *OAuth2Authenticator) Authenticate(ctx context.Context, t transport.Tran
 	u := &TokenClaims{}
 	err = tok.Claims(u)
 	if err != nil {
-		log.Errorf("failed to extract claims: %v", err)
+		// Authentication failure - SEC-MON-REQ-1 compliance (EOI-7 invalid_login)
+		log.NewHelper(log.DefaultLogger).Warnw("msg", "OIDC claims extraction failed",
+			"event", "authentication_failure",
+			"auth_method", "oidc",
+			"outcome", "failure",
+			"reason", "invalid_claims_payload",
+		)
 		return nil, api.Deny
 	}
 

@@ -411,7 +411,6 @@ func shutdown(db *gorm.DB, srv *server.Server, pprofSrv *pprof.Server, cm *consu
 		logger.Infow("msg", "Inventory API shutting down",
 			"event", "shutdown",
 			"reason", fmt.Sprintf("%v", reason),
-			"graceful", true,
 		)
 
 		timeout := srv.HttpServer.ReadTimeout

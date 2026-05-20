@@ -46,7 +46,7 @@ func (a *XRhIdentityAuthenticator) Authenticate(ctx context.Context, t transport
 			"event", "authentication_failure",
 			"auth_method", "x-rh-identity",
 			"outcome", "failure",
-			"reason", err.Error(),
+			"reason", "invalid_identity_header",
 			// Note: Cannot log principal (org_id, user_id) when authentication fails
 		)
 		return nil, api.Deny

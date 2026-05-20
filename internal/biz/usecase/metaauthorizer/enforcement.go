@@ -62,6 +62,7 @@ func EnforceMetaAuthzObject(ctx context.Context, authorizer MetaAuthorizer, rela
 		logger := log.NewHelper(log.DefaultLogger)
 		logger.Warnw("msg", "Permission denied",
 			"event", "authorization_failure",
+			"action", "authorize_resource_access",
 			"principal", principal,
 			"resource_type", resourceType,
 			"resource_id", resourceId,

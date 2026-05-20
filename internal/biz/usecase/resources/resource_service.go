@@ -97,6 +97,8 @@ func New(resourceRepository model.ResourceRepository, schemaRepository model.Sch
 }
 
 func (uc *Usecase) ReportResource(ctx context.Context, cmd ReportResourceCommand) error {
+	startTime := time.Now()
+
 	// Get authz context - required for authorization checks
 	authzCtx, ok := authnapi.FromAuthzContext(ctx)
 	if !ok || authzCtx.Subject == nil {
@@ -115,11 +117,6 @@ func (uc *Usecase) ReportResource(ctx context.Context, cmd ReportResourceCommand
 
 	if err := uc.enforceMetaAuthzObject(ctx, metaauthorizer.RelationReportResource, metaauthorizer.NewInventoryResourceFromKey(reporterResourceKey)); err != nil {
 		return err
-	}
-
-	// Log client_id if available (from OIDC authentication)
-	if authzCtx.Subject.ClientID != "" {
-		log.Infof("Reporting resource request from client_id: %s, resource_type: %s, reporter_type: %s", authzCtx.Subject.ClientID, cmd.ResourceType, cmd.ReporterType)
 	}
 
 	var subscription pubsub.Subscription
@@ -195,8 +192,61 @@ func (uc *Usecase) ReportResource(ctx context.Context, cmd ReportResourceCommand
 	}
 
 	if err != nil {
+		// Extract principal for failure logging
+		principal := "unknown"
+		if authzCtx.Subject != nil {
+			if authzCtx.Subject.ClientID != "" {
+				principal = string(authzCtx.Subject.ClientID)
+			} else if authzCtx.Subject.SubjectId != "" {
+				principal = string(authzCtx.Subject.SubjectId)
+			}
+		}
+
+		// CRUD operation failed - SEC-MON-REQ-1 compliance (#1 pii_manipulation, #11 warnings_or_errors)
+		uc.Log.Warnw("msg", "Resource operation failed",
+			"action", "REPORT_RESOURCE",
+			"resource_type", cmd.ResourceType.String(),
+			"resource_id", cmd.LocalResourceId,
+			"reporter_type", cmd.ReporterType.String(),
+			"reporter_instance_id", cmd.ReporterInstanceId.String(),
+			"principal", principal,
+			"outcome", "failure",
+			"duration_ms", time.Since(startTime).Milliseconds(),
+			"reason", err.Error(),
+		)
+
 		return err
 	}
+
+	// Extract principal for success logging
+	principal := "unknown"
+	if authzCtx.Subject != nil {
+		if authzCtx.Subject.ClientID != "" {
+			principal = string(authzCtx.Subject.ClientID)
+		} else if authzCtx.Subject.SubjectId != "" {
+			principal = string(authzCtx.Subject.SubjectId)
+		}
+	}
+
+	// Determine action based on operation type
+	action := "REPORT_RESOURCE"
+	if operationType == model.OperationTypeCreated {
+		action = "CREATE"
+	} else if operationType == model.OperationTypeUpdated {
+		action = "UPDATE"
+	}
+
+	// CRUD operation - SEC-MON-REQ-1 compliance (#1 pii_manipulation)
+	uc.Log.Infow("msg", "Resource operation completed",
+		"action", action,
+		"resource_type", cmd.ResourceType.String(),
+		"resource_id", cmd.LocalResourceId,
+		"reporter_type", cmd.ReporterType.String(),
+		"reporter_instance_id", cmd.ReporterInstanceId.String(),
+		"principal", principal,
+		"outcome", "success",
+		"duration_ms", time.Since(startTime).Milliseconds(),
+	)
 
 	// Increment outbox metrics only after successful transaction commit
 	if operationType != nil {
@@ -296,6 +346,8 @@ func (uc *Usecase) updateResource(tx *gorm.DB, cmd ReportResourceCommand, existi
 }
 
 func (uc *Usecase) Delete(ctx context.Context, reporterResourceKey model.ReporterResourceKey) error {
+	startTime := time.Now()
+
 	if err := uc.enforceMetaAuthzObject(ctx, metaauthorizer.RelationDeleteResource, metaauthorizer.NewInventoryResourceFromKey(reporterResourceKey)); err != nil {
 		return err
 	}
@@ -304,9 +356,11 @@ func (uc *Usecase) Delete(ctx context.Context, reporterResourceKey model.Reporte
 	if err != nil {
 		return err
 	}
-	// Log client_id if available (from OIDC authentication)
-	if authzCtx, ok := authnapi.FromAuthzContext(ctx); ok && authzCtx.Subject != nil && authzCtx.Subject.ClientID != "" {
-		log.Infof("Deleting resource %v from client_id: %s", reporterResourceKey, authzCtx.Subject.ClientID)
+
+	// Get authz context for logging
+	authzCtx, ok := authnapi.FromAuthzContext(ctx)
+	if !ok || authzCtx.Subject == nil {
+		return status.Error(codes.Unauthenticated, "authentication required")
 	}
 
 	err = uc.resourceRepository.GetTransactionManager().HandleSerializableTransaction(
@@ -331,9 +385,41 @@ func (uc *Usecase) Delete(ctx context.Context, reporterResourceKey model.Reporte
 		},
 	)
 
+	// Extract principal for logging
+	principal := "unknown"
+	if authzCtx.Subject.ClientID != "" {
+		principal = string(authzCtx.Subject.ClientID)
+	} else if authzCtx.Subject.SubjectId != "" {
+		principal = string(authzCtx.Subject.SubjectId)
+	}
+
 	if err != nil {
+		// DELETE operation failed - SEC-MON-REQ-1 compliance (#1 pii_manipulation, #11 warnings_or_errors)
+		uc.Log.Warnw("msg", "Delete resource failed",
+			"action", "DELETE",
+			"resource_type", reporterResourceKey.ResourceType().String(),
+			"resource_id", reporterResourceKey.LocalResourceId(),
+			"reporter_type", reporterResourceKey.ReporterType().String(),
+			"reporter_instance_id", reporterResourceKey.ReporterInstanceId().String(),
+			"principal", principal,
+			"outcome", "failure",
+			"duration_ms", time.Since(startTime).Milliseconds(),
+			"reason", err.Error(),
+		)
 		return err
 	}
+
+	// DELETE operation - SEC-MON-REQ-1 compliance (#1 pii_manipulation)
+	uc.Log.Infow("msg", "Resource deleted",
+		"action", "DELETE",
+		"resource_type", reporterResourceKey.ResourceType().String(),
+		"resource_id", reporterResourceKey.LocalResourceId(),
+		"reporter_type", reporterResourceKey.ReporterType().String(),
+		"reporter_instance_id", reporterResourceKey.ReporterInstanceId().String(),
+		"principal", principal,
+		"outcome", "success",
+		"duration_ms", time.Since(startTime).Milliseconds(),
+	)
 
 	// Increment outbox metrics only after successful transaction commit
 	metricscollector.Incr(uc.MetricsCollector.OutboxEventWrites, string(model.OperationTypeDeleted.OperationType()))
@@ -342,6 +428,8 @@ func (uc *Usecase) Delete(ctx context.Context, reporterResourceKey model.Reporte
 
 // Check verifies if a subject has the specified relation/permission on a resource.
 func (uc *Usecase) Check(ctx context.Context, relation model.Relation, sub model.SubjectReference, resourceRef model.ResourceReference, consistency model.Consistency) (model.CheckResult, error) {
+	startTime := time.Now()
+
 	if err := uc.enforceMetaAuthzObject(ctx, metaauthorizer.RelationCheck, metaauthorizer.NewInventoryResource(resourceRef.Reporter().ReporterType(), resourceRef.ResourceType(), resourceRef.ResourceId())); err != nil {
 		return model.CheckResult{}, err
 	}
@@ -349,11 +437,53 @@ func (uc *Usecase) Check(ctx context.Context, relation model.Relation, sub model
 	if err != nil {
 		return model.CheckResult{}, err
 	}
-	return uc.checkPermission(ctx, relation, sub, resourceRef, resolved)
+	result, err := uc.checkPermission(ctx, relation, sub, resourceRef, resolved)
+
+	// Get authz context for logging
+	authzCtx, ok := authnapi.FromAuthzContext(ctx)
+	principal := "unknown"
+	if ok && authzCtx.Subject != nil {
+		if authzCtx.Subject.ClientID != "" {
+			principal = string(authzCtx.Subject.ClientID)
+		} else if authzCtx.Subject.SubjectId != "" {
+			principal = string(authzCtx.Subject.SubjectId)
+		}
+	}
+
+	if err != nil {
+		// Authorization check failed - SEC-MON-REQ-1 compliance (#11 warnings_or_errors)
+		uc.Log.Warnw("msg", "Permission check failed",
+			"action", "CHECK",
+			"resource_type", resourceRef.ResourceType().String(),
+			"resource_id", string(resourceRef.ResourceId()),
+			"relation", relation.String(),
+			"principal", principal,
+			"outcome", "failure",
+			"duration_ms", time.Since(startTime).Milliseconds(),
+			"reason", err.Error(),
+		)
+		return model.CheckResult{}, err
+	}
+
+	// Authorization check - SEC-MON-REQ-1 compliance (Priority 3: read operation logging)
+	uc.Log.Infow("msg", "Permission check completed",
+		"action", "CHECK",
+		"resource_type", resourceRef.ResourceType().String(),
+		"resource_id", string(resourceRef.ResourceId()),
+		"relation", relation.String(),
+		"principal", principal,
+		"check_result", result.Allowed(),
+		"outcome", "success",
+		"duration_ms", time.Since(startTime).Milliseconds(),
+	)
+
+	return result, nil
 }
 
 // CheckSelf verifies access for the authenticated user using the self-subject strategy.
 func (uc *Usecase) CheckSelf(ctx context.Context, relation model.Relation, resourceRef model.ResourceReference, consistency model.Consistency) (model.CheckResult, error) {
+	startTime := time.Now()
+
 	if err := uc.enforceMetaAuthzObject(ctx, metaauthorizer.RelationCheckSelf, metaauthorizer.NewInventoryResource(resourceRef.Reporter().ReporterType(), resourceRef.ResourceType(), resourceRef.ResourceId())); err != nil {
 		return model.CheckResult{}, err
 	}
@@ -365,7 +495,47 @@ func (uc *Usecase) CheckSelf(ctx context.Context, relation model.Relation, resou
 	if err != nil {
 		return model.CheckResult{}, err
 	}
-	return uc.checkPermission(ctx, relation, subjectRef, resourceRef, resolved)
+	result, err := uc.checkPermission(ctx, relation, subjectRef, resourceRef, resolved)
+
+	// Get authz context for logging
+	authzCtx, ok := authnapi.FromAuthzContext(ctx)
+	principal := "unknown"
+	if ok && authzCtx.Subject != nil {
+		if authzCtx.Subject.ClientID != "" {
+			principal = string(authzCtx.Subject.ClientID)
+		} else if authzCtx.Subject.SubjectId != "" {
+			principal = string(authzCtx.Subject.SubjectId)
+		}
+	}
+
+	if err != nil {
+		// Authorization check failed - SEC-MON-REQ-1 compliance (#11 warnings_or_errors)
+		uc.Log.Warnw("msg", "Self permission check failed",
+			"action", "CHECK_SELF",
+			"resource_type", resourceRef.ResourceType().String(),
+			"resource_id", string(resourceRef.ResourceId()),
+			"relation", relation.String(),
+			"principal", principal,
+			"outcome", "failure",
+			"duration_ms", time.Since(startTime).Milliseconds(),
+			"reason", err.Error(),
+		)
+		return model.CheckResult{}, err
+	}
+
+	// Authorization check - SEC-MON-REQ-1 compliance (Priority 3: read operation logging)
+	uc.Log.Infow("msg", "Self permission check completed",
+		"action", "CHECK_SELF",
+		"resource_type", resourceRef.ResourceType().String(),
+		"resource_id", string(resourceRef.ResourceId()),
+		"relation", relation.String(),
+		"principal", principal,
+		"check_result", result.Allowed(),
+		"outcome", "success",
+		"duration_ms", time.Since(startTime).Milliseconds(),
+	)
+
+	return result, nil
 }
 
 // CheckForUpdate verifies if a subject can update the resource.

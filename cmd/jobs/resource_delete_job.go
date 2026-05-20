@@ -76,6 +76,15 @@ func deleteResources(storageOptions *storage.Options, loggerOptions common.Logge
 	// Delete ReporterResource records in batches (CASCADE will automatically delete ReporterRepresentation)
 	totalReporterResources, err := deleteBatchedReporterResources(db, logHelper, dryRun, resourceType, reporterType, batchSize, batchDelayMs)
 	if err != nil {
+		// Failed admin operation - SEC-MON-REQ-1 compliance (#3 admin_action, #11 warnings_or_errors)
+		logHelper.Warnw("msg", "Cronjob: deletion failed",
+			"action", "BULK_DELETE",
+			"resource_type", resourceType,
+			"reporter_type", reporterType,
+			"principal", "system:cronjob:resource-delete-job",
+			"outcome", "failure",
+			"error", err.Error(),
+		)
 		return err
 	}
 	logDeleteResult(logHelper, dryRun, "ReporterResource records (ReporterRepresentation cascade deleted)", totalReporterResources)
@@ -101,6 +110,19 @@ func deleteResources(storageOptions *storage.Options, loggerOptions common.Logge
 	} else {
 		logHelper.Infof("Resource deletion job completed successfully. Total records deleted: ReporterResource=%d, CommonRepresentation=%d, Resource=%d",
 			totalReporterResources, totalCommonRepresentations, totalResources)
+
+		// Scheduled cleanup job - SEC-MON-REQ-1 compliance (#3 admin_action, #1 pii_manipulation)
+		logHelper.Infow("msg", "Cronjob: deleted resources",
+			"action", "BULK_DELETE",
+			"resource_type", resourceType,
+			"reporter_type", reporterType,
+			"principal", "system:cronjob:resource-delete-job",
+			"deleted_count", totalReporterResources+totalCommonRepresentations+totalResources,
+			"reporter_resources_deleted", totalReporterResources,
+			"common_representations_deleted", totalCommonRepresentations,
+			"resources_deleted", totalResources,
+			"outcome", "success",
+		)
 	}
 
 	return nil

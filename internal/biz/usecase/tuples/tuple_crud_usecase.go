@@ -2,8 +2,11 @@ package tuples
 
 import (
 	"context"
+	"fmt"
+	"time"
 
 	"github.com/go-kratos/kratos/v2/log"
+	authnapi "github.com/project-kessel/inventory-api/internal/authn/api"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
 	"github.com/project-kessel/inventory-api/internal/biz/usecase/metaauthorizer"
 )
@@ -28,10 +31,23 @@ func New(authz model.RelationsRepository, metaAuthorizer metaauthorizer.MetaAuth
 // CreateTuples creates relationship tuples (DEPRECATED).
 // This endpoint exists only for RBAC backward compatibility.
 func (uc *TupleCrudUseCase) CreateTuples(ctx context.Context, cmd CreateTuplesCommand) (*CreateTuplesResult, error) {
+	startTime := time.Now()
+
 	uc.Log.Info("DEPRECATED: CreateTuples called - this endpoint is for RBAC-only backward compatibility")
 
 	if err := metaauthorizer.EnforceMetaAuthzObject(ctx, uc.MetaAuthorizer, metaauthorizer.RelationCreateTuples, metaauthorizer.NewTupleSystem()); err != nil {
 		return nil, err
+	}
+
+	// Get authz context for logging
+	authzCtx, ok := authnapi.FromAuthzContext(ctx)
+	principal := "unknown"
+	if ok && authzCtx.Subject != nil {
+		if authzCtx.Subject.ClientID != "" {
+			principal = string(authzCtx.Subject.ClientID)
+		} else if authzCtx.Subject.SubjectId != "" {
+			principal = string(authzCtx.Subject.SubjectId)
+		}
 	}
 
 	var fencing *model.FencingCheck
@@ -42,8 +58,28 @@ func (uc *TupleCrudUseCase) CreateTuples(ctx context.Context, cmd CreateTuplesCo
 
 	result, err := uc.Authz.CreateTuples(ctx, cmd.Tuples, cmd.Upsert, fencing)
 	if err != nil {
+		// CRUD operation failed - SEC-MON-REQ-1 compliance (#1 pii_manipulation, #11 warnings_or_errors)
+		uc.Log.Warnw("msg", "Create tuples failed",
+			"action", "CREATE",
+			"resource_type", "tuple",
+			"resource_id", fmt.Sprintf("batch_%d_tuples", len(cmd.Tuples)),
+			"principal", principal,
+			"outcome", "failure",
+			"duration_ms", time.Since(startTime).Milliseconds(),
+			"reason", err.Error(),
+		)
 		return nil, err
 	}
+
+	// CRUD operation - SEC-MON-REQ-1 compliance (#1 pii_manipulation)
+	uc.Log.Infow("msg", "Tuples created",
+		"action", "CREATE",
+		"resource_type", "tuple",
+		"resource_id", fmt.Sprintf("batch_%d_tuples", len(cmd.Tuples)),
+		"principal", principal,
+		"outcome", "success",
+		"duration_ms", time.Since(startTime).Milliseconds(),
+	)
 
 	return &CreateTuplesResult{
 		ConsistencyToken: result.ConsistencyToken(),
@@ -53,10 +89,23 @@ func (uc *TupleCrudUseCase) CreateTuples(ctx context.Context, cmd CreateTuplesCo
 // DeleteTuples deletes relationship tuples (DEPRECATED).
 // This endpoint exists only for RBAC backward compatibility.
 func (uc *TupleCrudUseCase) DeleteTuples(ctx context.Context, cmd DeleteTuplesCommand) (*DeleteTuplesResult, error) {
+	startTime := time.Now()
+
 	uc.Log.Info("DEPRECATED: DeleteTuples called - this endpoint is for RBAC-only backward compatibility")
 
 	if err := metaauthorizer.EnforceMetaAuthzObject(ctx, uc.MetaAuthorizer, metaauthorizer.RelationDeleteTuples, metaauthorizer.NewTupleSystem()); err != nil {
 		return nil, err
+	}
+
+	// Get authz context for logging
+	authzCtx, ok := authnapi.FromAuthzContext(ctx)
+	principal := "unknown"
+	if ok && authzCtx.Subject != nil {
+		if authzCtx.Subject.ClientID != "" {
+			principal = string(authzCtx.Subject.ClientID)
+		} else if authzCtx.Subject.SubjectId != "" {
+			principal = string(authzCtx.Subject.SubjectId)
+		}
 	}
 
 	var fencing *model.FencingCheck
@@ -67,8 +116,28 @@ func (uc *TupleCrudUseCase) DeleteTuples(ctx context.Context, cmd DeleteTuplesCo
 
 	result, err := uc.Authz.DeleteTuples(ctx, cmd.Filter, fencing)
 	if err != nil {
+		// CRUD operation failed - SEC-MON-REQ-1 compliance (#1 pii_manipulation, #11 warnings_or_errors)
+		uc.Log.Warnw("msg", "Delete tuples failed",
+			"action", "DELETE",
+			"resource_type", "tuple",
+			"resource_id", "filtered_delete",
+			"principal", principal,
+			"outcome", "failure",
+			"duration_ms", time.Since(startTime).Milliseconds(),
+			"reason", err.Error(),
+		)
 		return nil, err
 	}
+
+	// CRUD operation - SEC-MON-REQ-1 compliance (#1 pii_manipulation)
+	uc.Log.Infow("msg", "Tuples deleted",
+		"action", "DELETE",
+		"resource_type", "tuple",
+		"resource_id", "filtered_delete",
+		"principal", principal,
+		"outcome", "success",
+		"duration_ms", time.Since(startTime).Milliseconds(),
+	)
 
 	return &DeleteTuplesResult{
 		ConsistencyToken: result.ConsistencyToken(),

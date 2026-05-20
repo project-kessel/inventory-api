@@ -43,6 +43,7 @@ When creating Jira issues for this initiative, use the following invariants:
 - **Project**: RHCLOUD
 - **Parent Issue**: RHCLOUD-44628
 - **Component**: Fabric Kessel
+- **Team**: Fabric Kessel
 - **Work Type**: Product / Portfolio Work (ID: 10610)
 - **Summary Prefix**: "Phase <phase number>: "
 
@@ -58,6 +59,7 @@ For issues that are technical debt, code quality improvements, refactoring, or g
 - Work Type "Product / Portfolio Work" maps to ID `10610` in the Jira API
 - Link type for related issues is "Related" (not "Relates")
 - Component was previously "Management Fabric" - now updated to "Fabric Kessel"
+- Team field must be set to "Fabric Kessel" to ensure visibility in workstream views
 - Legacy label "mgmt-fabric-kessel" has been removed
 
 ### Jira Formatting Requirements

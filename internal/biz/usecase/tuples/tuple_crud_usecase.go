@@ -37,11 +37,8 @@ func (uc *TupleCrudUseCase) CreateTuples(ctx context.Context, cmd CreateTuplesCo
 	}
 
 	// Get authz context for logging
-	authzCtx, ok := authnapi.FromAuthzContext(ctx)
-	principal := "unknown"
-	if ok {
-		principal = authzCtx.ExtractPrincipal()
-	}
+	authzCtx, _ := authnapi.FromAuthzContext(ctx)
+	principal := authzCtx.ExtractPrincipal()
 
 	var fencing *model.FencingCheck
 	if cmd.FencingCheck != nil {
@@ -87,11 +84,8 @@ func (uc *TupleCrudUseCase) DeleteTuples(ctx context.Context, cmd DeleteTuplesCo
 	}
 
 	// Get authz context for logging
-	authzCtx, ok := authnapi.FromAuthzContext(ctx)
-	principal := "unknown"
-	if ok {
-		principal = authzCtx.ExtractPrincipal()
-	}
+	authzCtx, _ := authnapi.FromAuthzContext(ctx)
+	principal := authzCtx.ExtractPrincipal()
 
 	var fencing *model.FencingCheck
 	if cmd.FencingCheck != nil {

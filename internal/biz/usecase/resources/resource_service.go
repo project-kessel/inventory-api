@@ -421,8 +421,8 @@ func (uc *Usecase) Check(ctx context.Context, relation model.Relation, sub model
 	}
 
 	if err != nil {
-		// Authorization check failed - SEC-MON-REQ-1 compliance (#11 warnings_or_errors)
-		uc.Log.Warnw("msg", "Permission check failed",
+		// Operation failed - SEC-MON-REQ-1 compliance (#11 warnings_or_errors)
+		uc.Log.Warnw("msg", "Permission check operation failed",
 			"action", "CHECK",
 			"resource_type", resourceRef.ResourceType().String(),
 			"resource_id", string(resourceRef.ResourceId()),
@@ -434,16 +434,18 @@ func (uc *Usecase) Check(ctx context.Context, relation model.Relation, sub model
 		return model.CheckResult{}, err
 	}
 
-	// Authorization check - SEC-MON-REQ-1 compliance (Priority 3: read operation logging)
-	uc.Log.Infow("msg", "Permission check completed",
-		"action", "CHECK",
-		"resource_type", resourceRef.ResourceType().String(),
-		"resource_id", string(resourceRef.ResourceId()),
-		"relation", relation.String(),
-		"principal", principal,
-		"check_result", result.Allowed(),
-		"outcome", "success",
-	)
+	// Log permission denials - SEC-MON-REQ-1 compliance (#8 authorization_failure)
+	if !result.Allowed() {
+		uc.Log.Warnw("msg", "Permission denied",
+			"event", "authorization_failure",
+			"action", "CHECK",
+			"resource_type", resourceRef.ResourceType().String(),
+			"resource_id", string(resourceRef.ResourceId()),
+			"relation", relation.String(),
+			"principal", principal,
+			"outcome", "failure",
+		)
+	}
 
 	return result, nil
 }
@@ -471,8 +473,8 @@ func (uc *Usecase) CheckSelf(ctx context.Context, relation model.Relation, resou
 	}
 
 	if err != nil {
-		// Authorization check failed - SEC-MON-REQ-1 compliance (#11 warnings_or_errors)
-		uc.Log.Warnw("msg", "Self permission check failed",
+		// Operation failed - SEC-MON-REQ-1 compliance (#11 warnings_or_errors)
+		uc.Log.Warnw("msg", "Self permission check operation failed",
 			"action", "CHECK_SELF",
 			"resource_type", resourceRef.ResourceType().String(),
 			"resource_id", string(resourceRef.ResourceId()),
@@ -484,16 +486,18 @@ func (uc *Usecase) CheckSelf(ctx context.Context, relation model.Relation, resou
 		return model.CheckResult{}, err
 	}
 
-	// Authorization check - SEC-MON-REQ-1 compliance (Priority 3: read operation logging)
-	uc.Log.Infow("msg", "Self permission check completed",
-		"action", "CHECK_SELF",
-		"resource_type", resourceRef.ResourceType().String(),
-		"resource_id", string(resourceRef.ResourceId()),
-		"relation", relation.String(),
-		"principal", principal,
-		"check_result", result.Allowed(),
-		"outcome", "success",
-	)
+	// Log permission denials - SEC-MON-REQ-1 compliance (#8 authorization_failure)
+	if !result.Allowed() {
+		uc.Log.Warnw("msg", "Self permission denied",
+			"event", "authorization_failure",
+			"action", "CHECK_SELF",
+			"resource_type", resourceRef.ResourceType().String(),
+			"resource_id", string(resourceRef.ResourceId()),
+			"relation", relation.String(),
+			"principal", principal,
+			"outcome", "failure",
+		)
+	}
 
 	return result, nil
 }

@@ -34,14 +34,7 @@ func EnforceMetaAuthzObject(ctx context.Context, authorizer MetaAuthorizer, rela
 	}
 	if !allowed {
 		// Extract principal from authzCtx
-		principal := "unknown"
-		if authzCtx.Subject != nil {
-			if authzCtx.Subject.ClientID != "" {
-				principal = string(authzCtx.Subject.ClientID)
-			} else if authzCtx.Subject.SubjectId != "" {
-				principal = string(authzCtx.Subject.SubjectId)
-			}
-		}
+		principal := authzCtx.ExtractPrincipal()
 
 		// Extract resource information from MetaObject
 		resourceType := "unknown"
@@ -58,7 +51,7 @@ func EnforceMetaAuthzObject(ctx context.Context, authorizer MetaAuthorizer, rela
 			resourceId = "system"
 		}
 
-		// Auth failure - SEC-MON-REQ-1 compliance (#8 authorization_failure, #1 pii_manipulation)
+		// Auth failure - SEC-MON-REQ-1 compliance (EOI-8 authorization_failure, EOI-1 pii_manipulation)
 		logger := log.NewHelper(log.DefaultLogger)
 		logger.Warnw("msg", "Permission denied",
 			"event", "authorization_failure",

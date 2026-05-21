@@ -193,7 +193,7 @@ func (uc *Usecase) ReportResource(ctx context.Context, cmd ReportResourceCommand
 		// Extract principal for failure logging
 		principal := authzCtx.ExtractPrincipal()
 
-		// CRUD operation failed - SEC-MON-REQ-1 compliance (#1 pii_manipulation, #11 warnings_or_errors)
+		// CRUD operation failed - SEC-MON-REQ-1 compliance (EOI-1 pii_manipulation, EOI-11 warnings_or_errors)
 		uc.Log.Warnw("msg", "Resource operation failed",
 			"action", "REPORT_RESOURCE",
 			"resource_type", cmd.ResourceType.String(),
@@ -222,7 +222,7 @@ func (uc *Usecase) ReportResource(ctx context.Context, cmd ReportResourceCommand
 		action = "REPORT_RESOURCE"
 	}
 
-	// CRUD operation - SEC-MON-REQ-1 compliance (#1 pii_manipulation)
+	// CRUD operation - SEC-MON-REQ-1 compliance (EOI-1 pii_manipulation)
 	uc.Log.Infow("msg", "Resource operation completed",
 		"action", action,
 		"resource_type", cmd.ResourceType.String(),
@@ -372,7 +372,7 @@ func (uc *Usecase) Delete(ctx context.Context, reporterResourceKey model.Reporte
 	principal := authzCtx.ExtractPrincipal()
 
 	if err != nil {
-		// DELETE operation failed - SEC-MON-REQ-1 compliance (#1 pii_manipulation, #11 warnings_or_errors)
+		// DELETE operation failed - SEC-MON-REQ-1 compliance (EOI-1 pii_manipulation, EOI-11 warnings_or_errors)
 		uc.Log.Warnw("msg", "Delete resource failed",
 			"action", "DELETE",
 			"resource_type", reporterResourceKey.ResourceType().String(),
@@ -386,7 +386,7 @@ func (uc *Usecase) Delete(ctx context.Context, reporterResourceKey model.Reporte
 		return err
 	}
 
-	// DELETE operation - SEC-MON-REQ-1 compliance (#1 pii_manipulation)
+	// DELETE operation - SEC-MON-REQ-1 compliance (EOI-1 pii_manipulation)
 	uc.Log.Infow("msg", "Resource deleted",
 		"action", "DELETE",
 		"resource_type", reporterResourceKey.ResourceType().String(),
@@ -421,7 +421,7 @@ func (uc *Usecase) Check(ctx context.Context, relation model.Relation, sub model
 	}
 
 	if err != nil {
-		// Operation failed - SEC-MON-REQ-1 compliance (#11 warnings_or_errors)
+		// Operation failed - SEC-MON-REQ-1 compliance (EOI-11 warnings_or_errors)
 		uc.Log.Warnw("msg", "Permission check operation failed",
 			"action", "CHECK",
 			"resource_type", resourceRef.ResourceType().String(),
@@ -434,7 +434,7 @@ func (uc *Usecase) Check(ctx context.Context, relation model.Relation, sub model
 		return model.CheckResult{}, err
 	}
 
-	// Log permission denials - SEC-MON-REQ-1 compliance (#8 authorization_failure)
+	// Log permission denials - SEC-MON-REQ-1 compliance (EOI-8 authorization_failure)
 	if !result.Allowed() {
 		uc.Log.Warnw("msg", "Permission denied",
 			"event", "authorization_failure",
@@ -473,7 +473,7 @@ func (uc *Usecase) CheckSelf(ctx context.Context, relation model.Relation, resou
 	}
 
 	if err != nil {
-		// Operation failed - SEC-MON-REQ-1 compliance (#11 warnings_or_errors)
+		// Operation failed - SEC-MON-REQ-1 compliance (EOI-11 warnings_or_errors)
 		uc.Log.Warnw("msg", "Self permission check operation failed",
 			"action", "CHECK_SELF",
 			"resource_type", resourceRef.ResourceType().String(),
@@ -486,7 +486,7 @@ func (uc *Usecase) CheckSelf(ctx context.Context, relation model.Relation, resou
 		return model.CheckResult{}, err
 	}
 
-	// Log permission denials - SEC-MON-REQ-1 compliance (#8 authorization_failure)
+	// Log permission denials - SEC-MON-REQ-1 compliance (EOI-8 authorization_failure)
 	if !result.Allowed() {
 		uc.Log.Warnw("msg", "Self permission denied",
 			"event", "authorization_failure",

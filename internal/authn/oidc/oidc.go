@@ -104,23 +104,6 @@ func (o *OAuth2Authenticator) Authenticate(ctx context.Context, t transport.Tran
 	}
 
 	if u.Subject != "" && o.PrincipalUserDomain != "" {
-		// Extract principal for logging
-		principal := u.Subject
-		if u.ClientID != "" {
-			principal = u.ClientID
-		}
-
-		// Successful authentication - SEC-MON-REQ-1 compliance (EOI-6 login)
-		log.NewHelper(log.DefaultLogger).Infow("msg", "OIDC authentication successful",
-			"event", "authentication_success",
-			"auth_method", "oidc",
-			"principal", principal,
-			"subject", u.Subject,
-			"issuer", u.Issuer,
-			"client_id", u.ClientID,
-			"outcome", "success",
-		)
-
 		return &api.Claims{
 			SubjectId: api.SubjectId(u.Subject),
 			Issuer:    api.Issuer(u.Issuer),

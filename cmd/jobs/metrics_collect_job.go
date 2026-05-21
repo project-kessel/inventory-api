@@ -83,7 +83,7 @@ func collectMetricsWithDB(db *gorm.DB, logHelper *log.Helper, retentionDays int)
 
 	insertStart := time.Now()
 	if err := db.Session(&gorm.Session{Logger: db.Logger.LogMode(gormlogger.Silent)}).Create(&summary).Error; err != nil {
-		// Failed admin operation - SEC-MON-REQ-1 compliance (#3 admin_action, #2 system_object_manipulation, #11 warnings_or_errors)
+		// Failed admin operation - SEC-MON-REQ-1 compliance (EOI-3 admin_action, EOI-2 system_object_manipulation, EOI-11 warnings_or_errors)
 		logHelper.Errorw("msg", "Cronjob: metrics write failed",
 			"action", "CREATE",
 			"resource_type", "metrics_summary",
@@ -97,7 +97,7 @@ func collectMetricsWithDB(db *gorm.DB, logHelper *log.Helper, retentionDays int)
 
 	logHelper.Infof("Metrics summary written successfully (id=%s, duration=%s)", summary.ID, time.Since(insertStart))
 
-	// Cronjob metrics write - SEC-MON-REQ-1 compliance (#3 admin_action, #2 system_object_manipulation)
+	// Cronjob metrics write - SEC-MON-REQ-1 compliance (EOI-3 admin_action, EOI-2 system_object_manipulation)
 	logHelper.Infow("msg", "Cronjob: metrics summary written",
 		"action", "CREATE",
 		"resource_type", "metrics_summary",
@@ -114,7 +114,7 @@ func collectMetricsWithDB(db *gorm.DB, logHelper *log.Helper, retentionDays int)
 	cutoff := time.Now().UTC().AddDate(0, 0, -retentionDays)
 	result := db.Where("collected_at < ?", cutoff).Delete(&model.MetricsSummary{})
 	if result.Error != nil {
-		// Failed admin operation - SEC-MON-REQ-1 compliance (#3 admin_action, #2 system_object_manipulation, #11 warnings_or_errors)
+		// Failed admin operation - SEC-MON-REQ-1 compliance (EOI-3 admin_action, EOI-2 system_object_manipulation, EOI-11 warnings_or_errors)
 		logHelper.Errorw("msg", "Cronjob: metrics cleanup failed",
 			"action", "DELETE",
 			"resource_type", "metrics_summary",
@@ -128,7 +128,7 @@ func collectMetricsWithDB(db *gorm.DB, logHelper *log.Helper, retentionDays int)
 	}
 	logHelper.Infof("Cleaned up %d metrics summaries older than %d days", result.RowsAffected, retentionDays)
 
-	// Cronjob metrics cleanup - SEC-MON-REQ-1 compliance (#3 admin_action, #2 system_object_manipulation)
+	// Cronjob metrics cleanup - SEC-MON-REQ-1 compliance (EOI-3 admin_action, EOI-2 system_object_manipulation)
 	logHelper.Infow("msg", "Cronjob: metrics cleanup completed",
 		"action", "DELETE",
 		"resource_type", "metrics_summary",

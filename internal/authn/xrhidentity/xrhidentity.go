@@ -52,26 +52,6 @@ func (a *XRhIdentityAuthenticator) Authenticate(ctx context.Context, t transport
 		return nil, api.Deny
 	}
 
-	// Extract principal for logging
-	principal := "unknown"
-	if xrhid.Identity.OrgID != "" {
-		principal = xrhid.Identity.OrgID
-	}
-	if xrhid.Identity.User != nil && xrhid.Identity.User.UserID != "" {
-		// Prefer user_id if available, otherwise org_id
-		principal = xrhid.Identity.User.UserID
-	}
-
-	// Successful authentication - SEC-MON-REQ-1 compliance (EOI-6 login)
-	log.NewHelper(log.DefaultLogger).Infow("msg", "x-rh-identity authentication successful",
-		"event", "authentication_success",
-		"auth_method", "x-rh-identity",
-		"principal", principal,
-		"org_id", xrhid.Identity.OrgID,
-		"identity_type", xrhid.Identity.Type,
-		"outcome", "success",
-	)
-
 	// Convert platform identity to our internal Claims format
 	internalClaims := convertPlatformClaims(&xrhid.Identity)
 	return internalClaims, api.Allow

@@ -311,7 +311,7 @@ func NewCommand(
 			hb.RegisterKesselInventoryHealthServiceServer(server.GrpcServer, health_service)
 			hb.RegisterKesselInventoryHealthServiceHTTPServer(server.HttpServer, health_service)
 
-			// Service startup - SEC-MON-REQ-1 compliance (#5 process_status)
+			// Service startup - SEC-MON-REQ-1 compliance (EOI-5 process_status)
 			logHelper := log.NewHelper(logger)
 			logHelper.Infow("msg", "Inventory API starting",
 				"event", "startup",
@@ -407,7 +407,7 @@ func shutdown(db *gorm.DB, srv *server.Server, pprofSrv *pprof.Server, cm *consu
 	return func(reason interface{}) {
 		log.Info(fmt.Sprintf("Server Shutdown: %s", reason))
 
-		// Service shutdown - SEC-MON-REQ-1 compliance (#5 process_status)
+		// Service shutdown - SEC-MON-REQ-1 compliance (EOI-5 process_status)
 		logger.Infow("msg", "Inventory API shutting down",
 			"event", "shutdown",
 			"reason", fmt.Sprintf("%v", reason),

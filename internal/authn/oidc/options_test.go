@@ -29,5 +29,7 @@ func TestOptions_AddFlags(t *testing.T) {
 	fs := pflag.NewFlagSet("", pflag.ContinueOnError)
 	test.options.AddFlags(fs, prefix)
 
-	helpers.AllOptionsHaveFlags(t, prefix, fs, *test.options, nil)
+	// GrpcEndpoints is configured via YAML, not CLI flags, so exclude it from flag check
+	exclude := []string{"grpc-endpoints"}
+	helpers.AllOptionsHaveFlags(t, prefix, fs, *test.options, exclude)
 }

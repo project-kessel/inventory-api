@@ -285,6 +285,16 @@ func (c *Config) completeChainEntry(entry ChainEntry, index int) (ChainCompleted
 		if principalUserDomain, ok := entry.Config["principal-user-domain"].(string); ok {
 			oidcOpts.PrincipalUserDomain = principalUserDomain
 		}
+		// Pass gRPC endpoints from OIDC config to OIDC options
+		if grpcEndpoints, ok := entry.Config["grpc-endpoints"].([]interface{}); ok {
+			endpoints := make([]string, len(grpcEndpoints))
+			for i, ep := range grpcEndpoints {
+				if epStr, ok := ep.(string); ok {
+					endpoints[i] = epStr
+				}
+			}
+			oidcOpts.GrpcEndpoints = endpoints
+		}
 		oidcConfig := oidc.NewConfig(oidcOpts)
 		completedOIDC, err := oidcConfig.Complete()
 		if err != nil {

@@ -99,6 +99,7 @@ func collectMetricsWithDB(db *gorm.DB, logHelper *log.Helper, retentionDays int)
 
 	// Cronjob metrics write - SEC-MON-REQ-1 compliance (EOI-3 admin_action, EOI-2 system_object_manipulation)
 	logHelper.Infow("msg", "Cronjob: metrics summary written",
+		"event", "admin_action",
 		"action", "CREATE",
 		"resource_type", "metrics_summary",
 		"resource_id", summary.ID.String(),
@@ -130,6 +131,7 @@ func collectMetricsWithDB(db *gorm.DB, logHelper *log.Helper, retentionDays int)
 
 	// Cronjob metrics cleanup - SEC-MON-REQ-1 compliance (EOI-3 admin_action, EOI-2 system_object_manipulation)
 	logHelper.Infow("msg", "Cronjob: metrics cleanup completed",
+		"event", "admin_action",
 		"action", "DELETE",
 		"resource_type", "metrics_summary",
 		"resource_id", fmt.Sprintf("older_than_%d_days", retentionDays),

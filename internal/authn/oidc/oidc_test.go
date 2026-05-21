@@ -10,33 +10,33 @@ import (
 	"github.com/project-kessel/inventory-api/internal/authn/api"
 )
 
-type mockHeader struct {
+type fakeHeader struct {
 	headers map[string]string
 }
 
-func (m *mockHeader) Get(key string) string {
+func (m *fakeHeader) Get(key string) string {
 	if m.headers == nil {
 		return ""
 	}
 	return m.headers[key]
 }
-func (m *mockHeader) Set(key, value string)      {}
-func (m *mockHeader) Add(key, value string)      {}
-func (m *mockHeader) Keys() []string             { return nil }
-func (m *mockHeader) Values(key string) []string { return nil }
+func (m *fakeHeader) Set(key, value string)      {}
+func (m *fakeHeader) Add(key, value string)      {}
+func (m *fakeHeader) Keys() []string             { return nil }
+func (m *fakeHeader) Values(key string) []string { return nil }
 
-type mockTransporter struct {
+type fakeTransporter struct {
 	kind      transport.Kind
 	operation string
 	headers   map[string]string
 }
 
-func (m *mockTransporter) Kind() transport.Kind            { return m.kind }
-func (m *mockTransporter) Endpoint() string                { return "/test" }
-func (m *mockTransporter) Operation() string               { return m.operation }
-func (m *mockTransporter) RequestHeader() transport.Header { return &mockHeader{headers: m.headers} }
-func (m *mockTransporter) ReplyHeader() transport.Header {
-	return &mockHeader{headers: map[string]string{}}
+func (m *fakeTransporter) Kind() transport.Kind            { return m.kind }
+func (m *fakeTransporter) Endpoint() string                { return "/test" }
+func (m *fakeTransporter) Operation() string               { return m.operation }
+func (m *fakeTransporter) RequestHeader() transport.Header { return &fakeHeader{headers: m.headers} }
+func (m *fakeTransporter) ReplyHeader() transport.Header {
+	return &fakeHeader{headers: map[string]string{}}
 }
 
 // TestOAuth2Authenticator_Endpoints_NotMatched verifies that when endpoints are specified,
@@ -58,8 +58,8 @@ func TestOAuth2Authenticator_Endpoints_NotMatched(t *testing.T) {
 		},
 	}
 
-	// Mock transporter with non-matching endpoint
-	mockT := &mockTransporter{
+	// Fake transporter with non-matching endpoint
+	fakeT := &fakeTransporter{
 		kind:      transport.KindGRPC,
 		operation: "/kessel.inventory.v1beta2.KesselInventoryService/CreateResource",
 		headers: map[string]string{
@@ -68,7 +68,7 @@ func TestOAuth2Authenticator_Endpoints_NotMatched(t *testing.T) {
 	}
 
 	// Authenticate should return Ignore (endpoint not in list)
-	claims, decision := auth.Authenticate(context.Background(), mockT)
+	claims, decision := auth.Authenticate(context.Background(), fakeT)
 	assert.Nil(t, claims)
 	assert.Equal(t, api.Ignore, decision)
 }
@@ -92,15 +92,15 @@ func TestOAuth2Authenticator_Endpoints_MatchedNoToken(t *testing.T) {
 		},
 	}
 
-	// Mock transporter with matching endpoint but no token
-	mockT := &mockTransporter{
+	// Fake transporter with matching endpoint but no token
+	fakeT := &fakeTransporter{
 		kind:      transport.KindGRPC,
 		operation: "/kessel.inventory.v1beta2.KesselTupleService/CreateTuples",
 		headers:   map[string]string{}, // No authorization header
 	}
 
 	// Authenticate should return Deny (OIDC required for this endpoint)
-	claims, decision := auth.Authenticate(context.Background(), mockT)
+	claims, decision := auth.Authenticate(context.Background(), fakeT)
 	assert.Nil(t, claims)
 	assert.Equal(t, api.Deny, decision)
 }
@@ -121,15 +121,15 @@ func TestOAuth2Authenticator_NoEndpoints_NoToken(t *testing.T) {
 		},
 	}
 
-	// Mock transporter without token
-	mockT := &mockTransporter{
+	// Fake transporter without token
+	fakeT := &fakeTransporter{
 		kind:      transport.KindGRPC,
 		operation: "/any/endpoint",
 		headers:   map[string]string{},
 	}
 
 	// Authenticate should return Ignore (OIDC optional, current behavior)
-	claims, decision := auth.Authenticate(context.Background(), mockT)
+	claims, decision := auth.Authenticate(context.Background(), fakeT)
 	assert.Nil(t, claims)
 	assert.Equal(t, api.Ignore, decision)
 }
@@ -163,26 +163,26 @@ func TestOAuth2Authenticator_Endpoints_MultipleEndpoints(t *testing.T) {
 	// Test each endpoint matches and requires token
 	for _, endpoint := range endpoints {
 		t.Run(endpoint, func(t *testing.T) {
-			mockT := &mockTransporter{
+			fakeT := &fakeTransporter{
 				kind:      transport.KindGRPC,
 				operation: endpoint,
 				headers:   map[string]string{},
 			}
 
-			claims, decision := auth.Authenticate(context.Background(), mockT)
+			claims, decision := auth.Authenticate(context.Background(), fakeT)
 			assert.Nil(t, claims)
 			assert.Equal(t, api.Deny, decision, "Expected Deny for endpoint %s without token", endpoint)
 		})
 	}
 
 	// Test non-matching endpoint returns Ignore
-	mockT := &mockTransporter{
+	fakeT := &fakeTransporter{
 		kind:      transport.KindGRPC,
 		operation: "/some/other/endpoint",
 		headers:   map[string]string{},
 	}
 
-	claims, decision := auth.Authenticate(context.Background(), mockT)
+	claims, decision := auth.Authenticate(context.Background(), fakeT)
 	assert.Nil(t, claims)
 	assert.Equal(t, api.Ignore, decision)
 }

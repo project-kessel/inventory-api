@@ -340,11 +340,8 @@ func (uc *Usecase) Delete(ctx context.Context, reporterResourceKey model.Reporte
 		return err
 	}
 
-	// Get authz context for logging
-	authzCtx, ok := authnapi.FromAuthzContext(ctx)
-	if !ok || authzCtx.Subject == nil {
-		return status.Error(codes.Unauthenticated, "authentication required")
-	}
+	// Get authz context for logging (guaranteed to exist after enforceMetaAuthzObject)
+	authzCtx, _ := authnapi.FromAuthzContext(ctx)
 
 	err = uc.resourceRepository.GetTransactionManager().HandleSerializableTransaction(
 		DeleteResourceOperationName,
@@ -414,11 +411,8 @@ func (uc *Usecase) Check(ctx context.Context, relation model.Relation, sub model
 	result, err := uc.checkPermission(ctx, relation, sub, resourceRef, resolved)
 
 	// Get authz context for logging
-	authzCtx, ok := authnapi.FromAuthzContext(ctx)
-	principal := "unknown"
-	if ok {
-		principal = authzCtx.ExtractPrincipal()
-	}
+	authzCtx, _ := authnapi.FromAuthzContext(ctx)
+	principal := authzCtx.ExtractPrincipal()
 
 	if err != nil {
 		// Operation failed - SEC-MON-REQ-1 compliance (EOI-11 warnings_or_errors)
@@ -431,11 +425,8 @@ func (uc *Usecase) Check(ctx context.Context, relation model.Relation, sub model
 			"outcome", "failure",
 			"reason", err.Error(),
 		)
-		return model.CheckResult{}, err
-	}
-
-	// Log permission denials - SEC-MON-REQ-1 compliance (EOI-8 authorization_failure)
-	if !result.Allowed() {
+	} else if !result.Allowed() {
+		// Log permission denials - SEC-MON-REQ-1 compliance (EOI-8 authorization_failure)
 		uc.Log.Warnw("msg", "Permission denied",
 			"event", "authorization_failure",
 			"action", "CHECK",
@@ -447,7 +438,7 @@ func (uc *Usecase) Check(ctx context.Context, relation model.Relation, sub model
 		)
 	}
 
-	return result, nil
+	return result, err
 }
 
 // CheckSelf verifies access for the authenticated user using the self-subject strategy.
@@ -466,11 +457,8 @@ func (uc *Usecase) CheckSelf(ctx context.Context, relation model.Relation, resou
 	result, err := uc.checkPermission(ctx, relation, subjectRef, resourceRef, resolved)
 
 	// Get authz context for logging
-	authzCtx, ok := authnapi.FromAuthzContext(ctx)
-	principal := "unknown"
-	if ok {
-		principal = authzCtx.ExtractPrincipal()
-	}
+	authzCtx, _ := authnapi.FromAuthzContext(ctx)
+	principal := authzCtx.ExtractPrincipal()
 
 	if err != nil {
 		// Operation failed - SEC-MON-REQ-1 compliance (EOI-11 warnings_or_errors)
@@ -483,11 +471,8 @@ func (uc *Usecase) CheckSelf(ctx context.Context, relation model.Relation, resou
 			"outcome", "failure",
 			"reason", err.Error(),
 		)
-		return model.CheckResult{}, err
-	}
-
-	// Log permission denials - SEC-MON-REQ-1 compliance (EOI-8 authorization_failure)
-	if !result.Allowed() {
+	} else if !result.Allowed() {
+		// Log permission denials - SEC-MON-REQ-1 compliance (EOI-8 authorization_failure)
 		uc.Log.Warnw("msg", "Self permission denied",
 			"event", "authorization_failure",
 			"action", "CHECK_SELF",
@@ -499,7 +484,7 @@ func (uc *Usecase) CheckSelf(ctx context.Context, relation model.Relation, resou
 		)
 	}
 
-	return result, nil
+	return result, err
 }
 
 // CheckForUpdate verifies if a subject can update the resource.

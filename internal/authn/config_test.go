@@ -129,6 +129,84 @@ func TestConfigComplete_WithGrpcEndpoints(t *testing.T) {
 			"/kessel.inventory.v1beta2.KesselTupleService/DeleteTuples",
 		}, oidcChainConfig.OIDCConfig.GrpcEndpoints)
 	})
+
+	t.Run("grpc-endpoints rejects empty string", func(t *testing.T) {
+		c := &Config{
+			Authenticator: &AuthenticatorConfig{
+				Type: "first_match",
+				Chain: []ChainEntry{
+					{
+						Type:      "oidc",
+						Transport: &Transport{HTTP: boolPtr(false), GRPC: boolPtr(true)},
+						Config: map[string]interface{}{
+							"authn-server-url": "https://example.com",
+							"client-id":        "test-client",
+							"grpc-endpoints": []interface{}{
+								"/kessel.inventory.v1beta2.KesselTupleService/CreateTuples",
+								"", // Empty string - should fail
+							},
+						},
+					},
+					{Type: "allow-unauthenticated", Transport: &Transport{HTTP: boolPtr(true), GRPC: boolPtr(true)}},
+				},
+			},
+		}
+
+		_, errs := c.Complete()
+		assert.NotEmpty(t, errs)
+		assert.Contains(t, errs[0].Error(), "grpc-endpoints[1] is empty")
+	})
+
+	t.Run("grpc-endpoints rejects non-string element", func(t *testing.T) {
+		c := &Config{
+			Authenticator: &AuthenticatorConfig{
+				Type: "first_match",
+				Chain: []ChainEntry{
+					{
+						Type:      "oidc",
+						Transport: &Transport{HTTP: boolPtr(false), GRPC: boolPtr(true)},
+						Config: map[string]interface{}{
+							"authn-server-url": "https://example.com",
+							"client-id":        "test-client",
+							"grpc-endpoints": []interface{}{
+								"/kessel.inventory.v1beta2.KesselTupleService/CreateTuples",
+								123, // Non-string - should fail
+							},
+						},
+					},
+					{Type: "allow-unauthenticated", Transport: &Transport{HTTP: boolPtr(true), GRPC: boolPtr(true)}},
+				},
+			},
+		}
+
+		_, errs := c.Complete()
+		assert.NotEmpty(t, errs)
+		assert.Contains(t, errs[0].Error(), "grpc-endpoints[1] is not a string")
+	})
+
+	t.Run("grpc-endpoints rejects wrong type", func(t *testing.T) {
+		c := &Config{
+			Authenticator: &AuthenticatorConfig{
+				Type: "first_match",
+				Chain: []ChainEntry{
+					{
+						Type:      "oidc",
+						Transport: &Transport{HTTP: boolPtr(false), GRPC: boolPtr(true)},
+						Config: map[string]interface{}{
+							"authn-server-url": "https://example.com",
+							"client-id":        "test-client",
+							"grpc-endpoints":   "not-an-array", // Wrong type - should fail
+						},
+					},
+					{Type: "allow-unauthenticated", Transport: &Transport{HTTP: boolPtr(true), GRPC: boolPtr(true)}},
+				},
+			},
+		}
+
+		_, errs := c.Complete()
+		assert.NotEmpty(t, errs)
+		assert.Contains(t, errs[0].Error(), "grpc-endpoints must be an array")
+	})
 }
 
 func boolPtr(v bool) *bool { return &v }

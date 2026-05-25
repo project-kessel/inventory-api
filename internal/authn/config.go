@@ -286,13 +286,38 @@ func (c *Config) completeChainEntry(entry ChainEntry, index int) (ChainCompleted
 			oidcOpts.PrincipalUserDomain = principalUserDomain
 		}
 		// Pass gRPC endpoints from OIDC config to OIDC options
-		if grpcEndpoints, ok := entry.Config["grpc-endpoints"].([]interface{}); ok {
+		if grpcEndpointsRaw, exists := entry.Config["grpc-endpoints"]; exists {
+			// Only accept []interface{} (what YAML parsing via mapstructure produces)
+			grpcEndpoints, ok := grpcEndpointsRaw.([]interface{})
+			if !ok {
+				errs = append(errs, &ConfigError{
+					Message: fmt.Sprintf("grpc-endpoints must be an array at chain index %d", index),
+					Type:    entry.Type,
+				})
+				return chainConfig, errs
+			}
+
+			// Validate and convert each element to string
 			endpoints := make([]string, len(grpcEndpoints))
 			for i, ep := range grpcEndpoints {
-				if epStr, ok := ep.(string); ok {
-					endpoints[i] = epStr
+				epStr, ok := ep.(string)
+				if !ok {
+					errs = append(errs, &ConfigError{
+						Message: fmt.Sprintf("grpc-endpoints[%d] is not a string at chain index %d", i, index),
+						Type:    entry.Type,
+					})
+					return chainConfig, errs
 				}
+				if epStr == "" {
+					errs = append(errs, &ConfigError{
+						Message: fmt.Sprintf("grpc-endpoints[%d] is empty at chain index %d", i, index),
+						Type:    entry.Type,
+					})
+					return chainConfig, errs
+				}
+				endpoints[i] = epStr
 			}
+
 			oidcOpts.GrpcEndpoints = endpoints
 		}
 		oidcConfig := oidc.NewConfig(oidcOpts)

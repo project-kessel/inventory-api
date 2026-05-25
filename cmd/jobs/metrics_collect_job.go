@@ -95,8 +95,6 @@ func collectMetricsWithDB(db *gorm.DB, logHelper *log.Helper, retentionDays int)
 		return err
 	}
 
-	logHelper.Infof("Metrics summary written successfully (id=%s, duration=%s)", summary.ID, time.Since(insertStart))
-
 	// Cronjob metrics write - SEC-MON-REQ-1 compliance (EOI-3 admin_action, EOI-2 system_object_manipulation)
 	logHelper.Infow("msg", "Cronjob: metrics summary written",
 		"event", "admin_action",
@@ -105,6 +103,7 @@ func collectMetricsWithDB(db *gorm.DB, logHelper *log.Helper, retentionDays int)
 		"resource_id", summary.ID.String(),
 		"principal", "system:cronjob:metrics-collect-job",
 		"outcome", "success",
+		"duration", time.Since(insertStart).Seconds(),
 	)
 
 	if retentionDays <= 0 {

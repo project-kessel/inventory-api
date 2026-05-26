@@ -308,8 +308,7 @@ func NewFromJsonBytes(ctx context.Context, jsonBytes []byte, validationSchemaFro
 			log.Warnf("Skipping invalid reporter type in JSON '%s': %v", remainder, err)
 			continue
 		}
-		parsedResourceType, _ := model.NewResourceType(string(resourceType))
-		reporterSchemaRepr, err := model.NewReporterSchemaRepresentation(parsedResourceType, reporterType, validationSchemaFromString(value.(string)))
+		reporterSchemaRepr, err := model.NewReporterSchemaRepresentation(resourceType, reporterType, validationSchemaFromString(value.(string)))
 		if err != nil {
 			return nil, err
 		}

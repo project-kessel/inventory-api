@@ -280,7 +280,11 @@ func NewFromJsonBytes(ctx context.Context, jsonBytes []byte, validationSchemaFro
 				log.Warnf("Skipping invalid resource type in JSON '%s': %v", resourceTypeStr, err)
 				continue
 			}
-			resourceSchema, err := model.NewResourceSchemaRepresentation(resourceType, validationSchemaFromString(value.(string)))
+			s, ok := value.(string)
+			if !ok {
+				return nil, fmt.Errorf("expected string schema value for resource type %q, got %T", resourceTypeStr, value)
+			}
+			resourceSchema, err := model.NewResourceSchemaRepresentation(resourceType, validationSchemaFromString(s))
 			if err != nil {
 				return nil, err
 			}
@@ -308,7 +312,11 @@ func NewFromJsonBytes(ctx context.Context, jsonBytes []byte, validationSchemaFro
 			log.Warnf("Skipping invalid reporter type in JSON '%s': %v", remainder, err)
 			continue
 		}
-		reporterSchemaRepr, err := model.NewReporterSchemaRepresentation(resourceType, reporterType, validationSchemaFromString(value.(string)))
+		s, ok := value.(string)
+		if !ok {
+			return nil, fmt.Errorf("expected string schema value for reporter type %q of resource %q, got %T", remainder, resourceType, value)
+		}
+		reporterSchemaRepr, err := model.NewReporterSchemaRepresentation(resourceType, reporterType, validationSchemaFromString(s))
 		if err != nil {
 			return nil, err
 		}

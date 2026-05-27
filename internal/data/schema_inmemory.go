@@ -186,8 +186,7 @@ func NewInMemorySchemaRepositoryFromDir(ctx context.Context, resourceDir string,
 		}
 		resourceType, err := model.NewResourceType(dir.Name())
 		if err != nil {
-			log.Warnf("Skipping invalid resource type directory '%s': %v", dir.Name(), err)
-			continue
+			return nil, fmt.Errorf("invalid resource type directory %q: %w", dir.Name(), err)
 		}
 
 		commonResourceSchema, err := loadCommonResourceDataSchema(resourceType.String(), resourceDir)
@@ -219,8 +218,7 @@ func NewInMemorySchemaRepositoryFromDir(ctx context.Context, resourceDir string,
 			}
 			reporterType, err := model.NewReporterType(reporter.Name())
 			if err != nil {
-				log.Warnf("Skipping invalid reporter type directory '%s': %v", reporter.Name(), err)
-				continue
+				return nil, fmt.Errorf("invalid reporter type %q: %w", reporter.Name(), err)
 			}
 			reporterSchema, isReporterSchemaExists, err := loadResourceSchema(resourceType.String(), reporterType.String(), resourceDir)
 			if err == nil && isReporterSchemaExists {
@@ -277,8 +275,7 @@ func NewFromJsonBytes(ctx context.Context, jsonBytes []byte, validationSchemaFro
 			resourceTypeStr := key[len(commonPrefix):]
 			resourceType, err := model.NewResourceType(resourceTypeStr)
 			if err != nil {
-				log.Warnf("Skipping invalid resource type in JSON '%s': %v", resourceTypeStr, err)
-				continue
+				return nil, fmt.Errorf("invalid resource type in schema JSON key %q: %w", key, err)
 			}
 			s, ok := value.(string)
 			if !ok {
@@ -309,8 +306,7 @@ func NewFromJsonBytes(ctx context.Context, jsonBytes []byte, validationSchemaFro
 
 		reporterType, err := model.NewReporterType(remainder)
 		if err != nil {
-			log.Warnf("Skipping invalid reporter type in JSON '%s': %v", remainder, err)
-			continue
+			return nil, fmt.Errorf("invalid reporter type in schema JSON key %q: %w", key, err)
 		}
 		s, ok := value.(string)
 		if !ok {

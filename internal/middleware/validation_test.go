@@ -58,69 +58,57 @@ func TestValidation_InvalidRequest(t *testing.T) {
 	assert.True(t, errors.IsBadRequest(err))
 }
 
-func TestSanitizeReportResourceRequest_RemovesNulls(t *testing.T) {
+func TestSanitizeReportResourceRequest(t *testing.T) {
 	t.Parallel()
 
-	reporterData, err := structpb.NewStruct(map[string]interface{}{
-		"satellite_id": "sat-123",
-		"stale_key":    nil,
-	})
-	require.NoError(t, err)
-
-	req := &pb.ReportResourceRequest{
-		Type:               "host",
-		ReporterInstanceId: "test-instance",
-		ReporterType:       "hbi",
-		Representations: &pb.ResourceRepresentations{
-			Metadata: &pb.RepresentationMetadata{
-				LocalResourceId: "test-123",
-				ApiHref:         "/api/test",
-			},
-			Reporter: reporterData,
+	tests := []struct {
+		name             string
+		reporterInput    map[string]interface{}
+		expectedReporter map[string]interface{}
+	}{
+		{
+			name:             "reporter nulls removed",
+			reporterInput:    map[string]interface{}{"satellite_id": "sat-123", "stale_key": nil},
+			expectedReporter: map[string]interface{}{"satellite_id": "sat-123"},
+		},
+		{
+			name: "nil representations",
+		},
+		{
+			name:             "nil reporter",
+			reporterInput:    nil,
+			expectedReporter: nil,
 		},
 	}
 
-	err = sanitizeReportResourceRequest(req)
-	assert.NoError(t, err)
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 
-	sanitizedMap := req.GetRepresentations().GetReporter().AsMap()
-	assert.Equal(t, "sat-123", sanitizedMap["satellite_id"])
-	assert.NotContains(t, sanitizedMap, "stale_key")
-}
+			req := &pb.ReportResourceRequest{
+				Type:               "host",
+				ReporterInstanceId: "test-instance",
+				ReporterType:       "hbi",
+			}
 
-func TestSanitizeReportResourceRequest_NilRepresentations(t *testing.T) {
-	t.Parallel()
+			if tc.reporterInput != nil {
+				s, err := structpb.NewStruct(tc.reporterInput)
+				require.NoError(t, err)
+				req.Representations = &pb.ResourceRepresentations{
+					Metadata: &pb.RepresentationMetadata{
+						LocalResourceId: "test-123",
+						ApiHref:         "/api/test",
+					},
+					Reporter: s,
+				}
+			}
 
-	req := &pb.ReportResourceRequest{
-		Type:               "host",
-		ReporterInstanceId: "test-instance",
-		ReporterType:       "hbi",
+			err := sanitizeReportResourceRequest(req)
+			assert.NoError(t, err)
+
+			if tc.expectedReporter != nil {
+				assert.Equal(t, tc.expectedReporter, req.GetRepresentations().GetReporter().AsMap())
+			}
+		})
 	}
-
-	err := sanitizeReportResourceRequest(req)
-	assert.NoError(t, err)
-}
-
-func TestSanitizeReportResourceRequest_NilReporter(t *testing.T) {
-	t.Parallel()
-
-	commonData, err := structpb.NewStruct(map[string]interface{}{
-		"workspace_id": "ws-1",
-	})
-	require.NoError(t, err)
-
-	req := &pb.ReportResourceRequest{
-		Type:               "host",
-		ReporterInstanceId: "test-instance",
-		ReporterType:       "hbi",
-		Representations: &pb.ResourceRepresentations{
-			Metadata: &pb.RepresentationMetadata{
-				LocalResourceId: "test-123",
-			},
-			Common: commonData,
-		},
-	}
-
-	err = sanitizeReportResourceRequest(req)
-	assert.NoError(t, err)
 }

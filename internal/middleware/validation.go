@@ -42,21 +42,24 @@ func sanitizeReportResourceRequest(rr *pbv1beta2.ReportResourceRequest) error {
 		return nil
 	}
 
-	reporterMap := rr.GetRepresentations().GetReporter().AsMap()
-	if reporterMap == nil {
+	return sanitizeStruct(&rr.Representations.Reporter, "reporter")
+}
+
+func sanitizeStruct(s **structpb.Struct, name string) error {
+	if *s == nil {
 		return nil
 	}
 
-	sanitized := RemoveNulls(reporterMap)
-	if sanitized == nil {
+	m := (*s).AsMap()
+	if m == nil || !hasNullsRecursive(m) {
 		return nil
 	}
 
-	sanitizedStruct, err := structpb.NewStruct(sanitized)
+	sanitized := RemoveNulls(m)
+	rebuilt, err := structpb.NewStruct(sanitized)
 	if err != nil {
-		return fmt.Errorf("failed to rebuild reporter struct: %w", err)
+		return fmt.Errorf("failed to rebuild %s struct: %w", name, err)
 	}
-	rr.Representations.Reporter = sanitizedStruct
-
+	*s = rebuilt
 	return nil
 }

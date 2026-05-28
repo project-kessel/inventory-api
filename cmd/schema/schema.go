@@ -8,10 +8,11 @@ import (
 	"path/filepath"
 
 	"github.com/go-kratos/kratos/v2/log"
-	"github.com/project-kessel/inventory-api/cmd/common"
-	"github.com/project-kessel/inventory-api/internal/data"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
+
+	"github.com/project-kessel/inventory-api/cmd/common"
+	bizmodel "github.com/project-kessel/inventory-api/internal/biz/model"
 )
 
 var schemaDir = "data/schema/resources"
@@ -40,8 +41,11 @@ func normalizeYAMLResourceType(yamlContent []byte) ([]byte, error) {
 
 	// Normalize the resources type if it exists
 	if resourceType, exists := yamlData["type"].(string); exists {
-		normalized := data.NormalizeResourceType(resourceType)
-		yamlData["type"] = normalized
+		rt, err := bizmodel.NewResourceType(resourceType)
+		if err != nil {
+			return nil, fmt.Errorf("invalid resource type in YAML: %w", err)
+		}
+		yamlData["type"] = rt.String()
 	}
 
 	// Convert back to YAML format
@@ -82,7 +86,11 @@ func preloadSchemas() error {
 			continue
 		}
 
-		resourceType := data.NormalizeResourceType(resource.Name())
+		rt, err := bizmodel.NewResourceType(resource.Name())
+		if err != nil {
+			continue
+		}
+		resourceType := rt.String()
 		resourcePath := filepath.Join(schemaDir, resource.Name())
 
 		// Load common resource data schema
@@ -109,7 +117,11 @@ func preloadSchemas() error {
 					continue
 				}
 
-				reporterType := data.NormalizeResourceType(reporter.Name())
+				rpt, err := bizmodel.NewReporterType(reporter.Name())
+				if err != nil {
+					continue
+				}
+				reporterType := rpt.String()
 				reporterPath := filepath.Join(reportersPath, reporter.Name())
 
 				// Encode reporter's config.yaml

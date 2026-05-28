@@ -1,27 +1,27 @@
-package model
+package data
 
 import (
 	"fmt"
 	"strings"
 
+	"github.com/project-kessel/inventory-api/internal/biz/model"
 	"github.com/xeipuuv/gojsonschema"
 )
 
-type ValidationSchema interface {
-	Validate(data interface{}) (bool, error)
-}
-type ValidationSchemaFromString func(string) ValidationSchema
-
-type jsonSchemaValidator struct {
+// JsonSchemaWithWorkspaces is a schema implementation that validates data using JSON Schema.
+type JsonSchemaWithWorkspaces struct {
 	jsonSchema string
 }
 
-func NewJsonSchemaValidatorFromString(jsonSchema string) ValidationSchema {
-	return jsonSchemaValidator{
+// NewJsonSchemaWithWorkspacesFromString creates a new JsonSchemaWithWorkspaces from a JSON schema string.
+func NewJsonSchemaWithWorkspacesFromString(jsonSchema string) model.ValidationSchema {
+	return JsonSchemaWithWorkspaces{
 		jsonSchema: jsonSchema,
 	}
 }
-func (jschema jsonSchemaValidator) Validate(data interface{}) (bool, error) {
+
+// Validate validates the given data against the JSON schema.
+func (jschema JsonSchemaWithWorkspaces) Validate(data interface{}) (bool, error) {
 	schemaLoader := gojsonschema.NewStringLoader(jschema.jsonSchema)
 	dataLoader := gojsonschema.NewGoLoader(data)
 	result, err := gojsonschema.Validate(schemaLoader, dataLoader)

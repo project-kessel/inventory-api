@@ -18,15 +18,16 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/project-kessel/inventory-api/cmd/common"
+	bizmodel "github.com/project-kessel/inventory-api/internal/biz/model"
 	"github.com/project-kessel/inventory-api/internal/biz/usecase/metaauthorizer"
 	resourcesctl "github.com/project-kessel/inventory-api/internal/biz/usecase/resources"
 	tuplesctl "github.com/project-kessel/inventory-api/internal/biz/usecase/tuples"
 	"github.com/project-kessel/inventory-api/internal/config/schema"
+	inmemoryConfig "github.com/project-kessel/inventory-api/internal/config/schema/inmemory"
 	"github.com/project-kessel/inventory-api/internal/consistency"
 	"github.com/project-kessel/inventory-api/internal/consumer"
 	"github.com/project-kessel/inventory-api/internal/data"
 	"github.com/project-kessel/inventory-api/internal/pubsub"
-	"github.com/project-kessel/inventory-api/internal/subject/selfsubject"
 
 	//v1beta2
 	resourcesvc "github.com/project-kessel/inventory-api/internal/service/resources"
@@ -59,7 +60,7 @@ func NewCommand(
 	consumerOptions *consumer.Options,
 	consistencyOptions *consistency.Options,
 	serviceOptions *service.Options,
-	selfSubjectOptions *selfsubject.Options,
+	selfSubjectOptions *resourcesctl.SelfSubjectOptions,
 	loggerOptions common.LoggerOptions,
 	schemaOptions *schema.Options,
 	businessMetricsOptions *metricscollector.Options,
@@ -239,7 +240,7 @@ func NewCommand(
 			}
 
 			// constructs schema repository
-			schemaRepository, err := data.NewSchemaRepository(ctx, schemaConfig, log.NewHelper(log.With(logger, "subsystem", "schemaRepository")))
+			schemaRepository, err := newSchemaRepository(ctx, schemaConfig, log.NewHelper(log.With(logger, "subsystem", "schemaRepository")))
 			if err != nil {
 				return err
 			}
@@ -262,12 +263,12 @@ func NewCommand(
 				return err
 			}
 
-			usecaseConfig := &resourcesctl.UsecaseConfig{
-				ReadAfterWriteEnabled:          consistencyConfig.ReadAfterWriteEnabled,
-				ReadAfterWriteAllowlist:        consistencyConfig.ReadAfterWriteAllowlist,
-				ConsumerEnabled:                consumerOptions.Enabled,
-				DefaultToAtLeastAsAcknowledged: consistencyConfig.DefaultToAtLeastAsAcknowledged,
-			}
+			usecaseConfig := resourcesctl.NewUsecaseConfig()
+			usecaseConfig.ReadAfterWriteEnabled = consistencyConfig.ReadAfterWriteEnabled
+			usecaseConfig.ReadAfterWriteAllowlist = consistencyConfig.ReadAfterWriteAllowlist
+			usecaseConfig.ConsumerEnabled = consumerOptions.Enabled
+			usecaseConfig.DefaultToAtLeastAsAcknowledged = consistencyConfig.DefaultToAtLeastAsAcknowledged
+			usecaseConfig.IdempotencyCheckEnabled = consistencyConfig.IdempotencyCheckEnabled
 
 			// This circuit breaker is used to prevent request handlers from being blocked
 			// indefinitely if the consumer is not responding via notifications.
@@ -433,4 +434,25 @@ func shutdown(db *gorm.DB, srv *server.Server, pprofSrv *pprof.Server, cm *consu
 			}()
 		}
 	}
+}
+
+func newSchemaRepository(ctx context.Context, c schema.CompletedConfig, logger *log.Helper) (bizmodel.SchemaRepository, error) {
+	switch c.Repository {
+	case schema.InMemoryRepository:
+		switch c.InMemory.Type {
+		case inmemoryConfig.EmptyRepository:
+			logger.Infof("Using empty in-memory schema repository")
+			return data.NewInMemorySchemaRepository(), nil
+		case inmemoryConfig.JSONRepository:
+			logger.Infof("Using json in-memory schema repository from path %q", c.InMemory.Path)
+			return data.NewInMemorySchemaRepositoryFromJsonFile(ctx, c.InMemory.Path, data.NewJsonSchemaWithWorkspacesFromString)
+		case inmemoryConfig.DirRepository:
+			logger.Infof("Using dir in-memory schema repository from path %q", c.InMemory.Path)
+			return data.NewInMemorySchemaRepositoryFromDir(ctx, c.InMemory.Path, data.NewJsonSchemaWithWorkspacesFromString)
+		default:
+			return nil, fmt.Errorf("invalid repository type: %s/%s", c.Repository, c.InMemory.Type)
+		}
+	}
+
+	return nil, fmt.Errorf("invalid repository type: %s", c.Repository)
 }

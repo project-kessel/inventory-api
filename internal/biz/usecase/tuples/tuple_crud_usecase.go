@@ -36,7 +36,7 @@ func (uc *TupleCrudUseCase) CreateTuples(ctx context.Context, cmd CreateTuplesCo
 
 	var fencing *model.FencingCheck
 	if cmd.FencingCheck != nil {
-		fc := model.NewFencingCheck(model.DeserializeLockId(cmd.FencingCheck.LockId), model.DeserializeLockToken(cmd.FencingCheck.LockToken))
+		fc := model.NewFencingCheck(cmd.FencingCheck.LockId, cmd.FencingCheck.LockToken)
 		fencing = &fc
 	}
 
@@ -61,7 +61,7 @@ func (uc *TupleCrudUseCase) DeleteTuples(ctx context.Context, cmd DeleteTuplesCo
 
 	var fencing *model.FencingCheck
 	if cmd.FencingCheck != nil {
-		fc := model.NewFencingCheck(model.DeserializeLockId(cmd.FencingCheck.LockId), model.DeserializeLockToken(cmd.FencingCheck.LockToken))
+		fc := model.NewFencingCheck(cmd.FencingCheck.LockId, cmd.FencingCheck.LockToken)
 		fencing = &fc
 	}
 
@@ -96,13 +96,12 @@ func (uc *TupleCrudUseCase) AcquireLock(ctx context.Context, cmd AcquireLockComm
 		return nil, err
 	}
 
-	lockId := model.DeserializeLockId(cmd.LockId)
-	result, err := uc.Authz.AcquireLock(ctx, lockId)
+	result, err := uc.Authz.AcquireLock(ctx, cmd.LockId)
 	if err != nil {
 		return nil, err
 	}
 
 	return &AcquireLockResult{
-		LockToken: result.LockToken().String(),
+		LockToken: result.LockToken(),
 	}, nil
 }

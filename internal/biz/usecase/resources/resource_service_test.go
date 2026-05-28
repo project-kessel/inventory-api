@@ -19,7 +19,6 @@ import (
 	"github.com/project-kessel/inventory-api/internal/biz/usecase/metaauthorizer"
 	"github.com/project-kessel/inventory-api/internal/data"
 	"github.com/project-kessel/inventory-api/internal/metricscollector"
-	"github.com/project-kessel/inventory-api/internal/subject/selfsubject"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -47,7 +46,7 @@ func newTestHarness(t *testing.T, opts ...harnessOption) *testHarness {
 	t.Helper()
 	cfg := &harnessConfig{
 		relationsRepo: &data.AllowAllRelationsRepository{},
-		usecaseConfig: &UsecaseConfig{},
+		usecaseConfig: NewUsecaseConfig(),
 		logger:        log.DefaultLogger,
 		namespace:     "rbac",
 	}
@@ -168,7 +167,7 @@ func resourceRefFromKey(key model.ReporterResourceKey) model.ResourceReference {
 	return model.NewResourceReference(key.ResourceType(), key.LocalResourceId(), &reporter)
 }
 
-func newTestSelfSubjectStrategy() selfsubject.SelfSubjectStrategy {
+func newTestSelfSubjectStrategy() SelfSubjectStrategy {
 	return testSelfSubjectStrategy{}
 }
 
@@ -441,7 +440,7 @@ func TestCheckSelfBulk_RejectsInventoryManagedConsistency(t *testing.T) {
 func newFakeSchemaRepository(t *testing.T) model.SchemaRepository {
 	schemaRepository := data.NewInMemorySchemaRepository()
 
-	emptyValidationSchema := model.NewJsonSchemaValidatorFromString(`{
+	emptyValidationSchema := data.NewJsonSchemaWithWorkspacesFromString(`{
 		"$schema": "http://json-schema.org/draft-07/schema#",
 		"type": "object",
 		"properties": {
@@ -449,7 +448,7 @@ func newFakeSchemaRepository(t *testing.T) model.SchemaRepository {
 		"required": []
 	}`)
 
-	withWorkspaceValidationSchema := model.NewJsonSchemaValidatorFromString(`{
+	withWorkspaceValidationSchema := data.NewJsonSchemaWithWorkspacesFromString(`{
 		"$schema": "http://json-schema.org/draft-07/schema#",
 		"type": "object",
 		"properties": {
@@ -458,30 +457,33 @@ func newFakeSchemaRepository(t *testing.T) model.SchemaRepository {
 		"required": ["workspace_id"]
 	}`)
 
-	err := schemaRepository.CreateResourceSchema(context.Background(), model.ResourceSchema{
-		ResourceType:     "k8s_cluster",
-		ValidationSchema: withWorkspaceValidationSchema,
-	})
+	k8sCluster, err := model.NewResourceType("k8s_cluster")
+	require.NoError(t, err)
+	host, err := model.NewResourceType("host")
+	require.NoError(t, err)
+	ocm, err := model.NewReporterType("ocm")
+	require.NoError(t, err)
+	hbi, err := model.NewReporterType("hbi")
+	require.NoError(t, err)
+
+	k8sClusterSchema, err := model.NewResourceSchemaRepresentation(k8sCluster, withWorkspaceValidationSchema)
+	require.NoError(t, err)
+	err = schemaRepository.CreateResourceSchema(context.Background(), k8sClusterSchema)
 	assert.NoError(t, err)
 
-	err = schemaRepository.CreateReporterSchema(context.Background(), model.ReporterSchema{
-		ResourceType:     "k8s_cluster",
-		ReporterType:     "ocm",
-		ValidationSchema: emptyValidationSchema,
-	})
+	k8sClusterOcm, err := model.NewReporterSchemaRepresentation(k8sCluster, ocm, emptyValidationSchema)
+	require.NoError(t, err)
+	err = schemaRepository.CreateReporterSchema(context.Background(), k8sClusterOcm)
 	assert.NoError(t, err)
 
-	err = schemaRepository.CreateResourceSchema(context.Background(), model.ResourceSchema{
-		ResourceType:     "host",
-		ValidationSchema: withWorkspaceValidationSchema,
-	})
+	hostSchema, err := model.NewResourceSchemaRepresentation(host, withWorkspaceValidationSchema)
+	require.NoError(t, err)
+	err = schemaRepository.CreateResourceSchema(context.Background(), hostSchema)
 	assert.NoError(t, err)
 
-	err = schemaRepository.CreateReporterSchema(context.Background(), model.ReporterSchema{
-		ResourceType:     "host",
-		ReporterType:     "hbi",
-		ValidationSchema: emptyValidationSchema,
-	})
+	hostHbi, err := model.NewReporterSchemaRepresentation(host, hbi, emptyValidationSchema)
+	require.NoError(t, err)
+	err = schemaRepository.CreateReporterSchema(context.Background(), hostHbi)
 	assert.NoError(t, err)
 
 	return schemaRepository
@@ -1121,9 +1123,10 @@ func TestGetCurrentAndPreviousWorkspaceID(t *testing.T) {
 
 // Helper function to create a Representations for testing
 func createTestRep(t *testing.T, version uint, data map[string]interface{}) *model.Representations {
+	v := model.NewVersion(version)
 	rep, err := model.NewRepresentations(
 		model.Representation(data),
-		&version,
+		&v,
 		nil,
 		nil,
 	)
@@ -1296,24 +1299,6 @@ func TestReportResource_ValidationErrors(t *testing.T) {
 		expectError string
 	}{
 		{
-			name: "missing type",
-			cmd: func() ReportResourceCommand {
-				cmd := fixture(t).Basic("host", "hbi", "instance-1", "test-host", "ws-123")
-				cmd.ResourceType = ""
-				return cmd
-			}(),
-			expectError: "missing 'type' field",
-		},
-		{
-			name: "missing reporterType",
-			cmd: func() ReportResourceCommand {
-				cmd := fixture(t).Basic("host", "hbi", "instance-1", "test-host", "ws-123")
-				cmd.ReporterType = ""
-				return cmd
-			}(),
-			expectError: "missing 'reporterType' field",
-		},
-		{
 			name:        "reporter type not allowed for resource type",
 			cmd:         fixture(t).Basic("host", "unknown_reporter", "instance-1", "test-host", "ws-123"),
 			expectError: "reporter unknown_reporter does not report resource types: host",
@@ -1483,17 +1468,19 @@ func TestReportResource_SchemaValidation(t *testing.T) {
 			ctx := testAuthzContext()
 			schemaRepository := data.NewInMemorySchemaRepository()
 
-			err := schemaRepository.CreateResourceSchema(context.Background(), model.ResourceSchema{
-				ResourceType:     tc.resourceType,
-				ValidationSchema: model.NewJsonSchemaValidatorFromString(tc.commonSchema),
-			})
+			rt, err := model.NewResourceType(tc.resourceType)
+			require.NoError(t, err)
+			rpt, err := model.NewReporterType(tc.reporterType)
 			require.NoError(t, err)
 
-			err = schemaRepository.CreateReporterSchema(context.Background(), model.ReporterSchema{
-				ResourceType:     tc.resourceType,
-				ReporterType:     tc.reporterType,
-				ValidationSchema: model.NewJsonSchemaValidatorFromString(tc.reporterSchema),
-			})
+			resourceSchema, err := model.NewResourceSchemaRepresentation(rt, data.NewJsonSchemaWithWorkspacesFromString(tc.commonSchema))
+			require.NoError(t, err)
+			err = schemaRepository.CreateResourceSchema(context.Background(), resourceSchema)
+			require.NoError(t, err)
+
+			reporterSchema, err := model.NewReporterSchemaRepresentation(rt, rpt, data.NewJsonSchemaWithWorkspacesFromString(tc.reporterSchema))
+			require.NoError(t, err)
+			err = schemaRepository.CreateReporterSchema(context.Background(), reporterSchema)
 			require.NoError(t, err)
 
 			usecase := New(
@@ -1503,7 +1490,7 @@ func TestReportResource_SchemaValidation(t *testing.T) {
 				"test-topic",
 				log.DefaultLogger,
 				nil, nil,
-				&UsecaseConfig{},
+				NewUsecaseConfig(),
 				metricscollector.NewFakeMetricsCollector(),
 				nil,
 				newTestSelfSubjectStrategy(),
@@ -1564,24 +1551,6 @@ func TestReportResource_ValidationErrorFormat(t *testing.T) {
 		cmd            ReportResourceCommand
 		expectErrorMsg string
 	}{
-		{
-			name: "missing type field",
-			cmd: func() ReportResourceCommand {
-				cmd := fixture(t).Basic("host", "hbi", "instance-1", "test-host", "ws-123")
-				cmd.ResourceType = ""
-				return cmd
-			}(),
-			expectErrorMsg: "failed validation for report resource: missing 'type' field",
-		},
-		{
-			name: "missing reporterType field",
-			cmd: func() ReportResourceCommand {
-				cmd := fixture(t).Basic("host", "hbi", "instance-1", "test-host", "ws-123")
-				cmd.ReporterType = ""
-				return cmd
-			}(),
-			expectErrorMsg: "failed validation for report resource: missing 'reporterType' field",
-		},
 		{
 			name:           "unknown reporter for resource type",
 			cmd:            fixture(t).Basic("host", "unknown_reporter", "instance-1", "test-host", "ws-123"),
@@ -1693,9 +1662,9 @@ func TestResolveConsistency(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			h := newTestHarness(t, withNamespace("test-topic"), withUsecaseConfig(&UsecaseConfig{
-				DefaultToAtLeastAsAcknowledged: tt.featureFlagEnabled,
-			}))
+			cfg := NewUsecaseConfig()
+			cfg.DefaultToAtLeastAsAcknowledged = tt.featureFlagEnabled
+			h := newTestHarness(t, withNamespace("test-topic"), withUsecaseConfig(cfg))
 
 			reporterResourceKey := createReporterResourceKey(t, "test-resource-123", "host", "hbi", "test-instance")
 
@@ -1767,9 +1736,9 @@ func TestResolveConsistency_OverrideFeatureFlag(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			h := newTestHarness(t, withNamespace("test-topic"), withUsecaseConfig(&UsecaseConfig{
-				DefaultToAtLeastAsAcknowledged: tt.featureFlagEnabled,
-			}))
+			cfg := NewUsecaseConfig()
+			cfg.DefaultToAtLeastAsAcknowledged = tt.featureFlagEnabled
+			h := newTestHarness(t, withNamespace("test-topic"), withUsecaseConfig(cfg))
 
 			reporterResourceKey := createReporterResourceKey(t, "test-resource-override", "host", "hbi", "test-instance")
 
@@ -1807,10 +1776,12 @@ func TestResolveConsistency_NilConsistencyDefaultsToUnspecified(t *testing.T) {
 
 func TestResolveConsistency_OverrideFeatureFlag_LogsBypassWhenEnabled(t *testing.T) {
 	var logBuf bytes.Buffer
+	cfg := NewUsecaseConfig()
+	cfg.DefaultToAtLeastAsAcknowledged = true
 	h := newTestHarness(t,
 		withNamespace("test-topic"),
 		withLogger(log.NewStdLogger(&logBuf)),
-		withUsecaseConfig(&UsecaseConfig{DefaultToAtLeastAsAcknowledged: true}),
+		withUsecaseConfig(cfg),
 	)
 
 	reporterResourceKey := createReporterResourceKey(t, "host-123", "host", "hbi", "instance-1")
@@ -1821,10 +1792,12 @@ func TestResolveConsistency_OverrideFeatureFlag_LogsBypassWhenEnabled(t *testing
 
 func TestResolveConsistency_OverrideFeatureFlag_LogsEnabledWhenNotBypassed(t *testing.T) {
 	var logBuf bytes.Buffer
+	cfg := NewUsecaseConfig()
+	cfg.DefaultToAtLeastAsAcknowledged = true
 	h := newTestHarness(t,
 		withNamespace("test-topic"),
 		withLogger(log.NewStdLogger(&logBuf)),
-		withUsecaseConfig(&UsecaseConfig{DefaultToAtLeastAsAcknowledged: true}),
+		withUsecaseConfig(cfg),
 	)
 
 	reporterResourceKey := createReporterResourceKey(t, "host-456", "host", "hbi", "instance-1")
@@ -1838,7 +1811,11 @@ func TestResolveConsistency_OverrideFeatureFlag_LogsDisabledWhenFeatureOff(t *te
 	h := newTestHarness(t,
 		withNamespace("test-topic"),
 		withLogger(log.NewStdLogger(&logBuf)),
-		withUsecaseConfig(&UsecaseConfig{DefaultToAtLeastAsAcknowledged: false}),
+		withUsecaseConfig(func() *UsecaseConfig {
+			cfg := NewUsecaseConfig()
+			cfg.DefaultToAtLeastAsAcknowledged = false
+			return cfg
+		}()),
 	)
 
 	reporterResourceKey := createReporterResourceKey(t, "host-789", "host", "hbi", "instance-1")

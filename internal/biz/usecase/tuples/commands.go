@@ -30,13 +30,13 @@ type ReadTuplesCommand struct {
 // AcquireLockCommand - domain command for acquiring locks (DEPRECATED).
 // This command exists only for RBAC backward compatibility and will be removed.
 type AcquireLockCommand struct {
-	LockId string
+	LockId model.LockId
 }
 
 // FencingCheck represents distributed locking parameters.
 type FencingCheck struct {
-	LockId    string
-	LockToken string
+	LockId    model.LockId
+	LockToken model.LockToken
 }
 
 // CreateTuplesResult - result for CreateTuples operation.
@@ -51,5 +51,5 @@ type DeleteTuplesResult struct {
 
 // AcquireLockResult - result for AcquireLock operation.
 type AcquireLockResult struct {
-	LockToken string
+	LockToken model.LockToken
 }

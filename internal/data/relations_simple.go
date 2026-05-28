@@ -360,7 +360,7 @@ func (s *SimpleRelationsRepository) LookupObjects(_ context.Context,
 					model.DeserializeResourceType(key.ResourceType),
 					model.DeserializeLocalResourceId(key.ResourceID),
 					&reporter,
-				), "",
+				), model.DeserializeContinuationToken(""),
 			))
 		}
 	}
@@ -404,7 +404,7 @@ func (s *SimpleRelationsRepository) LookupSubjects(_ context.Context,
 				&reporter,
 			)
 			results = append(results, model.NewLookupSubjectsItem(
-				model.NewSubjectReferenceWithoutRelation(subResource), "",
+				model.NewSubjectReferenceWithoutRelation(subResource), model.DeserializeContinuationToken(""),
 			))
 		}
 	}
@@ -505,7 +505,7 @@ func (s *SimpleRelationsRepository) ReadTuples(_ context.Context, filter model.T
 				object,
 				model.DeserializeRelation(key.Relation),
 				model.NewSubjectReferenceWithoutRelation(subResource),
-				"",
+				model.DeserializeContinuationToken(""),
 				model.MinimizeLatencyToken,
 			))
 		}

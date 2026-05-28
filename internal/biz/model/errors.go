@@ -23,9 +23,16 @@ var (
 	ErrVersionConflict          = errors.New("optimistic concurrency failure")
 	ErrReporterDuplicate        = errors.New("reporter already exists for resource")
 	ErrResourceNotFound         = errors.New("resource not found")
+	ErrResourceSchemaNotFound   = errors.New("resource schema not found")
+	ErrReporterSchemaNotFound   = errors.New("reporter schema not found")
 	ErrInvalidData              = errors.New("invalid data structure")
 	ErrEmptyReporterList        = errors.New("must have at least one reporter resource")
 	ErrNoRepresentationProvided = errors.New("at least one of reporterRepresentation or commonRepresentation must be provided")
+)
+
+// Error reasons used in kratos errors across layers
+const (
+	ReasonNonUniqueTransactionID = "NON-UNIQUE TRANSACTION ID"
 )
 
 // Service-level sentinel errors - operation failures

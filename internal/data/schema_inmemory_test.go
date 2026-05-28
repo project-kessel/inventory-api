@@ -7,41 +7,42 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	bizmodel "github.com/project-kessel/inventory-api/internal/biz/model"
 )
 
-var validateSchemaTypeObject = bizmodel.NewJsonSchemaValidatorFromString(`{"type": "object"}`)
+var validateSchemaTypeObject = NewJsonSchemaWithWorkspacesFromString(`{"type": "object"}`)
 
 func TestInMemorySchemaRepository_CreateResource(t *testing.T) {
 	repo := NewInMemorySchemaRepository()
 	ctx := context.Background()
 
-	resource := bizmodel.ResourceSchema{
-		ResourceType:     "host",
-		ValidationSchema: validateSchemaTypeObject,
-	}
+	resourceType, err := bizmodel.NewResourceType("host")
+	require.NoError(t, err)
+	resource, err := bizmodel.NewResourceSchemaRepresentation(resourceType, validateSchemaTypeObject)
+	require.NoError(t, err)
 
-	err := repo.CreateResourceSchema(ctx, resource)
+	err = repo.CreateResourceSchema(ctx, resource)
 	assert.NoError(t, err)
 
 	// Verify resource was created
-	retrieved, err := repo.GetResourceSchema(ctx, "host")
+	retrieved, err := repo.GetResourceSchema(ctx, resourceType)
 	assert.NoError(t, err)
-	assert.Equal(t, "host", retrieved.ResourceType)
-	assert.Equal(t, validateSchemaTypeObject, retrieved.ValidationSchema)
+	assert.Equal(t, resourceType, retrieved.ResourceType())
+	assert.Equal(t, validateSchemaTypeObject, retrieved.ValidationSchema())
 }
 
 func TestInMemorySchemaRepository_CreateResource_AlreadyExists(t *testing.T) {
 	repo := NewInMemorySchemaRepository()
 	ctx := context.Background()
 
-	resource := bizmodel.ResourceSchema{
-		ResourceType:     "host",
-		ValidationSchema: validateSchemaTypeObject,
-	}
+	resourceType, err := bizmodel.NewResourceType("host")
+	require.NoError(t, err)
+	resource, err := bizmodel.NewResourceSchemaRepresentation(resourceType, validateSchemaTypeObject)
+	require.NoError(t, err)
 
-	err := repo.CreateResourceSchema(ctx, resource)
+	err = repo.CreateResourceSchema(ctx, resource)
 	assert.NoError(t, err)
 
 	// Try to create the same resource again
@@ -51,259 +52,307 @@ func TestInMemorySchemaRepository_CreateResource_AlreadyExists(t *testing.T) {
 }
 
 func TestInMemorySchemaRepository_GetResource(t *testing.T) {
-	repo := NewInMemorySchemaRepository()
-	ctx := context.Background()
-
-	resource := bizmodel.ResourceSchema{
-		ResourceType:     "k8s_cluster",
-		ValidationSchema: validateSchemaTypeObject,
+	cases := []struct {
+		name         string
+		createType   string
+		lookupType   string
+		expectedType string
+	}{
+		{"lowercase lookup", "k8s_cluster", "k8s_cluster", "k8s_cluster"},
+		{"uppercase lookup normalizes", "k8s_cluster", "K8S_CLUSTER", "k8s_cluster"},
+		{"mixed-case lookup", "k8s_cluster", "K8s_Cluster", "k8s_cluster"},
+		{"slash normalizes to underscore", "rhel_host", "rhel/host", "rhel_host"},
+		{"uppercase + slash", "rhel_host", "RHEL/Host", "rhel_host"},
+		{"create uppercase, lookup lowercase", "HOST", "host", "host"},
 	}
 
-	err := repo.CreateResourceSchema(ctx, resource)
-	assert.NoError(t, err)
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			repo := NewInMemorySchemaRepository()
+			ctx := context.Background()
 
-	retrieved, err := repo.GetResourceSchema(ctx, "k8s_cluster")
-	assert.NoError(t, err)
-	assert.Equal(t, "k8s_cluster", retrieved.ResourceType)
+			createType, err := bizmodel.NewResourceType(tc.createType)
+			require.NoError(t, err)
+			lookupType, err := bizmodel.NewResourceType(tc.lookupType)
+			require.NoError(t, err)
+			expectedType, err := bizmodel.NewResourceType(tc.expectedType)
+			require.NoError(t, err)
+
+			createSchema, err := bizmodel.NewResourceSchemaRepresentation(createType, validateSchemaTypeObject)
+			require.NoError(t, err)
+			err = repo.CreateResourceSchema(ctx, createSchema)
+			assert.NoError(t, err)
+
+			retrieved, err := repo.GetResourceSchema(ctx, lookupType)
+			assert.NoError(t, err)
+			assert.Equal(t, expectedType, retrieved.ResourceType())
+			assert.Equal(t, validateSchemaTypeObject, retrieved.ValidationSchema())
+		})
+	}
 }
 
 func TestInMemorySchemaRepository_GetResource_NotFound(t *testing.T) {
 	repo := NewInMemorySchemaRepository()
 	ctx := context.Background()
 
-	_, err := repo.GetResourceSchema(ctx, "nonexistent")
-	assert.ErrorIs(t, err, bizmodel.ResourceSchemaNotFound)
+	resourceType, err := bizmodel.NewResourceType("nonexistent")
+	require.NoError(t, err)
+	_, err = repo.GetResourceSchema(ctx, resourceType)
+	assert.ErrorIs(t, err, bizmodel.ErrResourceSchemaNotFound)
 }
 
 func TestInMemorySchemaRepository_UpdateResource(t *testing.T) {
 	repo := NewInMemorySchemaRepository()
 	ctx := context.Background()
 
-	resource := bizmodel.ResourceSchema{
-		ResourceType:     "host",
-		ValidationSchema: validateSchemaTypeObject,
-	}
+	resourceType, err := bizmodel.NewResourceType("host")
+	require.NoError(t, err)
+	resource, err := bizmodel.NewResourceSchemaRepresentation(resourceType, validateSchemaTypeObject)
+	require.NoError(t, err)
 
-	err := repo.CreateResourceSchema(ctx, resource)
+	err = repo.CreateResourceSchema(ctx, resource)
 	assert.NoError(t, err)
 
 	// Update the resource
-	updatedResource := bizmodel.ResourceSchema{
-		ResourceType:     "host",
-		ValidationSchema: bizmodel.NewJsonSchemaValidatorFromString(`{"type": "object", "properties": {"name": {"type": "string"}}}`),
-	}
+	updatedSchema := NewJsonSchemaWithWorkspacesFromString(`{"type": "object", "properties": {"name": {"type": "string"}}}`)
+	updatedResource, err := bizmodel.NewResourceSchemaRepresentation(resourceType, updatedSchema)
+	require.NoError(t, err)
 
 	err = repo.UpdateResourceSchema(ctx, updatedResource)
 	assert.NoError(t, err)
 
 	// Verify update
-	retrieved, err := repo.GetResourceSchema(ctx, "host")
+	retrieved, err := repo.GetResourceSchema(ctx, resourceType)
 	assert.NoError(t, err)
-	assert.Equal(t, updatedResource.ValidationSchema, retrieved.ValidationSchema)
+	assert.Equal(t, updatedSchema, retrieved.ValidationSchema())
 }
 
 func TestInMemorySchemaRepository_UpdateResource_NotFound(t *testing.T) {
 	repo := NewInMemorySchemaRepository()
 	ctx := context.Background()
 
-	resource := bizmodel.ResourceSchema{
-		ResourceType:     "nonexistent",
-		ValidationSchema: validateSchemaTypeObject,
-	}
+	resourceType, err := bizmodel.NewResourceType("nonexistent")
+	require.NoError(t, err)
+	resource, err := bizmodel.NewResourceSchemaRepresentation(resourceType, validateSchemaTypeObject)
+	require.NoError(t, err)
 
-	err := repo.UpdateResourceSchema(ctx, resource)
-	assert.ErrorIs(t, err, bizmodel.ResourceSchemaNotFound)
+	err = repo.UpdateResourceSchema(ctx, resource)
+	assert.ErrorIs(t, err, bizmodel.ErrResourceSchemaNotFound)
 }
 
 func TestInMemorySchemaRepository_DeleteResource(t *testing.T) {
 	repo := NewInMemorySchemaRepository()
 	ctx := context.Background()
 
-	resource := bizmodel.ResourceSchema{
-		ResourceType:     "host",
-		ValidationSchema: validateSchemaTypeObject,
-	}
+	resourceType, err := bizmodel.NewResourceType("host")
+	require.NoError(t, err)
+	resource, err := bizmodel.NewResourceSchemaRepresentation(resourceType, validateSchemaTypeObject)
+	require.NoError(t, err)
 
-	err := repo.CreateResourceSchema(ctx, resource)
+	err = repo.CreateResourceSchema(ctx, resource)
 	assert.NoError(t, err)
 
-	err = repo.DeleteResourceSchema(ctx, "host")
+	err = repo.DeleteResourceSchema(ctx, resourceType)
 	assert.NoError(t, err)
 
 	// Verify deletion
-	_, err = repo.GetResourceSchema(ctx, "host")
-	assert.ErrorIs(t, err, bizmodel.ResourceSchemaNotFound)
+	_, err = repo.GetResourceSchema(ctx, resourceType)
+	assert.ErrorIs(t, err, bizmodel.ErrResourceSchemaNotFound)
 }
 
 func TestInMemorySchemaRepository_GetResources(t *testing.T) {
 	repo := NewInMemorySchemaRepository()
 	ctx := context.Background()
 
-	resources := []bizmodel.ResourceSchema{
-		{ResourceType: "host", ValidationSchema: validateSchemaTypeObject},
-		{ResourceType: "k8s_cluster", ValidationSchema: validateSchemaTypeObject},
-		{ResourceType: "k8s_policy", ValidationSchema: validateSchemaTypeObject},
-	}
+	rtHost, err := bizmodel.NewResourceType("host")
+	require.NoError(t, err)
+	rtK8sCluster, err := bizmodel.NewResourceType("k8s_cluster")
+	require.NoError(t, err)
+	rtK8sPolicy, err := bizmodel.NewResourceType("k8s_policy")
+	require.NoError(t, err)
 
-	for _, r := range resources {
-		err := repo.CreateResourceSchema(ctx, r)
+	for _, rt := range []bizmodel.ResourceType{rtHost, rtK8sCluster, rtK8sPolicy} {
+		schema, err := bizmodel.NewResourceSchemaRepresentation(rt, validateSchemaTypeObject)
+		require.NoError(t, err)
+		err = repo.CreateResourceSchema(ctx, schema)
 		assert.NoError(t, err)
 	}
 
 	retrieved, err := repo.GetResourceSchemas(ctx)
 	assert.NoError(t, err)
 	assert.Len(t, retrieved, 3)
-	assert.Contains(t, retrieved, "host")
-	assert.Contains(t, retrieved, "k8s_cluster")
-	assert.Contains(t, retrieved, "k8s_policy")
+	assert.Contains(t, retrieved, rtHost)
+	assert.Contains(t, retrieved, rtK8sCluster)
+	assert.Contains(t, retrieved, rtK8sPolicy)
 }
 
 func TestInMemorySchemaRepository_CreateResourceReporter(t *testing.T) {
-	repo := NewInMemorySchemaRepository()
-	ctx := context.Background()
+	reporterValidation := NewJsonSchemaWithWorkspacesFromString(`{"type": "object", "properties": {"satellite_id": {"type": "string"}}}`)
 
-	// Create resource first
-	resource := bizmodel.ResourceSchema{
-		ResourceType:     "host",
-		ValidationSchema: validateSchemaTypeObject,
-	}
-	err := repo.CreateResourceSchema(ctx, resource)
-	assert.NoError(t, err)
-
-	// Create reporter
-	reporter := bizmodel.ReporterSchema{
-		ResourceType:     "host",
-		ReporterType:     "hbi",
-		ValidationSchema: bizmodel.NewJsonSchemaValidatorFromString(`{"type": "object", "properties": {"satellite_id": {"type": "string"}}}`),
+	cases := []struct {
+		name                 string
+		createReporterType   string
+		lookupReporterType   string
+		expectedReporterType string
+	}{
+		{"lowercase reporter", "hbi", "hbi", "hbi"},
+		{"uppercase reporter lookup", "hbi", "HBI", "hbi"},
+		{"create uppercase, lookup lowercase", "HBI", "hbi", "hbi"},
 	}
 
-	err = repo.CreateReporterSchema(ctx, reporter)
-	assert.NoError(t, err)
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			repo := NewInMemorySchemaRepository()
+			ctx := context.Background()
 
-	// Verify reporter was created
-	retrieved, err := repo.GetReporterSchema(ctx, "host", "hbi")
-	assert.NoError(t, err)
-	assert.Equal(t, "host", retrieved.ResourceType)
-	assert.Equal(t, "hbi", retrieved.ReporterType)
+			resourceType, err := bizmodel.NewResourceType("host")
+			require.NoError(t, err)
+			resourceSchema, err := bizmodel.NewResourceSchemaRepresentation(resourceType, validateSchemaTypeObject)
+			require.NoError(t, err)
+			err = repo.CreateResourceSchema(ctx, resourceSchema)
+			assert.NoError(t, err)
+
+			createRep, err := bizmodel.NewReporterType(tc.createReporterType)
+			require.NoError(t, err)
+			reporterSchema, err := bizmodel.NewReporterSchemaRepresentation(resourceType, createRep, reporterValidation)
+			require.NoError(t, err)
+			err = repo.CreateReporterSchema(ctx, reporterSchema)
+			assert.NoError(t, err)
+
+			lookupRep, err := bizmodel.NewReporterType(tc.lookupReporterType)
+			require.NoError(t, err)
+			retrieved, err := repo.GetReporterSchema(ctx, resourceType, lookupRep)
+			assert.NoError(t, err)
+			expectedRep, err := bizmodel.NewReporterType(tc.expectedReporterType)
+			require.NoError(t, err)
+			assert.Equal(t, resourceType, retrieved.ResourceType())
+			assert.Equal(t, expectedRep, retrieved.ReporterType())
+			assert.Equal(t, reporterValidation, retrieved.ValidationSchema())
+		})
+	}
 }
 
 func TestInMemorySchemaRepository_GetResourceReporter_NotFound(t *testing.T) {
 	repo := NewInMemorySchemaRepository()
 	ctx := context.Background()
 
-	// Create resource first
-	resource := bizmodel.ResourceSchema{
-		ResourceType:     "host",
-		ValidationSchema: validateSchemaTypeObject,
-	}
-	err := repo.CreateResourceSchema(ctx, resource)
+	resourceType, err := bizmodel.NewResourceType("host")
+	require.NoError(t, err)
+	resource, err := bizmodel.NewResourceSchemaRepresentation(resourceType, validateSchemaTypeObject)
+	require.NoError(t, err)
+	err = repo.CreateResourceSchema(ctx, resource)
 	assert.NoError(t, err)
 
+	repNonexistent, err := bizmodel.NewReporterType("nonexistent")
+	require.NoError(t, err)
 	// Try to get non-existent reporter
-	_, err = repo.GetReporterSchema(ctx, "host", "nonexistent")
-	assert.ErrorIs(t, err, bizmodel.ReporterSchemaNotFound)
+	_, err = repo.GetReporterSchema(ctx, resourceType, repNonexistent)
+	assert.ErrorIs(t, err, bizmodel.ErrReporterSchemaNotFound)
 }
 
 func TestInMemorySchemaRepository_UpdateResourceReporter(t *testing.T) {
 	repo := NewInMemorySchemaRepository()
 	ctx := context.Background()
 
+	resourceType, err := bizmodel.NewResourceType("host")
+	require.NoError(t, err)
+	repHbi, err := bizmodel.NewReporterType("hbi")
+	require.NoError(t, err)
+
 	// Create resource and reporter
-	resource := bizmodel.ResourceSchema{
-		ResourceType:     "host",
-		ValidationSchema: validateSchemaTypeObject,
-	}
-	err := repo.CreateResourceSchema(ctx, resource)
+	resource, err := bizmodel.NewResourceSchemaRepresentation(resourceType, validateSchemaTypeObject)
+	require.NoError(t, err)
+	err = repo.CreateResourceSchema(ctx, resource)
 	assert.NoError(t, err)
 
-	reporter := bizmodel.ReporterSchema{
-		ResourceType:     "host",
-		ReporterType:     "hbi",
-		ValidationSchema: validateSchemaTypeObject,
-	}
+	reporter, err := bizmodel.NewReporterSchemaRepresentation(resourceType, repHbi, validateSchemaTypeObject)
+	require.NoError(t, err)
 	err = repo.CreateReporterSchema(ctx, reporter)
 	assert.NoError(t, err)
 
 	// Update reporter
-	updatedReporter := bizmodel.ReporterSchema{
-		ResourceType:     "host",
-		ReporterType:     "hbi",
-		ValidationSchema: bizmodel.NewJsonSchemaValidatorFromString(`{"type": "object", "properties": {"satellite_id": {"type": "string"}}}`),
-	}
+	updatedSchema := NewJsonSchemaWithWorkspacesFromString(`{"type": "object", "properties": {"satellite_id": {"type": "string"}}}`)
+	updatedReporter, err := bizmodel.NewReporterSchemaRepresentation(resourceType, repHbi, updatedSchema)
+	require.NoError(t, err)
 	err = repo.UpdateReporterSchema(ctx, updatedReporter)
 	assert.NoError(t, err)
 
 	// Verify update
-	retrieved, err := repo.GetReporterSchema(ctx, "host", "hbi")
+	retrieved, err := repo.GetReporterSchema(ctx, resourceType, repHbi)
 	assert.NoError(t, err)
-	assert.Equal(t, updatedReporter.ValidationSchema, retrieved.ValidationSchema)
+	assert.Equal(t, updatedSchema, retrieved.ValidationSchema())
 }
 
 func TestInMemorySchemaRepository_DeleteResourceReporter(t *testing.T) {
 	repo := NewInMemorySchemaRepository()
 	ctx := context.Background()
 
+	resourceType, err := bizmodel.NewResourceType("host")
+	require.NoError(t, err)
+	repHbi, err := bizmodel.NewReporterType("hbi")
+	require.NoError(t, err)
+
 	// Create resource and reporter
-	resource := bizmodel.ResourceSchema{
-		ResourceType:     "host",
-		ValidationSchema: validateSchemaTypeObject,
-	}
-	err := repo.CreateResourceSchema(ctx, resource)
+	resource, err := bizmodel.NewResourceSchemaRepresentation(resourceType, validateSchemaTypeObject)
+	require.NoError(t, err)
+	err = repo.CreateResourceSchema(ctx, resource)
 	assert.NoError(t, err)
 
-	reporter := bizmodel.ReporterSchema{
-		ResourceType:     "host",
-		ReporterType:     "hbi",
-		ValidationSchema: validateSchemaTypeObject,
-	}
+	reporter, err := bizmodel.NewReporterSchemaRepresentation(resourceType, repHbi, validateSchemaTypeObject)
+	require.NoError(t, err)
 	err = repo.CreateReporterSchema(ctx, reporter)
 	assert.NoError(t, err)
 
 	// Delete reporter
-	err = repo.DeleteReporterSchema(ctx, "host", "hbi")
+	err = repo.DeleteReporterSchema(ctx, resourceType, repHbi)
 	assert.NoError(t, err)
 
 	// Verify deletion
-	_, err = repo.GetReporterSchema(ctx, "host", "hbi")
-	assert.ErrorIs(t, err, bizmodel.ReporterSchemaNotFound)
+	_, err = repo.GetReporterSchema(ctx, resourceType, repHbi)
+	assert.ErrorIs(t, err, bizmodel.ErrReporterSchemaNotFound)
 }
 
 func TestInMemorySchemaRepository_GetResourceReporters(t *testing.T) {
 	repo := NewInMemorySchemaRepository()
 	ctx := context.Background()
 
+	resourceType, err := bizmodel.NewResourceType("host")
+	require.NoError(t, err)
+	repHbi, err := bizmodel.NewReporterType("hbi")
+	require.NoError(t, err)
+	repSatellite, err := bizmodel.NewReporterType("satellite")
+	require.NoError(t, err)
+	repInsights, err := bizmodel.NewReporterType("insights")
+	require.NoError(t, err)
+
 	// Create resource
-	resource := bizmodel.ResourceSchema{
-		ResourceType:     "host",
-		ValidationSchema: validateSchemaTypeObject,
-	}
-	err := repo.CreateResourceSchema(ctx, resource)
+	resource, err := bizmodel.NewResourceSchemaRepresentation(resourceType, validateSchemaTypeObject)
+	require.NoError(t, err)
+	err = repo.CreateResourceSchema(ctx, resource)
 	assert.NoError(t, err)
 
 	// Create multiple reporters
-	reporters := []bizmodel.ReporterSchema{
-		{ResourceType: "host", ReporterType: "hbi", ValidationSchema: validateSchemaTypeObject},
-		{ResourceType: "host", ReporterType: "satellite", ValidationSchema: validateSchemaTypeObject},
-		{ResourceType: "host", ReporterType: "insights", ValidationSchema: validateSchemaTypeObject},
-	}
-
-	for _, r := range reporters {
-		err := repo.CreateReporterSchema(ctx, r)
+	for _, rep := range []bizmodel.ReporterType{repHbi, repSatellite, repInsights} {
+		reporterSchema, err := bizmodel.NewReporterSchemaRepresentation(resourceType, rep, validateSchemaTypeObject)
+		require.NoError(t, err)
+		err = repo.CreateReporterSchema(ctx, reporterSchema)
 		assert.NoError(t, err)
 	}
 
 	// Get all reporters for resource
-	retrieved, err := repo.GetReporterSchemas(ctx, "host")
+	retrieved, err := repo.GetReporterSchemas(ctx, resourceType)
 	assert.NoError(t, err)
 	assert.Len(t, retrieved, 3)
-	assert.Contains(t, retrieved, "hbi")
-	assert.Contains(t, retrieved, "satellite")
-	assert.Contains(t, retrieved, "insights")
+	assert.Contains(t, retrieved, repHbi)
+	assert.Contains(t, retrieved, repSatellite)
+	assert.Contains(t, retrieved, repInsights)
 }
 
 func TestNewFromDir_InvalidDirectory(t *testing.T) {
 	ctx := context.Background()
-	service, err := NewInMemorySchemaRepositoryFromDir(ctx, "/tmp/wrong/dir", bizmodel.NewJsonSchemaValidatorFromString)
+	service, err := NewInMemorySchemaRepositoryFromDir(ctx, "/tmp/wrong/dir", NewJsonSchemaWithWorkspacesFromString)
 	assert.Error(t, err)
 	assert.Nil(t, service)
 	assert.Contains(t, err.Error(), "failed to read schema directory \"/tmp/wrong/dir\"")
@@ -331,27 +380,32 @@ func TestNewFromDir_ValidDirectory(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Test NewFromDir
-	repo, err := NewInMemorySchemaRepositoryFromDir(ctx, tmpDir, bizmodel.NewJsonSchemaValidatorFromString)
+	repo, err := NewInMemorySchemaRepositoryFromDir(ctx, tmpDir, NewJsonSchemaWithWorkspacesFromString)
 	assert.NoError(t, err)
 	assert.NotNil(t, repo)
 
+	rtHost, err := bizmodel.NewResourceType("host")
+	require.NoError(t, err)
+	repHbi, err := bizmodel.NewReporterType("hbi")
+	require.NoError(t, err)
+
 	// Verify resource was loaded
-	resource, err := repo.GetResourceSchema(ctx, "host")
+	resource, err := repo.GetResourceSchema(ctx, rtHost)
 	assert.NoError(t, err)
-	assert.Equal(t, "host", resource.ResourceType)
-	assert.Equal(t, bizmodel.NewJsonSchemaValidatorFromString(commonSchema), resource.ValidationSchema)
+	assert.Equal(t, rtHost, resource.ResourceType())
+	assert.Equal(t, NewJsonSchemaWithWorkspacesFromString(commonSchema), resource.ValidationSchema())
 
 	// Verify reporter was loaded
-	reporter, err := repo.GetReporterSchema(ctx, "host", "hbi")
+	reporter, err := repo.GetReporterSchema(ctx, rtHost, repHbi)
 	assert.NoError(t, err)
-	assert.Equal(t, "host", reporter.ResourceType)
-	assert.Equal(t, "hbi", reporter.ReporterType)
-	assert.Equal(t, bizmodel.NewJsonSchemaValidatorFromString(reporterSchema), reporter.ValidationSchema)
+	assert.Equal(t, rtHost, reporter.ResourceType())
+	assert.Equal(t, repHbi, reporter.ReporterType())
+	assert.Equal(t, NewJsonSchemaWithWorkspacesFromString(reporterSchema), reporter.ValidationSchema())
 }
 
 func TestNewFromJsonFile_InvalidFile(t *testing.T) {
 	ctx := context.Background()
-	repo, err := NewInMemorySchemaRepositoryFromJsonFile(ctx, "/tmp/nonexistent.json", bizmodel.NewJsonSchemaValidatorFromString)
+	repo, err := NewInMemorySchemaRepositoryFromJsonFile(ctx, "/tmp/nonexistent.json", NewJsonSchemaWithWorkspacesFromString)
 	assert.Error(t, err)
 	assert.Nil(t, repo)
 	assert.Contains(t, err.Error(), "failed to read schema cache file")
@@ -371,20 +425,25 @@ func TestNewFromJsonFile_ValidFile(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Test NewFromJsonFile
-	repo, err := NewInMemorySchemaRepositoryFromJsonFile(ctx, tmpFile, bizmodel.NewJsonSchemaValidatorFromString)
+	repo, err := NewInMemorySchemaRepositoryFromJsonFile(ctx, tmpFile, NewJsonSchemaWithWorkspacesFromString)
 	assert.NoError(t, err)
 	assert.NotNil(t, repo)
 
+	rtHost, err := bizmodel.NewResourceType("host")
+	require.NoError(t, err)
+	repHbi, err := bizmodel.NewReporterType("hbi")
+	require.NoError(t, err)
+
 	// Verify resource was loaded
-	resource, err := repo.GetResourceSchema(ctx, "host")
+	resource, err := repo.GetResourceSchema(ctx, rtHost)
 	assert.NoError(t, err)
-	assert.Equal(t, "host", resource.ResourceType)
+	assert.Equal(t, rtHost, resource.ResourceType())
 
 	// Verify reporter was loaded
-	reporter, err := repo.GetReporterSchema(ctx, "host", "hbi")
+	reporter, err := repo.GetReporterSchema(ctx, rtHost, repHbi)
 	assert.NoError(t, err)
-	assert.Equal(t, "host", reporter.ResourceType)
-	assert.Equal(t, "hbi", reporter.ReporterType)
+	assert.Equal(t, rtHost, reporter.ResourceType())
+	assert.Equal(t, repHbi, reporter.ReporterType())
 }
 
 func TestNewFromJsonBytes_ValidJSON(t *testing.T) {
@@ -397,26 +456,35 @@ func TestNewFromJsonBytes_ValidJSON(t *testing.T) {
 		"k8s_cluster:acm": "{\"type\": \"object\"}"
 	}`)
 
-	repo, err := NewFromJsonBytes(ctx, jsonContent, bizmodel.NewJsonSchemaValidatorFromString)
+	repo, err := NewFromJsonBytes(ctx, jsonContent, NewJsonSchemaWithWorkspacesFromString)
 	assert.NoError(t, err)
 	assert.NotNil(t, repo)
+
+	rtHost, err := bizmodel.NewResourceType("host")
+	require.NoError(t, err)
+	rtK8sCluster, err := bizmodel.NewResourceType("k8s_cluster")
+	require.NoError(t, err)
+	repHbi, err := bizmodel.NewReporterType("hbi")
+	require.NoError(t, err)
+	repAcm, err := bizmodel.NewReporterType("acm")
+	require.NoError(t, err)
 
 	// Verify resources were loaded
 	resources, err := repo.GetResourceSchemas(ctx)
 	assert.NoError(t, err)
-	assert.Contains(t, resources, "host")
-	assert.Contains(t, resources, "k8s_cluster")
+	assert.Contains(t, resources, rtHost)
+	assert.Contains(t, resources, rtK8sCluster)
 
 	// Verify reporters were loaded
-	hostReporter, err := repo.GetReporterSchema(ctx, "host", "hbi")
+	hostReporter, err := repo.GetReporterSchema(ctx, rtHost, repHbi)
 	assert.NoError(t, err)
-	assert.Equal(t, "host", hostReporter.ResourceType)
-	assert.Equal(t, "hbi", hostReporter.ReporterType)
+	assert.Equal(t, rtHost, hostReporter.ResourceType())
+	assert.Equal(t, repHbi, hostReporter.ReporterType())
 
-	k8sReporter, err := repo.GetReporterSchema(ctx, "k8s_cluster", "acm")
+	k8sReporter, err := repo.GetReporterSchema(ctx, rtK8sCluster, repAcm)
 	assert.NoError(t, err)
-	assert.Equal(t, "k8s_cluster", k8sReporter.ResourceType)
-	assert.Equal(t, "acm", k8sReporter.ReporterType)
+	assert.Equal(t, rtK8sCluster, k8sReporter.ResourceType())
+	assert.Equal(t, repAcm, k8sReporter.ReporterType())
 }
 
 func TestNewFromJsonBytes_InvalidJSON(t *testing.T) {
@@ -424,7 +492,7 @@ func TestNewFromJsonBytes_InvalidJSON(t *testing.T) {
 
 	invalidJSON := []byte(`{invalid json`)
 
-	repo, err := NewFromJsonBytes(ctx, invalidJSON, bizmodel.NewJsonSchemaValidatorFromString)
+	repo, err := NewFromJsonBytes(ctx, invalidJSON, NewJsonSchemaWithWorkspacesFromString)
 	assert.Error(t, err)
 	assert.Nil(t, repo)
 	assert.Contains(t, err.Error(), "failed to unmarshal schema cache JSON")
@@ -438,19 +506,24 @@ func TestNewFromJsonBytes_OnlyCommonSchemas(t *testing.T) {
 		"common:k8s_cluster": "{\"type\": \"object\"}"
 	}`)
 
-	repo, err := NewFromJsonBytes(ctx, jsonContent, bizmodel.NewJsonSchemaValidatorFromString)
+	repo, err := NewFromJsonBytes(ctx, jsonContent, NewJsonSchemaWithWorkspacesFromString)
 	assert.NoError(t, err)
 	assert.NotNil(t, repo)
+
+	rtHost, err := bizmodel.NewResourceType("host")
+	require.NoError(t, err)
+	rtK8sCluster, err := bizmodel.NewResourceType("k8s_cluster")
+	require.NoError(t, err)
 
 	// Verify resources were loaded
 	resources, err := repo.GetResourceSchemas(ctx)
 	assert.NoError(t, err)
 	assert.Len(t, resources, 2)
-	assert.Contains(t, resources, "host")
-	assert.Contains(t, resources, "k8s_cluster")
+	assert.Contains(t, resources, rtHost)
+	assert.Contains(t, resources, rtK8sCluster)
 
 	// Verify no reporters exist
-	reporters, err := repo.GetReporterSchemas(ctx, "host")
+	reporters, err := repo.GetReporterSchemas(ctx, rtHost)
 	assert.NoError(t, err)
 	assert.Empty(t, reporters)
 }
@@ -519,7 +592,12 @@ func TestLoadResourceSchema(t *testing.T) {
 			err := tt.setupFiles(tmpDir)
 			assert.NoError(t, err)
 
-			schemaContent, exists, err := loadResourceSchema(tt.resourceType, tt.reporterType, tmpDir)
+			resourceType, err := bizmodel.NewResourceType(tt.resourceType)
+			require.NoError(t, err)
+			reporterType, err := bizmodel.NewReporterType(tt.reporterType)
+			require.NoError(t, err)
+
+			schemaContent, exists, err := loadResourceSchema(resourceType.String(), reporterType.String(), tmpDir)
 
 			if tt.expectErr {
 				assert.Error(t, err)
@@ -587,7 +665,10 @@ func TestLoadCommonResourceDataSchema(t *testing.T) {
 			err := tt.setupFiles(tmpDir)
 			assert.NoError(t, err)
 
-			schemaContent, err := loadCommonResourceDataSchema(tt.resourceType, tmpDir)
+			resourceType, err := bizmodel.NewResourceType(tt.resourceType)
+			require.NoError(t, err)
+
+			schemaContent, err := loadCommonResourceDataSchema(resourceType.String(), tmpDir)
 
 			if tt.expectErr {
 				assert.Error(t, err)
@@ -602,63 +683,32 @@ func TestLoadCommonResourceDataSchema(t *testing.T) {
 	}
 }
 
-func TestNormalizeResourceType(t *testing.T) {
+func TestNewResourceType_Normalization(t *testing.T) {
 	tests := []struct {
-		name     string
-		input    string
-		expected string
+		name      string
+		input     string
+		expected  string
+		expectErr bool
 	}{
-		{
-			name:     "Resource type with forward slash",
-			input:    "rhel/host",
-			expected: "rhel_host",
-		},
-		{
-			name:     "Resource type without forward slash",
-			input:    "k8s_cluster",
-			expected: "k8s_cluster",
-		},
-		{
-			name:     "Resource type with multiple forward slashes",
-			input:    "org/team/resource",
-			expected: "org_team_resource",
-		},
-		{
-			name:     "Empty string",
-			input:    "",
-			expected: "",
-		},
-		{
-			name:     "Resource type already normalized",
-			input:    "host",
-			expected: "host",
-		},
-		{
-			name:     "K8s_CLUSTER",
-			input:    "K8s_CLUSTER",
-			expected: "k8s_cluster",
-		},
-		{
-			name:     "rhel/host",
-			input:    "rhel/host",
-			expected: "rhel_host",
-		},
-		{
-			name:     "TEST/RESOURCE",
-			input:    "TEST/RESOURCE",
-			expected: "test_resource",
-		},
-		{
-			name:     "resource",
-			input:    "resource",
-			expected: "resource",
-		},
+		{name: "forward slash replaced", input: "rhel/host", expected: "rhel_host"},
+		{name: "underscore preserved", input: "k8s_cluster", expected: "k8s_cluster"},
+		{name: "multiple slashes", input: "org/team/resource", expected: "org_team_resource"},
+		{name: "empty string", input: "", expectErr: true},
+		{name: "already normalized", input: "host", expected: "host"},
+		{name: "mixed case lowered", input: "K8s_CLUSTER", expected: "k8s_cluster"},
+		{name: "mixed case with slash", input: "TEST/RESOURCE", expected: "test_resource"},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := NormalizeResourceType(tt.input)
-			assert.Equal(t, tt.expected, result)
+			rt, err := bizmodel.NewResourceType(tt.input)
+			if tt.expectErr {
+				assert.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.expected, rt.String())
+			assert.Equal(t, tt.expected, rt.Serialize(), "Serialize() should return already-normalized value")
 		})
 	}
 }
@@ -679,9 +729,14 @@ func TestLoadResourceSchema_ComplexScenarios(t *testing.T) {
 			assert.NoError(t, err)
 		}
 
+		rtHost, err := bizmodel.NewResourceType("host")
+		require.NoError(t, err)
+
 		// Verify each reporter has its own schema
 		for _, reporter := range reporters {
-			schemaContent, exists, err := loadResourceSchema("host", reporter, tmpDir)
+			rep, err := bizmodel.NewReporterType(reporter)
+			require.NoError(t, err)
+			schemaContent, exists, err := loadResourceSchema(rtHost.String(), rep.String(), tmpDir)
 			assert.NoError(t, err)
 			assert.True(t, exists)
 			assert.Contains(t, schemaContent, reporter+"_id")
@@ -703,9 +758,14 @@ func TestLoadResourceSchema_ComplexScenarios(t *testing.T) {
 			assert.NoError(t, err)
 		}
 
+		repAcm, err := bizmodel.NewReporterType("acm")
+		require.NoError(t, err)
+
 		// Verify each resource has its own ACM schema
 		for _, resource := range resources {
-			schemaContent, exists, err := loadResourceSchema(resource, "acm", tmpDir)
+			resourceType, err := bizmodel.NewResourceType(resource)
+			require.NoError(t, err)
+			schemaContent, exists, err := loadResourceSchema(resourceType.String(), repAcm.String(), tmpDir)
 			assert.NoError(t, err)
 			assert.True(t, exists)
 			assert.Contains(t, schemaContent, resource+"_field")
@@ -733,8 +793,10 @@ func TestLoadCommonResourceDataSchema_ComplexScenarios(t *testing.T) {
 		}
 
 		// Verify each resource has its own common schema
-		for resourceType, expectedSchema := range resources {
-			schemaContent, err := loadCommonResourceDataSchema(resourceType, tmpDir)
+		for resourceTypeName, expectedSchema := range resources {
+			resourceType, err := bizmodel.NewResourceType(resourceTypeName)
+			require.NoError(t, err)
+			schemaContent, err := loadCommonResourceDataSchema(resourceType.String(), tmpDir)
 			assert.NoError(t, err)
 			assert.Equal(t, expectedSchema, schemaContent)
 		}
@@ -745,21 +807,21 @@ func TestReporterMutationsPersist(t *testing.T) {
 	repo := NewInMemorySchemaRepository()
 	ctx := context.Background()
 
-	err := repo.CreateResourceSchema(ctx, bizmodel.ResourceSchema{
-		ResourceType:     "host",
-		ValidationSchema: validateSchemaTypeObject,
-	})
+	resourceType, err := bizmodel.NewResourceType("host")
+	require.NoError(t, err)
+	repHbi, err := bizmodel.NewReporterType("hbi")
+	require.NoError(t, err)
 
+	resourceSchema, err := bizmodel.NewResourceSchemaRepresentation(resourceType, validateSchemaTypeObject)
+	require.NoError(t, err)
+	err = repo.CreateResourceSchema(ctx, resourceSchema)
 	assert.NoError(t, err)
 
-	err = repo.CreateReporterSchema(ctx, bizmodel.ReporterSchema{
-		ResourceType:     "host",
-		ReporterType:     "hbi",
-		ValidationSchema: validateSchemaTypeObject,
-	})
-
+	reporterSchema, err := bizmodel.NewReporterSchemaRepresentation(resourceType, repHbi, validateSchemaTypeObject)
+	require.NoError(t, err)
+	err = repo.CreateReporterSchema(ctx, reporterSchema)
 	assert.NoError(t, err)
 
-	reporters, _ := repo.GetReporterSchemas(ctx, "host")
-	assert.Contains(t, reporters, "hbi")
+	reporters, _ := repo.GetReporterSchemas(ctx, resourceType)
+	assert.Contains(t, reporters, repHbi)
 }

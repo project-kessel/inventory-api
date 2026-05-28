@@ -43,12 +43,12 @@ func (re ResourceDeleteEvent) UpdatedAt() *time.Time {
 	return &re.updatedAt
 }
 
-func (re ResourceDeleteEvent) ResourceType() string {
-	return re.resourceType.String()
+func (re ResourceDeleteEvent) ResourceType() ResourceType {
+	return re.resourceType
 }
 
-func (re ResourceDeleteEvent) ReporterType() string {
-	return re.reporterId.reporterType.String()
+func (re ResourceDeleteEvent) ReporterType() ReporterType {
+	return re.reporterId.reporterType
 }
 
 func (re ResourceDeleteEvent) ReporterInstanceId() string {

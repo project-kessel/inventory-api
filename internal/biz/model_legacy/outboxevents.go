@@ -132,16 +132,16 @@ func newResourceEvent(operationType bizmodel.EventOperationType, resourceEvent *
 
 	return &ResourceEvent{
 		Specversion:     "1.0",
-		Type:            makeEventType(eventType, resourceEvent.ResourceType(), string(operationType.OperationType())),
+		Type:            makeEventType(eventType, resourceEvent.ResourceType().String(), string(operationType.OperationType())),
 		Source:          "", // TODO: inventory uri
 		Id:              eventId.String(),
-		Subject:         makeEventSubject(eventType, resourceEvent.ResourceType(), resourceEvent.Id().String()),
+		Subject:         makeEventSubject(eventType, resourceEvent.ResourceType().String(), resourceEvent.Id().String()),
 		Time:            reportedTime,
 		DataContentType: "application/json",
 		Data: EventResourceData{
 			Metadata: EventResourceMetadata{
 				Id:           resourceEvent.Id().String(),
-				ResourceType: resourceEvent.ResourceType(),
+				ResourceType: resourceEvent.ResourceType().String(),
 				CreatedAt:    createdAt,
 				UpdatedAt:    updatedAt,
 				DeletedAt:    deletedAt,
@@ -149,7 +149,7 @@ func newResourceEvent(operationType bizmodel.EventOperationType, resourceEvent *
 			},
 			ReporterData: EventResourceReporter{
 				ReporterInstanceId: resourceEvent.ReporterInstanceId(),
-				ReporterType:       resourceEvent.ReporterType(),
+				ReporterType:       resourceEvent.ReporterType().String(),
 				ConsoleHref:        bizmodel.SerializeStringPtr(resourceEvent.ConsoleHref()),
 				ApiHref:            resourceEvent.ApiHref(),
 				LocalResourceId:    resourceEvent.LocalResourceId(),
@@ -200,7 +200,7 @@ func convertResourceToTupleEvent(reporterResourceKey bizmodel.ReporterResourceKe
 	return payload, nil
 }
 
-func NewOutboxEventsFromResourceEvent(domainResourceEvent bizmodel.ResourceEvent, operationType bizmodel.EventOperationType, txid string) (*OutboxEvent, *OutboxEvent, error) {
+func NewOutboxEventsFromResourceEvent(domainResourceEvent bizmodel.ResourceEvent, operationType bizmodel.EventOperationType, txid bizmodel.TransactionId) (*OutboxEvent, *OutboxEvent, error) {
 	var payload internal.JsonObject
 	var tuplePayload internal.JsonObject
 	var err error
@@ -238,7 +238,7 @@ func NewOutboxEventsFromResourceEvent(domainResourceEvent bizmodel.ResourceEvent
 		Operation:     operationType,
 		AggregateType: TupleAggregateType,
 		AggregateID:   domainResourceEvent.Id().String(),
-		TxId:          txid,
+		TxId:          txid.String(),
 		Payload:       tuplePayload,
 	}
 

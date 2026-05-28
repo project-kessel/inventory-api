@@ -137,7 +137,7 @@ func TestPaginationToV1Beta1_Nil(t *testing.T) {
 }
 
 func TestPaginationToV1Beta1_WithContinuation(t *testing.T) {
-	token := "continuation-abc"
+	token := model.DeserializeContinuationToken("continuation-abc")
 	result := paginationToV1Beta1(&model.Pagination{Limit: 100, Continuation: &token})
 	require.NotNil(t, result)
 	assert.Equal(t, uint32(100), result.Limit)
@@ -400,7 +400,7 @@ func TestLookupObjectsStream_Recv(t *testing.T) {
 	assert.Equal(t, "host", item.Object().ResourceType().String())
 	require.NotNil(t, item.Object().Reporter())
 	assert.Equal(t, "hbi", item.Object().Reporter().ReporterType().String())
-	assert.Equal(t, "page-1", item.ContinuationToken())
+	assert.Equal(t, "page-1", item.ContinuationToken().String())
 
 	_, err = stream.Recv()
 	assert.ErrorIs(t, err, io.EOF)
@@ -447,7 +447,7 @@ func TestLookupSubjectsStream_WithoutRelation(t *testing.T) {
 	assert.Equal(t, "user-1", item.Subject().Resource().ResourceId().String())
 	assert.Equal(t, "principal", item.Subject().Resource().ResourceType().String())
 	assert.False(t, item.Subject().HasRelation())
-	assert.Equal(t, "tok", item.ContinuationToken())
+	assert.Equal(t, "tok", item.ContinuationToken().String())
 }
 
 func TestLookupSubjectsStream_WithRelation(t *testing.T) {
@@ -526,7 +526,7 @@ func TestReadTuplesStream_BasicTuple(t *testing.T) {
 	assert.Equal(t, model.DeserializeRelation("member"), item.Relation())
 	assert.Equal(t, "user-1", item.Subject().Resource().ResourceId().String())
 	assert.False(t, item.Subject().HasRelation())
-	assert.Equal(t, "page-tok", item.ContinuationToken())
+	assert.Equal(t, "page-tok", item.ContinuationToken().String())
 	assert.Equal(t, model.DeserializeConsistencyToken("ct-1"), item.ConsistencyToken())
 }
 

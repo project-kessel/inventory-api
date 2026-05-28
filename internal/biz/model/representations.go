@@ -10,9 +10,9 @@ import (
 // If a representation is present, its version must also be present (and vice versa).
 type Representations struct {
 	commonData                    Representation
-	commonVersion                 *uint
+	commonVersion                 *Version
 	reporterData                  Representation
-	reporterRepresentationVersion *uint
+	reporterRepresentationVersion *Version
 }
 
 // NewRepresentations creates a Representations with optional common and reporter data.
@@ -20,9 +20,9 @@ type Representations struct {
 // If a representation is provided, its version must also be provided.
 func NewRepresentations(
 	commonData Representation,
-	commonVersion *uint,
+	commonVersion *Version,
 	reporterData Representation,
-	reporterRepresentationVersion *uint,
+	reporterRepresentationVersion *Version,
 ) (*Representations, error) {
 	// Validate that at least one representation is present
 	hasCommon := len(commonData) > 0 && commonVersion != nil
@@ -56,7 +56,7 @@ func (r *Representations) CommonData() Representation {
 }
 
 // CommonVersion returns a pointer to the common version, or nil if not present.
-func (r *Representations) CommonVersion() *uint {
+func (r *Representations) CommonVersion() *Version {
 	return r.commonVersion
 }
 

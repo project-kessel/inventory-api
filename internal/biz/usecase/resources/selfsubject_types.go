@@ -1,4 +1,4 @@
-package selfsubject
+package resources
 
 // RedHatRbacSelfSubjectStrategyConfig configures the Red Hat RBAC strategy.
 type RedHatRbacSelfSubjectStrategyConfig struct {

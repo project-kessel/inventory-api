@@ -62,4 +62,3 @@ log:
   level: "debug"
   livez: true
   readyz: true
-

@@ -99,6 +99,25 @@ func DeserializeConsistencyToken(value string) ConsistencyToken {
 	return Deserialize[ConsistencyToken](value)
 }
 
+// ContinuationToken is an opaque pagination cursor from clients or authz backends.
+type ContinuationToken string
+
+func NewContinuationToken(token string) (ContinuationToken, error) {
+	return ContinuationToken(token), nil
+}
+
+func (ct ContinuationToken) String() string {
+	return string(ct)
+}
+
+func (ct ContinuationToken) Serialize() string {
+	return SerializeString(ct)
+}
+
+func DeserializeContinuationToken(value string) ContinuationToken {
+	return Deserialize[ContinuationToken](value)
+}
+
 func DeserializeGeneration(value uint) Generation {
 	return DeserializeUint[Generation](value)
 }
@@ -155,6 +174,15 @@ func (v Version) Uint() uint {
 // (18,446,744,073,709,551,615 on 64-bit systems or 4,294,967,295 on 32-bit systems).
 func (v Version) Increment() Version {
 	return Version(uint(v) + 1)
+}
+
+// Decrement returns a new Version with the value decremented by 1.
+// Returns 0 if the current value is already 0 (prevents underflow).
+func (v Version) Decrement() Version {
+	if uint(v) == 0 {
+		return Version(0)
+	}
+	return Version(uint(v) - 1)
 }
 
 func (v Version) Serialize() uint {
@@ -224,6 +252,7 @@ func NewResourceType(resourceType string) (ResourceType, error) {
 	if resourceType == "" {
 		return ResourceType(""), fmt.Errorf("%w: ResourceType", ErrEmpty)
 	}
+	resourceType = strings.ToLower(strings.ReplaceAll(resourceType, "/", "_"))
 	return ResourceType(resourceType), nil
 }
 
@@ -231,10 +260,7 @@ func (rt ResourceType) String() string {
 	return string(rt)
 }
 
-func (rt ResourceType) Serialize() string {
-	str := SerializeString(rt)
-	return strings.ToLower(str)
-}
+func (rt ResourceType) Serialize() string { return SerializeString(rt) }
 
 type ReporterType string
 
@@ -243,17 +269,14 @@ func NewReporterType(reporterType string) (ReporterType, error) {
 	if reporterType == "" {
 		return ReporterType(""), fmt.Errorf("%w: ReporterType", ErrEmpty)
 	}
-	return ReporterType(reporterType), nil
+	return ReporterType(strings.ToLower(reporterType)), nil
 }
 
 func (rt ReporterType) String() string {
 	return string(rt)
 }
 
-func (rt ReporterType) Serialize() string {
-	str := SerializeString(rt)
-	return strings.ToLower(str)
-}
+func (rt ReporterType) Serialize() string { return SerializeString(rt) }
 
 type ReporterInstanceId string
 
@@ -262,17 +285,14 @@ func NewReporterInstanceId(reporterInstanceId string) (ReporterInstanceId, error
 	if reporterInstanceId == "" {
 		return ReporterInstanceId(""), fmt.Errorf("%w: ReporterInstanceId", ErrEmpty)
 	}
-	return ReporterInstanceId(reporterInstanceId), nil
+	return ReporterInstanceId(strings.ToLower(reporterInstanceId)), nil
 }
 
 func (ri ReporterInstanceId) String() string {
 	return string(ri)
 }
 
-func (ri ReporterInstanceId) Serialize() string {
-	str := SerializeString(ri)
-	return strings.ToLower(str)
-}
+func (ri ReporterInstanceId) Serialize() string { return SerializeString(ri) }
 
 type ConsistencyToken string
 

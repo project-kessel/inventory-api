@@ -74,7 +74,7 @@ func (f *fakeResourceRepository) NextReporterResourceId() (bizmodel.ReporterReso
 	return bizmodel.NewReporterResourceId(uuidV7)
 }
 
-func (f *fakeResourceRepository) Save(tx *gorm.DB, resource bizmodel.Resource, operationType bizmodel.EventOperationType, txid string) error {
+func (f *fakeResourceRepository) Save(tx *gorm.DB, resource bizmodel.Resource, operationType bizmodel.EventOperationType, txid bizmodel.TransactionId) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
@@ -253,7 +253,7 @@ func (f *fakeResourceRepository) FindResourceByKeys(tx *gorm.DB, key bizmodel.Re
 	return nil, gorm.ErrRecordNotFound
 }
 
-func (f *fakeResourceRepository) FindCurrentAndPreviousVersionedRepresentations(tx *gorm.DB, key bizmodel.ReporterResourceKey, currentVersion *uint, operationType bizmodel.EventOperationType) (*bizmodel.Representations, *bizmodel.Representations, error) {
+func (f *fakeResourceRepository) FindCurrentAndPreviousVersionedRepresentations(tx *gorm.DB, key bizmodel.ReporterResourceKey, currentVersion *bizmodel.Version, operationType bizmodel.EventOperationType) (*bizmodel.Representations, *bizmodel.Representations, error) {
 	if currentVersion == nil {
 		return nil, nil, nil
 	}
@@ -273,14 +273,16 @@ func (f *fakeResourceRepository) FindCurrentAndPreviousVersionedRepresentations(
 		return nil, nil, fmt.Errorf("no representations found for key")
 	}
 
+	cv := currentVersion.Uint()
 	var current *bizmodel.Representations
 	var previous *bizmodel.Representations
 
-	if entry, ok := versionMap[*currentVersion]; ok {
+	if entry, ok := versionMap[cv]; ok {
+		v := bizmodel.NewVersion(entry.commonVersion)
 		var err error
 		current, err = bizmodel.NewRepresentations(
 			bizmodel.Representation(cloneJsonObject(entry.commonData)),
-			uintPtr(entry.commonVersion),
+			&v,
 			nil,
 			nil,
 		)
@@ -289,12 +291,13 @@ func (f *fakeResourceRepository) FindCurrentAndPreviousVersionedRepresentations(
 		}
 	}
 
-	if *currentVersion > 0 {
-		if entry, ok := versionMap[*currentVersion-1]; ok {
+	if cv > 0 {
+		if entry, ok := versionMap[cv-1]; ok {
+			v := bizmodel.NewVersion(entry.commonVersion)
 			var err error
 			previous, err = bizmodel.NewRepresentations(
 				bizmodel.Representation(cloneJsonObject(entry.commonData)),
-				uintPtr(entry.commonVersion),
+				&v,
 				nil,
 				nil,
 			)
@@ -332,9 +335,10 @@ func (f *fakeResourceRepository) FindLatestRepresentations(tx *gorm.DB, key bizm
 		}
 	}
 
+	v := bizmodel.NewVersion(latest.commonVersion)
 	return bizmodel.NewRepresentations(
 		bizmodel.Representation(cloneJsonObject(latest.commonData)),
-		uintPtr(latest.commonVersion),
+		&v,
 		nil,
 		nil,
 	)
@@ -369,11 +373,6 @@ func (f *fakeResourceRepository) markTransactionIdAsProcessed(transactionId stri
 	f.processedTransactionIds[transactionId] = true
 }
 
-func uintPtr(v uint) *uint {
-	value := v
-	return &value
-}
-
 func cloneJsonObject(src internal.JsonObject) internal.JsonObject {
 	if src == nil {
 		return nil
@@ -395,15 +394,10 @@ func cloneJsonObject(src internal.JsonObject) internal.JsonObject {
 
 // HasTransactionIdBeenProcessed checks if a transaction ID has been processed before
 // Returns true if the transaction has already been processed, false otherwise
-func (f *fakeResourceRepository) HasTransactionIdBeenProcessed(tx *gorm.DB, transactionId string) (bool, error) {
-	if transactionId == "" {
-		return false, nil
-	}
-
+func (f *fakeResourceRepository) HasTransactionIdBeenProcessed(tx *gorm.DB, transactionId bizmodel.TransactionId) (bool, error) {
 	f.mu.RLock()
 	defer f.mu.RUnlock()
 
-	// Check if this transaction ID has been processed before
-	_, exists := f.processedTransactionIds[transactionId]
+	_, exists := f.processedTransactionIds[transactionId.String()]
 	return exists, nil
 }

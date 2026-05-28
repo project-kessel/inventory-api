@@ -90,7 +90,10 @@ func (s *TupleService) ReadTuples(req *pb.ReadTuplesRequest, stream pb.KesselTup
 // AcquireLock acquires a distributed lock (DEPRECATED).
 // This endpoint exists only for RBAC backward compatibility.
 func (s *TupleService) AcquireLock(ctx context.Context, req *pb.AcquireLockRequest) (*pb.AcquireLockResponse, error) {
-	cmd := toAcquireLockCommand(req)
+	cmd, err := toAcquireLockCommand(req)
+	if err != nil {
+		return nil, err
+	}
 
 	result, err := s.Ctl.AcquireLock(ctx, cmd)
 	if err != nil {
@@ -98,7 +101,7 @@ func (s *TupleService) AcquireLock(ctx context.Context, req *pb.AcquireLockReque
 	}
 
 	return &pb.AcquireLockResponse{
-		LockToken: result.LockToken,
+		LockToken: result.LockToken.String(),
 	}, nil
 }
 
@@ -115,12 +118,11 @@ func toCreateTuplesCommand(req *pb.CreateTuplesRequest) (tuplesctl.CreateTuplesC
 		Upsert: req.GetUpsert(),
 	}
 
-	if req.GetFencingCheck() != nil {
-		cmd.FencingCheck = &tuplesctl.FencingCheck{
-			LockId:    req.GetFencingCheck().GetLockId(),
-			LockToken: req.GetFencingCheck().GetLockToken(),
-		}
+	fc, err := fencingCheckFromProto(req.GetFencingCheck())
+	if err != nil {
+		return tuplesctl.CreateTuplesCommand{}, err
 	}
+	cmd.FencingCheck = fc
 
 	return cmd, nil
 }
@@ -130,12 +132,11 @@ func toDeleteTuplesCommand(req *pb.DeleteTuplesRequest) (tuplesctl.DeleteTuplesC
 		Filter: tupleFilterFromProto(req.GetFilter()),
 	}
 
-	if req.GetFencingCheck() != nil {
-		cmd.FencingCheck = &tuplesctl.FencingCheck{
-			LockId:    req.GetFencingCheck().GetLockId(),
-			LockToken: req.GetFencingCheck().GetLockToken(),
-		}
+	fc, err := fencingCheckFromProto(req.GetFencingCheck())
+	if err != nil {
+		return tuplesctl.DeleteTuplesCommand{}, err
 	}
+	cmd.FencingCheck = fc
 
 	return cmd, nil
 }
@@ -148,13 +149,33 @@ func toReadTuplesCommand(req *pb.ReadTuplesRequest) (tuplesctl.ReadTuplesCommand
 	}, nil
 }
 
-func toAcquireLockCommand(req *pb.AcquireLockRequest) tuplesctl.AcquireLockCommand {
-	return tuplesctl.AcquireLockCommand{
-		LockId: req.GetLockId(),
+func toAcquireLockCommand(req *pb.AcquireLockRequest) (tuplesctl.AcquireLockCommand, error) {
+	lockId, err := model.NewLockId(req.GetLockId())
+	if err != nil {
+		return tuplesctl.AcquireLockCommand{}, fmt.Errorf("invalid lock id: %w", err)
 	}
+	return tuplesctl.AcquireLockCommand{LockId: lockId}, nil
 }
 
 // --- proto → domain helpers ---
+
+func fencingCheckFromProto(fc *pb.RelationFencingCheck) (*tuplesctl.FencingCheck, error) {
+	if fc == nil {
+		return nil, nil
+	}
+	lockId, err := model.NewLockId(fc.GetLockId())
+	if err != nil {
+		return nil, fmt.Errorf("invalid fencing lock id: %w", err)
+	}
+	lockToken, err := model.NewLockToken(fc.GetLockToken())
+	if err != nil {
+		return nil, fmt.Errorf("invalid fencing lock token: %w", err)
+	}
+	return &tuplesctl.FencingCheck{
+		LockId:    lockId,
+		LockToken: lockToken,
+	}, nil
+}
 
 func relationshipsToRelationsTuples(rels []*pb.Relationship) ([]model.RelationsTuple, error) {
 	tuples := make([]model.RelationsTuple, len(rels))
@@ -247,9 +268,14 @@ func paginationFromProto(p *pb.RequestPagination) *model.Pagination {
 	if p == nil {
 		return nil
 	}
+	var continuation *model.ContinuationToken
+	if p.ContinuationToken != nil {
+		ct := model.DeserializeContinuationToken(*p.ContinuationToken)
+		continuation = &ct
+	}
 	return &model.Pagination{
 		Limit:        p.Limit,
-		Continuation: p.ContinuationToken,
+		Continuation: continuation,
 	}
 }
 
@@ -332,7 +358,8 @@ func readTuplesItemToProto(item model.ReadTuplesItem) *pb.ReadTuplesResponse {
 	}
 
 	if item.ContinuationToken() != "" {
-		resp.Pagination = &pb.ResponsePagination{ContinuationToken: item.ContinuationToken()}
+		ct := item.ContinuationToken().String()
+		resp.Pagination = &pb.ResponsePagination{ContinuationToken: ct}
 	}
 
 	if item.ConsistencyToken() != "" {

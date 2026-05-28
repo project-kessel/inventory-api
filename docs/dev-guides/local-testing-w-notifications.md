@@ -48,7 +48,7 @@ make migrate
 ```shell
 # The config provided assumes Relations is running locally on ports 8000/9000
 # so Inventory is set to use ports 8081/9081 instead to not conflict
-./bin/inventory-api serve --config config/inventory-w-relations.yaml
+./bin/inventory-api serve --config development/configs/local-w-relations.yaml
 ```
 
 ### Running Notifications

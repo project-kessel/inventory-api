@@ -184,27 +184,27 @@ pr-check:
 
 .PHONY: inventory-up
 inventory-up:
-	./scripts/start-inventory.sh full-setup 8000 9000
+	AUTHZ_IMPL=allow-all ./scripts/start-inventory.sh base 8000 9000 inventory-api kafka-connect-setup kafka-setup
 
 .PHONY: inventory-up-relations-ready
 inventory-up-relations-ready:
-	./scripts/start-inventory.sh full-setup-relations-ready 8081 9081
+	./scripts/start-inventory.sh authn-rh-identity 8081 9081 inventory-api kafka-connect-setup kafka-setup
 
 .PHONY: inventory-up-w-monitoring
 inventory-up-w-monitoring:
-	./scripts/start-inventory.sh full-kessel-w-monitoring 8081 9081
+	./scripts/start-inventory.sh base 8081 9081 inventory-api kafka-connect-setup kafka-setup prometheus grafana alertmanager
 
 .PHONY: inventory-up-split
 inventory-up-split:
-	./scripts/start-inventory.sh split-setup 8000 9000
+	AUTHZ_IMPL=allow-all ./scripts/start-inventory.sh base 8000 9000 invmigrate kafka-connect-setup kafka-setup
 
 .PHONY: inventory-up-split-relations-ready
 inventory-up-split-relations-ready:
-	./scripts/start-inventory.sh split-setup-relations-ready 8081 9081
+	./scripts/start-inventory.sh base 8081 9081 invmigrate kafka-connect-setup kafka-setup
 
 .PHONY: inventory-up-sso
 inventory-up-sso:
-	./scripts/start-inventory.sh full-setup-w-sso 8081 9081
+	./scripts/start-inventory.sh authn-sso 8081 9081 inventory-api kafka-connect-setup kafka-setup keycloak
 
 .PHONY: inventory-up-kind
 inventory-up-kind:
@@ -213,7 +213,7 @@ inventory-up-kind:
 .PHONY: monitoring-only
 monitoring-only:
 	./scripts/monitoring-only-prom-update.sh
-	./scripts/start-inventory.sh monitoring-only 8000 9000
+	./scripts/start-inventory.sh base 8000 9000 prometheus-ephem grafana alertmanager
 
 .PHONY: monitoring-down
 monitoring-down:
@@ -222,6 +222,22 @@ monitoring-down:
 .PHONY: get-token
 get-token:
 	./scripts/get-token.sh
+
+.PHONY: kessel-up
+kessel-up:
+	./scripts/start-full-kessel.sh
+
+.PHONY: kessel-up-monitoring
+kessel-up-monitoring:
+	./scripts/start-full-kessel.sh --profile monitoring
+
+.PHONY: kessel-compose-integration-test
+kessel-compose-integration-test:
+	./scripts/kessel-integration-test.sh
+
+.PHONY: kessel-down
+kessel-down:
+	./scripts/stop-full-kessel.sh
 
 .PHONY: inventory-down
 inventory-down:

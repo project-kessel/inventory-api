@@ -1,4 +1,4 @@
-package model
+package data
 
 import (
 	"testing"
@@ -6,7 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestValidateJSONSchema(t *testing.T) {
+func TestJsonSchemaWithWorkspaces_Validate(t *testing.T) {
 	schema := `{
 		"$schema": "http://json-schema.org/draft-07/schema#",
 		"type": "object",
@@ -36,12 +36,12 @@ func TestValidateJSONSchema(t *testing.T) {
 			name:          "Invalid JSON (wrong data type for workspace_id)",
 			jsonInput:     map[string]interface{}{"workspace_id": 123},
 			expectErr:     true,
-			expectedError: "validation failed: workspace_id: Invalid type. Expected: string, given: integer", // Error due to wrong data type
+			expectedError: "validation failed: workspace_id: Invalid type. Expected: string, given: integer",
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			validationSchema := NewJsonSchemaValidatorFromString(schema)
+			validationSchema := NewJsonSchemaWithWorkspacesFromString(schema)
 			isValid, err := validationSchema.Validate(tt.jsonInput)
 			assert.NotEqual(t, tt.expectErr, isValid)
 			if tt.expectErr {

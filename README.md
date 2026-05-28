@@ -113,24 +113,21 @@ make api
 
 Testing locally is fine for simple changes but in order to test the full application, it requires all the dependent backing services.
 
-The Full Setup option for Docker Compose:
-- Exposes the inventory API in `localhost` and using port `8000` for http and port `9000` for grpc.
-- Sets both AuthN and AuthZ to Allow
-- Deploys and configures Inventory to leverage postgres
-- Deploys and configures Kafka, Zookeeper and Kafka Connect with Debezium configured for the Outbox table
-- Enables and configures the Inventory Consumer for the local Kafka cluster
-- Configures Inventory API using the [Full-Setup](development/configs/full-setup.yaml) config file
+The quickest way to run the full Kessel suite locally (Inventory API, Relations API + SpiceDB, Inventory Consumer, Kafka, and Kafka Connect) is:
 
-This setup allows testing the full inventory stack, but does not require Relations API. Calls that would get made to Relations API are just logged by the consumer.
-
-To start with Full Setup configuration:
 ```shell
-make inventory-up
+make kessel-up
 ```
 
-To stop:
+This uses pre-built images so no other repos need to be cloned. To stop:
 ```shell
-make inventory-down
+make kessel-down
+```
+
+For Inventory API only (without Relations API or Consumer), use:
+```shell
+make inventory-up    # start
+make inventory-down  # stop
 ```
 
 ### Alternative ways of running this service

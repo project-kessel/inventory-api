@@ -1,4 +1,4 @@
-package selfsubject
+package resources
 
 import (
 	"testing"

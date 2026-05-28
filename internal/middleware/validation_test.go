@@ -8,84 +8,107 @@ import (
 	"github.com/go-kratos/kratos/v2/errors"
 	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2"
 	"github.com/stretchr/testify/assert"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/metadata"
+	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/types/known/structpb"
 )
 
-type dummyServerStream struct {
-	grpc.ServerStream
-	recvMsgFunc func(msg interface{}) error
-}
-
-func (d *dummyServerStream) RecvMsg(msg interface{}) error {
-	return d.recvMsgFunc(msg)
-}
-
-func (d *dummyServerStream) Context() context.Context {
-	return context.Background()
-}
-
-func (d *dummyServerStream) SetHeader(metadata.MD) error  { return nil }
-func (d *dummyServerStream) SendHeader(metadata.MD) error { return nil }
-func (d *dummyServerStream) SetTrailer(metadata.MD)       {}
-func (d *dummyServerStream) SendMsg(interface{}) error    { return nil }
-
-func TestStreamValidationInterceptor_ValidRequest(t *testing.T) {
+func TestValidation_ValidRequest(t *testing.T) {
 	t.Parallel()
 
 	validator, err := protovalidate.New()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
-	interceptor := StreamValidationInterceptor(validator)
+	mw := Validation(validator)
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return "ok", nil
+	}
 
-	dummyStream := &dummyServerStream{
-		recvMsgFunc: func(msg interface{}) error {
-			*msg.(*pb.StreamedListObjectsRequest) = pb.StreamedListObjectsRequest{
-				ObjectType: &pb.RepresentationType{ResourceType: "host"},
-				Relation:   "viewer",
-				Subject: &pb.SubjectReference{
-					Resource: &pb.ResourceReference{
-						ResourceType: "user",
-						ResourceId:   "alice",
-					},
-				},
-			}
-			return nil
+	req := &pb.ReportResourceRequest{
+		Type:               "host",
+		ReporterInstanceId: "test-instance",
+		ReporterType:       "hbi",
+		Representations: &pb.ResourceRepresentations{
+			Metadata: &pb.RepresentationMetadata{
+				LocalResourceId: "test-123",
+				ApiHref:         "/api/test",
+			},
 		},
 	}
 
-	handler := func(srv interface{}, stream grpc.ServerStream) error {
-		msg := &pb.StreamedListObjectsRequest{}
-		return stream.RecvMsg(msg)
-	}
-
-	err = interceptor(nil, dummyStream, nil, handler)
+	resp, err := mw(handler)(context.Background(), req)
 	assert.NoError(t, err)
+	assert.Equal(t, "ok", resp)
 }
 
-func TestStreamValidationInterceptor_InvalidRequest(t *testing.T) {
+func TestValidation_InvalidRequest(t *testing.T) {
 	t.Parallel()
 
 	validator, err := protovalidate.New()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
-	interceptor := StreamValidationInterceptor(validator)
-
-	dummyStream := &dummyServerStream{
-		recvMsgFunc: func(msg interface{}) error {
-			*msg.(*pb.StreamedListObjectsRequest) = pb.StreamedListObjectsRequest{}
-			return nil
-		},
+	mw := Validation(validator)
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return "ok", nil
 	}
 
-	handler := func(srv interface{}, stream grpc.ServerStream) error {
-		msg := &pb.StreamedListObjectsRequest{}
-		return stream.RecvMsg(msg)
-	}
+	req := &pb.ReportResourceRequest{}
 
-	err = interceptor(nil, dummyStream, nil, handler)
+	_, err = mw(handler)(context.Background(), req)
 	assert.Error(t, err)
 	assert.True(t, errors.IsBadRequest(err))
-	se := errors.FromError(err)
-	assert.Equal(t, "VALIDATOR", se.Reason)
+}
+
+func TestSanitizeReportResourceRequest(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name             string
+		reporterInput    map[string]interface{}
+		expectedReporter map[string]interface{}
+	}{
+		{
+			name:             "reporter nulls removed",
+			reporterInput:    map[string]interface{}{"satellite_id": "sat-123", "stale_key": nil},
+			expectedReporter: map[string]interface{}{"satellite_id": "sat-123"},
+		},
+		{
+			name: "nil representations",
+		},
+		{
+			name:             "nil reporter",
+			reporterInput:    nil,
+			expectedReporter: nil,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			req := &pb.ReportResourceRequest{
+				Type:               "host",
+				ReporterInstanceId: "test-instance",
+				ReporterType:       "hbi",
+			}
+
+			if tc.reporterInput != nil {
+				s, err := structpb.NewStruct(tc.reporterInput)
+				require.NoError(t, err)
+				req.Representations = &pb.ResourceRepresentations{
+					Metadata: &pb.RepresentationMetadata{
+						LocalResourceId: "test-123",
+						ApiHref:         "/api/test",
+					},
+					Reporter: s,
+				}
+			}
+
+			err := sanitizeReportResourceRequest(req)
+			assert.NoError(t, err)
+
+			if tc.expectedReporter != nil {
+				assert.Equal(t, tc.expectedReporter, req.GetRepresentations().GetReporter().AsMap())
+			}
+		})
+	}
 }

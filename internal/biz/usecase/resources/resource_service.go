@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	kratosErrors "github.com/go-kratos/kratos/v2/errors"
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/google/uuid"
 	"github.com/project-kessel/inventory-api/cmd/common"
@@ -14,7 +15,6 @@ import (
 	"github.com/project-kessel/inventory-api/internal/biz/usecase/metaauthorizer"
 	"github.com/project-kessel/inventory-api/internal/metricscollector"
 	"github.com/project-kessel/inventory-api/internal/pubsub"
-	"github.com/project-kessel/inventory-api/internal/subject/selfsubject"
 	"github.com/sony/gobreaker/v2"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -49,6 +49,13 @@ type UsecaseConfig struct {
 	ReadAfterWriteAllowlist        []string
 	ConsumerEnabled                bool
 	DefaultToAtLeastAsAcknowledged bool
+	IdempotencyCheckEnabled        bool
+}
+
+func NewUsecaseConfig() *UsecaseConfig {
+	return &UsecaseConfig{
+		IdempotencyCheckEnabled: true,
+	}
 }
 
 // Usecase provides business logic operations for resource management in the inventory system.
@@ -64,12 +71,12 @@ type Usecase struct {
 	ListenManager       pubsub.ListenManagerImpl
 	Config              *UsecaseConfig
 	MetricsCollector    *metricscollector.MetricsCollector
-	SelfSubjectStrategy selfsubject.SelfSubjectStrategy
+	SelfSubjectStrategy SelfSubjectStrategy
 }
 
 func New(resourceRepository model.ResourceRepository, schemaRepository model.SchemaRepository,
 	relations model.RelationsRepository, namespace string, logger log.Logger,
-	listenManager pubsub.ListenManagerImpl, waitForNotifBreaker *gobreaker.CircuitBreaker[any], usecaseConfig *UsecaseConfig, metricsCollector *metricscollector.MetricsCollector, metaAuthorizer metaauthorizer.MetaAuthorizer, selfSubjectStrategy selfsubject.SelfSubjectStrategy) *Usecase {
+	listenManager pubsub.ListenManagerImpl, waitForNotifBreaker *gobreaker.CircuitBreaker[any], usecaseConfig *UsecaseConfig, metricsCollector *metricscollector.MetricsCollector, metaAuthorizer metaauthorizer.MetaAuthorizer, selfSubjectStrategy SelfSubjectStrategy) *Usecase {
 	if metaAuthorizer == nil {
 		metaAuthorizer = metaauthorizer.NewSimpleMetaAuthorizer()
 	}
@@ -141,8 +148,8 @@ func (uc *Usecase) ReportResource(ctx context.Context, cmd ReportResourceCommand
 	// predicate locks on the transaction_id indexes. The unique constraint on transaction_id
 	// provides the actual correctness guarantee, if a duplicate sneaks past this
 	// advisory check due to a concurrent commit.
-	if cmd.TransactionId != nil {
-		alreadyProcessed, err := uc.resourceRepository.HasTransactionIdBeenProcessed(uc.resourceRepository.GetDB(), cmd.TransactionId.String())
+	if uc.Config.IdempotencyCheckEnabled && cmd.TransactionId != nil {
+		alreadyProcessed, err := uc.resourceRepository.HasTransactionIdBeenProcessed(uc.resourceRepository.GetDB(), *cmd.TransactionId)
 		if err != nil {
 			return fmt.Errorf("failed to check transaction ID: %w", err)
 		}
@@ -153,26 +160,39 @@ func (uc *Usecase) ReportResource(ctx context.Context, cmd ReportResourceCommand
 	}
 
 	var operationType model.EventOperationType
-	err = uc.resourceRepository.GetTransactionManager().HandleSerializableTransaction(
-		ReportResourceOperationName,
-		uc.resourceRepository.GetDB(),
-		func(tx *gorm.DB) error {
-			res, err := uc.resourceRepository.FindResourceByKeys(tx, reporterResourceKey)
-			if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
-				return fmt.Errorf("failed to lookup existing resource: %w", err)
-			}
+	reportResource := func() error {
+		return uc.resourceRepository.GetTransactionManager().HandleSerializableTransaction(
+			ReportResourceOperationName,
+			uc.resourceRepository.GetDB(),
+			func(tx *gorm.DB) error {
+				res, err := uc.resourceRepository.FindResourceByKeys(tx, reporterResourceKey)
+				if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+					return fmt.Errorf("failed to lookup existing resource: %w", err)
+				}
 
-			if err == nil && res != nil {
-				log.Info("Resource already exists, updating: ")
-				operationType = model.OperationTypeUpdated
-				return uc.updateResource(tx, cmd, res, txid.String())
-			}
+				if err == nil && res != nil {
+					log.Info("Resource already exists, updating: ")
+					operationType = model.OperationTypeUpdated
+					return uc.updateResource(tx, cmd, res, txid)
+				}
 
-			log.Info("Creating new resource")
-			operationType = model.OperationTypeCreated
-			return uc.createResource(tx, cmd, txid.String())
-		},
-	)
+				log.Info("Creating new resource")
+				operationType = model.OperationTypeCreated
+				return uc.createResource(tx, cmd, txid)
+			},
+		)
+	}
+
+	err = reportResource()
+	if err != nil && !uc.Config.IdempotencyCheckEnabled && isDuplicateTransactionError(err) {
+		log.Debugf("Idempotency check disabled and duplicate transaction ID detected, retrying with new transaction ID: %s", cmd.TransactionId.String())
+		retryTxid, retryErr := getNextTransactionID()
+		if retryErr != nil {
+			return retryErr
+		}
+		cmd.TransactionId = &retryTxid
+		err = reportResource()
+	}
 
 	if err != nil {
 		return err
@@ -216,7 +236,7 @@ func (uc *Usecase) ReportResource(ctx context.Context, cmd ReportResourceCommand
 	return nil
 }
 
-func (uc *Usecase) createResource(tx *gorm.DB, cmd ReportResourceCommand, txidStr string) error {
+func (uc *Usecase) createResource(tx *gorm.DB, cmd ReportResourceCommand, txid model.TransactionId) error {
 	resourceId, err := uc.resourceRepository.NextResourceId()
 	if err != nil {
 		return err
@@ -245,10 +265,10 @@ func (uc *Usecase) createResource(tx *gorm.DB, cmd ReportResourceCommand, txidSt
 		return err
 	}
 
-	return uc.resourceRepository.Save(tx, resource, model.OperationTypeCreated, txidStr)
+	return uc.resourceRepository.Save(tx, resource, model.OperationTypeCreated, txid)
 }
 
-func (uc *Usecase) updateResource(tx *gorm.DB, cmd ReportResourceCommand, existingResource *model.Resource, txidStr string) error {
+func (uc *Usecase) updateResource(tx *gorm.DB, cmd ReportResourceCommand, existingResource *model.Resource, txid model.TransactionId) error {
 	reporterResourceKey, err := model.NewReporterResourceKey(
 		cmd.LocalResourceId,
 		cmd.ResourceType,
@@ -272,7 +292,7 @@ func (uc *Usecase) updateResource(tx *gorm.DB, cmd ReportResourceCommand, existi
 		return fmt.Errorf("failed to update resource: %w", err)
 	}
 
-	return uc.resourceRepository.Save(tx, *existingResource, model.OperationTypeUpdated, txidStr)
+	return uc.resourceRepository.Save(tx, *existingResource, model.OperationTypeUpdated, txid)
 }
 
 func (uc *Usecase) Delete(ctx context.Context, reporterResourceKey model.ReporterResourceKey) error {
@@ -301,7 +321,7 @@ func (uc *Usecase) Delete(ctx context.Context, reporterResourceKey model.Reporte
 				if err != nil {
 					return fmt.Errorf("failed to delete resource: %w", err)
 				}
-				return uc.resourceRepository.Save(tx, *res, model.OperationTypeDeleted, txid.String())
+				return uc.resourceRepository.Save(tx, *res, model.OperationTypeDeleted, txid)
 			} else {
 				if errors.Is(err, gorm.ErrRecordNotFound) {
 					return ErrResourceNotFound
@@ -567,38 +587,36 @@ func (uc *Usecase) enforceMetaAuthzObject(ctx context.Context, relation metaauth
 // It checks that the reporter is allowed for the resource type,
 // and validates both reporter and common representations.
 func (uc *Usecase) validateReportResourceCommand(ctx context.Context, cmd ReportResourceCommand) error {
-	resourceType := cmd.ResourceType.String()
-	reporterType := cmd.ReporterType.String()
-
-	if resourceType == "" {
-		return fmt.Errorf("missing 'type' field")
-	}
-	if reporterType == "" {
-		return fmt.Errorf("missing 'reporterType' field")
-	}
-
-	if isReporter, err := uc.schemaService.IsReporterForResource(ctx, resourceType, reporterType); !isReporter {
+	if isReporter, err := uc.schemaService.IsReporterForResource(ctx, cmd.ResourceType, cmd.ReporterType); !isReporter {
 		if err != nil {
 			return err
 		}
-		return fmt.Errorf("reporter %s does not report resource types: %s", reporterType, resourceType)
+		return fmt.Errorf("reporter %s does not report resource types: %s", cmd.ReporterType.String(), cmd.ResourceType.String())
 	}
 
 	if cmd.ReporterRepresentation != nil {
-		sanitizedReporterRepresentation := removeNulls(map[string]interface{}(*cmd.ReporterRepresentation))
-		if err := uc.schemaService.ReporterShallowValidate(ctx, resourceType, reporterType, sanitizedReporterRepresentation); err != nil {
+		reporterRepresentation := map[string]interface{}(*cmd.ReporterRepresentation)
+		if err := uc.schemaService.ReporterShallowValidate(ctx, cmd.ResourceType, cmd.ReporterType, reporterRepresentation); err != nil {
 			return err
 		}
 	}
 
 	if cmd.CommonRepresentation != nil {
 		commonRepresentation := map[string]interface{}(*cmd.CommonRepresentation)
-		if err := uc.schemaService.CommonShallowValidate(ctx, resourceType, commonRepresentation); err != nil {
+		if err := uc.schemaService.CommonShallowValidate(ctx, cmd.ResourceType, commonRepresentation); err != nil {
 			return err
 		}
 	}
 
 	return nil
+}
+
+func isDuplicateTransactionError(err error) bool {
+	var kratosErr *kratosErrors.Error
+	if errors.As(err, &kratosErr) {
+		return kratosErr.Reason == model.ReasonNonUniqueTransactionID
+	}
+	return false
 }
 
 func getNextTransactionID() (model.TransactionId, error) {

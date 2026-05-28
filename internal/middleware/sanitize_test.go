@@ -1,4 +1,4 @@
-package resources
+package middleware
 
 import (
 	"testing"
@@ -70,7 +70,7 @@ func TestRemoveNulls(t *testing.T) {
 			expected: map[string]interface{}{},
 		},
 		{
-			name: "nested string 'null' value",
+			name: "nested string null value",
 			input: map[string]interface{}{
 				"details": map[string]interface{}{
 					"comment": "NULL",
@@ -84,7 +84,7 @@ func TestRemoveNulls(t *testing.T) {
 			},
 		},
 		{
-			name: "nested string 'null' value case insensitive",
+			name: "nested string null value case insensitive",
 			input: map[string]interface{}{
 				"details": map[string]interface{}{
 					"comment": "null",
@@ -128,7 +128,7 @@ func TestRemoveNulls(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := removeNulls(tt.input)
+			result := RemoveNulls(tt.input)
 			assert.Equal(t, tt.expected, result)
 		})
 	}

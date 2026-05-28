@@ -1,13 +1,10 @@
-package resources
+package middleware
 
-import (
-	"strings"
-)
+import "strings"
 
-// removeNulls recursively creates a new map with keys removed where the value is null.
+// RemoveNulls recursively creates a new map with keys removed where the value is null.
 // This function is safe for concurrent use as it does not modify the input map.
-func removeNulls(m map[string]interface{}) map[string]interface{} {
-	// Fast path: check if any nulls exist at any depth
+func RemoveNulls(m map[string]interface{}) map[string]interface{} {
 	if !hasNullsRecursive(m) {
 		return m
 	}
@@ -26,7 +23,7 @@ func removeNulls(m map[string]interface{}) map[string]interface{} {
 			result[key] = v
 
 		case map[string]interface{}:
-			cleaned := removeNulls(v)
+			cleaned := RemoveNulls(v)
 			if len(cleaned) > 0 {
 				result[key] = cleaned
 			}
@@ -38,7 +35,6 @@ func removeNulls(m map[string]interface{}) map[string]interface{} {
 	return result
 }
 
-// Recursively checks for nil values or "null" strings in a map
 func hasNullsRecursive(m map[string]interface{}) bool {
 	for _, val := range m {
 		if val == nil {

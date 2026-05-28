@@ -440,7 +440,7 @@ func TestCheckSelfBulk_RejectsInventoryManagedConsistency(t *testing.T) {
 func newFakeSchemaRepository(t *testing.T) model.SchemaRepository {
 	schemaRepository := data.NewInMemorySchemaRepository()
 
-	emptyValidationSchema := model.NewJsonSchemaValidatorFromString(`{
+	emptyValidationSchema := data.NewJsonSchemaWithWorkspacesFromString(`{
 		"$schema": "http://json-schema.org/draft-07/schema#",
 		"type": "object",
 		"properties": {
@@ -448,7 +448,7 @@ func newFakeSchemaRepository(t *testing.T) model.SchemaRepository {
 		"required": []
 	}`)
 
-	withWorkspaceValidationSchema := model.NewJsonSchemaValidatorFromString(`{
+	withWorkspaceValidationSchema := data.NewJsonSchemaWithWorkspacesFromString(`{
 		"$schema": "http://json-schema.org/draft-07/schema#",
 		"type": "object",
 		"properties": {
@@ -466,30 +466,24 @@ func newFakeSchemaRepository(t *testing.T) model.SchemaRepository {
 	hbi, err := model.NewReporterType("hbi")
 	require.NoError(t, err)
 
-	err = schemaRepository.CreateResourceSchema(context.Background(), model.ResourceSchema{
-		ResourceType:     k8sCluster,
-		ValidationSchema: withWorkspaceValidationSchema,
-	})
+	k8sClusterSchema, err := model.NewResourceSchemaRepresentation(k8sCluster, withWorkspaceValidationSchema)
+	require.NoError(t, err)
+	err = schemaRepository.CreateResourceSchema(context.Background(), k8sClusterSchema)
 	assert.NoError(t, err)
 
-	err = schemaRepository.CreateReporterSchema(context.Background(), model.ReporterSchema{
-		ResourceType:     k8sCluster,
-		ReporterType:     ocm,
-		ValidationSchema: emptyValidationSchema,
-	})
+	k8sClusterOcm, err := model.NewReporterSchemaRepresentation(k8sCluster, ocm, emptyValidationSchema)
+	require.NoError(t, err)
+	err = schemaRepository.CreateReporterSchema(context.Background(), k8sClusterOcm)
 	assert.NoError(t, err)
 
-	err = schemaRepository.CreateResourceSchema(context.Background(), model.ResourceSchema{
-		ResourceType:     host,
-		ValidationSchema: withWorkspaceValidationSchema,
-	})
+	hostSchema, err := model.NewResourceSchemaRepresentation(host, withWorkspaceValidationSchema)
+	require.NoError(t, err)
+	err = schemaRepository.CreateResourceSchema(context.Background(), hostSchema)
 	assert.NoError(t, err)
 
-	err = schemaRepository.CreateReporterSchema(context.Background(), model.ReporterSchema{
-		ResourceType:     host,
-		ReporterType:     hbi,
-		ValidationSchema: emptyValidationSchema,
-	})
+	hostHbi, err := model.NewReporterSchemaRepresentation(host, hbi, emptyValidationSchema)
+	require.NoError(t, err)
+	err = schemaRepository.CreateReporterSchema(context.Background(), hostHbi)
 	assert.NoError(t, err)
 
 	return schemaRepository
@@ -1479,17 +1473,14 @@ func TestReportResource_SchemaValidation(t *testing.T) {
 			rpt, err := model.NewReporterType(tc.reporterType)
 			require.NoError(t, err)
 
-			err = schemaRepository.CreateResourceSchema(context.Background(), model.ResourceSchema{
-				ResourceType:     rt,
-				ValidationSchema: model.NewJsonSchemaValidatorFromString(tc.commonSchema),
-			})
+			resourceSchema, err := model.NewResourceSchemaRepresentation(rt, data.NewJsonSchemaWithWorkspacesFromString(tc.commonSchema))
+			require.NoError(t, err)
+			err = schemaRepository.CreateResourceSchema(context.Background(), resourceSchema)
 			require.NoError(t, err)
 
-			err = schemaRepository.CreateReporterSchema(context.Background(), model.ReporterSchema{
-				ResourceType:     rt,
-				ReporterType:     rpt,
-				ValidationSchema: model.NewJsonSchemaValidatorFromString(tc.reporterSchema),
-			})
+			reporterSchema, err := model.NewReporterSchemaRepresentation(rt, rpt, data.NewJsonSchemaWithWorkspacesFromString(tc.reporterSchema))
+			require.NoError(t, err)
+			err = schemaRepository.CreateReporterSchema(context.Background(), reporterSchema)
 			require.NoError(t, err)
 
 			usecase := New(

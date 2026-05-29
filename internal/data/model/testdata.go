@@ -577,7 +577,7 @@ func AssertGORMTag(t *testing.T, model interface{}, fieldName string, expectedTa
 	t.Helper()
 
 	modelType := reflect.TypeOf(model)
-	if modelType.Kind() == reflect.Ptr {
+	if modelType.Kind() == reflect.Pointer {
 		modelType = modelType.Elem()
 	}
 
@@ -598,7 +598,7 @@ func AssertFieldType(t *testing.T, model interface{}, fieldName string, expected
 	t.Helper()
 
 	modelType := reflect.TypeOf(model)
-	if modelType.Kind() == reflect.Ptr {
+	if modelType.Kind() == reflect.Pointer {
 		modelType = modelType.Elem()
 	}
 

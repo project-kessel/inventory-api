@@ -9,7 +9,7 @@ import (
 )
 
 // SchemaService is a domain service that orchestrates schema-based operations
-// such as validation and reporter verification.
+// such as validation, tuple calculation, and reporter verification.
 type SchemaService struct {
 	Log              *log.Helper
 	schemaRepository SchemaRepository
@@ -23,35 +23,51 @@ func NewSchemaService(schemaRepository SchemaRepository, logger *log.Helper) *Sc
 	}
 }
 
-func (sc *SchemaService) CalculateTuples(currentRepresentation, previousRepresentation *Representations, key ReporterResourceKey) (TuplesToReplicate, error) {
-	// Extract workspace IDs from representations
-	// currentRepresentation can be nil for DELETE operations (meaning no current/new state)
-	currentWorkspaceID := ""
-	if currentRepresentation != nil {
-		currentWorkspaceID = currentRepresentation.WorkspaceID()
-	}
-	previousWorkspaceID := ""
-	if previousRepresentation != nil {
-		previousWorkspaceID = previousRepresentation.WorkspaceID()
-	}
+// CalculateTuplesForResource computes the relation tuples to replicate for a given resource.
+// It retrieves the appropriate schema for the resource type and delegates tuple calculation to it.
+// If no schema is registered for the resource type, it uses a default schema implementation.
+//
+// Note: this currently only uses the ResourceSchema (common), so tuple calculation
+// can only reference attributes from the common representation. Any tuple logic
+// that depends on reporter-specific attributes would require changes here.
+func (sc *SchemaService) CalculateTuplesForResource(ctx context.Context, current, previous *Representations, key ReporterResourceKey) (TuplesToReplicate, error) {
+	resourceType := key.ResourceType()
 
-	// Handle no-op case where workspace hasn't changed
-	if previousWorkspaceID != "" && previousWorkspaceID == currentWorkspaceID {
-		return TuplesToReplicate{}, nil
-	}
-
-	// Build tuples to create and delete
-	var tuplesToCreate, tuplesToDelete []RelationsTuple
-
-	if currentWorkspaceID != "" {
-		tuplesToCreate = append(tuplesToCreate, NewWorkspaceRelationsTuple(currentWorkspaceID, key))
+	resource, err := sc.schemaRepository.GetResourceSchema(ctx, resourceType)
+	if err != nil {
+		if errors.Is(err, ErrResourceSchemaNotFound) {
+			return NewDefaultSchema().CalculateTuples(current, previous, key)
+		}
+		return TuplesToReplicate{}, err
 	}
 
-	if previousWorkspaceID != "" {
-		tuplesToDelete = append(tuplesToDelete, NewWorkspaceRelationsTuple(previousWorkspaceID, key))
+	return resource.Schema().CalculateTuples(current, previous, key)
+}
+
+// ValidateReportAgainstSchema validates that a resource report conforms to the configured schemas.
+// It checks that the reporter is allowed for the resource type, and validates both
+// reporter and common representations against their respective schemas.
+func (sc *SchemaService) ValidateReportAgainstSchema(ctx context.Context, resourceType ResourceType, reporterType ReporterType, commonRepresentation, reporterRepresentation *Representation) error {
+	if isReporter, err := sc.IsReporterForResource(ctx, resourceType, reporterType); !isReporter {
+		if err != nil {
+			return err
+		}
+		return fmt.Errorf("reporter %s does not report resource types: %s", reporterType, resourceType)
 	}
 
-	return NewTuplesToReplicate(tuplesToCreate, tuplesToDelete)
+	if reporterRepresentation != nil {
+		if err := sc.ReporterShallowValidate(ctx, resourceType, reporterType, *reporterRepresentation); err != nil {
+			return err
+		}
+	}
+
+	if commonRepresentation != nil {
+		if err := sc.CommonShallowValidate(ctx, resourceType, *commonRepresentation); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // IsReporterForResource validates the resourceType and reporterType combination is valid.
@@ -69,22 +85,22 @@ func (sc *SchemaService) IsReporterForResource(ctx context.Context, resourceType
 }
 
 // CommonShallowValidate validates the common representation for a given resourceType.
-func (sc *SchemaService) CommonShallowValidate(ctx context.Context, resourceType ResourceType, commonRepresentation map[string]interface{}) error {
+func (sc *SchemaService) CommonShallowValidate(ctx context.Context, resourceType ResourceType, commonRepresentation Representation) error {
 	resource, err := sc.schemaRepository.GetResourceSchema(ctx, resourceType)
 	if err != nil {
 		return fmt.Errorf("failed to load common representation schema for '%s': %w", resourceType, err)
 	}
 
-	if resource.ValidationSchema() == nil {
+	if resource.Schema() == nil {
 		return fmt.Errorf("no schema found for '%s'", resourceType)
 	}
 
 	hasCommonRepresentationData := len(commonRepresentation) > 0
 	if !hasCommonRepresentationData {
-		commonRepresentation = map[string]interface{}{}
+		commonRepresentation = NewEmptyRepresentation()
 	}
 
-	_, err = resource.ValidationSchema().Validate(commonRepresentation)
+	_, err = resource.Schema().Validate(commonRepresentation)
 	if err != nil {
 		if hasCommonRepresentationData {
 			return err
@@ -96,14 +112,14 @@ func (sc *SchemaService) CommonShallowValidate(ctx context.Context, resourceType
 }
 
 // ReporterShallowValidate validates the specific reporter representation for a given resourceType/reporterType.
-func (sc *SchemaService) ReporterShallowValidate(ctx context.Context, resourceType ResourceType, reporterType ReporterType, reporterRepresentation map[string]interface{}) error {
+func (sc *SchemaService) ReporterShallowValidate(ctx context.Context, resourceType ResourceType, reporterType ReporterType, reporterRepresentation Representation) error {
 	reporter, err := sc.schemaRepository.GetReporterSchema(ctx, resourceType, reporterType)
 	if err != nil {
 		return err
 	}
 
 	// Case 1: No schema found for resourceType:reporterType
-	if reporter.ValidationSchema() == nil {
+	if reporter.Schema() == nil {
 		if len(reporterRepresentation) > 0 {
 			return fmt.Errorf("no schema found for '%s:%s', but reporter representation was provided. Submission is not allowed", resourceType, reporterType)
 		}
@@ -113,10 +129,10 @@ func (sc *SchemaService) ReporterShallowValidate(ctx context.Context, resourceTy
 
 	hasReporterRepresentationData := len(reporterRepresentation) > 0
 	if !hasReporterRepresentationData {
-		reporterRepresentation = map[string]interface{}{}
+		reporterRepresentation = NewEmptyRepresentation()
 	}
 
-	_, err = reporter.ValidationSchema().Validate(reporterRepresentation)
+	_, err = reporter.Schema().Validate(reporterRepresentation)
 	if err != nil {
 		if hasReporterRepresentationData {
 			return err

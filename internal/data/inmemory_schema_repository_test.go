@@ -30,7 +30,7 @@ func TestInMemorySchemaRepository_CreateResource(t *testing.T) {
 	retrieved, err := repo.GetResourceSchema(ctx, resourceType)
 	assert.NoError(t, err)
 	assert.Equal(t, resourceType, retrieved.ResourceType())
-	assert.Equal(t, validateSchemaTypeObject, retrieved.ValidationSchema())
+	assert.Equal(t, validateSchemaTypeObject, retrieved.Schema())
 }
 
 func TestInMemorySchemaRepository_CreateResource_AlreadyExists(t *testing.T) {
@@ -87,7 +87,7 @@ func TestInMemorySchemaRepository_GetResource(t *testing.T) {
 			retrieved, err := repo.GetResourceSchema(ctx, lookupType)
 			assert.NoError(t, err)
 			assert.Equal(t, expectedType, retrieved.ResourceType())
-			assert.Equal(t, validateSchemaTypeObject, retrieved.ValidationSchema())
+			assert.Equal(t, validateSchemaTypeObject, retrieved.Schema())
 		})
 	}
 }
@@ -125,7 +125,7 @@ func TestInMemorySchemaRepository_UpdateResource(t *testing.T) {
 	// Verify update
 	retrieved, err := repo.GetResourceSchema(ctx, resourceType)
 	assert.NoError(t, err)
-	assert.Equal(t, updatedSchema, retrieved.ValidationSchema())
+	assert.Equal(t, updatedSchema, retrieved.Schema())
 }
 
 func TestInMemorySchemaRepository_UpdateResource_NotFound(t *testing.T) {
@@ -229,7 +229,7 @@ func TestInMemorySchemaRepository_CreateResourceReporter(t *testing.T) {
 			require.NoError(t, err)
 			assert.Equal(t, resourceType, retrieved.ResourceType())
 			assert.Equal(t, expectedRep, retrieved.ReporterType())
-			assert.Equal(t, reporterValidation, retrieved.ValidationSchema())
+			assert.Equal(t, reporterValidation, retrieved.Schema())
 		})
 	}
 }
@@ -282,7 +282,7 @@ func TestInMemorySchemaRepository_UpdateResourceReporter(t *testing.T) {
 	// Verify update
 	retrieved, err := repo.GetReporterSchema(ctx, resourceType, repHbi)
 	assert.NoError(t, err)
-	assert.Equal(t, updatedSchema, retrieved.ValidationSchema())
+	assert.Equal(t, updatedSchema, retrieved.Schema())
 }
 
 func TestInMemorySchemaRepository_DeleteResourceReporter(t *testing.T) {
@@ -393,14 +393,14 @@ func TestNewFromDir_ValidDirectory(t *testing.T) {
 	resource, err := repo.GetResourceSchema(ctx, rtHost)
 	assert.NoError(t, err)
 	assert.Equal(t, rtHost, resource.ResourceType())
-	assert.Equal(t, NewJsonSchemaWithWorkspacesFromString(commonSchema), resource.ValidationSchema())
+	assert.Equal(t, NewJsonSchemaWithWorkspacesFromString(commonSchema), resource.Schema())
 
 	// Verify reporter was loaded
 	reporter, err := repo.GetReporterSchema(ctx, rtHost, repHbi)
 	assert.NoError(t, err)
 	assert.Equal(t, rtHost, reporter.ResourceType())
 	assert.Equal(t, repHbi, reporter.ReporterType())
-	assert.Equal(t, NewJsonSchemaWithWorkspacesFromString(reporterSchema), reporter.ValidationSchema())
+	assert.Equal(t, NewJsonSchemaWithWorkspacesFromString(reporterSchema), reporter.Schema())
 }
 
 func TestNewFromJsonFile_InvalidFile(t *testing.T) {

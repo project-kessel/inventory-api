@@ -2,6 +2,8 @@
 
 ## Docs Index
 
+**All guidelines in this file and the linked docs are mandatory, not recommendations.** Agents MUST read the relevant guideline doc before making changes in that area and MUST follow every rule. Failure to read is not an excuse for non-compliance.
+
 The following domain-specific guidelines provide detailed, repo-specific conventions for AI agents working in this codebase:
 
 - [Security Guidelines](docs/security-guidelines.md) - Authentication, authorization, TLS, input validation, and security patterns
@@ -44,6 +46,8 @@ Each tiny type gets:
 See `common.go` for the full pattern and generic helpers.
 
 **Struct value objects**: Use unexported fields, a `New*` constructor, and minimal getters. Each struct type gets its own file for a flat view of the domain (e.g., `relationship.go`, `fencing_check.go`). Tightly coupled types may share a file.
+
+**Domain services** (e.g., `SchemaService`): Stateless domain services that orchestrate logic over injected repositories can be constructed inside a usecase's `New` function from already-injected dependencies. There is no need to inject them pre-built -- they have no lifecycle, configuration, or external connections of their own. If a domain service ever gains its own dependencies (caching, external API calls, etc.), promote it to a directly injected parameter.
 
 - **Use meaningful variable names** -- `resourceType`, `reporterType`, `reporterInstanceId`, not cryptic abbreviations like `rt`, `rpt`, `ri`.
 - **All domain types must use unexported fields** initialized through constructor functions (`New*`).

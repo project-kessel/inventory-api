@@ -3,7 +3,9 @@ package data
 import (
 	"testing"
 
+	"github.com/project-kessel/inventory-api/internal/biz/model"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestJsonSchemaWithWorkspaces_Validate(t *testing.T) {
@@ -52,4 +54,86 @@ func TestJsonSchemaWithWorkspaces_Validate(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestJsonSchemaWithWorkspaces_CalculateTuples(t *testing.T) {
+	schema := NewJsonSchemaWithWorkspacesFromString(`{"type": "object"}`)
+
+	resourceType, err := model.NewResourceType("host")
+	require.NoError(t, err)
+	reporterType, err := model.NewReporterType("hbi")
+	require.NoError(t, err)
+	reporterInstanceId, err := model.NewReporterInstanceId("test-instance")
+	require.NoError(t, err)
+	key, err := model.NewReporterResourceKey(
+		model.LocalResourceId("test-resource"),
+		resourceType, reporterType, reporterInstanceId,
+	)
+	require.NoError(t, err)
+
+	t.Run("new workspace creates tuple", func(t *testing.T) {
+		currentVersion := model.NewVersion(0)
+		current, err := model.NewRepresentations(
+			model.Representation(map[string]interface{}{"workspace_id": "ws-1"}),
+			&currentVersion, nil, nil,
+		)
+		require.NoError(t, err)
+
+		result, err := schema.CalculateTuples(current, nil, key)
+		require.NoError(t, err)
+		assert.True(t, result.HasTuplesToCreate())
+		assert.False(t, result.HasTuplesToDelete())
+
+		require.Len(t, *result.TuplesToCreate(), 1)
+		assert.Equal(t, model.NewWorkspaceRelationsTuple("ws-1", key), (*result.TuplesToCreate())[0])
+	})
+
+	t.Run("workspace change creates and deletes", func(t *testing.T) {
+		currentVersion := model.NewVersion(1)
+		current, err := model.NewRepresentations(
+			model.Representation(map[string]interface{}{"workspace_id": "ws-new"}),
+			&currentVersion, nil, nil,
+		)
+		require.NoError(t, err)
+
+		previousVersion := currentVersion.Decrement()
+		previous, err := model.NewRepresentations(
+			model.Representation(map[string]interface{}{"workspace_id": "ws-old"}),
+			&previousVersion, nil, nil,
+		)
+		require.NoError(t, err)
+
+		result, err := schema.CalculateTuples(current, previous, key)
+		require.NoError(t, err)
+		assert.True(t, result.HasTuplesToCreate())
+		assert.True(t, result.HasTuplesToDelete())
+
+		require.Len(t, *result.TuplesToCreate(), 1)
+		assert.Equal(t, model.NewWorkspaceRelationsTuple("ws-new", key), (*result.TuplesToCreate())[0])
+		require.Len(t, *result.TuplesToDelete(), 1)
+		assert.Equal(t, model.NewWorkspaceRelationsTuple("ws-old", key), (*result.TuplesToDelete())[0])
+	})
+
+	t.Run("same workspace is no-op", func(t *testing.T) {
+		currentVersion := model.NewVersion(1)
+		current, err := model.NewRepresentations(
+			model.Representation(map[string]interface{}{"workspace_id": "ws-same"}),
+			&currentVersion, nil, nil,
+		)
+		require.NoError(t, err)
+
+		previousVersion := currentVersion.Decrement()
+		previous, err := model.NewRepresentations(
+			model.Representation(map[string]interface{}{"workspace_id": "ws-same"}),
+			&previousVersion, nil, nil,
+		)
+		require.NoError(t, err)
+
+		result, err := schema.CalculateTuples(current, previous, key)
+		require.NoError(t, err)
+		assert.False(t, result.HasTuplesToCreate())
+		assert.False(t, result.HasTuplesToDelete())
+		assert.Nil(t, result.TuplesToCreate())
+		assert.Nil(t, result.TuplesToDelete())
+	})
 }

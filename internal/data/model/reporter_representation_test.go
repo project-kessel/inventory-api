@@ -142,7 +142,7 @@ func TestReporterRepresentation_Structure(t *testing.T) {
 			}
 
 			// Check if it's a pointer type
-			if field.Type.Kind() != reflect.Ptr {
+			if field.Type.Kind() != reflect.Pointer {
 				t.Errorf("Field %s should be a pointer type for nullable field", fieldName)
 			}
 

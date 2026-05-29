@@ -72,9 +72,9 @@ type InventoryConsumer struct {
 	// to coordinate with rebalance callback
 	shutdownInProgress bool
 
-	lockToken          model.LockToken
-	lockId             model.LockId
-	ResourceRepository model.ResourceRepository
+	lockToken model.LockToken
+	lockId    model.LockId
+	Store     model.Store
 }
 
 // New instantiates a new InventoryConsumer
@@ -118,9 +118,12 @@ func New(config CompletedConfig, db *gorm.DB, schemaRepository model.SchemaRepos
 
 	var errChan chan error
 
-	maxSerializationRetries := viper.GetInt("storage.max-serialization-retries")
 	outboxMode := viper.GetString("storage.outbox-mode")
-	resourceRepository := data.NewResourceRepository(db, data.NewGormTransactionManager(&mc, maxSerializationRetries), data.SetOutboxPublisher(outboxMode))
+	store := data.NewGormResourceRepository(data.GormResourceRepositoryConfig{
+		DB:               db,
+		OutboxPublisher:  data.SetOutboxPublisher(outboxMode),
+		MetricsCollector: &mc,
+	})
 	schemaService := model.NewSchemaService(schemaRepository, logger)
 
 	return InventoryConsumer{
@@ -128,7 +131,7 @@ func New(config CompletedConfig, db *gorm.DB, schemaRepository model.SchemaRepos
 		OffsetStorage:      make([]kafka.TopicPartition, 0),
 		Config:             config,
 		DB:                 db,
-		ResourceRepository: resourceRepository,
+		Store:              store,
 		Relations:          relations,
 		Errors:             errChan,
 		MetricsCollector:   &mc,
@@ -298,7 +301,9 @@ func (i *InventoryConsumer) ProcessMessage(headers map[string]string, relationsE
 		if relationsEnabled {
 			return i.processRelationsOperation(operation, txid, msg, operationConfig{
 				fetchRepresentations: func(i *InventoryConsumer, key model.ReporterResourceKey, version *model.Version) (*model.Representations, *model.Representations, error) {
-					return i.ResourceRepository.FindCurrentAndPreviousVersionedRepresentations(nil, key, version, model.OperationTypeCreated)
+					return i.readOnlyRepoCall(func(repo model.ResourceRepository) (*model.Representations, *model.Representations, error) {
+						return repo.FindCurrentAndPreviousVersionedRepresentations(key, version, model.OperationTypeCreated)
+					})
 				},
 				executeSpiceDB: func(i *InventoryConsumer, tuples model.TuplesToReplicate) (string, error) {
 					return i.CreateTuple(context.Background(), tuples.TuplesToCreate())
@@ -311,7 +316,9 @@ func (i *InventoryConsumer) ProcessMessage(headers map[string]string, relationsE
 		if relationsEnabled {
 			return i.processRelationsOperation(operation, txid, msg, operationConfig{
 				fetchRepresentations: func(i *InventoryConsumer, key model.ReporterResourceKey, version *model.Version) (*model.Representations, *model.Representations, error) {
-					return i.ResourceRepository.FindCurrentAndPreviousVersionedRepresentations(nil, key, version, model.OperationTypeUpdated)
+					return i.readOnlyRepoCall(func(repo model.ResourceRepository) (*model.Representations, *model.Representations, error) {
+						return repo.FindCurrentAndPreviousVersionedRepresentations(key, version, model.OperationTypeUpdated)
+					})
 				},
 				executeSpiceDB: func(i *InventoryConsumer, tuples model.TuplesToReplicate) (string, error) {
 					return i.UpdateTuple(context.Background(), tuples.TuplesToCreate(), tuples.TuplesToDelete())
@@ -323,8 +330,10 @@ func (i *InventoryConsumer) ProcessMessage(headers map[string]string, relationsE
 		if relationsEnabled {
 			return i.processRelationsOperation(operation, txid, msg, operationConfig{
 				fetchRepresentations: func(i *InventoryConsumer, key model.ReporterResourceKey, version *model.Version) (*model.Representations, *model.Representations, error) {
-					previous, err := i.ResourceRepository.FindLatestRepresentations(nil, key)
-					return nil, previous, err
+					return i.readOnlyRepoCall(func(repo model.ResourceRepository) (*model.Representations, *model.Representations, error) {
+						previous, err := repo.FindLatestRepresentations(key)
+						return nil, previous, err
+					})
 				},
 				executeSpiceDB: func(i *InventoryConsumer, tuples model.TuplesToReplicate) (string, error) {
 					_, err := i.DeleteTuple(context.Background(), *tuples.TuplesToDelete())
@@ -615,6 +624,17 @@ func tupleToFilter(tuple model.RelationsTuple) model.TupleFilter {
 		}
 	}
 	return filter
+}
+
+// readOnlyRepoCall opens a short-lived read-only transaction, invokes fn with
+// the scoped ResourceRepository, and rolls back (never commits).
+func (i *InventoryConsumer) readOnlyRepoCall(fn func(repo model.ResourceRepository) (*model.Representations, *model.Representations, error)) (*model.Representations, *model.Representations, error) {
+	tx, err := i.Store.Begin()
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to begin read-only transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+	return fn(tx.ResourceRepository())
 }
 
 // updateConsistencyTokenIfPresent updates the consistency token in the DB only if the token is non-empty.

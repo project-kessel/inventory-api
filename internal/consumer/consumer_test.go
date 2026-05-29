@@ -121,9 +121,15 @@ func (t *TestCase) TestSetup(testingT *testing.T) []error {
 		return errs
 	}
 
-	// Replace the repository with one using a no-op outbox publisher for SQLite compatibility
+	// Replace the store with one using a no-op outbox publisher for SQLite compatibility
 	noopPublisher := data.OutboxPublisher(func(_ *gorm.DB, _ *model_legacy.OutboxEvent) error { return nil })
-	t.inv.ResourceRepository = data.NewResourceRepository(db, data.NewGormTransactionManager(t.inv.MetricsCollector, 3), noopPublisher)
+	mc := metricscollector.NewFakeMetricsCollector()
+	t.inv.Store = data.NewGormResourceRepository(data.GormResourceRepositoryConfig{
+		DB:                      db,
+		OutboxPublisher:         noopPublisher,
+		MetricsCollector:        mc,
+		MaxSerializationRetries: 3,
+	})
 
 	t.inv.SchemaService = model.NewSchemaService(schemaRepository, t.logger)
 
@@ -316,7 +322,7 @@ func TestInventoryConsumer_ProcessMessage(t *testing.T) {
 		expectedTxid      string
 		msg               *kafka.Message
 		relationsEnabled  bool
-		setupData         func(t *testing.T, repo model.ResourceRepository, db *gorm.DB)
+		setupData         func(t *testing.T, store model.Store)
 	}{
 		{
 			name:              "Create Operation",
@@ -327,11 +333,16 @@ func TestInventoryConsumer_ProcessMessage(t *testing.T) {
 				Value: []byte(testCreateMessage),
 			},
 			relationsEnabled: true,
-			setupData: func(t *testing.T, repo model.ResourceRepository, db *gorm.DB) {
+			setupData: func(t *testing.T, store model.Store) {
+				tx, err := store.Begin()
+				require.NoError(t, err)
+				defer func() { _ = tx.Rollback() }()
+				repo := tx.ResourceRepository()
 				testData, err := model.NewResourceFixture("test-resource-4321", "integration", "notifications", "test-instance-1", "test-workspace-v0")
 				require.NoError(t, err)
-				err = repo.Save(db, *testData.Resource, model.OperationTypeCreated, testData.InitialTransactionId)
+				err = repo.Save(*testData.Resource, model.OperationTypeCreated, testData.InitialTransactionId)
 				require.NoError(t, err)
+				require.NoError(t, tx.Commit())
 			},
 		},
 		{
@@ -343,10 +354,14 @@ func TestInventoryConsumer_ProcessMessage(t *testing.T) {
 				Value: []byte(testUpdateMessage),
 			},
 			relationsEnabled: true,
-			setupData: func(t *testing.T, repo model.ResourceRepository, db *gorm.DB) {
+			setupData: func(t *testing.T, store model.Store) {
+				tx, err := store.Begin()
+				require.NoError(t, err)
+				defer func() { _ = tx.Rollback() }()
+				repo := tx.ResourceRepository()
 				testData, err := model.NewResourceFixture("test-resource-4321", "integration", "notifications", "test-instance-1", "test-workspace-v0")
 				require.NoError(t, err)
-				err = repo.Save(db, *testData.Resource, model.OperationTypeCreated, testData.InitialTransactionId)
+				err = repo.Save(*testData.Resource, model.OperationTypeCreated, testData.InitialTransactionId)
 				require.NoError(t, err)
 
 				updatedCommon, err := model.NewRepresentation(map[string]interface{}{"workspace_id": "test-workspace-v1"})
@@ -354,8 +369,9 @@ func TestInventoryConsumer_ProcessMessage(t *testing.T) {
 				txId := model.TransactionId("tx-v1")
 				err = testData.Resource.Update(testData.Key, testData.ApiHref, &testData.ConsoleHref, nil, &testData.ReporterRepresentation, &updatedCommon, txId)
 				require.NoError(t, err)
-				err = repo.Save(db, *testData.Resource, model.OperationTypeUpdated, model.NewTransactionId("tx-v1"))
+				err = repo.Save(*testData.Resource, model.OperationTypeUpdated, model.NewTransactionId("tx-v1"))
 				require.NoError(t, err)
+				require.NoError(t, tx.Commit())
 			},
 		},
 		{
@@ -367,10 +383,14 @@ func TestInventoryConsumer_ProcessMessage(t *testing.T) {
 				Value: []byte(testDeleteMessage),
 			},
 			relationsEnabled: true,
-			setupData: func(t *testing.T, repo model.ResourceRepository, db *gorm.DB) {
+			setupData: func(t *testing.T, store model.Store) {
+				tx, err := store.Begin()
+				require.NoError(t, err)
+				defer func() { _ = tx.Rollback() }()
+				repo := tx.ResourceRepository()
 				testData, err := model.NewResourceFixture("test-resource-4321", "integration", "notifications", "test-instance-1", "test-workspace-v0")
 				require.NoError(t, err)
-				err = repo.Save(db, *testData.Resource, model.OperationTypeCreated, testData.InitialTransactionId)
+				err = repo.Save(*testData.Resource, model.OperationTypeCreated, testData.InitialTransactionId)
 				require.NoError(t, err)
 
 				updatedCommon, err := model.NewRepresentation(map[string]interface{}{"workspace_id": "test-workspace-v1"})
@@ -378,8 +398,9 @@ func TestInventoryConsumer_ProcessMessage(t *testing.T) {
 				txId := model.TransactionId("tx-v1")
 				err = testData.Resource.Update(testData.Key, testData.ApiHref, &testData.ConsoleHref, nil, &testData.ReporterRepresentation, &updatedCommon, txId)
 				require.NoError(t, err)
-				err = repo.Save(db, *testData.Resource, model.OperationTypeUpdated, model.NewTransactionId("tx-v1"))
+				err = repo.Save(*testData.Resource, model.OperationTypeUpdated, model.NewTransactionId("tx-v1"))
 				require.NoError(t, err)
+				require.NoError(t, tx.Commit())
 			},
 		},
 		{
@@ -405,7 +426,7 @@ func TestInventoryConsumer_ProcessMessage(t *testing.T) {
 			assert.Nil(t, errs)
 
 			if test.setupData != nil {
-				test.setupData(t, tester.inv.ResourceRepository, tester.inv.DB)
+				test.setupData(t, tester.inv.Store)
 			}
 
 			headers := []kafka.Header{
@@ -940,8 +961,12 @@ func TestInventoryConsumer_UpdateWithSameWorkspace_NoOp(t *testing.T) {
 	testData, err := model.NewResourceFixture("test-resource-4321", "integration", "notifications", "test-instance-1", sameWorkspace)
 	require.NoError(t, err)
 
-	fakeRepo := data.NewFakeResourceRepository()
-	require.NoError(t, fakeRepo.Save(nil, *testData.Resource, model.OperationTypeCreated, testData.InitialTransactionId))
+	fakeStore := data.NewFakeResourceRepository()
+	setupTx, err := fakeStore.Begin()
+	require.NoError(t, err)
+	defer func() { _ = setupTx.Rollback() }()
+	fakeRepo := setupTx.ResourceRepository()
+	require.NoError(t, fakeRepo.Save(*testData.Resource, model.OperationTypeCreated, testData.InitialTransactionId))
 
 	txId := model.TransactionId("tx-update")
 	err = testData.Resource.Update(
@@ -955,9 +980,10 @@ func TestInventoryConsumer_UpdateWithSameWorkspace_NoOp(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	require.NoError(t, fakeRepo.Save(nil, *testData.Resource, model.OperationTypeUpdated, model.NewTransactionId("tx-update")))
+	require.NoError(t, fakeRepo.Save(*testData.Resource, model.OperationTypeUpdated, model.NewTransactionId("tx-update")))
+	require.NoError(t, setupTx.Commit())
 
-	tester.inv.ResourceRepository = fakeRepo
+	tester.inv.Store = fakeStore
 
 	// Use SimpleRelationsRepository to verify no operations occur
 	relationsRepo := data.NewSimpleRelationsRepository()

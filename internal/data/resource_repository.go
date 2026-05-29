@@ -60,7 +60,6 @@ func ToSnapshotsFromResults(results []FindResourceByKeysResult) (*bizmodel.Resou
 }
 
 func (result FindResourceByKeysResult) ToSnapshots() (bizmodel.ResourceSnapshot, bizmodel.ReporterResourceSnapshot) {
-	// Create ResourceSnapshot
 	resourceSnapshot := bizmodel.ResourceSnapshot{
 		ID:                result.ResourceID,
 		Type:              result.ResourceType,
@@ -71,7 +70,6 @@ func (result FindResourceByKeysResult) ToSnapshots() (bizmodel.ResourceSnapshot,
 		UpdatedAt:         result.UpdatedAt,
 	}
 
-	// Create ReporterResourceKeySnapshot
 	keySnapshot := bizmodel.ReporterResourceKeySnapshot{
 		LocalResourceID:    result.LocalResourceID,
 		ReporterType:       result.ReporterType,
@@ -95,42 +93,27 @@ func (result FindResourceByKeysResult) ToSnapshots() (bizmodel.ResourceSnapshot,
 	return resourceSnapshot, reporterResourceSnapshot
 }
 
-type resourceRepository struct {
-	db                 *gorm.DB
-	transactionManager bizmodel.TransactionManager
-	outboxPublisher    OutboxPublisher
-}
+// --- Package-level functions that encapsulate the core DB operations. ---
+// These are called by both the txResourceRepository (Store/Tx pattern)
+// and the consumer's direct repository usage.
 
-func NewResourceRepository(db *gorm.DB, transactionManager bizmodel.TransactionManager, outboxPublisher OutboxPublisher) bizmodel.ResourceRepository {
-	if outboxPublisher == nil {
-		outboxPublisher = publishOutboxEvent
-	}
-	return &resourceRepository{
-		db:                 db,
-		transactionManager: transactionManager,
-		outboxPublisher:    outboxPublisher,
-	}
-}
-
-func (r *resourceRepository) NextResourceId() (bizmodel.ResourceId, error) {
+func nextResourceId() (bizmodel.ResourceId, error) {
 	uuidV7, err := uuid.NewV7()
 	if err != nil {
 		return bizmodel.ResourceId{}, err
 	}
-
 	return bizmodel.NewResourceId(uuidV7)
 }
 
-func (r *resourceRepository) NextReporterResourceId() (bizmodel.ReporterResourceId, error) {
+func nextReporterResourceId() (bizmodel.ReporterResourceId, error) {
 	uuidV7, err := uuid.NewV7()
 	if err != nil {
 		return bizmodel.ReporterResourceId{}, err
 	}
-
 	return bizmodel.NewReporterResourceId(uuidV7)
 }
 
-func (r *resourceRepository) Save(tx *gorm.DB, resource bizmodel.Resource, operationType bizmodel.EventOperationType, txid bizmodel.TransactionId) error {
+func saveResource(tx *gorm.DB, outboxPublisher OutboxPublisher, resource bizmodel.Resource, operationType bizmodel.EventOperationType, txid bizmodel.TransactionId) error {
 	resourceSnapshot, reporterResourceSnapshot, reporterRepresentationSnapshot, commonRepresentationSnapshot, err := resource.Serialize()
 	if err != nil {
 		return fmt.Errorf("failed to serialize resource: %w", err)
@@ -173,32 +156,31 @@ func (r *resourceRepository) Save(tx *gorm.DB, resource bizmodel.Resource, opera
 		deleteEvents := resource.ResourceDeleteEvents()
 		log.Infof("DeleteEvents to publish to outbox : %+v", deleteEvents)
 		if len(deleteEvents) == 0 {
-			// No delete events to process (e.g., resource was already tombstoned)
 			return nil
 		}
 		resourceEvent = deleteEvents[0]
 	default:
 		resourceEvent = resource.ResourceReportEvents()[0]
 	}
-	if err := r.handleOutboxEvents(tx, resourceEvent, operationType, txid); err != nil {
+	if err := handleOutboxEvents(tx, outboxPublisher, resourceEvent, operationType, txid); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func (r *resourceRepository) handleOutboxEvents(tx *gorm.DB, resourceEvent bizmodel.ResourceEvent, operationType bizmodel.EventOperationType, txid bizmodel.TransactionId) error {
+func handleOutboxEvents(tx *gorm.DB, outboxPublisher OutboxPublisher, resourceEvent bizmodel.ResourceEvent, operationType bizmodel.EventOperationType, txid bizmodel.TransactionId) error {
 	resourceMessage, tupleMessage, err := model_legacy.NewOutboxEventsFromResourceEvent(resourceEvent, operationType, txid)
 	if err != nil {
 		return err
 	}
 
-	err = r.outboxPublisher(tx, resourceMessage)
+	err = outboxPublisher(tx, resourceMessage)
 	if err != nil {
 		return err
 	}
 
-	err = r.outboxPublisher(tx, tupleMessage)
+	err = outboxPublisher(tx, tupleMessage)
 	if err != nil {
 		return err
 	}
@@ -206,14 +188,7 @@ func (r *resourceRepository) handleOutboxEvents(tx *gorm.DB, resourceEvent bizmo
 	return nil
 }
 
-func (r *resourceRepository) getDBSession(tx *gorm.DB) *gorm.DB {
-	if tx == nil {
-		return r.db.Session(&gorm.Session{})
-	}
-	return tx
-}
-
-func (r *resourceRepository) buildReporterResourceKeyQuery(db *gorm.DB, key bizmodel.ReporterResourceKey) *gorm.DB {
+func buildReporterResourceKeyQuery(db *gorm.DB, key bizmodel.ReporterResourceKey) *gorm.DB {
 	query := db.
 		Where("rr.local_resource_id = ?", key.LocalResourceId().Serialize()).
 		Where("rr.resource_type = ?", key.ResourceType().Serialize()).
@@ -226,12 +201,10 @@ func (r *resourceRepository) buildReporterResourceKeyQuery(db *gorm.DB, key bizm
 	return query
 }
 
-func (r *resourceRepository) FindResourceByKeys(tx *gorm.DB, key bizmodel.ReporterResourceKey) (*bizmodel.Resource, error) {
+func findResourceByKeys(tx *gorm.DB, key bizmodel.ReporterResourceKey) (*bizmodel.Resource, error) {
 	var results []FindResourceByKeysResult
 
-	db := r.getDBSession(tx)
-
-	query := db.Table("reporter_resources AS rr").
+	query := tx.Table("reporter_resources AS rr").
 		Select(`
 		rr2.id AS reporter_resource_id,
 		rr2.representation_version,
@@ -260,7 +233,7 @@ func (r *resourceRepository) FindResourceByKeys(tx *gorm.DB, key bizmodel.Report
 	// This ensures results[0] (used as the primary resource snapshot) is the same
 	// "latest" row the fake selects. We do not LIMIT 1 here because all rr2 rows
 	// are intentionally collected as reporter resource snapshots.
-	err := r.buildReporterResourceKeyQuery(query, key).
+	err := buildReporterResourceKeyQuery(query, key).
 		Order("rr2.tombstone ASC, rr2.representation_version DESC, rr2.generation DESC").
 		Find(&results).Error
 
@@ -269,7 +242,7 @@ func (r *resourceRepository) FindResourceByKeys(tx *gorm.DB, key bizmodel.Report
 	}
 
 	if len(results) == 0 {
-		return nil, gorm.ErrRecordNotFound
+		return nil, bizmodel.ErrResourceNotFound
 	}
 
 	resourceSnapshot, reporterResourceSnapshots := ToSnapshotsFromResults(results)
@@ -278,15 +251,7 @@ func (r *resourceRepository) FindResourceByKeys(tx *gorm.DB, key bizmodel.Report
 	return resource, nil
 }
 
-func (r *resourceRepository) GetDB() *gorm.DB {
-	return r.db
-}
-
-func (r *resourceRepository) GetTransactionManager() bizmodel.TransactionManager {
-	return r.transactionManager
-}
-
-func (r *resourceRepository) FindCurrentAndPreviousVersionedRepresentations(tx *gorm.DB, key bizmodel.ReporterResourceKey, currentCommonVersion *bizmodel.Version, operationType bizmodel.EventOperationType) (*bizmodel.Representations, *bizmodel.Representations, error) {
+func findCurrentAndPreviousVersionedRepresentations(tx *gorm.DB, key bizmodel.ReporterResourceKey, currentCommonVersion *bizmodel.Version, operationType bizmodel.EventOperationType) (*bizmodel.Representations, *bizmodel.Representations, error) {
 	if currentCommonVersion == nil {
 		return nil, nil, nil
 	}
@@ -302,13 +267,11 @@ func (r *resourceRepository) FindCurrentAndPreviousVersionedRepresentations(tx *
 
 	var results []commonRepresentationRow
 
-	db := r.getDBSession(tx)
-
-	query := db.Table("reporter_resources rr").
+	query := tx.Table("reporter_resources rr").
 		Select("cr.data, cr.version, cr.resource_id, cr.reported_by_reporter_type, cr.reported_by_reporter_instance, cr.transaction_id").
 		Joins("JOIN common_representations cr ON rr.resource_id = cr.resource_id")
 
-	query = r.buildReporterResourceKeyQuery(query, key)
+	query = buildReporterResourceKeyQuery(query, key)
 
 	cv := currentCommonVersion.Uint()
 	if operationType.OperationType() == bizmodel.OperationTypeCreated {
@@ -340,19 +303,17 @@ func (r *resourceRepository) FindCurrentAndPreviousVersionedRepresentations(tx *
 	return current, previous, nil
 }
 
-func (r *resourceRepository) FindLatestRepresentations(tx *gorm.DB, key bizmodel.ReporterResourceKey) (*bizmodel.Representations, error) {
+func findLatestRepresentations(tx *gorm.DB, key bizmodel.ReporterResourceKey) (*bizmodel.Representations, error) {
 	var result struct {
 		Data    internal.JsonObject
 		Version uint
 	}
 
-	db := r.getDBSession(tx)
-
-	query := db.Table("reporter_resources rr").
+	query := tx.Table("reporter_resources rr").
 		Select("cr.data, cr.version").
 		Joins("JOIN common_representations cr ON rr.resource_id = cr.resource_id")
 
-	query = r.buildReporterResourceKeyQuery(query, key)
+	query = buildReporterResourceKeyQuery(query, key)
 
 	err := query.Order("cr.version DESC").Limit(1).Scan(&result).Error
 	if err != nil {
@@ -372,10 +333,7 @@ func (r *resourceRepository) FindLatestRepresentations(tx *gorm.DB, key bizmodel
 	return rep, nil
 }
 
-// HasTransactionIdBeenProcessed checks if a transaction ID exists in either the
-// reporter_representations or common_representations tables.
-// Returns true if the transaction has already been processed, false otherwise.
-func (r *resourceRepository) HasTransactionIdBeenProcessed(tx *gorm.DB, transactionId bizmodel.TransactionId) (bool, error) {
+func hasTransactionIdBeenProcessed(tx *gorm.DB, transactionId bizmodel.TransactionId) (bool, error) {
 	tid := transactionId.String()
 	var exists bool
 	err := tx.Raw(`

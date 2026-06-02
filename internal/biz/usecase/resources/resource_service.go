@@ -132,19 +132,19 @@ func (uc *Usecase) ReportResource(ctx context.Context, cmd ReportResourceCommand
 		defer subscription.Unsubscribe()
 	}
 
-	// Advisory duplicate-transaction-ID check. This runs inside Transact (serializable)
-	// which may acquire predicate locks on the transaction_id indexes. The unique
-	// constraint on transaction_id provides the actual correctness guarantee; this
-	// check is an optimization to avoid the heavier write transaction when possible.
+	// Advisory duplicate-transaction-ID check. Runs in a short read-only
+	// serializable transaction. The unique constraint on transaction_id provides
+	// the actual correctness guarantee; this check is an optimization to avoid
+	// the heavier write transaction when possible.
 	if uc.Config.IdempotencyCheckEnabled && cmd.TransactionId != nil {
-		var alreadyProcessed bool
-		err = uc.resourceRepository.Transact(func(tx model.ResourceTx) error {
-			var txErr error
-			alreadyProcessed, txErr = tx.HasTransactionIdBeenProcessed(*cmd.TransactionId)
-			return txErr
-		})
-		if err != nil {
-			return fmt.Errorf("failed to check transaction ID: %w", err)
+		tx, beginErr := uc.resourceRepository.Begin()
+		if beginErr != nil {
+			return fmt.Errorf("failed to begin idempotency check: %w", beginErr)
+		}
+		alreadyProcessed, checkErr := tx.HasTransactionIdBeenProcessed(*cmd.TransactionId)
+		_ = tx.Rollback()
+		if checkErr != nil {
+			return fmt.Errorf("failed to check transaction ID: %w", checkErr)
 		}
 		if alreadyProcessed {
 			log.Infof("Transaction already processed, skipping update: transaction_id=%s", cmd.TransactionId.String())
@@ -154,22 +154,7 @@ func (uc *Usecase) ReportResource(ctx context.Context, cmd ReportResourceCommand
 
 	var operationType model.EventOperationType
 	reportResource := func() error {
-		return uc.resourceRepository.Transact(func(tx model.ResourceTx) error {
-			res, err := tx.FindResourceByKeys(reporterResourceKey)
-			if err != nil && !errors.Is(err, model.ErrResourceNotFound) {
-				return fmt.Errorf("failed to lookup existing resource: %w", err)
-			}
-
-			if err == nil && res != nil {
-				log.Info("Resource already exists, updating: ")
-				operationType = model.OperationTypeUpdated
-				return uc.updateResource(tx, cmd, res, txid)
-			}
-
-			log.Info("Creating new resource")
-			operationType = model.OperationTypeCreated
-			return uc.createResource(tx, cmd, txid)
-		})
+		return uc.reportResourceWithRetry(reporterResourceKey, cmd, txid, &operationType)
 	}
 
 	err = reportResource()
@@ -265,6 +250,64 @@ func (uc *Usecase) ReportResource(ctx context.Context, cmd ReportResourceCommand
 	return nil
 }
 
+func (uc *Usecase) reportResourceWithRetry(reporterResourceKey model.ReporterResourceKey, cmd ReportResourceCommand, txid model.TransactionId, operationType *model.EventOperationType) error {
+	maxRetries := uc.resourceRepository.MaxSerializationRetries()
+	var lastErr error
+	for attempt := 0; attempt < maxRetries; attempt++ {
+		tx, err := uc.resourceRepository.Begin()
+		if err != nil {
+			return err
+		}
+
+		res, err := tx.FindResourceByKeys(reporterResourceKey)
+		if err != nil && !errors.Is(err, model.ErrResourceNotFound) {
+			_ = tx.Rollback()
+			if errors.Is(err, model.ErrSerializationFailure) {
+				lastErr = err
+				continue
+			}
+			return fmt.Errorf("failed to lookup existing resource: %w", err)
+		}
+
+		if err == nil && res != nil {
+			log.Info("Resource already exists, updating: ")
+			*operationType = model.OperationTypeUpdated
+			if err := uc.updateResource(tx, cmd, res, txid); err != nil {
+				_ = tx.Rollback()
+				if errors.Is(err, model.ErrSerializationFailure) {
+					lastErr = err
+					continue
+				}
+				return err
+			}
+		} else {
+			log.Info("Creating new resource")
+			*operationType = model.OperationTypeCreated
+			if err := uc.createResource(tx, cmd, txid); err != nil {
+				_ = tx.Rollback()
+				if errors.Is(err, model.ErrSerializationFailure) {
+					lastErr = err
+					continue
+				}
+				return err
+			}
+		}
+
+		if err := tx.Commit(); err != nil {
+			_ = tx.Rollback()
+			if errors.Is(err, model.ErrSerializationFailure) {
+				lastErr = err
+				continue
+			}
+			return err
+		}
+		return nil
+	}
+	uc.resourceRepository.RecordSerializationExhaustion()
+	log.Errorf("transaction failed after %d attempts: %v", maxRetries, lastErr)
+	return fmt.Errorf("transaction failed after %d attempts: %w", maxRetries, lastErr)
+}
+
 func (uc *Usecase) createResource(tx model.ResourceTx, cmd ReportResourceCommand, txid model.TransactionId) error {
 	resourceId, err := tx.NextResourceId()
 	if err != nil {
@@ -337,56 +380,88 @@ func (uc *Usecase) Delete(ctx context.Context, reporterResourceKey model.Reporte
 	// Get authz context for logging (guaranteed to exist after enforceMetaAuthzObject)
 	authzCtx, _ := authnapi.FromAuthzContext(ctx)
 
-	err = uc.resourceRepository.Transact(func(tx model.ResourceTx) error {
-		res, err := tx.FindResourceByKeys(reporterResourceKey)
+	maxRetries := uc.resourceRepository.MaxSerializationRetries()
+	var lastErr error
+	for attempt := 0; attempt < maxRetries; attempt++ {
+		tx, beginErr := uc.resourceRepository.Begin()
+		if beginErr != nil {
+			return beginErr
+		}
 
-		if err == nil && res != nil {
-			log.Info("Found Resource, deleting: ", res)
-			err := res.Delete(reporterResourceKey)
-			if err != nil {
-				return fmt.Errorf("failed to delete resource: %w", err)
+		res, findErr := tx.FindResourceByKeys(reporterResourceKey)
+		if findErr != nil {
+			_ = tx.Rollback()
+			if errors.Is(findErr, model.ErrSerializationFailure) {
+				lastErr = findErr
+				continue
 			}
-			return tx.Save(*res, model.OperationTypeDeleted, txid)
-		} else {
-			if errors.Is(err, model.ErrResourceNotFound) {
+			if errors.Is(findErr, model.ErrResourceNotFound) {
 				return ErrResourceNotFound
 			}
 			return ErrDatabaseError
 		}
-	})
 
-	// Extract principal for logging
-	principal := authzCtx.ExtractPrincipal()
+		log.Info("Found Resource, deleting: ", res)
+		if deleteErr := res.Delete(reporterResourceKey); deleteErr != nil {
+			_ = tx.Rollback()
+			return fmt.Errorf("failed to delete resource: %w", deleteErr)
+		}
 
-	if err != nil {
-		// DELETE operation failed - SEC-MON-REQ-1 compliance (EOI-1 pii_manipulation, EOI-11 warnings_or_errors)
-		uc.Log.Warnw("msg", "Delete resource failed",
+		if saveErr := tx.Save(*res, model.OperationTypeDeleted, txid); saveErr != nil {
+			_ = tx.Rollback()
+			if errors.Is(saveErr, model.ErrSerializationFailure) {
+				lastErr = saveErr
+				continue
+			}
+			return saveErr
+		}
+
+		if commitErr := tx.Commit(); commitErr != nil {
+			_ = tx.Rollback()
+			if errors.Is(commitErr, model.ErrSerializationFailure) {
+				lastErr = commitErr
+				continue
+			}
+			return commitErr
+		}
+
+		// Extract principal for success logging
+		principal := authzCtx.ExtractPrincipal()
+
+		// DELETE operation - SEC-MON-REQ-1 compliance (EOI-1 pii_manipulation)
+		uc.Log.Infow("msg", "Resource deleted",
 			"action", "DELETE",
 			"resource_type", reporterResourceKey.ResourceType().String(),
 			"resource_id", reporterResourceKey.LocalResourceId(),
 			"reporter_type", reporterResourceKey.ReporterType().String(),
 			"reporter_instance_id", reporterResourceKey.ReporterInstanceId().String(),
 			"principal", principal,
-			"outcome", "failure",
-			"reason", err.Error(),
+			"outcome", "success",
 		)
-		return err
+
+		// Increment outbox metrics only after successful transaction commit
+		metricscollector.Incr(uc.MetricsCollector.OutboxEventWrites, string(model.OperationTypeDeleted.OperationType()))
+		return nil
 	}
 
-	// DELETE operation - SEC-MON-REQ-1 compliance (EOI-1 pii_manipulation)
-	uc.Log.Infow("msg", "Resource deleted",
+	// Extract principal for failure logging
+	principal := authzCtx.ExtractPrincipal()
+
+	// DELETE operation failed - SEC-MON-REQ-1 compliance (EOI-1 pii_manipulation, EOI-11 warnings_or_errors)
+	uc.Log.Warnw("msg", "Delete resource failed",
 		"action", "DELETE",
 		"resource_type", reporterResourceKey.ResourceType().String(),
 		"resource_id", reporterResourceKey.LocalResourceId(),
 		"reporter_type", reporterResourceKey.ReporterType().String(),
 		"reporter_instance_id", reporterResourceKey.ReporterInstanceId().String(),
 		"principal", principal,
-		"outcome", "success",
+		"outcome", "failure",
+		"reason", lastErr.Error(),
 	)
 
-	// Increment outbox metrics only after successful transaction commit
-	metricscollector.Incr(uc.MetricsCollector.OutboxEventWrites, string(model.OperationTypeDeleted.OperationType()))
-	return nil
+	uc.resourceRepository.RecordSerializationExhaustion()
+	log.Errorf("delete transaction failed after %d attempts: %v", maxRetries, lastErr)
+	return fmt.Errorf("transaction failed after %d attempts: %w", maxRetries, lastErr)
 }
 
 // Check verifies if a subject has the specified relation/permission on a resource.
@@ -605,23 +680,27 @@ func (uc *Usecase) lookupConsistencyTokenFromDB(ctx context.Context, resourceRef
 	if err != nil {
 		return "", fmt.Errorf("failed to build reporter resource key from reference: %w", err)
 	}
-	var token string
-	err = uc.resourceRepository.Transact(func(tx model.ResourceTx) error {
-		res, txErr := tx.FindResourceByKeys(reporterResourceKey)
-		if txErr != nil {
-			if errors.Is(txErr, model.ErrResourceNotFound) {
-				uc.Log.WithContext(ctx).Warnf("Resource not found in inventory, falling back to minimize_latency for ref: %v", resourceRef)
-				return nil
-			}
-			return txErr
-		}
-		token = res.ConsistencyToken().Serialize()
-		uc.Log.WithContext(ctx).Debug("Found inventory-managed consistency token")
-		return nil
-	})
+
+	tx, err := uc.resourceRepository.Begin()
 	if err != nil {
 		return "", err
 	}
+	defer func() { _ = tx.Rollback() }()
+
+	res, err := tx.FindResourceByKeys(reporterResourceKey)
+	if err != nil {
+		if errors.Is(err, model.ErrResourceNotFound) {
+			uc.Log.WithContext(ctx).Warnf("Resource not found in inventory, falling back to minimize_latency for ref: %v", resourceRef)
+			return "", nil
+		}
+		return "", err
+	}
+
+	if err := tx.Commit(); err != nil {
+		return "", err
+	}
+	token := res.ConsistencyToken().Serialize()
+	uc.Log.WithContext(ctx).Debug("Found inventory-managed consistency token")
 	return token, nil
 }
 

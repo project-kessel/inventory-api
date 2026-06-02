@@ -335,9 +335,11 @@ func TestInventoryConsumer_ProcessMessage(t *testing.T) {
 			setupData: func(t *testing.T, repo model.ResourceRepository) {
 				testData, err := model.NewResourceFixture("test-resource-4321", "integration", "notifications", "test-instance-1", "test-workspace-v0")
 				require.NoError(t, err)
-				err = repo.Transact(func(tx model.ResourceTx) error {
-					return tx.Save(*testData.Resource, model.OperationTypeCreated, testData.InitialTransactionId)
-				})
+				tx, err := repo.Begin()
+				require.NoError(t, err)
+				err = tx.Save(*testData.Resource, model.OperationTypeCreated, testData.InitialTransactionId)
+				require.NoError(t, err)
+				err = tx.Commit()
 				require.NoError(t, err)
 			},
 		},
@@ -353,9 +355,11 @@ func TestInventoryConsumer_ProcessMessage(t *testing.T) {
 			setupData: func(t *testing.T, repo model.ResourceRepository) {
 				testData, err := model.NewResourceFixture("test-resource-4321", "integration", "notifications", "test-instance-1", "test-workspace-v0")
 				require.NoError(t, err)
-				err = repo.Transact(func(tx model.ResourceTx) error {
-					return tx.Save(*testData.Resource, model.OperationTypeCreated, testData.InitialTransactionId)
-				})
+				tx, err := repo.Begin()
+				require.NoError(t, err)
+				err = tx.Save(*testData.Resource, model.OperationTypeCreated, testData.InitialTransactionId)
+				require.NoError(t, err)
+				err = tx.Commit()
 				require.NoError(t, err)
 
 				updatedCommon, err := model.NewRepresentation(map[string]interface{}{"workspace_id": "test-workspace-v1"})
@@ -363,9 +367,11 @@ func TestInventoryConsumer_ProcessMessage(t *testing.T) {
 				txId := model.TransactionId("tx-v1")
 				err = testData.Resource.Update(testData.Key, testData.ApiHref, &testData.ConsoleHref, nil, &testData.ReporterRepresentation, &updatedCommon, txId)
 				require.NoError(t, err)
-				err = repo.Transact(func(tx model.ResourceTx) error {
-					return tx.Save(*testData.Resource, model.OperationTypeUpdated, model.NewTransactionId("tx-v1"))
-				})
+				tx, err = repo.Begin()
+				require.NoError(t, err)
+				err = tx.Save(*testData.Resource, model.OperationTypeUpdated, model.NewTransactionId("tx-v1"))
+				require.NoError(t, err)
+				err = tx.Commit()
 				require.NoError(t, err)
 			},
 		},
@@ -381,9 +387,11 @@ func TestInventoryConsumer_ProcessMessage(t *testing.T) {
 			setupData: func(t *testing.T, repo model.ResourceRepository) {
 				testData, err := model.NewResourceFixture("test-resource-4321", "integration", "notifications", "test-instance-1", "test-workspace-v0")
 				require.NoError(t, err)
-				err = repo.Transact(func(tx model.ResourceTx) error {
-					return tx.Save(*testData.Resource, model.OperationTypeCreated, testData.InitialTransactionId)
-				})
+				tx, err := repo.Begin()
+				require.NoError(t, err)
+				err = tx.Save(*testData.Resource, model.OperationTypeCreated, testData.InitialTransactionId)
+				require.NoError(t, err)
+				err = tx.Commit()
 				require.NoError(t, err)
 
 				updatedCommon, err := model.NewRepresentation(map[string]interface{}{"workspace_id": "test-workspace-v1"})
@@ -391,9 +399,11 @@ func TestInventoryConsumer_ProcessMessage(t *testing.T) {
 				txId := model.TransactionId("tx-v1")
 				err = testData.Resource.Update(testData.Key, testData.ApiHref, &testData.ConsoleHref, nil, &testData.ReporterRepresentation, &updatedCommon, txId)
 				require.NoError(t, err)
-				err = repo.Transact(func(tx model.ResourceTx) error {
-					return tx.Save(*testData.Resource, model.OperationTypeUpdated, model.NewTransactionId("tx-v1"))
-				})
+				tx, err = repo.Begin()
+				require.NoError(t, err)
+				err = tx.Save(*testData.Resource, model.OperationTypeUpdated, model.NewTransactionId("tx-v1"))
+				require.NoError(t, err)
+				err = tx.Commit()
 				require.NoError(t, err)
 			},
 		},
@@ -956,9 +966,10 @@ func TestInventoryConsumer_UpdateWithSameWorkspace_NoOp(t *testing.T) {
 	require.NoError(t, err)
 
 	fakeRepo := data.NewFakeResourceRepository()
-	require.NoError(t, fakeRepo.Transact(func(tx model.ResourceTx) error {
-		return tx.Save(*testData.Resource, model.OperationTypeCreated, testData.InitialTransactionId)
-	}))
+	tx, txErr := fakeRepo.Begin()
+	require.NoError(t, txErr)
+	require.NoError(t, tx.Save(*testData.Resource, model.OperationTypeCreated, testData.InitialTransactionId))
+	require.NoError(t, tx.Commit())
 
 	txId := model.TransactionId("tx-update")
 	err = testData.Resource.Update(
@@ -972,9 +983,10 @@ func TestInventoryConsumer_UpdateWithSameWorkspace_NoOp(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	require.NoError(t, fakeRepo.Transact(func(tx model.ResourceTx) error {
-		return tx.Save(*testData.Resource, model.OperationTypeUpdated, model.NewTransactionId("tx-update"))
-	}))
+	tx, txErr = fakeRepo.Begin()
+	require.NoError(t, txErr)
+	require.NoError(t, tx.Save(*testData.Resource, model.OperationTypeUpdated, model.NewTransactionId("tx-update")))
+	require.NoError(t, tx.Commit())
 
 	tester.inv.ResourceRepository = fakeRepo
 

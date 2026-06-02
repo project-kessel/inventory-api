@@ -57,11 +57,16 @@ func NewFakeResourceRepository() bizmodel.ResourceRepository {
 
 var _ bizmodel.ResourceRepository = (*fakeResourceRepository)(nil)
 
-// Transact runs fn in a pseudo-transaction. The fake has no real transaction
-// semantics, but the interface contract is satisfied.
-func (f *fakeResourceRepository) Transact(fn func(tx bizmodel.ResourceTx) error) error {
-	rtx := &fakeResourceTx{repo: f}
-	return fn(rtx)
+func (f *fakeResourceRepository) Begin() (bizmodel.ResourceTx, error) {
+	return &fakeResourceTx{repo: f}, nil
+}
+
+func (f *fakeResourceRepository) MaxSerializationRetries() int {
+	return 3
+}
+
+func (f *fakeResourceRepository) RecordSerializationExhaustion() {
+	// no-op for fake
 }
 
 // --- fakeResourceTx implements model.ResourceTx ---
@@ -71,6 +76,14 @@ type fakeResourceTx struct {
 }
 
 var _ bizmodel.ResourceTx = (*fakeResourceTx)(nil)
+
+func (tx *fakeResourceTx) Commit() error {
+	return nil
+}
+
+func (tx *fakeResourceTx) Rollback() error {
+	return nil
+}
 
 func (tx *fakeResourceTx) NextResourceId() (bizmodel.ResourceId, error) {
 	uuidV7, err := uuid.NewV7()

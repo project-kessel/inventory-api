@@ -303,13 +303,19 @@ func (i *InventoryConsumer) ProcessMessage(headers map[string]string, relationsE
 		if relationsEnabled {
 			return i.processRelationsOperation(operation, txid, msg, operationConfig{
 				fetchRepresentations: func(i *InventoryConsumer, key model.ReporterResourceKey, version *model.Version) (*model.Representations, *model.Representations, error) {
-					var current, previous *model.Representations
-					err := i.ResourceRepository.Transact(func(tx model.ResourceTx) error {
-						var txErr error
-						current, previous, txErr = tx.FindCurrentAndPreviousVersionedRepresentations(key, version, model.OperationTypeCreated)
-						return txErr
-					})
-					return current, previous, err
+					tx, err := i.ResourceRepository.Begin()
+					if err != nil {
+						return nil, nil, err
+					}
+					defer func() { _ = tx.Rollback() }()
+					current, previous, err := tx.FindCurrentAndPreviousVersionedRepresentations(key, version, model.OperationTypeCreated)
+					if err != nil {
+						return nil, nil, err
+					}
+					if err := tx.Commit(); err != nil {
+						return nil, nil, err
+					}
+					return current, previous, nil
 				},
 				executeSpiceDB: func(i *InventoryConsumer, tuples model.TuplesToReplicate) (string, error) {
 					return i.CreateTuple(context.Background(), tuples.TuplesToCreate())
@@ -322,13 +328,19 @@ func (i *InventoryConsumer) ProcessMessage(headers map[string]string, relationsE
 		if relationsEnabled {
 			return i.processRelationsOperation(operation, txid, msg, operationConfig{
 				fetchRepresentations: func(i *InventoryConsumer, key model.ReporterResourceKey, version *model.Version) (*model.Representations, *model.Representations, error) {
-					var current, previous *model.Representations
-					err := i.ResourceRepository.Transact(func(tx model.ResourceTx) error {
-						var txErr error
-						current, previous, txErr = tx.FindCurrentAndPreviousVersionedRepresentations(key, version, model.OperationTypeUpdated)
-						return txErr
-					})
-					return current, previous, err
+					tx, err := i.ResourceRepository.Begin()
+					if err != nil {
+						return nil, nil, err
+					}
+					defer func() { _ = tx.Rollback() }()
+					current, previous, err := tx.FindCurrentAndPreviousVersionedRepresentations(key, version, model.OperationTypeUpdated)
+					if err != nil {
+						return nil, nil, err
+					}
+					if err := tx.Commit(); err != nil {
+						return nil, nil, err
+					}
+					return current, previous, nil
 				},
 				executeSpiceDB: func(i *InventoryConsumer, tuples model.TuplesToReplicate) (string, error) {
 					return i.UpdateTuple(context.Background(), tuples.TuplesToCreate(), tuples.TuplesToDelete())
@@ -340,13 +352,19 @@ func (i *InventoryConsumer) ProcessMessage(headers map[string]string, relationsE
 		if relationsEnabled {
 			return i.processRelationsOperation(operation, txid, msg, operationConfig{
 				fetchRepresentations: func(i *InventoryConsumer, key model.ReporterResourceKey, version *model.Version) (*model.Representations, *model.Representations, error) {
-					var previous *model.Representations
-					err := i.ResourceRepository.Transact(func(tx model.ResourceTx) error {
-						var txErr error
-						previous, txErr = tx.FindLatestRepresentations(key)
-						return txErr
-					})
-					return nil, previous, err
+					tx, err := i.ResourceRepository.Begin()
+					if err != nil {
+						return nil, nil, err
+					}
+					defer func() { _ = tx.Rollback() }()
+					previous, err := tx.FindLatestRepresentations(key)
+					if err != nil {
+						return nil, nil, err
+					}
+					if err := tx.Commit(); err != nil {
+						return nil, nil, err
+					}
+					return nil, previous, nil
 				},
 				executeSpiceDB: func(i *InventoryConsumer, tuples model.TuplesToReplicate) (string, error) {
 					_, err := i.DeleteTuple(context.Background(), *tuples.TuplesToDelete())

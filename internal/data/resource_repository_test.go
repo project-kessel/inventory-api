@@ -40,11 +40,12 @@ func newTestGormResourceRepository(db *gorm.DB) bizmodel.ResourceRepository {
 
 func gormResourceTxFromDB(gormTx *gorm.DB) bizmodel.ResourceTx {
 	return &gormResourceTx{
-		gormTx:          gormTx,
-		outboxPublisher: noopOutboxPublisher,
+		gormTx:           gormTx,
+		outboxPublisher:  noopOutboxPublisher,
+		metricsCollector: metricscollector.NewFakeMetricsCollector(),
+		operationName:    "test",
 	}
 }
-
 
 func TestResourceRepositoryContract(t *testing.T) {
 	implementations := []struct {
@@ -76,20 +77,18 @@ func TestResourceRepositoryContract(t *testing.T) {
 func testRepositoryContract(t *testing.T, repo bizmodel.ResourceRepository) {
 	t.Run("NextResourceId generates valid UUIDs", func(t *testing.T) {
 		var id1 bizmodel.ResourceId
-		err := repo.Transact(func(tx bizmodel.ResourceTx) error {
-			var nextErr error
-			id1, nextErr = tx.NextResourceId()
-			return nextErr
-		})
+		tx, err := repo.Begin()
+		require.NoError(t, err)
+		id1, err = tx.NextResourceId()
+		_ = tx.Commit()
 		require.NoError(t, err)
 		assert.NotEqual(t, uuid.Nil, id1.UUID())
 
 		var id2 bizmodel.ResourceId
-		err = repo.Transact(func(tx bizmodel.ResourceTx) error {
-			var nextErr error
-			id2, nextErr = tx.NextResourceId()
-			return nextErr
-		})
+		tx, err = repo.Begin()
+		require.NoError(t, err)
+		id2, err = tx.NextResourceId()
+		_ = tx.Commit()
 		require.NoError(t, err)
 		assert.NotEqual(t, uuid.Nil, id2.UUID())
 		assert.NotEqual(t, id1.UUID(), id2.UUID())
@@ -97,20 +96,18 @@ func testRepositoryContract(t *testing.T, repo bizmodel.ResourceRepository) {
 
 	t.Run("NextReporterResourceId generates valid UUIDs", func(t *testing.T) {
 		var id1 bizmodel.ReporterResourceId
-		err := repo.Transact(func(tx bizmodel.ResourceTx) error {
-			var nextErr error
-			id1, nextErr = tx.NextReporterResourceId()
-			return nextErr
-		})
+		tx, err := repo.Begin()
+		require.NoError(t, err)
+		id1, err = tx.NextReporterResourceId()
+		_ = tx.Commit()
 		require.NoError(t, err)
 		assert.NotEqual(t, uuid.Nil, id1.UUID())
 
 		var id2 bizmodel.ReporterResourceId
-		err = repo.Transact(func(tx bizmodel.ResourceTx) error {
-			var nextErr error
-			id2, nextErr = tx.NextReporterResourceId()
-			return nextErr
-		})
+		tx, err = repo.Begin()
+		require.NoError(t, err)
+		id2, err = tx.NextReporterResourceId()
+		_ = tx.Commit()
 		require.NoError(t, err)
 		assert.NotEqual(t, uuid.Nil, id2.UUID())
 		assert.NotEqual(t, id1.UUID(), id2.UUID())
@@ -118,17 +115,20 @@ func testRepositoryContract(t *testing.T, repo bizmodel.ResourceRepository) {
 
 	t.Run("Save and FindResourceByKeys basic workflow", func(t *testing.T) {
 		resource := createTestResourceWithLocalId(t, "contract-test-1")
-		err := repo.Transact(func(tx bizmodel.ResourceTx) error { return tx.Save(resource, bizmodel.OperationTypeCreated, bizmodel.NewTransactionId("contract-tx-1")) })
+		tx, err := repo.Begin()
+		require.NoError(t, err)
+		err = tx.Save(resource, bizmodel.OperationTypeCreated, bizmodel.NewTransactionId("contract-tx-1"))
+		require.NoError(t, err)
+		err = tx.Commit()
 		require.NoError(t, err, "Save should succeed")
 
 		key := createContractReporterResourceKey(t, "contract-test-1", "k8s_cluster", "ocm", "ocm-instance-1")
 
 		var foundResource *bizmodel.Resource
-		err = repo.Transact(func(tx bizmodel.ResourceTx) error {
-			var findErr error
-			foundResource, findErr = tx.FindResourceByKeys(key)
-			return findErr
-		})
+		tx, err = repo.Begin()
+		require.NoError(t, err)
+		foundResource, err = tx.FindResourceByKeys(key)
+		_ = tx.Commit()
 		require.NoError(t, err, "Find should succeed")
 		require.NotNil(t, foundResource, "Found resource should not be nil")
 		assert.Len(t, foundResource.ReporterResources(), 1, "Should have one reporter resource")
@@ -138,11 +138,10 @@ func testRepositoryContract(t *testing.T, repo bizmodel.ResourceRepository) {
 		key := createContractReporterResourceKey(t, "non-existent-contract", "k8s_cluster", "ocm", "ocm-instance-1")
 
 		var foundResource *bizmodel.Resource
-		err := repo.Transact(func(tx bizmodel.ResourceTx) error {
-			var findErr error
-			foundResource, findErr = tx.FindResourceByKeys(key)
-			return findErr
-		})
+		tx, err := repo.Begin()
+		require.NoError(t, err)
+		foundResource, err = tx.FindResourceByKeys(key)
+		_ = tx.Commit()
 		require.ErrorIs(t, err, bizmodel.ErrResourceNotFound, "Should return ErrResourceNotFound")
 		assert.Nil(t, foundResource, "Found resource should be nil")
 	})
@@ -150,18 +149,21 @@ func testRepositoryContract(t *testing.T, repo bizmodel.ResourceRepository) {
 	t.Run("Save-Update-Save workflow", func(t *testing.T) {
 		// Create initial resource
 		resource := createTestResourceWithLocalId(t, "contract-update-test")
-		err := repo.Transact(func(tx bizmodel.ResourceTx) error { return tx.Save(resource, bizmodel.OperationTypeCreated, bizmodel.NewTransactionId("contract-tx-create")) })
+		tx, err := repo.Begin()
+		require.NoError(t, err)
+		err = tx.Save(resource, bizmodel.OperationTypeCreated, bizmodel.NewTransactionId("contract-tx-create"))
+		require.NoError(t, err)
+		err = tx.Commit()
 		require.NoError(t, err, "Initial save should succeed")
 
 		// Find and update
 		key := createContractReporterResourceKey(t, "contract-update-test", "k8s_cluster", "ocm", "ocm-instance-1")
 
 		var foundResource *bizmodel.Resource
-		err = repo.Transact(func(tx bizmodel.ResourceTx) error {
-			var findErr error
-			foundResource, findErr = tx.FindResourceByKeys(key)
-			return findErr
-		})
+		tx, err = repo.Begin()
+		require.NoError(t, err)
+		foundResource, err = tx.FindResourceByKeys(key)
+		_ = tx.Commit()
 		require.NoError(t, err, "Find should succeed")
 		require.NotNil(t, foundResource)
 
@@ -176,16 +178,19 @@ func testRepositoryContract(t *testing.T, repo bizmodel.ResourceRepository) {
 		require.NoError(t, err, "Update should succeed")
 
 		// Save updated resource
-		err = repo.Transact(func(tx bizmodel.ResourceTx) error { return tx.Save(*foundResource, bizmodel.OperationTypeUpdated, bizmodel.NewTransactionId("contract-tx-update")) })
+		tx, err = repo.Begin()
+		require.NoError(t, err)
+		err = tx.Save(*foundResource, bizmodel.OperationTypeUpdated, bizmodel.NewTransactionId("contract-tx-update"))
+		require.NoError(t, err)
+		err = tx.Commit()
 		require.NoError(t, err, "Updated save should succeed")
 
 		// Verify update persisted
 		var updatedResource *bizmodel.Resource
-		err = repo.Transact(func(tx bizmodel.ResourceTx) error {
-			var findErr error
-			updatedResource, findErr = tx.FindResourceByKeys(key)
-			return findErr
-		})
+		tx, err = repo.Begin()
+		require.NoError(t, err)
+		updatedResource, err = tx.FindResourceByKeys(key)
+		_ = tx.Commit()
 		require.NoError(t, err, "Find updated resource should succeed")
 		require.NotNil(t, updatedResource)
 	})
@@ -193,18 +198,21 @@ func testRepositoryContract(t *testing.T, repo bizmodel.ResourceRepository) {
 	t.Run("Save-Delete workflow", func(t *testing.T) {
 		// Create resource
 		resource := createTestResourceWithLocalId(t, "contract-delete-test")
-		err := repo.Transact(func(tx bizmodel.ResourceTx) error { return tx.Save(resource, bizmodel.OperationTypeCreated, bizmodel.NewTransactionId("contract-tx-create")) })
+		tx, err := repo.Begin()
+		require.NoError(t, err)
+		err = tx.Save(resource, bizmodel.OperationTypeCreated, bizmodel.NewTransactionId("contract-tx-create"))
+		require.NoError(t, err)
+		err = tx.Commit()
 		require.NoError(t, err, "Initial save should succeed")
 
 		// Find and delete
 		key := createContractReporterResourceKey(t, "contract-delete-test", "k8s_cluster", "ocm", "ocm-instance-1")
 
 		var foundResource *bizmodel.Resource
-		err = repo.Transact(func(tx bizmodel.ResourceTx) error {
-			var findErr error
-			foundResource, findErr = tx.FindResourceByKeys(key)
-			return findErr
-		})
+		tx, err = repo.Begin()
+		require.NoError(t, err)
+		foundResource, err = tx.FindResourceByKeys(key)
+		_ = tx.Commit()
 		require.NoError(t, err, "Find should succeed")
 		require.NotNil(t, foundResource)
 
@@ -213,16 +221,19 @@ func testRepositoryContract(t *testing.T, repo bizmodel.ResourceRepository) {
 		require.NoError(t, err, "Delete should succeed")
 
 		// Save deleted resource
-		err = repo.Transact(func(tx bizmodel.ResourceTx) error { return tx.Save(*foundResource, bizmodel.OperationTypeDeleted, bizmodel.NewTransactionId("contract-tx-delete")) })
+		tx, err = repo.Begin()
+		require.NoError(t, err)
+		err = tx.Save(*foundResource, bizmodel.OperationTypeDeleted, bizmodel.NewTransactionId("contract-tx-delete"))
+		require.NoError(t, err)
+		err = tx.Commit()
 		require.NoError(t, err, "Delete save should succeed")
 
 		// Verify deletion behavior is consistent
 		var deletedResource *bizmodel.Resource
-		err = repo.Transact(func(tx bizmodel.ResourceTx) error {
-			var findErr error
-			deletedResource, findErr = tx.FindResourceByKeys(key)
-			return findErr
-		})
+		tx, err = repo.Begin()
+		require.NoError(t, err)
+		deletedResource, err = tx.FindResourceByKeys(key)
+		_ = tx.Commit()
 		if errors.Is(err, bizmodel.ErrResourceNotFound) {
 			assert.Nil(t, deletedResource, "Deleted resource should not be found with tombstone filter")
 		} else {
@@ -234,12 +245,19 @@ func testRepositoryContract(t *testing.T, repo bizmodel.ResourceRepository) {
 	t.Run("Unique constraint enforcement", func(t *testing.T) {
 		// Create first resource
 		resource1 := createTestResourceWithLocalId(t, "contract-unique-test")
-		err := repo.Transact(func(tx bizmodel.ResourceTx) error { return tx.Save(resource1, bizmodel.OperationTypeCreated, bizmodel.NewTransactionId("contract-tx-1")) })
+		tx, err := repo.Begin()
+		require.NoError(t, err)
+		err = tx.Save(resource1, bizmodel.OperationTypeCreated, bizmodel.NewTransactionId("contract-tx-1"))
+		require.NoError(t, err)
+		err = tx.Commit()
 		require.NoError(t, err, "First save should succeed")
 
 		// Try to create second resource with same composite key
 		resource2 := createTestResourceWithLocalId(t, "contract-unique-test")
-		err = repo.Transact(func(tx bizmodel.ResourceTx) error { return tx.Save(resource2, bizmodel.OperationTypeCreated, bizmodel.NewTransactionId("contract-tx-2")) })
+		tx, err = repo.Begin()
+		require.NoError(t, err)
+		err = tx.Save(resource2, bizmodel.OperationTypeCreated, bizmodel.NewTransactionId("contract-tx-2"))
+		_ = tx.Commit()
 		require.Error(t, err, "Second save with duplicate key should fail")
 
 		// Error should indicate constraint violation
@@ -251,37 +269,41 @@ func testRepositoryContract(t *testing.T, repo bizmodel.ResourceRepository) {
 	t.Run("Case insensitive key matching for non ID fields", func(t *testing.T) {
 		// Create resource with mixed case
 		resource := createTestResourceWithReporter(t, "Contract-Case-Test", "OCM", "Instance-1")
-		err := repo.Transact(func(tx bizmodel.ResourceTx) error { return tx.Save(resource, bizmodel.OperationTypeCreated, bizmodel.NewTransactionId("contract-case-tx")) })
+		tx, err := repo.Begin()
+		require.NoError(t, err)
+		err = tx.Save(resource, bizmodel.OperationTypeCreated, bizmodel.NewTransactionId("contract-case-tx"))
+		require.NoError(t, err)
+		err = tx.Commit()
 		require.NoError(t, err, "Save should succeed")
 
 		// Find with different casing
 		key := createContractReporterResourceKey(t, "Contract-Case-Test", "k8s_cluster", "ocm", "Instance-1")
 
 		var foundResource *bizmodel.Resource
-		err = repo.Transact(func(tx bizmodel.ResourceTx) error {
-			var findErr error
-			foundResource, findErr = tx.FindResourceByKeys(key)
-			return findErr
-		})
+		tx, err = repo.Begin()
+		require.NoError(t, err)
+		foundResource, err = tx.FindResourceByKeys(key)
+		_ = tx.Commit()
 		require.NoError(t, err, "Case insensitive find should succeed")
 		require.NotNil(t, foundResource)
 	})
 
 	t.Run("Transaction handling", func(t *testing.T) {
 		resource := createTestResourceWithLocalId(t, "contract-tx-test")
-		err := repo.Transact(func(tx bizmodel.ResourceTx) error {
-			return tx.Save(resource, bizmodel.OperationTypeCreated, bizmodel.NewTransactionId("contract-tx"))
-		})
+		tx, err := repo.Begin()
+		require.NoError(t, err)
+		err = tx.Save(resource, bizmodel.OperationTypeCreated, bizmodel.NewTransactionId("contract-tx"))
+		require.NoError(t, err)
+		err = tx.Commit()
 		require.NoError(t, err, "Save within Transact should succeed")
 
 		key := createContractReporterResourceKey(t, "contract-tx-test", "k8s_cluster", "ocm", "ocm-instance-1")
 
 		var foundResource *bizmodel.Resource
-		err = repo.Transact(func(tx bizmodel.ResourceTx) error {
-			var findErr error
-			foundResource, findErr = tx.FindResourceByKeys(key)
-			return findErr
-		})
+		tx, err = repo.Begin()
+		require.NoError(t, err)
+		foundResource, err = tx.FindResourceByKeys(key)
+		_ = tx.Commit()
 		require.NoError(t, err, "Find within Transact should succeed")
 		require.NotNil(t, foundResource)
 	})
@@ -323,7 +345,11 @@ func TestFindResourceByKeys(t *testing.T) {
 				repo := getFreshInstances()
 
 				resource := createTestResource(t)
-				err := repo.Transact(func(tx bizmodel.ResourceTx) error { return tx.Save(resource, bizmodel.OperationTypeCreated, bizmodel.NewTransactionId("test-tx-123")) })
+				tx, err := repo.Begin()
+				require.NoError(t, err)
+				err = tx.Save(resource, bizmodel.OperationTypeCreated, bizmodel.NewTransactionId("test-tx-123"))
+				require.NoError(t, err)
+				err = tx.Commit()
 				require.NoError(t, err)
 
 				key, err := bizmodel.NewReporterResourceKey(
@@ -335,11 +361,10 @@ func TestFindResourceByKeys(t *testing.T) {
 				require.NoError(t, err)
 
 				var foundResource *bizmodel.Resource
-				err = repo.Transact(func(tx bizmodel.ResourceTx) error {
-					var findErr error
-					foundResource, findErr = tx.FindResourceByKeys(key)
-					return findErr
-				})
+				tx, err = repo.Begin()
+				require.NoError(t, err)
+				foundResource, err = tx.FindResourceByKeys(key)
+				_ = tx.Commit()
 				require.NoError(t, err)
 				require.NotNil(t, foundResource)
 				assert.Len(t, foundResource.ReporterResources(), 1, "should have reporter resources")
@@ -357,11 +382,10 @@ func TestFindResourceByKeys(t *testing.T) {
 				require.NoError(t, err)
 
 				var foundResource *bizmodel.Resource
-				err = repo.Transact(func(tx bizmodel.ResourceTx) error {
-					var findErr error
-					foundResource, findErr = tx.FindResourceByKeys(key)
-					return findErr
-				})
+				tx, err := repo.Begin()
+				require.NoError(t, err)
+				foundResource, err = tx.FindResourceByKeys(key)
+				_ = tx.Commit()
 				require.ErrorIs(t, err, bizmodel.ErrResourceNotFound)
 				assert.Nil(t, foundResource)
 			})
@@ -372,9 +396,17 @@ func TestFindResourceByKeys(t *testing.T) {
 
 				repo := getFreshInstances()
 
-				err := repo.Transact(func(tx bizmodel.ResourceTx) error { return tx.Save(resource1, bizmodel.OperationTypeCreated, bizmodel.NewTransactionId("test-tx-1")) })
+				tx, err := repo.Begin()
 				require.NoError(t, err)
-				err = repo.Transact(func(tx bizmodel.ResourceTx) error { return tx.Save(resource2, bizmodel.OperationTypeCreated, bizmodel.NewTransactionId("test-tx-2")) })
+				err = tx.Save(resource1, bizmodel.OperationTypeCreated, bizmodel.NewTransactionId("test-tx-1"))
+				require.NoError(t, err)
+				err = tx.Commit()
+				require.NoError(t, err)
+				tx, err = repo.Begin()
+				require.NoError(t, err)
+				err = tx.Save(resource2, bizmodel.OperationTypeCreated, bizmodel.NewTransactionId("test-tx-2"))
+				require.NoError(t, err)
+				err = tx.Commit()
 				require.NoError(t, err)
 
 				key1, err := bizmodel.NewReporterResourceKey("resource-1", "k8s_cluster", "ocm", "ocm-instance-1")
@@ -383,20 +415,18 @@ func TestFindResourceByKeys(t *testing.T) {
 				require.NoError(t, err)
 
 				var found1 *bizmodel.Resource
-				err = repo.Transact(func(tx bizmodel.ResourceTx) error {
-					var findErr error
-					found1, findErr = tx.FindResourceByKeys(key1)
-					return findErr
-				})
+				tx, err = repo.Begin()
+				require.NoError(t, err)
+				found1, err = tx.FindResourceByKeys(key1)
+				_ = tx.Commit()
 				require.NoError(t, err)
 				require.NotNil(t, found1)
 
 				var found2 *bizmodel.Resource
-				err = repo.Transact(func(tx bizmodel.ResourceTx) error {
-					var findErr error
-					found2, findErr = tx.FindResourceByKeys(key2)
-					return findErr
-				})
+				tx, err = repo.Begin()
+				require.NoError(t, err)
+				found2, err = tx.FindResourceByKeys(key2)
+				_ = tx.Commit()
 				require.NoError(t, err)
 				require.NotNil(t, found2)
 
@@ -412,7 +442,11 @@ func TestFindResourceByKeys(t *testing.T) {
 				repo := getFreshInstances()
 
 				resource := createTestResource(t)
-				err := repo.Transact(func(tx bizmodel.ResourceTx) error { return tx.Save(resource, bizmodel.OperationTypeCreated, bizmodel.NewTransactionId("test-tx-1")) })
+				tx, err := repo.Begin()
+				require.NoError(t, err)
+				err = tx.Save(resource, bizmodel.OperationTypeCreated, bizmodel.NewTransactionId("test-tx-1"))
+				require.NoError(t, err)
+				err = tx.Commit()
 				require.NoError(t, err)
 
 				key, err := bizmodel.NewReporterResourceKey(
@@ -424,11 +458,10 @@ func TestFindResourceByKeys(t *testing.T) {
 				require.NoError(t, err)
 
 				var foundResource *bizmodel.Resource
-				err = repo.Transact(func(tx bizmodel.ResourceTx) error {
-					var findErr error
-					foundResource, findErr = tx.FindResourceByKeys(key)
-					return findErr
-				})
+				tx, err = repo.Begin()
+				require.NoError(t, err)
+				foundResource, err = tx.FindResourceByKeys(key)
+				_ = tx.Commit()
 				require.NoError(t, err)
 				require.NotNil(t, foundResource)
 				assert.Len(t, foundResource.ReporterResources(), 1, "should have one reporter resource")
@@ -446,11 +479,10 @@ func TestFindResourceByKeys(t *testing.T) {
 				require.NoError(t, err)
 
 				var foundResource *bizmodel.Resource
-				err = repo.Transact(func(tx bizmodel.ResourceTx) error {
-					var findErr error
-					foundResource, findErr = tx.FindResourceByKeys(key)
-					return findErr
-				})
+				tx, err := repo.Begin()
+				require.NoError(t, err)
+				foundResource, err = tx.FindResourceByKeys(key)
+				_ = tx.Commit()
 				require.ErrorIs(t, err, bizmodel.ErrResourceNotFound)
 				assert.Nil(t, foundResource)
 			})
@@ -459,7 +491,11 @@ func TestFindResourceByKeys(t *testing.T) {
 				repo := getFreshInstances()
 
 				resource := createTestResourceWithLocalId(t, "test-resource-no-instance-lookup")
-				err := repo.Transact(func(tx bizmodel.ResourceTx) error { return tx.Save(resource, bizmodel.OperationTypeCreated, bizmodel.NewTransactionId("test-tx-no-instance")) })
+				tx, err := repo.Begin()
+				require.NoError(t, err)
+				err = tx.Save(resource, bizmodel.OperationTypeCreated, bizmodel.NewTransactionId("test-tx-no-instance"))
+				require.NoError(t, err)
+				err = tx.Commit()
 				require.NoError(t, err)
 
 				key, err := bizmodel.NewReporterResourceKey(
@@ -471,11 +507,10 @@ func TestFindResourceByKeys(t *testing.T) {
 				require.NoError(t, err)
 
 				var foundResource *bizmodel.Resource
-				err = repo.Transact(func(tx bizmodel.ResourceTx) error {
-					var findErr error
-					foundResource, findErr = tx.FindResourceByKeys(key)
-					return findErr
-				})
+				tx, err = repo.Begin()
+				require.NoError(t, err)
+				foundResource, err = tx.FindResourceByKeys(key)
+				_ = tx.Commit()
 				require.NoError(t, err)
 				require.NotNil(t, foundResource)
 				assert.Len(t, foundResource.ReporterResources(), 1, "should have one reporter resource")
@@ -487,7 +522,11 @@ func TestFindResourceByKeys(t *testing.T) {
 
 				// Create a resource with mixed case values
 				resource := createTestResourceWithMixedCase(t)
-				err := repo.Transact(func(tx bizmodel.ResourceTx) error { return tx.Save(resource, bizmodel.OperationTypeCreated, bizmodel.NewTransactionId("test-tx-case")) })
+				tx, err := repo.Begin()
+				require.NoError(t, err)
+				err = tx.Save(resource, bizmodel.OperationTypeCreated, bizmodel.NewTransactionId("test-tx-case"))
+				require.NoError(t, err)
+				err = tx.Commit()
 				require.NoError(t, err)
 
 				testCases := []struct {
@@ -563,11 +602,10 @@ func TestFindResourceByKeys(t *testing.T) {
 						require.NoError(t, err)
 
 						var foundResource *bizmodel.Resource
-						err = repo.Transact(func(tx bizmodel.ResourceTx) error {
-							var findErr error
-							foundResource, findErr = tx.FindResourceByKeys(key)
-							return findErr
-						})
+						tx, err := repo.Begin()
+						require.NoError(t, err)
+						foundResource, err = tx.FindResourceByKeys(key)
+						_ = tx.Commit()
 						require.NoError(t, err, tc.description)
 						require.NotNil(t, foundResource, tc.description)
 						assert.Len(t, foundResource.ReporterResources(), 1, "should have one reporter resource")
@@ -611,7 +649,11 @@ func TestFindResourceByKeys_TombstoneFilter(t *testing.T) {
 			repo := getFreshInstances()
 
 			resource := createTestResourceWithLocalId(t, "tombstoned-resource")
-			err := repo.Transact(func(tx bizmodel.ResourceTx) error { return tx.Save(resource, bizmodel.OperationTypeCreated, bizmodel.NewTransactionId("test-tx-tombstone")) })
+			tx, err := repo.Begin()
+			require.NoError(t, err)
+			err = tx.Save(resource, bizmodel.OperationTypeCreated, bizmodel.NewTransactionId("test-tx-tombstone"))
+			require.NoError(t, err)
+			err = tx.Commit()
 			require.NoError(t, err)
 
 			key, err := bizmodel.NewReporterResourceKey(
@@ -623,26 +665,28 @@ func TestFindResourceByKeys_TombstoneFilter(t *testing.T) {
 			require.NoError(t, err)
 
 			var foundResource *bizmodel.Resource
-			err = repo.Transact(func(tx bizmodel.ResourceTx) error {
-				var findErr error
-				foundResource, findErr = tx.FindResourceByKeys(key)
-				return findErr
-			})
+			tx, err = repo.Begin()
+			require.NoError(t, err)
+			foundResource, err = tx.FindResourceByKeys(key)
+			_ = tx.Commit()
 			require.NoError(t, err)
 			require.NotNil(t, foundResource)
 
 			err = foundResource.Delete(key)
 			require.NoError(t, err)
 
-			err = repo.Transact(func(tx bizmodel.ResourceTx) error { return tx.Save(*foundResource, bizmodel.OperationTypeDeleted, bizmodel.NewTransactionId("test-tx-delete")) })
+			tx, err = repo.Begin()
+			require.NoError(t, err)
+			err = tx.Save(*foundResource, bizmodel.OperationTypeDeleted, bizmodel.NewTransactionId("test-tx-delete"))
+			require.NoError(t, err)
+			err = tx.Commit()
 			require.NoError(t, err)
 
 			// With tombstone filter removed, we should be able to find the tombstoned resource
-			err = repo.Transact(func(tx bizmodel.ResourceTx) error {
-				var findErr error
-				foundResource, findErr = tx.FindResourceByKeys(key)
-				return findErr
-			})
+			tx, err = repo.Begin()
+			require.NoError(t, err)
+			foundResource, err = tx.FindResourceByKeys(key)
+			_ = tx.Commit()
 			require.NoError(t, err)
 			require.NotNil(t, foundResource)
 
@@ -691,13 +735,20 @@ func TestUniqueConstraint_ReporterResourceCompositeKey(t *testing.T) {
 
 				// Create first resource
 				resource1 := createTestResourceWithLocalId(t, "duplicate-key-test")
-				err := repo.Transact(func(tx bizmodel.ResourceTx) error { return tx.Save(resource1, bizmodel.OperationTypeCreated, bizmodel.NewTransactionId("test-tx-1")) })
+				tx, err := repo.Begin()
+				require.NoError(t, err)
+				err = tx.Save(resource1, bizmodel.OperationTypeCreated, bizmodel.NewTransactionId("test-tx-1"))
+				require.NoError(t, err)
+				err = tx.Commit()
 				require.NoError(t, err, "First save should succeed")
 
 				// Create second resource with same composite key components
 				// (same LocalResourceID, ReporterType, ResourceType, ReporterInstanceID, RepresentationVersion=0, Generation=0)
 				resource2 := createTestResourceWithLocalId(t, "duplicate-key-test") // Same local ID
-				err = repo.Transact(func(tx bizmodel.ResourceTx) error { return tx.Save(resource2, bizmodel.OperationTypeCreated, bizmodel.NewTransactionId("test-tx-2")) })
+				tx, err = repo.Begin()
+				require.NoError(t, err)
+				err = tx.Save(resource2, bizmodel.OperationTypeCreated, bizmodel.NewTransactionId("test-tx-2"))
+				_ = tx.Commit()
 
 				// Both implementations should reject this duplicate
 				require.Error(t, err, "Second save with duplicate composite key should fail")
@@ -714,7 +765,11 @@ func TestUniqueConstraint_ReporterResourceCompositeKey(t *testing.T) {
 
 				// Create and save initial resource
 				resource := createTestResourceWithLocalId(t, "version-test-resource")
-				err := repo.Transact(func(tx bizmodel.ResourceTx) error { return tx.Save(resource, bizmodel.OperationTypeCreated, bizmodel.NewTransactionId("test-tx-create")) })
+				tx, err := repo.Begin()
+				require.NoError(t, err)
+				err = tx.Save(resource, bizmodel.OperationTypeCreated, bizmodel.NewTransactionId("test-tx-create"))
+				require.NoError(t, err)
+				err = tx.Commit()
 				require.NoError(t, err, "Initial save should succeed")
 
 				// Update the resource (this increments representation version and potentially generation)
@@ -736,7 +791,11 @@ func TestUniqueConstraint_ReporterResourceCompositeKey(t *testing.T) {
 				require.NoError(t, err, "Update should succeed")
 
 				// Save the updated resource (different version/generation should be allowed)
-				err = repo.Transact(func(tx bizmodel.ResourceTx) error { return tx.Save(resource, bizmodel.OperationTypeUpdated, bizmodel.NewTransactionId("test-tx-update")) })
+				tx, err = repo.Begin()
+				require.NoError(t, err)
+				err = tx.Save(resource, bizmodel.OperationTypeUpdated, bizmodel.NewTransactionId("test-tx-update"))
+				require.NoError(t, err)
+				err = tx.Commit()
 				require.NoError(t, err, "Save with different version should succeed")
 			})
 
@@ -745,12 +804,20 @@ func TestUniqueConstraint_ReporterResourceCompositeKey(t *testing.T) {
 
 				// Create first resource with k8s_cluster type
 				resource1 := createTestResourceWithLocalIdAndType(t, "multi-type-test", "k8s_cluster")
-				err := repo.Transact(func(tx bizmodel.ResourceTx) error { return tx.Save(resource1, bizmodel.OperationTypeCreated, bizmodel.NewTransactionId("test-tx-1")) })
+				tx, err := repo.Begin()
+				require.NoError(t, err)
+				err = tx.Save(resource1, bizmodel.OperationTypeCreated, bizmodel.NewTransactionId("test-tx-1"))
+				require.NoError(t, err)
+				err = tx.Commit()
 				require.NoError(t, err, "First save should succeed")
 
 				// Create second resource with same local ID but different resource type
 				resource2 := createTestResourceWithLocalIdAndType(t, "multi-type-test", "host")
-				err = repo.Transact(func(tx bizmodel.ResourceTx) error { return tx.Save(resource2, bizmodel.OperationTypeCreated, bizmodel.NewTransactionId("test-tx-2")) })
+				tx, err = repo.Begin()
+				require.NoError(t, err)
+				err = tx.Save(resource2, bizmodel.OperationTypeCreated, bizmodel.NewTransactionId("test-tx-2"))
+				require.NoError(t, err)
+				err = tx.Commit()
 				require.NoError(t, err, "Save with different resource type should succeed")
 			})
 
@@ -759,12 +826,20 @@ func TestUniqueConstraint_ReporterResourceCompositeKey(t *testing.T) {
 
 				// Create resource with OCM reporter
 				resource1 := createTestResourceWithReporter(t, "reporter-test", "ocm", "ocm-instance-1")
-				err := repo.Transact(func(tx bizmodel.ResourceTx) error { return tx.Save(resource1, bizmodel.OperationTypeCreated, bizmodel.NewTransactionId("test-tx-1")) })
+				tx, err := repo.Begin()
+				require.NoError(t, err)
+				err = tx.Save(resource1, bizmodel.OperationTypeCreated, bizmodel.NewTransactionId("test-tx-1"))
+				require.NoError(t, err)
+				err = tx.Commit()
 				require.NoError(t, err, "First save should succeed")
 
 				// Create resource with same local ID but different reporter type
 				resource2 := createTestResourceWithReporter(t, "reporter-test", "hbi", "hbi-instance-1")
-				err = repo.Transact(func(tx bizmodel.ResourceTx) error { return tx.Save(resource2, bizmodel.OperationTypeCreated, bizmodel.NewTransactionId("test-tx-2")) })
+				tx, err = repo.Begin()
+				require.NoError(t, err)
+				err = tx.Save(resource2, bizmodel.OperationTypeCreated, bizmodel.NewTransactionId("test-tx-2"))
+				require.NoError(t, err)
+				err = tx.Commit()
 				require.NoError(t, err, "Save with different reporter type should succeed")
 			})
 
@@ -773,12 +848,20 @@ func TestUniqueConstraint_ReporterResourceCompositeKey(t *testing.T) {
 
 				// Create resource with instance-1
 				resource1 := createTestResourceWithReporter(t, "instance-test", "ocm", "ocm-instance-1")
-				err := repo.Transact(func(tx bizmodel.ResourceTx) error { return tx.Save(resource1, bizmodel.OperationTypeCreated, bizmodel.NewTransactionId("test-tx-1")) })
+				tx, err := repo.Begin()
+				require.NoError(t, err)
+				err = tx.Save(resource1, bizmodel.OperationTypeCreated, bizmodel.NewTransactionId("test-tx-1"))
+				require.NoError(t, err)
+				err = tx.Commit()
 				require.NoError(t, err, "First save should succeed")
 
 				// Create resource with same components but different reporter instance
 				resource2 := createTestResourceWithReporter(t, "instance-test", "ocm", "ocm-instance-2")
-				err = repo.Transact(func(tx bizmodel.ResourceTx) error { return tx.Save(resource2, bizmodel.OperationTypeCreated, bizmodel.NewTransactionId("test-tx-2")) })
+				tx, err = repo.Begin()
+				require.NoError(t, err)
+				err = tx.Save(resource2, bizmodel.OperationTypeCreated, bizmodel.NewTransactionId("test-tx-2"))
+				require.NoError(t, err)
+				err = tx.Commit()
 				require.NoError(t, err, "Save with different reporter instance should succeed")
 			})
 		})
@@ -822,18 +905,21 @@ func TestResourceRepository_IdempotentOperations(t *testing.T) {
 
 				// 1. REPORT: Create initial resource
 				resource := createTestResourceWithLocalId(t, localResourceId)
-				err := repo.Transact(func(tx bizmodel.ResourceTx) error { return tx.Save(resource, bizmodel.OperationTypeCreated, bizmodel.NewTransactionId("repo-create-1")) })
+				tx, err := repo.Begin()
+				require.NoError(t, err)
+				err = tx.Save(resource, bizmodel.OperationTypeCreated, bizmodel.NewTransactionId("repo-create-1"))
+				require.NoError(t, err)
+				err = tx.Commit()
 				require.NoError(t, err, "Initial save should succeed")
 
 				key := createContractReporterResourceKey(t, localResourceId, "k8s_cluster", "ocm", "ocm-instance-1")
 
 				// Verify initial state
 				var afterCreate *bizmodel.Resource
-				err = repo.Transact(func(tx bizmodel.ResourceTx) error {
-					var findErr error
-					afterCreate, findErr = tx.FindResourceByKeys(key)
-					return findErr
-				})
+				tx, err = repo.Begin()
+				require.NoError(t, err)
+				afterCreate, err = tx.FindResourceByKeys(key)
+				_ = tx.Commit()
 				require.NoError(t, err, "Should find resource after creation")
 				require.NotNil(t, afterCreate)
 				initialState := afterCreate.ReporterResources()[0].Serialize()
@@ -843,27 +929,29 @@ func TestResourceRepository_IdempotentOperations(t *testing.T) {
 
 				// 2. DELETE: Delete the resource
 				var foundResource *bizmodel.Resource
-				err = repo.Transact(func(tx bizmodel.ResourceTx) error {
-					var findErr error
-					foundResource, findErr = tx.FindResourceByKeys(key)
-					return findErr
-				})
+				tx, err = repo.Begin()
+				require.NoError(t, err)
+				foundResource, err = tx.FindResourceByKeys(key)
+				_ = tx.Commit()
 				require.NoError(t, err, "Should find resource for delete")
 				require.NotNil(t, foundResource)
 
 				err = foundResource.Delete(key)
 				require.NoError(t, err, "Delete operation should succeed")
 
-				err = repo.Transact(func(tx bizmodel.ResourceTx) error { return tx.Save(*foundResource, bizmodel.OperationTypeDeleted, bizmodel.NewTransactionId("repo-delete-1")) })
+				tx, err = repo.Begin()
+				require.NoError(t, err)
+				err = tx.Save(*foundResource, bizmodel.OperationTypeDeleted, bizmodel.NewTransactionId("repo-delete-1"))
+				require.NoError(t, err)
+				err = tx.Commit()
 				require.NoError(t, err, "Delete save should succeed")
 
 				// Verify delete state
 				var afterDelete1 *bizmodel.Resource
-				err = repo.Transact(func(tx bizmodel.ResourceTx) error {
-					var findErr error
-					afterDelete1, findErr = tx.FindResourceByKeys(key)
-					return findErr
-				})
+				tx, err = repo.Begin()
+				require.NoError(t, err)
+				afterDelete1, err = tx.FindResourceByKeys(key)
+				_ = tx.Commit()
 				if errors.Is(err, bizmodel.ErrResourceNotFound) {
 					// If tombstone filter is active, we can't verify the exact state
 					// but the delete succeeded, which is what we're testing
@@ -879,11 +967,10 @@ func TestResourceRepository_IdempotentOperations(t *testing.T) {
 
 				// 3. RESUBMIT SAME DELETE: Should succeed (handle duplicate gracefully)
 				var foundResource2 *bizmodel.Resource
-				err = repo.Transact(func(tx bizmodel.ResourceTx) error {
-					var findErr error
-					foundResource2, findErr = tx.FindResourceByKeys(key)
-					return findErr
-				})
+				tx, err = repo.Begin()
+				require.NoError(t, err)
+				foundResource2, err = tx.FindResourceByKeys(key)
+				_ = tx.Commit()
 				if errors.Is(err, bizmodel.ErrResourceNotFound) {
 					// With tombstone filter, we expect this behavior
 					t.Log("Cannot resubmit delete - resource not found due to tombstone filter (expected)")
@@ -894,16 +981,19 @@ func TestResourceRepository_IdempotentOperations(t *testing.T) {
 					err = foundResource2.Delete(key)
 					require.NoError(t, err, "Duplicate delete operation should succeed")
 
-					err = repo.Transact(func(tx bizmodel.ResourceTx) error { return tx.Save(*foundResource2, bizmodel.OperationTypeDeleted, bizmodel.NewTransactionId("repo-delete-2")) })
+					tx, err := repo.Begin()
+					require.NoError(t, err)
+					err = tx.Save(*foundResource2, bizmodel.OperationTypeDeleted, bizmodel.NewTransactionId("repo-delete-2"))
+					require.NoError(t, err)
+					err = tx.Commit()
 					require.NoError(t, err, "Duplicate delete save should succeed")
 
 					// Verify state after duplicate delete
 					var afterDelete2 *bizmodel.Resource
-					err = repo.Transact(func(tx bizmodel.ResourceTx) error {
-						var findErr error
-						afterDelete2, findErr = tx.FindResourceByKeys(key)
-						return findErr
-					})
+					tx, err = repo.Begin()
+					require.NoError(t, err)
+					afterDelete2, err = tx.FindResourceByKeys(key)
+					_ = tx.Commit()
 					if !errors.Is(err, bizmodel.ErrResourceNotFound) {
 						require.NoError(t, err, "Should find resource after duplicate delete")
 						require.NotNil(t, afterDelete2)
@@ -922,18 +1012,21 @@ func TestResourceRepository_IdempotentOperations(t *testing.T) {
 
 				// 1. REPORT: Create initial resource
 				resource1 := createTestResourceWithLocalId(t, localResourceId)
-				err := repo.Transact(func(tx bizmodel.ResourceTx) error { return tx.Save(resource1, bizmodel.OperationTypeCreated, bizmodel.NewTransactionId("repo-create-1")) })
+				tx, err := repo.Begin()
+				require.NoError(t, err)
+				err = tx.Save(resource1, bizmodel.OperationTypeCreated, bizmodel.NewTransactionId("repo-create-1"))
+				require.NoError(t, err)
+				err = tx.Commit()
 				require.NoError(t, err, "Initial save should succeed")
 
 				key := createContractReporterResourceKey(t, localResourceId, "k8s_cluster", "ocm", "ocm-instance-1")
 
 				// 2. RESUBMIT SAME REPORT: Should succeed and increment version
 				var foundResource1 *bizmodel.Resource
-				err = repo.Transact(func(tx bizmodel.ResourceTx) error {
-					var findErr error
-					foundResource1, findErr = tx.FindResourceByKeys(key)
-					return findErr
-				})
+				tx, err = repo.Begin()
+				require.NoError(t, err)
+				foundResource1, err = tx.FindResourceByKeys(key)
+				_ = tx.Commit()
 				require.NoError(t, err, "Should find resource for update")
 				require.NotNil(t, foundResource1)
 
@@ -946,32 +1039,38 @@ func TestResourceRepository_IdempotentOperations(t *testing.T) {
 				err = foundResource1.Update(key, apiHref, &consoleHref, nil, &reporterData, &commonData, transactionId)
 				require.NoError(t, err, "Update should succeed")
 
-				err = repo.Transact(func(tx bizmodel.ResourceTx) error { return tx.Save(*foundResource1, bizmodel.OperationTypeUpdated, bizmodel.NewTransactionId("repo-update-1")) })
+				tx, err = repo.Begin()
+				require.NoError(t, err)
+				err = tx.Save(*foundResource1, bizmodel.OperationTypeUpdated, bizmodel.NewTransactionId("repo-update-1"))
+				require.NoError(t, err)
+				err = tx.Commit()
 				require.NoError(t, err, "Duplicate report save should succeed")
 
 				// 3. DELETE: Delete the resource
 				var foundResource2 *bizmodel.Resource
-				err = repo.Transact(func(tx bizmodel.ResourceTx) error {
-					var findErr error
-					foundResource2, findErr = tx.FindResourceByKeys(key)
-					return findErr
-				})
+				tx, err = repo.Begin()
+				require.NoError(t, err)
+				foundResource2, err = tx.FindResourceByKeys(key)
+				_ = tx.Commit()
 				require.NoError(t, err, "Should find resource for delete")
 				require.NotNil(t, foundResource2)
 
 				err = foundResource2.Delete(key)
 				require.NoError(t, err, "Delete operation should succeed")
 
-				err = repo.Transact(func(tx bizmodel.ResourceTx) error { return tx.Save(*foundResource2, bizmodel.OperationTypeDeleted, bizmodel.NewTransactionId("repo-delete-1")) })
+				tx, err = repo.Begin()
+				require.NoError(t, err)
+				err = tx.Save(*foundResource2, bizmodel.OperationTypeDeleted, bizmodel.NewTransactionId("repo-delete-1"))
+				require.NoError(t, err)
+				err = tx.Commit()
 				require.NoError(t, err, "Delete save should succeed")
 
 				// 4. RESUBMIT SAME DELETE: Should succeed
 				var foundResource3 *bizmodel.Resource
-				err = repo.Transact(func(tx bizmodel.ResourceTx) error {
-					var findErr error
-					foundResource3, findErr = tx.FindResourceByKeys(key)
-					return findErr
-				})
+				tx, err = repo.Begin()
+				require.NoError(t, err)
+				foundResource3, err = tx.FindResourceByKeys(key)
+				_ = tx.Commit()
 				if errors.Is(err, bizmodel.ErrResourceNotFound) {
 					// With tombstone filter, we expect this behavior
 					t.Log("Cannot resubmit delete - resource not found due to tombstone filter (expected)")
@@ -982,7 +1081,11 @@ func TestResourceRepository_IdempotentOperations(t *testing.T) {
 					err = foundResource3.Delete(key)
 					require.NoError(t, err, "Duplicate delete operation should succeed")
 
-					err = repo.Transact(func(tx bizmodel.ResourceTx) error { return tx.Save(*foundResource3, bizmodel.OperationTypeDeleted, bizmodel.NewTransactionId("repo-delete-2")) })
+					tx, err := repo.Begin()
+					require.NoError(t, err)
+					err = tx.Save(*foundResource3, bizmodel.OperationTypeDeleted, bizmodel.NewTransactionId("repo-delete-2"))
+					require.NoError(t, err)
+					err = tx.Commit()
 					require.NoError(t, err, "Duplicate delete save should succeed")
 				}
 			})
@@ -999,17 +1102,20 @@ func TestResourceRepository_IdempotentOperations(t *testing.T) {
 
 					// Report: Check if resource exists, create or update accordingly
 					var foundResource *bizmodel.Resource
-					err := repo.Transact(func(tx bizmodel.ResourceTx) error {
-						var findErr error
-						foundResource, findErr = tx.FindResourceByKeys(key)
-						return findErr
-					})
+					tx, err := repo.Begin()
+					require.NoError(t, err)
+					foundResource, err = tx.FindResourceByKeys(key)
+					_ = tx.Commit()
 
 					if errors.Is(err, bizmodel.ErrResourceNotFound) {
 						// Resource doesn't exist - create new one
 						t.Logf("Cycle %d: Creating new resource", cycle)
 						resource := createTestResourceWithLocalId(t, localResourceId)
-						err = repo.Transact(func(tx bizmodel.ResourceTx) error { return tx.Save(resource, bizmodel.OperationTypeCreated, bizmodel.NewTransactionId(fmt.Sprintf("repo-cycle-%d-create", cycle))) })
+						tx, err := repo.Begin()
+						require.NoError(t, err)
+						err = tx.Save(resource, bizmodel.OperationTypeCreated, bizmodel.NewTransactionId(fmt.Sprintf("repo-cycle-%d-create", cycle)))
+						require.NoError(t, err)
+						err = tx.Commit()
 						require.NoError(t, err, "Save should succeed in cycle %d", cycle)
 					} else {
 						// Resource exists (potentially tombstoned) - update it
@@ -1026,17 +1132,20 @@ func TestResourceRepository_IdempotentOperations(t *testing.T) {
 						err = foundResource.Update(key, apiHref, &consoleHref, nil, &reporterData, &commonData, transactionId)
 						require.NoError(t, err, "Update should succeed in cycle %d", cycle)
 
-						err = repo.Transact(func(tx bizmodel.ResourceTx) error { return tx.Save(*foundResource, bizmodel.OperationTypeUpdated, bizmodel.NewTransactionId(fmt.Sprintf("repo-cycle-%d-update", cycle))) })
+						tx, err := repo.Begin()
+						require.NoError(t, err)
+						err = tx.Save(*foundResource, bizmodel.OperationTypeUpdated, bizmodel.NewTransactionId(fmt.Sprintf("repo-cycle-%d-update", cycle)))
+						require.NoError(t, err)
+						err = tx.Commit()
 						require.NoError(t, err, "Update save should succeed in cycle %d", cycle)
 					}
 
 					// Verify current state after report/update
 					var currentResource *bizmodel.Resource
-					err = repo.Transact(func(tx bizmodel.ResourceTx) error {
-						var findErr error
-						currentResource, findErr = tx.FindResourceByKeys(key)
-						return findErr
-					})
+					tx, err = repo.Begin()
+					require.NoError(t, err)
+					currentResource, err = tx.FindResourceByKeys(key)
+					_ = tx.Commit()
 					require.NoError(t, err, "Should find resource after report/update in cycle %d", cycle)
 					require.NotNil(t, currentResource)
 					currentState := currentResource.ReporterResources()[0].Serialize()
@@ -1047,16 +1156,19 @@ func TestResourceRepository_IdempotentOperations(t *testing.T) {
 					err = currentResource.Delete(key)
 					require.NoError(t, err, "Delete should succeed in cycle %d", cycle)
 
-					err = repo.Transact(func(tx bizmodel.ResourceTx) error { return tx.Save(*currentResource, bizmodel.OperationTypeDeleted, bizmodel.NewTransactionId(fmt.Sprintf("repo-cycle-%d-delete", cycle))) })
+					tx, err = repo.Begin()
+					require.NoError(t, err)
+					err = tx.Save(*currentResource, bizmodel.OperationTypeDeleted, bizmodel.NewTransactionId(fmt.Sprintf("repo-cycle-%d-delete", cycle)))
+					require.NoError(t, err)
+					err = tx.Commit()
 					require.NoError(t, err, "Delete save should succeed in cycle %d", cycle)
 
 					// Verify state after delete
 					var deletedResource *bizmodel.Resource
-					err = repo.Transact(func(tx bizmodel.ResourceTx) error {
-						var findErr error
-						deletedResource, findErr = tx.FindResourceByKeys(key)
-						return findErr
-					})
+					tx, err = repo.Begin()
+					require.NoError(t, err)
+					deletedResource, err = tx.FindResourceByKeys(key)
+					_ = tx.Commit()
 					if errors.Is(err, bizmodel.ErrResourceNotFound) {
 						t.Logf("Cycle %d: Resource not found after delete (tombstone filter active)", cycle)
 					} else {
@@ -1108,7 +1220,11 @@ func TestSave(t *testing.T) {
 				repo := getFreshInstances()
 
 				resource := createTestResourceWithLocalId(t, "update-test")
-				err := repo.Transact(func(tx bizmodel.ResourceTx) error { return tx.Save(resource, bizmodel.OperationTypeCreated, bizmodel.NewTransactionId("test-tx-1")) })
+				tx, err := repo.Begin()
+				require.NoError(t, err)
+				err = tx.Save(resource, bizmodel.OperationTypeCreated, bizmodel.NewTransactionId("test-tx-1"))
+				require.NoError(t, err)
+				err = tx.Commit()
 				require.NoError(t, err)
 
 				key, err := bizmodel.NewReporterResourceKey("update-test", "k8s_cluster", "ocm", "ocm-instance-1")
@@ -1137,15 +1253,18 @@ func TestSave(t *testing.T) {
 				err = resource.Update(key, apiHref, &consoleHref, nil, &updatedReporterData, &updatedCommonData, updatedTransactionId)
 				require.NoError(t, err)
 
-				err = repo.Transact(func(tx bizmodel.ResourceTx) error { return tx.Save(resource, bizmodel.OperationTypeUpdated, bizmodel.NewTransactionId("test-tx-2")) })
+				tx, err = repo.Begin()
+				require.NoError(t, err)
+				err = tx.Save(resource, bizmodel.OperationTypeUpdated, bizmodel.NewTransactionId("test-tx-2"))
+				require.NoError(t, err)
+				err = tx.Commit()
 				require.NoError(t, err)
 
 				var foundResource *bizmodel.Resource
-				err = repo.Transact(func(tx bizmodel.ResourceTx) error {
-					var findErr error
-					foundResource, findErr = tx.FindResourceByKeys(key)
-					return findErr
-				})
+				tx, err = repo.Begin()
+				require.NoError(t, err)
+				foundResource, err = tx.FindResourceByKeys(key)
+				_ = tx.Commit()
 				require.NoError(t, err)
 				require.NotNil(t, foundResource)
 				assert.Len(t, foundResource.ReporterResources(), 1, "should have one reporter resource")
@@ -1156,18 +1275,21 @@ func TestSave(t *testing.T) {
 
 				resource := createTestResourceWithLocalId(t, "save-new-test")
 
-				err := repo.Transact(func(tx bizmodel.ResourceTx) error { return tx.Save(resource, bizmodel.OperationTypeCreated, bizmodel.NewTransactionId("test-tx-save")) })
+				tx, err := repo.Begin()
+				require.NoError(t, err)
+				err = tx.Save(resource, bizmodel.OperationTypeCreated, bizmodel.NewTransactionId("test-tx-save"))
+				require.NoError(t, err)
+				err = tx.Commit()
 				require.NoError(t, err)
 
 				key, err := bizmodel.NewReporterResourceKey("save-new-test", "k8s_cluster", "ocm", "ocm-instance-1")
 				require.NoError(t, err)
 
 				var foundResource *bizmodel.Resource
-				err = repo.Transact(func(tx bizmodel.ResourceTx) error {
-					var findErr error
-					foundResource, findErr = tx.FindResourceByKeys(key)
-					return findErr
-				})
+				tx, err = repo.Begin()
+				require.NoError(t, err)
+				foundResource, err = tx.FindResourceByKeys(key)
+				_ = tx.Commit()
 				require.NoError(t, err)
 				require.NotNil(t, foundResource)
 				assert.Len(t, foundResource.ReporterResources(), 1, "should have one reporter resource")
@@ -1181,18 +1303,21 @@ func TestSave(t *testing.T) {
 				repo := getFreshInstances()
 
 				resource := createTestResourceWithLocalId(t, "zero-pk-test")
-				err := repo.Transact(func(tx bizmodel.ResourceTx) error { return tx.Save(resource, bizmodel.OperationTypeCreated, bizmodel.NewTransactionId("test-tx-zero-pk")) })
+				tx, err := repo.Begin()
+				require.NoError(t, err)
+				err = tx.Save(resource, bizmodel.OperationTypeCreated, bizmodel.NewTransactionId("test-tx-zero-pk"))
+				require.NoError(t, err)
+				err = tx.Commit()
 				require.NoError(t, err, "Save should succeed and skip representations with zero value primary keys")
 
 				key, err := bizmodel.NewReporterResourceKey("zero-pk-test", "k8s_cluster", "ocm", "ocm-instance-1")
 				require.NoError(t, err)
 
 				var foundResource *bizmodel.Resource
-				err = repo.Transact(func(tx bizmodel.ResourceTx) error {
-					var findErr error
-					foundResource, findErr = tx.FindResourceByKeys(key)
-					return findErr
-				})
+				tx, err = repo.Begin()
+				require.NoError(t, err)
+				foundResource, err = tx.FindResourceByKeys(key)
+				_ = tx.Commit()
 				require.NoError(t, err, "Resource should be found even if representations were skipped")
 				require.NotNil(t, foundResource)
 			})
@@ -1236,10 +1361,18 @@ func TestResourceRepository_MultipleHostsLifecycle(t *testing.T) {
 			host1 := createTestResourceWithLocalIdAndType(t, "host-1", "host")
 			host2 := createTestResourceWithLocalIdAndType(t, "host-2", "host")
 
-			err := repo.Transact(func(tx bizmodel.ResourceTx) error { return tx.Save(host1, bizmodel.OperationTypeCreated, bizmodel.NewTransactionId("tx-create-host1")) })
+			tx, err := repo.Begin()
+			require.NoError(t, err)
+			err = tx.Save(host1, bizmodel.OperationTypeCreated, bizmodel.NewTransactionId("tx-create-host1"))
+			require.NoError(t, err)
+			err = tx.Commit()
 			require.NoError(t, err, "Should create host1")
 
-			err = repo.Transact(func(tx bizmodel.ResourceTx) error { return tx.Save(host2, bizmodel.OperationTypeCreated, bizmodel.NewTransactionId("tx-create-host2")) })
+			tx, err = repo.Begin()
+			require.NoError(t, err)
+			err = tx.Save(host2, bizmodel.OperationTypeCreated, bizmodel.NewTransactionId("tx-create-host2"))
+			require.NoError(t, err)
+			err = tx.Commit()
 			require.NoError(t, err, "Should create host2")
 
 			// Verify both hosts can be found
@@ -1249,20 +1382,18 @@ func TestResourceRepository_MultipleHostsLifecycle(t *testing.T) {
 			require.NoError(t, err)
 
 			var foundHost1 *bizmodel.Resource
-			err = repo.Transact(func(tx bizmodel.ResourceTx) error {
-				var findErr error
-				foundHost1, findErr = tx.FindResourceByKeys(key1)
-				return findErr
-			})
+			tx, err = repo.Begin()
+			require.NoError(t, err)
+			foundHost1, err = tx.FindResourceByKeys(key1)
+			_ = tx.Commit()
 			require.NoError(t, err, "Should find host1 after creation")
 			require.NotNil(t, foundHost1)
 
 			var foundHost2 *bizmodel.Resource
-			err = repo.Transact(func(tx bizmodel.ResourceTx) error {
-				var findErr error
-				foundHost2, findErr = tx.FindResourceByKeys(key2)
-				return findErr
-			})
+			tx, err = repo.Begin()
+			require.NoError(t, err)
+			foundHost2, err = tx.FindResourceByKeys(key2)
+			_ = tx.Commit()
 			require.NoError(t, err, "Should find host2 after creation")
 			require.NotNil(t, foundHost2)
 
@@ -1291,28 +1422,34 @@ func TestResourceRepository_MultipleHostsLifecycle(t *testing.T) {
 			err = foundHost2.Update(key2, apiHref, &consoleHref, nil, &updatedReporterData, &updatedCommonData, updatedTransactionId2)
 			require.NoError(t, err, "Should update host2")
 
-			err = repo.Transact(func(tx bizmodel.ResourceTx) error { return tx.Save(*foundHost1, bizmodel.OperationTypeUpdated, bizmodel.NewTransactionId("tx-update-host1")) })
+			tx, err = repo.Begin()
+			require.NoError(t, err)
+			err = tx.Save(*foundHost1, bizmodel.OperationTypeUpdated, bizmodel.NewTransactionId("tx-update-host1"))
+			require.NoError(t, err)
+			err = tx.Commit()
 			require.NoError(t, err, "Should save updated host1")
 
-			err = repo.Transact(func(tx bizmodel.ResourceTx) error { return tx.Save(*foundHost2, bizmodel.OperationTypeUpdated, bizmodel.NewTransactionId("tx-update-host2")) })
+			tx, err = repo.Begin()
+			require.NoError(t, err)
+			err = tx.Save(*foundHost2, bizmodel.OperationTypeUpdated, bizmodel.NewTransactionId("tx-update-host2"))
+			require.NoError(t, err)
+			err = tx.Commit()
 			require.NoError(t, err, "Should save updated host2")
 
 			// Verify both updated hosts can still be found
 			var updatedHost1 *bizmodel.Resource
-			err = repo.Transact(func(tx bizmodel.ResourceTx) error {
-				var findErr error
-				updatedHost1, findErr = tx.FindResourceByKeys(key1)
-				return findErr
-			})
+			tx, err = repo.Begin()
+			require.NoError(t, err)
+			updatedHost1, err = tx.FindResourceByKeys(key1)
+			_ = tx.Commit()
 			require.NoError(t, err, "Should find host1 after update")
 			require.NotNil(t, updatedHost1)
 
 			var updatedHost2 *bizmodel.Resource
-			err = repo.Transact(func(tx bizmodel.ResourceTx) error {
-				var findErr error
-				updatedHost2, findErr = tx.FindResourceByKeys(key2)
-				return findErr
-			})
+			tx, err = repo.Begin()
+			require.NoError(t, err)
+			updatedHost2, err = tx.FindResourceByKeys(key2)
+			_ = tx.Commit()
 			require.NoError(t, err, "Should find host2 after update")
 			require.NotNil(t, updatedHost2)
 
@@ -1323,27 +1460,33 @@ func TestResourceRepository_MultipleHostsLifecycle(t *testing.T) {
 			err = updatedHost2.Delete(key2)
 			require.NoError(t, err, "Should delete host2")
 
-			err = repo.Transact(func(tx bizmodel.ResourceTx) error { return tx.Save(*updatedHost1, bizmodel.OperationTypeDeleted, bizmodel.NewTransactionId("tx-delete-host1")) })
+			tx, err = repo.Begin()
+			require.NoError(t, err)
+			err = tx.Save(*updatedHost1, bizmodel.OperationTypeDeleted, bizmodel.NewTransactionId("tx-delete-host1"))
+			require.NoError(t, err)
+			err = tx.Commit()
 			require.NoError(t, err, "Should save deleted host1")
 
-			err = repo.Transact(func(tx bizmodel.ResourceTx) error { return tx.Save(*updatedHost2, bizmodel.OperationTypeDeleted, bizmodel.NewTransactionId("tx-delete-host2")) })
+			tx, err = repo.Begin()
+			require.NoError(t, err)
+			err = tx.Save(*updatedHost2, bizmodel.OperationTypeDeleted, bizmodel.NewTransactionId("tx-delete-host2"))
+			require.NoError(t, err)
+			err = tx.Commit()
 			require.NoError(t, err, "Should save deleted host2")
 
 			// Verify both hosts can be found (tombstoned) with tombstone filter removed
-			err = repo.Transact(func(tx bizmodel.ResourceTx) error {
-				var findErr error
-				foundHost1, findErr = tx.FindResourceByKeys(key1)
-				return findErr
-			})
+			tx, err = repo.Begin()
+			require.NoError(t, err)
+			foundHost1, err = tx.FindResourceByKeys(key1)
+			_ = tx.Commit()
 			require.NoError(t, err, "Should find tombstoned host1")
 			require.NotNil(t, foundHost1)
 			assert.True(t, foundHost1.ReporterResources()[0].Serialize().Tombstone, "Host1 should be tombstoned")
 
-			err = repo.Transact(func(tx bizmodel.ResourceTx) error {
-				var findErr error
-				foundHost2, findErr = tx.FindResourceByKeys(key2)
-				return findErr
-			})
+			tx, err = repo.Begin()
+			require.NoError(t, err)
+			foundHost2, err = tx.FindResourceByKeys(key2)
+			_ = tx.Commit()
 			require.NoError(t, err, "Should find tombstoned host2")
 			require.NotNil(t, foundHost2)
 			assert.True(t, foundHost2.ReporterResources()[0].Serialize().Tombstone, "Host2 should be tombstoned")
@@ -1385,18 +1528,21 @@ func TestResourceRepository_PartialDataScenarios(t *testing.T) {
 				repo := getFreshInstances()
 
 				resource := createTestResourceWithReporterDataOnly(t, "reporter-only-resource")
-				err := repo.Transact(func(tx bizmodel.ResourceTx) error { return tx.Save(resource, bizmodel.OperationTypeCreated, bizmodel.NewTransactionId("tx-reporter-only")) })
+				tx, err := repo.Begin()
+				require.NoError(t, err)
+				err = tx.Save(resource, bizmodel.OperationTypeCreated, bizmodel.NewTransactionId("tx-reporter-only"))
+				require.NoError(t, err)
+				err = tx.Commit()
 				require.NoError(t, err, "Should save resource with only reporter data")
 
 				key, err := bizmodel.NewReporterResourceKey("reporter-only-resource", "k8s_cluster", "ocm", "ocm-instance-1")
 				require.NoError(t, err)
 
 				var foundResource *bizmodel.Resource
-				err = repo.Transact(func(tx bizmodel.ResourceTx) error {
-					var findErr error
-					foundResource, findErr = tx.FindResourceByKeys(key)
-					return findErr
-				})
+				tx, err = repo.Begin()
+				require.NoError(t, err)
+				foundResource, err = tx.FindResourceByKeys(key)
+				_ = tx.Commit()
 				require.NoError(t, err, "Should find resource with only reporter data")
 				require.NotNil(t, foundResource)
 			})
@@ -1405,18 +1551,21 @@ func TestResourceRepository_PartialDataScenarios(t *testing.T) {
 				repo := getFreshInstances()
 
 				resource := createTestResourceWithCommonDataOnly(t, "common-only-resource")
-				err := repo.Transact(func(tx bizmodel.ResourceTx) error { return tx.Save(resource, bizmodel.OperationTypeCreated, bizmodel.NewTransactionId("tx-common-only")) })
+				tx, err := repo.Begin()
+				require.NoError(t, err)
+				err = tx.Save(resource, bizmodel.OperationTypeCreated, bizmodel.NewTransactionId("tx-common-only"))
+				require.NoError(t, err)
+				err = tx.Commit()
 				require.NoError(t, err, "Should save resource with only common data")
 
 				key, err := bizmodel.NewReporterResourceKey("common-only-resource", "k8s_cluster", "ocm", "ocm-instance-1")
 				require.NoError(t, err)
 
 				var foundResource *bizmodel.Resource
-				err = repo.Transact(func(tx bizmodel.ResourceTx) error {
-					var findErr error
-					foundResource, findErr = tx.FindResourceByKeys(key)
-					return findErr
-				})
+				tx, err = repo.Begin()
+				require.NoError(t, err)
+				foundResource, err = tx.FindResourceByKeys(key)
+				_ = tx.Commit()
 				require.NoError(t, err, "Should find resource with only common data")
 				require.NotNil(t, foundResource)
 			})
@@ -1426,18 +1575,21 @@ func TestResourceRepository_PartialDataScenarios(t *testing.T) {
 
 				// 1. Report with both reporter and common data
 				resourceBoth := createTestResourceWithLocalId(t, "progressive-resource")
-				err := repo.Transact(func(tx bizmodel.ResourceTx) error { return tx.Save(resourceBoth, bizmodel.OperationTypeCreated, bizmodel.NewTransactionId("tx-both")) })
+				tx, err := repo.Begin()
+				require.NoError(t, err)
+				err = tx.Save(resourceBoth, bizmodel.OperationTypeCreated, bizmodel.NewTransactionId("tx-both"))
+				require.NoError(t, err)
+				err = tx.Commit()
 				require.NoError(t, err, "Should save resource with both data types")
 
 				key, err := bizmodel.NewReporterResourceKey("progressive-resource", "k8s_cluster", "ocm", "ocm-instance-1")
 				require.NoError(t, err)
 
 				var foundResource *bizmodel.Resource
-				err = repo.Transact(func(tx bizmodel.ResourceTx) error {
-					var findErr error
-					foundResource, findErr = tx.FindResourceByKeys(key)
-					return findErr
-				})
+				tx, err = repo.Begin()
+				require.NoError(t, err)
+				foundResource, err = tx.FindResourceByKeys(key)
+				_ = tx.Commit()
 				require.NoError(t, err, "Should find resource after initial save")
 				require.NotNil(t, foundResource)
 
@@ -1461,15 +1613,18 @@ func TestResourceRepository_PartialDataScenarios(t *testing.T) {
 				err = foundResource.Update(key, apiHref, &consoleHref, nil, &reporterOnlyData, &emptyCommonData, updatedTransactionId1)
 				require.NoError(t, err, "Should update with reporter data only")
 
-				err = repo.Transact(func(tx bizmodel.ResourceTx) error { return tx.Save(*foundResource, bizmodel.OperationTypeUpdated, bizmodel.NewTransactionId("tx-reporter-update")) })
+				tx, err = repo.Begin()
+				require.NoError(t, err)
+				err = tx.Save(*foundResource, bizmodel.OperationTypeUpdated, bizmodel.NewTransactionId("tx-reporter-update"))
+				require.NoError(t, err)
+				err = tx.Commit()
 				require.NoError(t, err, "Should save resource with reporter-only update")
 
 				// 3. Update with just common data
-				err = repo.Transact(func(tx bizmodel.ResourceTx) error {
-					var findErr error
-					foundResource, findErr = tx.FindResourceByKeys(key)
-					return findErr
-				})
+				tx, err = repo.Begin()
+				require.NoError(t, err)
+				foundResource, err = tx.FindResourceByKeys(key)
+				_ = tx.Commit()
 				require.NoError(t, err, "Should find resource after reporter-only update")
 
 				emptyReporterData, err := bizmodel.NewRepresentation(map[string]interface{}{
@@ -1487,16 +1642,19 @@ func TestResourceRepository_PartialDataScenarios(t *testing.T) {
 				err = foundResource.Update(key, apiHref, &consoleHref, nil, &emptyReporterData, &commonOnlyData, updatedTransactionId2)
 				require.NoError(t, err, "Should update with common data only")
 
-				err = repo.Transact(func(tx bizmodel.ResourceTx) error { return tx.Save(*foundResource, bizmodel.OperationTypeUpdated, bizmodel.NewTransactionId("tx-common-update")) })
+				tx, err = repo.Begin()
+				require.NoError(t, err)
+				err = tx.Save(*foundResource, bizmodel.OperationTypeUpdated, bizmodel.NewTransactionId("tx-common-update"))
+				require.NoError(t, err)
+				err = tx.Commit()
 				require.NoError(t, err, "Should save resource with common-only update")
 
 				// Verify final resource can still be found
 				var finalResource *bizmodel.Resource
-				err = repo.Transact(func(tx bizmodel.ResourceTx) error {
-					var findErr error
-					finalResource, findErr = tx.FindResourceByKeys(key)
-					return findErr
-				})
+				tx, err = repo.Begin()
+				require.NoError(t, err)
+				finalResource, err = tx.FindResourceByKeys(key)
+				_ = tx.Commit()
 				require.NoError(t, err, "Should find resource after all updates")
 				require.NotNil(t, finalResource)
 			})
@@ -1537,14 +1695,22 @@ func TestSerializableCreateFails(t *testing.T) {
 			// Do NOT commit yet to hold locks
 
 			// Attempt to create the same resource via a separate serializable transaction managed by TM
-			err = repo.Transact(func(tx bizmodel.ResourceTx) error {
-				foundResource, findErr := tx.FindResourceByKeys(resource.ReporterResources()[0].ReporterResourceKey)
-				assert.NotNil(t, findErr)
-				assert.Nil(t, foundResource)
-				return tx.Save(resource, bizmodel.OperationTypeCreated, bizmodel.NewTransactionId("tx-create"))
-			})
-			assert.Error(t, err)
-			assert.ErrorContains(t, err, "transaction failed")
+			tx, err := repo.Begin()
+			require.NoError(t, err)
+			foundResource, findErr := tx.FindResourceByKeys(resource.ReporterResources()[0].ReporterResourceKey)
+			assert.NotNil(t, findErr)
+			assert.Nil(t, foundResource)
+			saveErr := tx.Save(resource, bizmodel.OperationTypeCreated, bizmodel.NewTransactionId("tx-create"))
+			commitErr := tx.Commit()
+			_ = tx.Rollback()
+
+			// Serialization failure can surface from Save or Commit
+			txErr := saveErr
+			if txErr == nil {
+				txErr = commitErr
+			}
+			assert.Error(t, txErr)
+			assert.True(t, errors.Is(txErr, bizmodel.ErrSerializationFailure), "expected serialization failure, got: %v", txErr)
 
 			// Cleanup
 			assert.NoError(t, conflictTx.Commit().Error)
@@ -1574,7 +1740,11 @@ func TestSerializableUpdateFails(t *testing.T) {
 
 			// Create initial resource (committed)
 			resource := createTestResourceWithLocalId(t, "serializable-update-conflict")
-			assert.NoError(t, repo.Transact(func(tx bizmodel.ResourceTx) error { return tx.Save(resource, bizmodel.OperationTypeCreated, bizmodel.NewTransactionId("tx-initial")) }))
+			tx, err := repo.Begin()
+			require.NoError(t, err)
+			err = tx.Save(resource, bizmodel.OperationTypeCreated, bizmodel.NewTransactionId("tx-initial"))
+			assert.NoError(t, err)
+			err = tx.Commit()
 
 			// Prepare an updated version
 			key, err := bizmodel.NewReporterResourceKey("serializable-update-conflict", "k8s_cluster", "ocm", "ocm-instance-1")
@@ -1597,11 +1767,19 @@ func TestSerializableUpdateFails(t *testing.T) {
 			// Do NOT commit yet to hold locks
 
 			// Attempt to update the same resource via TM-managed serializable transaction
-			err = repo.Transact(func(tx bizmodel.ResourceTx) error {
-				return tx.Save(resource, bizmodel.OperationTypeUpdated, bizmodel.NewTransactionId("tx-update"))
-			})
-			assert.Error(t, err)
-			assert.ErrorContains(t, err, "transaction failed")
+			tx, err = repo.Begin()
+			require.NoError(t, err)
+			saveErr := tx.Save(resource, bizmodel.OperationTypeUpdated, bizmodel.NewTransactionId("tx-update"))
+			commitErr := tx.Commit()
+			_ = tx.Rollback()
+
+			// Serialization failure can surface from Save or Commit
+			txErr := saveErr
+			if txErr == nil {
+				txErr = commitErr
+			}
+			assert.Error(t, txErr)
+			assert.True(t, errors.Is(txErr, bizmodel.ErrSerializationFailure), "expected serialization failure, got: %v", txErr)
 
 			// Cleanup
 			assert.NoError(t, conflictTx.Commit().Error)
@@ -2014,7 +2192,11 @@ func TestFindLatestRepresentations(t *testing.T) {
 			resource := createTestResourceWithLocalIdAndType(t, "localResourceId-latest", "host")
 
 			// Save initial version (version 0)
-			err = repo.Transact(func(tx bizmodel.ResourceTx) error { return tx.Save(resource, bizmodel.OperationTypeCreated, bizmodel.NewTransactionId("tx-latest-v0")) })
+			tx, err := repo.Begin()
+			require.NoError(t, err)
+			err = tx.Save(resource, bizmodel.OperationTypeCreated, bizmodel.NewTransactionId("tx-latest-v0"))
+			require.NoError(t, err)
+			err = tx.Commit()
 			require.NoError(t, err)
 
 			// Update to version 1
@@ -2033,7 +2215,11 @@ func TestFindLatestRepresentations(t *testing.T) {
 			require.NoError(t, err)
 			err = resource.Update(key, placeholderApiHref, nil, nil, &updatedReporter1, &updatedCommon1, transactionId1)
 			require.NoError(t, err)
-			err = repo.Transact(func(tx bizmodel.ResourceTx) error { return tx.Save(resource, bizmodel.OperationTypeUpdated, bizmodel.NewTransactionId("tx-latest-v1")) })
+			tx, err = repo.Begin()
+			require.NoError(t, err)
+			err = tx.Save(resource, bizmodel.OperationTypeUpdated, bizmodel.NewTransactionId("tx-latest-v1"))
+			require.NoError(t, err)
+			err = tx.Commit()
 			require.NoError(t, err)
 
 			// Update to version 2 (this should be the latest)
@@ -2051,16 +2237,19 @@ func TestFindLatestRepresentations(t *testing.T) {
 			transactionId2 := bizmodel.NewTransactionId("test-transaction-id-v2")
 			err = resource.Update(key, placeholderApiHref, nil, nil, &updatedReporter2, &updatedCommon2, transactionId2)
 			require.NoError(t, err)
-			err = repo.Transact(func(tx bizmodel.ResourceTx) error { return tx.Save(resource, bizmodel.OperationTypeUpdated, bizmodel.NewTransactionId("tx-latest-v2")) })
+			tx, err = repo.Begin()
+			require.NoError(t, err)
+			err = tx.Save(resource, bizmodel.OperationTypeUpdated, bizmodel.NewTransactionId("tx-latest-v2"))
+			require.NoError(t, err)
+			err = tx.Commit()
 			require.NoError(t, err)
 
 			// Test FindLatestRepresentations
 			var result *bizmodel.Representations
-			err = repo.Transact(func(tx bizmodel.ResourceTx) error {
-				var findErr error
-				result, findErr = tx.FindLatestRepresentations(key)
-				return findErr
-			})
+			tx, err = repo.Begin()
+			require.NoError(t, err)
+			result, err = tx.FindLatestRepresentations(key)
+			_ = tx.Commit()
 			require.NoError(t, err)
 
 			// Both implementations should return the latest version (version 2)
@@ -2109,7 +2298,11 @@ func TestFindCurrentAndPreviousVersionedRepresentations(t *testing.T) {
 
 				// Create and update a resource to have versioned representations (same for both implementations)
 				resource := createTestResourceWithLocalIdAndType(t, "workspace-test-resource", "host")
-				err := repo.Transact(func(tx bizmodel.ResourceTx) error { return tx.Save(resource, bizmodel.OperationTypeCreated, bizmodel.NewTransactionId("tx-ws-test")) })
+				tx, err := repo.Begin()
+				require.NoError(t, err)
+				err = tx.Save(resource, bizmodel.OperationTypeCreated, bizmodel.NewTransactionId("tx-ws-test"))
+				require.NoError(t, err)
+				err = tx.Commit()
 				require.NoError(t, err)
 
 				// Update to create version 1
@@ -2126,16 +2319,19 @@ func TestFindCurrentAndPreviousVersionedRepresentations(t *testing.T) {
 				require.NoError(t, err)
 				err = resource.Update(key, placeholderApiHref, nil, nil, &updatedReporter, &updatedCommon, transactionId)
 				require.NoError(t, err)
-				require.NoError(t, repo.Transact(func(tx bizmodel.ResourceTx) error { return tx.Save(resource, bizmodel.OperationTypeUpdated, bizmodel.NewTransactionId("tx-ws-update")) }))
+				tx, err = repo.Begin()
+				require.NoError(t, err)
+				err = tx.Save(resource, bizmodel.OperationTypeUpdated, bizmodel.NewTransactionId("tx-ws-update"))
+				require.NoError(t, err)
+				err = tx.Commit()
 
 				// Get current and previous versions
 				version := bizmodel.NewVersion(1)
 				var cur, prev *bizmodel.Representations
-				err = repo.Transact(func(tx bizmodel.ResourceTx) error {
-					var findErr error
-					cur, prev, findErr = tx.FindCurrentAndPreviousVersionedRepresentations(key, &version, bizmodel.OperationTypeUpdated)
-					return findErr
-				})
+				tx, err = repo.Begin()
+				require.NoError(t, err)
+				cur, prev, err = tx.FindCurrentAndPreviousVersionedRepresentations(key, &version, bizmodel.OperationTypeUpdated)
+				_ = tx.Commit()
 				require.NoError(t, err)
 
 				currentWS, previousWS := GetCurrentAndPreviousWorkspaceID(cur, prev)
@@ -2151,17 +2347,20 @@ func TestFindCurrentAndPreviousVersionedRepresentations(t *testing.T) {
 
 				// Create a resource without updates (version 0) - same for both implementations
 				resource := createTestResourceWithLocalIdAndType(t, "test-resource-v0", "host")
-				err = repo.Transact(func(tx bizmodel.ResourceTx) error { return tx.Save(resource, bizmodel.OperationTypeCreated, bizmodel.NewTransactionId("tx-v0-test")) })
+				tx, err := repo.Begin()
+				require.NoError(t, err)
+				err = tx.Save(resource, bizmodel.OperationTypeCreated, bizmodel.NewTransactionId("tx-v0-test"))
+				require.NoError(t, err)
+				err = tx.Commit()
 				require.NoError(t, err)
 
 				// Get version 0 representations
 				version := bizmodel.NewVersion(0)
 				var cur, prev *bizmodel.Representations
-				err = repo.Transact(func(tx bizmodel.ResourceTx) error {
-					var findErr error
-					cur, prev, findErr = tx.FindCurrentAndPreviousVersionedRepresentations(key, &version, bizmodel.OperationTypeCreated)
-					return findErr
-				})
+				tx, err = repo.Begin()
+				require.NoError(t, err)
+				cur, prev, err = tx.FindCurrentAndPreviousVersionedRepresentations(key, &version, bizmodel.OperationTypeCreated)
+				_ = tx.Commit()
 				require.NoError(t, err)
 
 				currentWS, previousWS := GetCurrentAndPreviousWorkspaceID(cur, prev)
@@ -2228,11 +2427,10 @@ func TestHasTransactionIdBeenProcessed(t *testing.T) {
 func testHasTransactionIdBeenProcessed(t *testing.T, repo bizmodel.ResourceRepository) {
 	t.Run("Empty transaction ID returns false", func(t *testing.T) {
 		var processed bool
-		err := repo.Transact(func(tx bizmodel.ResourceTx) error {
-			var checkErr error
-			processed, checkErr = tx.HasTransactionIdBeenProcessed(emptyTxId)
-			return checkErr
-		})
+		tx, err := repo.Begin()
+		require.NoError(t, err)
+		processed, err = tx.HasTransactionIdBeenProcessed(emptyTxId)
+		_ = tx.Commit()
 		require.NoError(t, err)
 		assert.False(t, processed, "Empty transaction ID should return false")
 	})
@@ -2241,11 +2439,10 @@ func testHasTransactionIdBeenProcessed(t *testing.T, repo bizmodel.ResourceRepos
 		transactionId := "non-existent-transaction-123"
 
 		var processed bool
-		err := repo.Transact(func(tx bizmodel.ResourceTx) error {
-			var checkErr error
-			processed, checkErr = tx.HasTransactionIdBeenProcessed(bizmodel.NewTransactionId(transactionId))
-			return checkErr
-		})
+		tx, err := repo.Begin()
+		require.NoError(t, err)
+		processed, err = tx.HasTransactionIdBeenProcessed(bizmodel.NewTransactionId(transactionId))
+		_ = tx.Commit()
 		require.NoError(t, err)
 		assert.False(t, processed, "Non-existent transaction ID should return false")
 	})
@@ -2257,11 +2454,10 @@ func testHasTransactionIdBeenProcessed(t *testing.T, repo bizmodel.ResourceRepos
 
 			// Initially should not be processed
 			var processed bool
-			err := fakeRepo.Transact(func(tx bizmodel.ResourceTx) error {
-				var checkErr error
-				processed, checkErr = tx.HasTransactionIdBeenProcessed(bizmodel.NewTransactionId(transactionId))
-				return checkErr
-			})
+			tx, err := fakeRepo.Begin()
+			require.NoError(t, err)
+			processed, err = tx.HasTransactionIdBeenProcessed(bizmodel.NewTransactionId(transactionId))
+			_ = tx.Commit()
 			require.NoError(t, err)
 			assert.False(t, processed, "Transaction ID should not be processed initially")
 
@@ -2269,21 +2465,19 @@ func testHasTransactionIdBeenProcessed(t *testing.T, repo bizmodel.ResourceRepos
 			fakeRepo.markTransactionIdAsProcessed(transactionId)
 
 			// Now should be processed
-			err = fakeRepo.Transact(func(tx bizmodel.ResourceTx) error {
-				var checkErr error
-				processed, checkErr = tx.HasTransactionIdBeenProcessed(bizmodel.NewTransactionId(transactionId))
-				return checkErr
-			})
+			tx, err = fakeRepo.Begin()
+			require.NoError(t, err)
+			processed, err = tx.HasTransactionIdBeenProcessed(bizmodel.NewTransactionId(transactionId))
+			_ = tx.Commit()
 			require.NoError(t, err)
 			assert.True(t, processed, "Transaction ID should be processed after marking")
 
 			// Different transaction ID should still be false
 			differentTransactionId := "different-transaction-789"
-			err = fakeRepo.Transact(func(tx bizmodel.ResourceTx) error {
-				var checkErr error
-				processed, checkErr = tx.HasTransactionIdBeenProcessed(bizmodel.NewTransactionId(differentTransactionId))
-				return checkErr
-			})
+			tx, err = fakeRepo.Begin()
+			require.NoError(t, err)
+			processed, err = tx.HasTransactionIdBeenProcessed(bizmodel.NewTransactionId(differentTransactionId))
+			_ = tx.Commit()
 			require.NoError(t, err)
 			assert.False(t, processed, "Different transaction ID should not be processed")
 		}
@@ -2297,20 +2491,18 @@ func testHasTransactionIdBeenProcessed(t *testing.T, repo bizmodel.ResourceRepos
 
 			// Test that the method doesn't crash and returns false for non-existent transaction
 			var processed bool
-			err := repo.Transact(func(tx bizmodel.ResourceTx) error {
-				var checkErr error
-				processed, checkErr = tx.HasTransactionIdBeenProcessed(bizmodel.NewTransactionId(transactionId))
-				return checkErr
-			})
+			tx, err := repo.Begin()
+			require.NoError(t, err)
+			processed, err = tx.HasTransactionIdBeenProcessed(bizmodel.NewTransactionId(transactionId))
+			_ = tx.Commit()
 			require.NoError(t, err)
 			assert.False(t, processed, "Non-existent transaction ID should return false")
 
 			// Test empty transaction ID
-			err = repo.Transact(func(tx bizmodel.ResourceTx) error {
-				var checkErr error
-				processed, checkErr = tx.HasTransactionIdBeenProcessed(emptyTxId)
-				return checkErr
-			})
+			tx, err = repo.Begin()
+			require.NoError(t, err)
+			processed, err = tx.HasTransactionIdBeenProcessed(emptyTxId)
+			_ = tx.Commit()
 			require.NoError(t, err)
 			assert.False(t, processed, "Empty transaction ID should return false")
 		}
@@ -2323,29 +2515,26 @@ func testHasTransactionIdBeenProcessed(t *testing.T, repo bizmodel.ResourceRepos
 
 		// Initially none should be processed
 		var processed1 bool
-		err := repo.Transact(func(tx bizmodel.ResourceTx) error {
-			var checkErr error
-			processed1, checkErr = tx.HasTransactionIdBeenProcessed(bizmodel.NewTransactionId(transactionId1))
-			return checkErr
-		})
+		tx, err := repo.Begin()
+		require.NoError(t, err)
+		processed1, err = tx.HasTransactionIdBeenProcessed(bizmodel.NewTransactionId(transactionId1))
+		_ = tx.Commit()
 		require.NoError(t, err)
 		assert.False(t, processed1, "Transaction ID 1 should not be processed initially")
 
 		var processed2 bool
-		err = repo.Transact(func(tx bizmodel.ResourceTx) error {
-			var checkErr error
-			processed2, checkErr = tx.HasTransactionIdBeenProcessed(bizmodel.NewTransactionId(transactionId2))
-			return checkErr
-		})
+		tx, err = repo.Begin()
+		require.NoError(t, err)
+		processed2, err = tx.HasTransactionIdBeenProcessed(bizmodel.NewTransactionId(transactionId2))
+		_ = tx.Commit()
 		require.NoError(t, err)
 		assert.False(t, processed2, "Transaction ID 2 should not be processed initially")
 
 		var processed3 bool
-		err = repo.Transact(func(tx bizmodel.ResourceTx) error {
-			var checkErr error
-			processed3, checkErr = tx.HasTransactionIdBeenProcessed(bizmodel.NewTransactionId(transactionId3))
-			return checkErr
-		})
+		tx, err = repo.Begin()
+		require.NoError(t, err)
+		processed3, err = tx.HasTransactionIdBeenProcessed(bizmodel.NewTransactionId(transactionId3))
+		_ = tx.Commit()
 		require.NoError(t, err)
 		assert.False(t, processed3, "Transaction ID 3 should not be processed initially")
 
@@ -2354,27 +2543,24 @@ func testHasTransactionIdBeenProcessed(t *testing.T, repo bizmodel.ResourceRepos
 			fakeRepo.markTransactionIdAsProcessed(transactionId2)
 
 			// Check all again
-			err = repo.Transact(func(tx bizmodel.ResourceTx) error {
-				var checkErr error
-				processed1, checkErr = tx.HasTransactionIdBeenProcessed(bizmodel.NewTransactionId(transactionId1))
-				return checkErr
-			})
+			tx, err := repo.Begin()
+			require.NoError(t, err)
+			processed1, err = tx.HasTransactionIdBeenProcessed(bizmodel.NewTransactionId(transactionId1))
+			_ = tx.Commit()
 			require.NoError(t, err)
 			assert.False(t, processed1, "Transaction ID 1 should still not be processed")
 
-			err = repo.Transact(func(tx bizmodel.ResourceTx) error {
-				var checkErr error
-				processed2, checkErr = tx.HasTransactionIdBeenProcessed(bizmodel.NewTransactionId(transactionId2))
-				return checkErr
-			})
+			tx, err = repo.Begin()
+			require.NoError(t, err)
+			processed2, err = tx.HasTransactionIdBeenProcessed(bizmodel.NewTransactionId(transactionId2))
+			_ = tx.Commit()
 			require.NoError(t, err)
 			assert.True(t, processed2, "Transaction ID 2 should now be processed")
 
-			err = repo.Transact(func(tx bizmodel.ResourceTx) error {
-				var checkErr error
-				processed3, checkErr = tx.HasTransactionIdBeenProcessed(bizmodel.NewTransactionId(transactionId3))
-				return checkErr
-			})
+			tx, err = repo.Begin()
+			require.NoError(t, err)
+			processed3, err = tx.HasTransactionIdBeenProcessed(bizmodel.NewTransactionId(transactionId3))
+			_ = tx.Commit()
 			require.NoError(t, err)
 			assert.False(t, processed3, "Transaction ID 3 should still not be processed")
 		}
@@ -2390,11 +2576,10 @@ func testHasTransactionIdBeenProcessed(t *testing.T, repo bizmodel.ResourceRepos
 			for i := 0; i < 10; i++ {
 				go func() {
 					var processed bool
-					err := fakeRepo.Transact(func(tx bizmodel.ResourceTx) error {
-						var checkErr error
-						processed, checkErr = tx.HasTransactionIdBeenProcessed(bizmodel.NewTransactionId(transactionId))
-						return checkErr
-					})
+					tx, err := fakeRepo.Begin()
+					require.NoError(t, err)
+					processed, err = tx.HasTransactionIdBeenProcessed(bizmodel.NewTransactionId(transactionId))
+					_ = tx.Commit()
 					require.NoError(t, err)
 					assert.False(t, processed, "Concurrent read should return false")
 					done <- true
@@ -2413,11 +2598,10 @@ func testHasTransactionIdBeenProcessed(t *testing.T, repo bizmodel.ResourceRepos
 			for i := 0; i < 10; i++ {
 				go func() {
 					var processed bool
-					err := fakeRepo.Transact(func(tx bizmodel.ResourceTx) error {
-						var checkErr error
-						processed, checkErr = tx.HasTransactionIdBeenProcessed(bizmodel.NewTransactionId(transactionId))
-						return checkErr
-					})
+					tx, err := fakeRepo.Begin()
+					require.NoError(t, err)
+					processed, err = tx.HasTransactionIdBeenProcessed(bizmodel.NewTransactionId(transactionId))
+					_ = tx.Commit()
 					require.NoError(t, err)
 					assert.True(t, processed, "Concurrent read should return true after marking")
 					done <- true
@@ -2473,7 +2657,11 @@ func testTransactionIDUniqueConstraint(t *testing.T, repo bizmodel.ResourceRepos
 		err := resource1.Update(key1, apiHref, &consoleHref, nil, &reporterData, &commonData, duplicateTxID)
 		require.NoError(t, err)
 
-		err = repo.Transact(func(tx bizmodel.ResourceTx) error { return tx.Save(resource1, bizmodel.OperationTypeCreated, bizmodel.NewTransactionId("tx-duplicate-1")) })
+		tx, err := repo.Begin()
+		require.NoError(t, err)
+		err = tx.Save(resource1, bizmodel.OperationTypeCreated, bizmodel.NewTransactionId("tx-duplicate-1"))
+		require.NoError(t, err)
+		err = tx.Commit()
 		require.NoError(t, err, "First save should succeed")
 
 		// Create second resource with the same TransactionID
@@ -2484,7 +2672,10 @@ func testTransactionIDUniqueConstraint(t *testing.T, repo bizmodel.ResourceRepos
 		require.NoError(t, err)
 
 		// This should fail due to unique constraint violation
-		err = repo.Transact(func(tx bizmodel.ResourceTx) error { return tx.Save(resource2, bizmodel.OperationTypeCreated, bizmodel.NewTransactionId("tx-duplicate-2")) })
+		tx, err = repo.Begin()
+		require.NoError(t, err)
+		err = tx.Save(resource2, bizmodel.OperationTypeCreated, bizmodel.NewTransactionId("tx-duplicate-2"))
+		_ = tx.Commit()
 		require.Error(t, err, "Second save should fail due to duplicate TransactionID")
 		assert.Contains(t, err.Error(), bizmodel.ReasonNonUniqueTransactionID)
 	})
@@ -2680,15 +2871,18 @@ func TestCommonVersionIncrementAndResetCycle(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	err = repo.Transact(func(tx bizmodel.ResourceTx) error { return tx.Save(resource, bizmodel.OperationTypeCreated, emptyTxId) })
+	tx, err := repo.Begin()
+	require.NoError(t, err)
+	err = tx.Save(resource, bizmodel.OperationTypeCreated, emptyTxId)
+	require.NoError(t, err)
+	err = tx.Commit()
 	require.NoError(t, err)
 
 	var found *bizmodel.Resource
-	err = repo.Transact(func(tx bizmodel.ResourceTx) error {
-		var findErr error
-		found, findErr = tx.FindResourceByKeys(key)
-		return findErr
-	})
+	tx, err = repo.Begin()
+	require.NoError(t, err)
+	found, err = tx.FindResourceByKeys(key)
+	_ = tx.Commit()
 	require.NoError(t, err)
 	require.NotNil(t, found)
 	snap, _, _, _, err := found.Serialize()
@@ -2707,14 +2901,17 @@ func TestCommonVersionIncrementAndResetCycle(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	err = repo.Transact(func(tx bizmodel.ResourceTx) error { return tx.Save(*found, bizmodel.OperationTypeUpdated, emptyTxId) })
+	tx, err = repo.Begin()
+	require.NoError(t, err)
+	err = tx.Save(*found, bizmodel.OperationTypeUpdated, emptyTxId)
+	require.NoError(t, err)
+	err = tx.Commit()
 	require.NoError(t, err)
 
-	err = repo.Transact(func(tx bizmodel.ResourceTx) error {
-		var findErr error
-		found, findErr = tx.FindResourceByKeys(key)
-		return findErr
-	})
+	tx, err = repo.Begin()
+	require.NoError(t, err)
+	found, err = tx.FindResourceByKeys(key)
+	_ = tx.Commit()
 	require.NoError(t, err)
 	require.NotNil(t, found)
 	snap, _, _, _, err = found.Serialize()
@@ -2732,14 +2929,17 @@ func TestCommonVersionIncrementAndResetCycle(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	err = repo.Transact(func(tx bizmodel.ResourceTx) error { return tx.Save(*found, bizmodel.OperationTypeUpdated, emptyTxId) })
+	tx, err = repo.Begin()
+	require.NoError(t, err)
+	err = tx.Save(*found, bizmodel.OperationTypeUpdated, emptyTxId)
+	require.NoError(t, err)
+	err = tx.Commit()
 	require.NoError(t, err)
 
-	err = repo.Transact(func(tx bizmodel.ResourceTx) error {
-		var findErr error
-		found, findErr = tx.FindResourceByKeys(key)
-		return findErr
-	})
+	tx, err = repo.Begin()
+	require.NoError(t, err)
+	found, err = tx.FindResourceByKeys(key)
+	_ = tx.Commit()
 	require.NoError(t, err)
 	require.NotNil(t, found)
 	snap, _, _, _, err = found.Serialize()
@@ -2787,14 +2987,17 @@ func TestCommonVersionAfterDeleteAndRecreate(t *testing.T) {
 		nil,
 	)
 	require.NoError(t, err)
-	require.NoError(t, repo.Transact(func(tx bizmodel.ResourceTx) error { return tx.Save(resource1, bizmodel.OperationTypeCreated, emptyTxId) }))
+	tx, err := repo.Begin()
+	require.NoError(t, err)
+	err = tx.Save(resource1, bizmodel.OperationTypeCreated, emptyTxId)
+	require.NoError(t, err)
+	err = tx.Commit()
 
 	var found *bizmodel.Resource
-	err = repo.Transact(func(tx bizmodel.ResourceTx) error {
-		var findErr error
-		found, findErr = tx.FindResourceByKeys(key)
-		return findErr
-	})
+	tx, err = repo.Begin()
+	require.NoError(t, err)
+	found, err = tx.FindResourceByKeys(key)
+	_ = tx.Commit()
 	require.NoError(t, err)
 	drRep2 := bizmodel.Representation(internal.JsonObject{"cluster_id": "v2"})
 	drCommon2 := bizmodel.Representation(internal.JsonObject{"workspace_id": "ws-v2"})
@@ -2803,13 +3006,16 @@ func TestCommonVersionAfterDeleteAndRecreate(t *testing.T) {
 		&drCommon2,
 		newUniqueTxID("dr-update-1a"),
 	))
-	require.NoError(t, repo.Transact(func(tx bizmodel.ResourceTx) error { return tx.Save(*found, bizmodel.OperationTypeUpdated, emptyTxId) }))
+	tx, err = repo.Begin()
+	require.NoError(t, err)
+	err = tx.Save(*found, bizmodel.OperationTypeUpdated, emptyTxId)
+	require.NoError(t, err)
+	err = tx.Commit()
 
-	err = repo.Transact(func(tx bizmodel.ResourceTx) error {
-		var findErr error
-		found, findErr = tx.FindResourceByKeys(key)
-		return findErr
-	})
+	tx, err = repo.Begin()
+	require.NoError(t, err)
+	found, err = tx.FindResourceByKeys(key)
+	_ = tx.Commit()
 	require.NoError(t, err)
 	drRep3 := bizmodel.Representation(internal.JsonObject{"cluster_id": "v3"})
 	drCommon3 := bizmodel.Representation(internal.JsonObject{"workspace_id": "ws-v3"})
@@ -2818,13 +3024,16 @@ func TestCommonVersionAfterDeleteAndRecreate(t *testing.T) {
 		&drCommon3,
 		newUniqueTxID("dr-update-1b"),
 	))
-	require.NoError(t, repo.Transact(func(tx bizmodel.ResourceTx) error { return tx.Save(*found, bizmodel.OperationTypeUpdated, emptyTxId) }))
+	tx, err = repo.Begin()
+	require.NoError(t, err)
+	err = tx.Save(*found, bizmodel.OperationTypeUpdated, emptyTxId)
+	require.NoError(t, err)
+	err = tx.Commit()
 
-	err = repo.Transact(func(tx bizmodel.ResourceTx) error {
-		var findErr error
-		found, findErr = tx.FindResourceByKeys(key)
-		return findErr
-	})
+	tx, err = repo.Begin()
+	require.NoError(t, err)
+	found, err = tx.FindResourceByKeys(key)
+	_ = tx.Commit()
 	require.NoError(t, err)
 	snap, _, _, _, err := found.Serialize()
 	require.NoError(t, err)
@@ -2832,7 +3041,11 @@ func TestCommonVersionAfterDeleteAndRecreate(t *testing.T) {
 
 	// Delete the first lifecycle resource
 	require.NoError(t, found.Delete(key))
-	require.NoError(t, repo.Transact(func(tx bizmodel.ResourceTx) error { return tx.Save(*found, bizmodel.OperationTypeDeleted, emptyTxId) }))
+	tx, err = repo.Begin()
+	require.NoError(t, err)
+	err = tx.Save(*found, bizmodel.OperationTypeDeleted, emptyTxId)
+	require.NoError(t, err)
+	err = tx.Commit()
 
 	// --- Second lifecycle: new UUIDs, same logical identity ---
 	// The system always generates fresh UUIDs on recreation; common_representations
@@ -2855,13 +3068,16 @@ func TestCommonVersionAfterDeleteAndRecreate(t *testing.T) {
 		nil,
 	)
 	require.NoError(t, err)
-	require.NoError(t, repo.Transact(func(tx bizmodel.ResourceTx) error { return tx.Save(resource2, bizmodel.OperationTypeCreated, emptyTxId) }))
+	tx, err = repo.Begin()
+	require.NoError(t, err)
+	err = tx.Save(resource2, bizmodel.OperationTypeCreated, emptyTxId)
+	require.NoError(t, err)
+	err = tx.Commit()
 
-	err = repo.Transact(func(tx bizmodel.ResourceTx) error {
-		var findErr error
-		found, findErr = tx.FindResourceByKeys(key)
-		return findErr
-	})
+	tx, err = repo.Begin()
+	require.NoError(t, err)
+	found, err = tx.FindResourceByKeys(key)
+	_ = tx.Commit()
 	require.NoError(t, err)
 	snap, _, _, _, err = found.Serialize()
 	require.NoError(t, err)
@@ -2874,13 +3090,16 @@ func TestCommonVersionAfterDeleteAndRecreate(t *testing.T) {
 		&drCommon2New,
 		newUniqueTxID("dr-update-2a"),
 	))
-	require.NoError(t, repo.Transact(func(tx bizmodel.ResourceTx) error { return tx.Save(*found, bizmodel.OperationTypeUpdated, emptyTxId) }))
+	tx, err = repo.Begin()
+	require.NoError(t, err)
+	err = tx.Save(*found, bizmodel.OperationTypeUpdated, emptyTxId)
+	require.NoError(t, err)
+	err = tx.Commit()
 
-	err = repo.Transact(func(tx bizmodel.ResourceTx) error {
-		var findErr error
-		found, findErr = tx.FindResourceByKeys(key)
-		return findErr
-	})
+	tx, err = repo.Begin()
+	require.NoError(t, err)
+	found, err = tx.FindResourceByKeys(key)
+	_ = tx.Commit()
 	require.NoError(t, err)
 	snap, _, _, _, err = found.Serialize()
 	require.NoError(t, err)
@@ -2944,7 +3163,11 @@ func TestNullCommonVersionPersistence(t *testing.T) {
 	_ = emptyCommonRepresentation
 	require.NoError(t, err)
 
-	err = repo.Transact(func(tx bizmodel.ResourceTx) error { return tx.Save(resource, bizmodel.OperationTypeCreated, emptyTxId) })
+	tx, err := repo.Begin()
+	require.NoError(t, err)
+	err = tx.Save(resource, bizmodel.OperationTypeCreated, emptyTxId)
+	require.NoError(t, err)
+	err = tx.Commit()
 	require.NoError(t, err, "Should save resource without common representation")
 
 	key, err := bizmodel.NewReporterResourceKey(
@@ -2956,11 +3179,10 @@ func TestNullCommonVersionPersistence(t *testing.T) {
 	require.NoError(t, err)
 
 	var retrievedResource *bizmodel.Resource
-	err = repo.Transact(func(tx bizmodel.ResourceTx) error {
-		var findErr error
-		retrievedResource, findErr = tx.FindResourceByKeys(key)
-		return findErr
-	})
+	tx, err = repo.Begin()
+	require.NoError(t, err)
+	retrievedResource, err = tx.FindResourceByKeys(key)
+	_ = tx.Commit()
 	require.NoError(t, err, "Should find resource by keys")
 	require.NotNil(t, retrievedResource, "Retrieved resource should not be nil")
 
@@ -3017,15 +3239,18 @@ func TestCommonVersionDropThenReAdd(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	err = repo.Transact(func(tx bizmodel.ResourceTx) error { return tx.Save(resource, bizmodel.OperationTypeCreated, emptyTxId) })
+	tx, err := repo.Begin()
+	require.NoError(t, err)
+	err = tx.Save(resource, bizmodel.OperationTypeCreated, emptyTxId)
+	require.NoError(t, err)
+	err = tx.Commit()
 	require.NoError(t, err)
 
 	var found *bizmodel.Resource
-	err = repo.Transact(func(tx bizmodel.ResourceTx) error {
-		var findErr error
-		found, findErr = tx.FindResourceByKeys(key)
-		return findErr
-	})
+	tx, err = repo.Begin()
+	require.NoError(t, err)
+	found, err = tx.FindResourceByKeys(key)
+	_ = tx.Commit()
 	require.NoError(t, err)
 	require.NotNil(t, found)
 	snap, _, _, _, err := found.Serialize()
@@ -3042,14 +3267,17 @@ func TestCommonVersionDropThenReAdd(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	err = repo.Transact(func(tx bizmodel.ResourceTx) error { return tx.Save(*found, bizmodel.OperationTypeUpdated, emptyTxId) })
+	tx, err = repo.Begin()
+	require.NoError(t, err)
+	err = tx.Save(*found, bizmodel.OperationTypeUpdated, emptyTxId)
+	require.NoError(t, err)
+	err = tx.Commit()
 	require.NoError(t, err)
 
-	err = repo.Transact(func(tx bizmodel.ResourceTx) error {
-		var findErr error
-		found, findErr = tx.FindResourceByKeys(key)
-		return findErr
-	})
+	tx, err = repo.Begin()
+	require.NoError(t, err)
+	found, err = tx.FindResourceByKeys(key)
+	_ = tx.Commit()
 	require.NoError(t, err)
 	require.NotNil(t, found)
 	snap, _, _, _, err = found.Serialize()
@@ -3067,14 +3295,17 @@ func TestCommonVersionDropThenReAdd(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	err = repo.Transact(func(tx bizmodel.ResourceTx) error { return tx.Save(*found, bizmodel.OperationTypeUpdated, emptyTxId) })
+	tx, err = repo.Begin()
+	require.NoError(t, err)
+	err = tx.Save(*found, bizmodel.OperationTypeUpdated, emptyTxId)
+	require.NoError(t, err)
+	err = tx.Commit()
 	require.NoError(t, err)
 
-	err = repo.Transact(func(tx bizmodel.ResourceTx) error {
-		var findErr error
-		found, findErr = tx.FindResourceByKeys(key)
-		return findErr
-	})
+	tx, err = repo.Begin()
+	require.NoError(t, err)
+	found, err = tx.FindResourceByKeys(key)
+	_ = tx.Commit()
 	require.NoError(t, err)
 	require.NotNil(t, found)
 	snap, _, _, _, err = found.Serialize()
@@ -3129,15 +3360,18 @@ func TestCommonVersionFirstAddedOnUpdate(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	err = repo.Transact(func(tx bizmodel.ResourceTx) error { return tx.Save(resource, bizmodel.OperationTypeCreated, emptyTxId) })
+	tx, err := repo.Begin()
+	require.NoError(t, err)
+	err = tx.Save(resource, bizmodel.OperationTypeCreated, emptyTxId)
+	require.NoError(t, err)
+	err = tx.Commit()
 	require.NoError(t, err)
 
 	var found *bizmodel.Resource
-	err = repo.Transact(func(tx bizmodel.ResourceTx) error {
-		var findErr error
-		found, findErr = tx.FindResourceByKeys(key)
-		return findErr
-	})
+	tx, err = repo.Begin()
+	require.NoError(t, err)
+	found, err = tx.FindResourceByKeys(key)
+	_ = tx.Commit()
 	require.NoError(t, err)
 	require.NotNil(t, found)
 	snap, _, _, _, err := found.Serialize()
@@ -3155,14 +3389,17 @@ func TestCommonVersionFirstAddedOnUpdate(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	err = repo.Transact(func(tx bizmodel.ResourceTx) error { return tx.Save(*found, bizmodel.OperationTypeUpdated, emptyTxId) })
+	tx, err = repo.Begin()
+	require.NoError(t, err)
+	err = tx.Save(*found, bizmodel.OperationTypeUpdated, emptyTxId)
+	require.NoError(t, err)
+	err = tx.Commit()
 	require.NoError(t, err)
 
-	err = repo.Transact(func(tx bizmodel.ResourceTx) error {
-		var findErr error
-		found, findErr = tx.FindResourceByKeys(key)
-		return findErr
-	})
+	tx, err = repo.Begin()
+	require.NoError(t, err)
+	found, err = tx.FindResourceByKeys(key)
+	_ = tx.Commit()
 	require.NoError(t, err)
 	require.NotNil(t, found)
 	snap, _, _, _, err = found.Serialize()

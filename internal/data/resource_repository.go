@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/go-kratos/kratos/v2/log"
 	kratosErrors "github.com/go-kratos/kratos/v2/errors"
+	"github.com/go-kratos/kratos/v2/log"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/mattn/go-sqlite3"
@@ -137,71 +137,40 @@ func NewResourceRepository(cfg GormResourceRepositoryConfig) bizmodel.ResourceRe
 
 var _ bizmodel.ResourceRepository = (*resourceRepository)(nil)
 
-// Transact executes fn within a serializable transaction with automatic retry
-// on serialization failures (PostgreSQL 40001 / SQLite busy).
-func (r *resourceRepository) Transact(fn func(tx bizmodel.ResourceTx) error) error {
-	var err error
-	for i := 0; i < r.maxSerializationRetries; i++ {
-		var gormTx *gorm.DB
-		gormTx, err = r.beginTx()
-		if err != nil {
-			return err
-		}
-
-		rtx := &gormResourceTx{
-			gormTx:          gormTx,
-			outboxPublisher: r.outboxPublisher,
-		}
-
-		err = fn(rtx)
-		if err != nil {
-			_ = rtx.rollback()
-			if isSerializationFailure(err, i, r.maxSerializationRetries) {
-				metricscollector.Incr(r.metricsCollector.SerializationFailures, r.operationName)
-				continue
-			}
-			return fmt.Errorf("transaction failed: %w", err)
-		}
-
-		err = rtx.commit()
-		if err != nil {
-			_ = rtx.rollback()
-			if isSerializationFailure(err, i, r.maxSerializationRetries) {
-				metricscollector.Incr(r.metricsCollector.SerializationFailures, r.operationName)
-				continue
-			}
-			return fmt.Errorf("committing transaction failed: %w", err)
-		}
-		return nil
-	}
-	metricscollector.Incr(r.metricsCollector.SerializationExhaustions, r.operationName)
-	log.Errorf("transaction failed after %d attempts: %v", r.maxSerializationRetries, err)
-	return fmt.Errorf("transaction failed after %d attempts: %w", r.maxSerializationRetries, err)
-}
-
-func (r *resourceRepository) beginTx() (*gorm.DB, error) {
+func (r *resourceRepository) Begin() (bizmodel.ResourceTx, error) {
 	gormTx := r.db.Begin(&sql.TxOptions{
 		Isolation: sql.LevelSerializable,
 	})
 	if gormTx.Error != nil {
 		return nil, fmt.Errorf("failed to begin transaction: %w", gormTx.Error)
 	}
-	return gormTx, nil
+	return &gormResourceTx{
+		gormTx:           gormTx,
+		outboxPublisher:  r.outboxPublisher,
+		metricsCollector: r.metricsCollector,
+		operationName:    r.operationName,
+	}, nil
 }
 
-func isSerializationFailure(err error, attempt, maxRetries int) bool {
+func (r *resourceRepository) MaxSerializationRetries() int {
+	return r.maxSerializationRetries
+}
+
+func (r *resourceRepository) RecordSerializationExhaustion() {
+	metricscollector.Incr(r.metricsCollector.SerializationExhaustions, r.operationName)
+}
+
+func isSerializationFailure(err error) bool {
 	var pgErr *pgconn.PgError
 	if errors.As(err, &pgErr) {
 		if pgErr.Code == "40001" {
-			log.Errorf("transaction serialization failure (attempt %d/%d): %v", attempt+1, maxRetries, err)
 			return true
 		}
 	}
 
 	var sqliteErr sqlite3.Error
 	if errors.As(err, &sqliteErr) {
-		if sqliteErr.Code == sqlite3.ErrError {
-			log.Errorf("transaction serialization failure (attempt %d/%d): %v", attempt+1, maxRetries, err)
+		if sqliteErr.Code == sqlite3.ErrBusy || sqliteErr.Code == sqlite3.ErrLocked {
 			return true
 		}
 	}
@@ -212,30 +181,46 @@ func isSerializationFailure(err error, attempt, maxRetries int) bool {
 
 // gormResourceTx implements model.ResourceTx within a GORM transaction.
 type gormResourceTx struct {
-	gormTx          *gorm.DB
-	outboxPublisher OutboxPublisher
-	done            bool
+	gormTx           *gorm.DB
+	outboxPublisher  OutboxPublisher
+	metricsCollector *metricscollector.MetricsCollector
+	operationName    string
+	done             bool
 }
 
 var _ bizmodel.ResourceTx = (*gormResourceTx)(nil)
 
-func (tx *gormResourceTx) commit() error {
+func (tx *gormResourceTx) Commit() error {
 	if tx.done {
 		return nil
 	}
 	if err := tx.gormTx.Commit().Error; err != nil {
+		if isSerializationFailure(err) {
+			metricscollector.Incr(tx.metricsCollector.SerializationFailures, tx.operationName)
+			return fmt.Errorf("commit failed: %w", bizmodel.ErrSerializationFailure)
+		}
 		return fmt.Errorf("commit failed: %w", err)
 	}
 	tx.done = true
 	return nil
 }
 
-func (tx *gormResourceTx) rollback() error {
+func (tx *gormResourceTx) Rollback() error {
 	if tx.done {
 		return nil
 	}
 	tx.done = true
 	return tx.gormTx.Rollback().Error
+}
+
+// wrapSerializationError checks whether err is a serialization failure and,
+// if so, wraps it with the domain sentinel and increments the metric.
+func (tx *gormResourceTx) wrapSerializationError(err error) error {
+	if err != nil && isSerializationFailure(err) {
+		metricscollector.Incr(tx.metricsCollector.SerializationFailures, tx.operationName)
+		return fmt.Errorf("%w: %v", bizmodel.ErrSerializationFailure, err)
+	}
+	return err
 }
 
 func (tx *gormResourceTx) NextResourceId() (bizmodel.ResourceId, error) {
@@ -264,10 +249,16 @@ func (tx *gormResourceTx) Save(resource bizmodel.Resource, operationType bizmode
 	dataReporterResource := datamodel.DeserializeReporterResourceFromSnapshot(reporterResourceSnapshot)
 
 	if err := tx.gormTx.Save(&dataResource).Error; err != nil {
+		if wrapped := tx.wrapSerializationError(err); wrapped != err {
+			return wrapped
+		}
 		return fmt.Errorf("failed to save resource: %w", err)
 	}
 
 	if err := tx.gormTx.Save(&dataReporterResource).Error; err != nil {
+		if wrapped := tx.wrapSerializationError(err); wrapped != err {
+			return wrapped
+		}
 		return fmt.Errorf("failed to save reporter resource: %w", err)
 	}
 
@@ -276,6 +267,9 @@ func (tx *gormResourceTx) Save(resource bizmodel.Resource, operationType bizmode
 		if err := tx.gormTx.Create(&dataReporterRepresentation).Error; err != nil {
 			if kratosErrors.Is(err, gorm.ErrDuplicatedKey) {
 				return kratosErrors.BadRequest(bizmodel.ReasonNonUniqueTransactionID, err.Error()).WithCause(err)
+			}
+			if wrapped := tx.wrapSerializationError(err); wrapped != err {
+				return wrapped
 			}
 			return fmt.Errorf("failed to save reporter representation: %w", err)
 		}
@@ -286,6 +280,9 @@ func (tx *gormResourceTx) Save(resource bizmodel.Resource, operationType bizmode
 		if err := tx.gormTx.Create(&dataCommonRepresentation).Error; err != nil {
 			if kratosErrors.Is(err, gorm.ErrDuplicatedKey) {
 				return kratosErrors.BadRequest(bizmodel.ReasonNonUniqueTransactionID, err.Error()).WithCause(err)
+			}
+			if wrapped := tx.wrapSerializationError(err); wrapped != err {
+				return wrapped
 			}
 			return fmt.Errorf("failed to save common representation: %w", err)
 		}
@@ -372,6 +369,9 @@ func (tx *gormResourceTx) FindResourceByKeys(key bizmodel.ReporterResourceKey) (
 		Find(&results).Error
 
 	if err != nil {
+		if wrapped := tx.wrapSerializationError(err); wrapped != err {
+			return nil, wrapped
+		}
 		return nil, fmt.Errorf("failed to find resource by keys: %w", err)
 	}
 
@@ -418,6 +418,9 @@ func (tx *gormResourceTx) FindCurrentAndPreviousVersionedRepresentations(key biz
 
 	err := query.Find(&results).Error
 	if err != nil {
+		if wrapped := tx.wrapSerializationError(err); wrapped != err {
+			return nil, nil, wrapped
+		}
 		return nil, nil, fmt.Errorf("failed to find common representations by version: %w", err)
 	}
 
@@ -455,6 +458,9 @@ func (tx *gormResourceTx) FindLatestRepresentations(key bizmodel.ReporterResourc
 
 	err := query.Order("cr.version DESC").Limit(1).Scan(&result).Error
 	if err != nil {
+		if wrapped := tx.wrapSerializationError(err); wrapped != err {
+			return nil, wrapped
+		}
 		return nil, fmt.Errorf("failed to find latest representations: %w", err)
 	}
 
@@ -486,6 +492,9 @@ func (tx *gormResourceTx) HasTransactionIdBeenProcessed(transactionId bizmodel.T
 	`, tid, tid).Scan(&exists).Error
 
 	if err != nil {
+		if wrapped := tx.wrapSerializationError(err); wrapped != err {
+			return false, wrapped
+		}
 		return false, fmt.Errorf("failed to check representations for the transaction_id: %w", err)
 	}
 	return exists, nil

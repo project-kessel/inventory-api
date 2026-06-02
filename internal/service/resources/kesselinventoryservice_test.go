@@ -3218,33 +3218,45 @@ func newSQLiteTestRepo(t *testing.T) model.ResourceRepository {
 }
 
 func repoFindResourceByKeys(repo model.ResourceRepository, key model.ReporterResourceKey) (*model.Resource, error) {
-	var resource *model.Resource
-	err := repo.Transact(func(tx model.ResourceTx) error {
-		var innerErr error
-		resource, innerErr = tx.FindResourceByKeys(key)
-		return innerErr
-	})
-	return resource, err
+	tx, err := repo.Begin()
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = tx.Rollback() }()
+	resource, err := tx.FindResourceByKeys(key)
+	if err != nil {
+		return nil, err
+	}
+	_ = tx.Commit()
+	return resource, nil
 }
 
 func repoFindLatestRepresentations(repo model.ResourceRepository, key model.ReporterResourceKey) (*model.Representations, error) {
-	var reps *model.Representations
-	err := repo.Transact(func(tx model.ResourceTx) error {
-		var innerErr error
-		reps, innerErr = tx.FindLatestRepresentations(key)
-		return innerErr
-	})
-	return reps, err
+	tx, err := repo.Begin()
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = tx.Rollback() }()
+	reps, err := tx.FindLatestRepresentations(key)
+	if err != nil {
+		return nil, err
+	}
+	_ = tx.Commit()
+	return reps, nil
 }
 
 func repoHasTransactionIdBeenProcessed(repo model.ResourceRepository, transactionId model.TransactionId) (bool, error) {
-	var processed bool
-	err := repo.Transact(func(tx model.ResourceTx) error {
-		var innerErr error
-		processed, innerErr = tx.HasTransactionIdBeenProcessed(transactionId)
-		return innerErr
-	})
-	return processed, err
+	tx, err := repo.Begin()
+	if err != nil {
+		return false, err
+	}
+	defer func() { _ = tx.Rollback() }()
+	processed, err := tx.HasTransactionIdBeenProcessed(transactionId)
+	if err != nil {
+		return false, err
+	}
+	_ = tx.Commit()
+	return processed, nil
 }
 
 // buildReporterResourceKey is a test helper that constructs a model.ReporterResourceKey

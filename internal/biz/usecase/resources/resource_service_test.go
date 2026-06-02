@@ -11,13 +11,13 @@ import (
 	"testing"
 
 	"github.com/go-kratos/kratos/v2/log"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	authnapi "github.com/project-kessel/inventory-api/internal/authn/api"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
 	"github.com/project-kessel/inventory-api/internal/biz/usecase/metaauthorizer"
 	"github.com/project-kessel/inventory-api/internal/data"
 	"github.com/project-kessel/inventory-api/internal/metricscollector"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -111,15 +111,19 @@ func (h *testHarness) resetMeta() {
 	}
 }
 
-// findResourceByKeys wraps a Transact call around tx.FindResourceByKeys for test convenience.
+// findResourceByKeys wraps Begin/FindResourceByKeys/Commit for test convenience.
 func findResourceByKeys(repo model.ResourceRepository, key model.ReporterResourceKey) (*model.Resource, error) {
-	var resource *model.Resource
-	err := repo.Transact(func(tx model.ResourceTx) error {
-		var findErr error
-		resource, findErr = tx.FindResourceByKeys(key)
-		return findErr
-	})
-	return resource, err
+	tx, err := repo.Begin()
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = tx.Rollback() }()
+	resource, err := tx.FindResourceByKeys(key)
+	if err != nil {
+		return nil, err
+	}
+	_ = tx.Commit()
+	return resource, nil
 }
 
 // --- Test helpers ---
@@ -844,16 +848,14 @@ func TestResourceLifecycle_ReportUpdateDeleteReportDelete(t *testing.T) {
 		err = h.usecase.Delete(h.ctx, key)
 		require.NoError(t, err, "Second delete should succeed")
 
-		var finalResource *model.Resource
-		txErr := h.resourceRepo.Transact(func(tx model.ResourceTx) error {
-			var findErr error
-			finalResource, findErr = tx.FindResourceByKeys(key)
-			return findErr
-		})
-		if errors.Is(txErr, model.ErrResourceNotFound) {
+		tx, beginErr := h.resourceRepo.Begin()
+		require.NoError(t, beginErr)
+		finalResource, findErr := tx.FindResourceByKeys(key)
+		_ = tx.Commit()
+		if errors.Is(findErr, model.ErrResourceNotFound) {
 			assert.Nil(t, finalResource, "Resource should not be found if tombstone filter is active")
 		} else {
-			require.NoError(t, txErr, "Should find tombstoned resource if filter is removed")
+			require.NoError(t, findErr, "Should find tombstoned resource if filter is removed")
 			require.NotNil(t, finalResource)
 		}
 	})

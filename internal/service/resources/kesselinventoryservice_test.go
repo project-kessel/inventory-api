@@ -3218,7 +3218,7 @@ func newSQLiteTestRepo(t *testing.T) model.ResourceRepository {
 }
 
 func repoFindResourceByKeys(repo model.ResourceRepository, key model.ReporterResourceKey) (*model.Resource, error) {
-	tx, err := repo.Begin()
+	tx, err := repo.Begin("")
 	if err != nil {
 		return nil, err
 	}
@@ -3232,7 +3232,7 @@ func repoFindResourceByKeys(repo model.ResourceRepository, key model.ReporterRes
 }
 
 func repoFindLatestRepresentations(repo model.ResourceRepository, key model.ReporterResourceKey) (*model.Representations, error) {
-	tx, err := repo.Begin()
+	tx, err := repo.Begin("")
 	if err != nil {
 		return nil, err
 	}
@@ -3246,7 +3246,7 @@ func repoFindLatestRepresentations(repo model.ResourceRepository, key model.Repo
 }
 
 func repoHasTransactionIdBeenProcessed(repo model.ResourceRepository, transactionId model.TransactionId) (bool, error) {
-	tx, err := repo.Begin()
+	tx, err := repo.Begin("")
 	if err != nil {
 		return false, err
 	}

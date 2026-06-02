@@ -20,6 +20,11 @@ import (
 	"google.golang.org/grpc/status"
 )
 
+const (
+	DeleteResourceOperationName = "DeleteResource"
+	ReportResourceOperationName = "ReportResource"
+)
+
 // Domain errors re-exported from model package.
 var (
 	ErrResourceNotFound      = model.ErrResourceNotFound
@@ -137,7 +142,7 @@ func (uc *Usecase) ReportResource(ctx context.Context, cmd ReportResourceCommand
 	// the actual correctness guarantee; this check is an optimization to avoid
 	// the heavier write transaction when possible.
 	if uc.Config.IdempotencyCheckEnabled && cmd.TransactionId != nil {
-		tx, beginErr := uc.resourceRepository.Begin()
+		tx, beginErr := uc.resourceRepository.Begin("")
 		if beginErr != nil {
 			return fmt.Errorf("failed to begin idempotency check: %w", beginErr)
 		}
@@ -254,7 +259,7 @@ func (uc *Usecase) reportResourceWithRetry(reporterResourceKey model.ReporterRes
 	maxRetries := uc.resourceRepository.MaxSerializationRetries()
 	var lastErr error
 	for attempt := 0; attempt < maxRetries; attempt++ {
-		tx, err := uc.resourceRepository.Begin()
+		tx, err := uc.resourceRepository.Begin(ReportResourceOperationName)
 		if err != nil {
 			return err
 		}
@@ -303,7 +308,7 @@ func (uc *Usecase) reportResourceWithRetry(reporterResourceKey model.ReporterRes
 		}
 		return nil
 	}
-	uc.resourceRepository.RecordSerializationExhaustion()
+	uc.resourceRepository.RecordSerializationExhaustion(ReportResourceOperationName)
 	log.Errorf("transaction failed after %d attempts: %v", maxRetries, lastErr)
 	return fmt.Errorf("transaction failed after %d attempts: %w", maxRetries, lastErr)
 }
@@ -383,7 +388,7 @@ func (uc *Usecase) Delete(ctx context.Context, reporterResourceKey model.Reporte
 	maxRetries := uc.resourceRepository.MaxSerializationRetries()
 	var lastErr error
 	for attempt := 0; attempt < maxRetries; attempt++ {
-		tx, beginErr := uc.resourceRepository.Begin()
+		tx, beginErr := uc.resourceRepository.Begin(DeleteResourceOperationName)
 		if beginErr != nil {
 			return beginErr
 		}
@@ -459,7 +464,7 @@ func (uc *Usecase) Delete(ctx context.Context, reporterResourceKey model.Reporte
 		"reason", lastErr.Error(),
 	)
 
-	uc.resourceRepository.RecordSerializationExhaustion()
+	uc.resourceRepository.RecordSerializationExhaustion(DeleteResourceOperationName)
 	log.Errorf("delete transaction failed after %d attempts: %v", maxRetries, lastErr)
 	return fmt.Errorf("transaction failed after %d attempts: %w", maxRetries, lastErr)
 }
@@ -681,7 +686,7 @@ func (uc *Usecase) lookupConsistencyTokenFromDB(ctx context.Context, resourceRef
 		return "", fmt.Errorf("failed to build reporter resource key from reference: %w", err)
 	}
 
-	tx, err := uc.resourceRepository.Begin()
+	tx, err := uc.resourceRepository.Begin("")
 	if err != nil {
 		return "", err
 	}

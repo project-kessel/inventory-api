@@ -105,7 +105,6 @@ type resourceRepository struct {
 	outboxPublisher         OutboxPublisher
 	metricsCollector        *metricscollector.MetricsCollector
 	maxSerializationRetries int
-	operationName           string
 }
 
 // GormResourceRepositoryConfig holds configuration for creating a GORM-backed ResourceRepository.
@@ -114,7 +113,6 @@ type GormResourceRepositoryConfig struct {
 	OutboxPublisher         OutboxPublisher
 	MetricsCollector        *metricscollector.MetricsCollector
 	MaxSerializationRetries int
-	OperationName           string
 }
 
 func NewResourceRepository(cfg GormResourceRepositoryConfig) bizmodel.ResourceRepository {
@@ -131,13 +129,12 @@ func NewResourceRepository(cfg GormResourceRepositoryConfig) bizmodel.ResourceRe
 		outboxPublisher:         publisher,
 		metricsCollector:        cfg.MetricsCollector,
 		maxSerializationRetries: maxRetries,
-		operationName:           cfg.OperationName,
 	}
 }
 
 var _ bizmodel.ResourceRepository = (*resourceRepository)(nil)
 
-func (r *resourceRepository) Begin() (bizmodel.ResourceTx, error) {
+func (r *resourceRepository) Begin(operationName string) (bizmodel.ResourceTx, error) {
 	gormTx := r.db.Begin(&sql.TxOptions{
 		Isolation: sql.LevelSerializable,
 	})
@@ -148,7 +145,7 @@ func (r *resourceRepository) Begin() (bizmodel.ResourceTx, error) {
 		gormTx:           gormTx,
 		outboxPublisher:  r.outboxPublisher,
 		metricsCollector: r.metricsCollector,
-		operationName:    r.operationName,
+		operationName:    operationName,
 	}, nil
 }
 
@@ -156,8 +153,8 @@ func (r *resourceRepository) MaxSerializationRetries() int {
 	return r.maxSerializationRetries
 }
 
-func (r *resourceRepository) RecordSerializationExhaustion() {
-	metricscollector.Incr(r.metricsCollector.SerializationExhaustions, r.operationName)
+func (r *resourceRepository) RecordSerializationExhaustion(operationName string) {
+	metricscollector.Incr(r.metricsCollector.SerializationExhaustions, operationName)
 }
 
 func isSerializationFailure(err error) bool {

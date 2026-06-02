@@ -57,7 +57,7 @@ func NewFakeResourceRepository() bizmodel.ResourceRepository {
 
 var _ bizmodel.ResourceRepository = (*fakeResourceRepository)(nil)
 
-func (f *fakeResourceRepository) Begin() (bizmodel.ResourceTx, error) {
+func (f *fakeResourceRepository) Begin(_ string) (bizmodel.ResourceTx, error) {
 	return &fakeResourceTx{repo: f}, nil
 }
 
@@ -65,7 +65,7 @@ func (f *fakeResourceRepository) MaxSerializationRetries() int {
 	return 3
 }
 
-func (f *fakeResourceRepository) RecordSerializationExhaustion() {
+func (f *fakeResourceRepository) RecordSerializationExhaustion(_ string) {
 	// no-op for fake
 }
 

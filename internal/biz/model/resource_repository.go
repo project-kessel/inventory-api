@@ -11,7 +11,9 @@ var ErrSerializationFailure = errors.New("serialization failure")
 // Callers obtain a ResourceTx via Begin and manage its lifecycle explicitly.
 type ResourceRepository interface {
 	// Begin starts a new serializable transaction and returns a ResourceTx.
-	Begin() (ResourceTx, error)
+	// operationName labels the transaction for metrics (e.g. "ReportResource",
+	// "DeleteResource"). Pass "" for read-only or unlabeled transactions.
+	Begin(operationName string) (ResourceTx, error)
 
 	// MaxSerializationRetries returns the configured maximum number of
 	// retry attempts for serialization failures.
@@ -19,7 +21,7 @@ type ResourceRepository interface {
 
 	// RecordSerializationExhaustion records a metric when all retry attempts
 	// are exhausted. Called by the caller after the retry loop exits.
-	RecordSerializationExhaustion()
+	RecordSerializationExhaustion(operationName string)
 }
 
 // ResourceTx provides resource operations scoped to a serializable transaction.

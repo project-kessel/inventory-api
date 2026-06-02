@@ -113,7 +113,7 @@ func (h *testHarness) resetMeta() {
 
 // findResourceByKeys wraps Begin/FindResourceByKeys/Commit for test convenience.
 func findResourceByKeys(repo model.ResourceRepository, key model.ReporterResourceKey) (*model.Resource, error) {
-	tx, err := repo.Begin()
+	tx, err := repo.Begin("")
 	if err != nil {
 		return nil, err
 	}
@@ -848,7 +848,7 @@ func TestResourceLifecycle_ReportUpdateDeleteReportDelete(t *testing.T) {
 		err = h.usecase.Delete(h.ctx, key)
 		require.NoError(t, err, "Second delete should succeed")
 
-		tx, beginErr := h.resourceRepo.Begin()
+		tx, beginErr := h.resourceRepo.Begin("")
 		require.NoError(t, beginErr)
 		finalResource, findErr := tx.FindResourceByKeys(key)
 		_ = tx.Commit()

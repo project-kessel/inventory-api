@@ -293,7 +293,6 @@ func NewCommand(
 				OutboxPublisher:         data.SetOutboxPublisher(storageConfig.Options.OutboxMode),
 				MetricsCollector:        mc,
 				MaxSerializationRetries: storageConfig.Options.MaxSerializationRetries,
-				OperationName:           "ResourceRepository",
 			})
 			inventory_controller := resourcesctl.New(resourceRepo, schemaRepository, relationsRepo, "notifications", log.With(logger, "subsystem", "notificationsintegrations_controller"), listenManager, waitForNotifCircuitBreaker, usecaseConfig, mc, metaauthorizer.NewSimpleMetaAuthorizer(), selfSubjectStrategy)
 

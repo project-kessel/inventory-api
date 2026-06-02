@@ -32,7 +32,7 @@ func newTestRepo(t *testing.T) bizmodel.ResourceRepository {
 func TestBeginCommit_Success(t *testing.T) {
 	repo := newTestRepo(t)
 
-	tx, err := repo.Begin()
+	tx, err := repo.Begin("")
 	require.NoError(t, err)
 	require.NotNil(t, tx)
 
@@ -43,7 +43,7 @@ func TestBeginCommit_Success(t *testing.T) {
 func TestBeginRollback_Success(t *testing.T) {
 	repo := newTestRepo(t)
 
-	tx, err := repo.Begin()
+	tx, err := repo.Begin("")
 	require.NoError(t, err)
 
 	err = tx.Rollback()
@@ -75,10 +75,9 @@ func TestCommit_WrapsSerializationFailure(t *testing.T) {
 		OutboxPublisher:         noopOutboxPublisher,
 		MetricsCollector:        mc,
 		MaxSerializationRetries: 3,
-		OperationName:           "test",
 	})
 
-	tx, err := repo.Begin()
+	tx, err := repo.Begin("")
 	require.NoError(t, err)
 
 	err = tx.Commit()
@@ -104,7 +103,7 @@ func TestSerializationRetry_ManualLoop(t *testing.T) {
 	callCount := 0
 	var lastErr error
 	for attempt := 0; attempt < repo.MaxSerializationRetries(); attempt++ {
-		tx, err := repo.Begin()
+		tx, err := repo.Begin("")
 		require.NoError(t, err)
 
 		callCount++
@@ -139,7 +138,7 @@ func TestSerializationRecovery_ManualLoop(t *testing.T) {
 	callCount := 0
 	var finalErr error
 	for attempt := 0; attempt < repo.MaxSerializationRetries(); attempt++ {
-		tx, err := repo.Begin()
+		tx, err := repo.Begin("")
 		require.NoError(t, err)
 
 		callCount++
@@ -168,7 +167,7 @@ func TestSerializationRecovery_ManualLoop(t *testing.T) {
 func TestFakeResourceRepository_BeginCommit(t *testing.T) {
 	repo := NewFakeResourceRepository()
 
-	tx, err := repo.Begin()
+	tx, err := repo.Begin("")
 	require.NoError(t, err)
 	require.NotNil(t, tx)
 
@@ -179,7 +178,7 @@ func TestFakeResourceRepository_BeginCommit(t *testing.T) {
 func TestFakeResourceRepository_BeginRollback(t *testing.T) {
 	repo := NewFakeResourceRepository()
 
-	tx, err := repo.Begin()
+	tx, err := repo.Begin("")
 	require.NoError(t, err)
 
 	err = tx.Rollback()

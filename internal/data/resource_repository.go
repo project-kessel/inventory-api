@@ -160,36 +160,6 @@ func (r *resourceRepository) RecordSerializationExhaustion() {
 	metricscollector.Incr(r.metricsCollector.SerializationExhaustions, r.operationName)
 }
 
-func (r *resourceRepository) HasTransactionIdBeenProcessed(transactionId bizmodel.TransactionId) (bool, error) {
-	tx, err := r.Begin()
-	if err != nil {
-		return false, err
-	}
-	defer func() { _ = tx.Rollback() }()
-	return tx.HasTransactionIdBeenProcessed(transactionId)
-}
-
-func (r *resourceRepository) FindConsistencyToken(key bizmodel.ReporterResourceKey) (string, error) {
-	tx, err := r.Begin()
-	if err != nil {
-		return "", err
-	}
-	defer func() { _ = tx.Rollback() }()
-
-	res, err := tx.FindResourceByKeys(key)
-	if err != nil {
-		if errors.Is(err, bizmodel.ErrResourceNotFound) {
-			return "", nil
-		}
-		return "", err
-	}
-
-	if err := tx.Commit(); err != nil {
-		return "", err
-	}
-	return res.ConsistencyToken().Serialize(), nil
-}
-
 func isSerializationFailure(err error) bool {
 	var pgErr *pgconn.PgError
 	if errors.As(err, &pgErr) {

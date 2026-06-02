@@ -132,11 +132,17 @@ func (uc *Usecase) ReportResource(ctx context.Context, cmd ReportResourceCommand
 		defer subscription.Unsubscribe()
 	}
 
-	// Advisory duplicate-transaction-ID check. The unique constraint on
-	// transaction_id provides the actual correctness guarantee; this check
-	// is an optimization to avoid the heavier write transaction when possible.
+	// Advisory duplicate-transaction-ID check. Runs in a short read-only
+	// serializable transaction. The unique constraint on transaction_id provides
+	// the actual correctness guarantee; this check is an optimization to avoid
+	// the heavier write transaction when possible.
 	if uc.Config.IdempotencyCheckEnabled && cmd.TransactionId != nil {
-		alreadyProcessed, checkErr := uc.resourceRepository.HasTransactionIdBeenProcessed(*cmd.TransactionId)
+		tx, beginErr := uc.resourceRepository.Begin()
+		if beginErr != nil {
+			return fmt.Errorf("failed to begin idempotency check: %w", beginErr)
+		}
+		alreadyProcessed, checkErr := tx.HasTransactionIdBeenProcessed(*cmd.TransactionId)
+		_ = tx.Rollback()
 		if checkErr != nil {
 			return fmt.Errorf("failed to check transaction ID: %w", checkErr)
 		}
@@ -675,14 +681,25 @@ func (uc *Usecase) lookupConsistencyTokenFromDB(ctx context.Context, resourceRef
 		return "", fmt.Errorf("failed to build reporter resource key from reference: %w", err)
 	}
 
-	token, err := uc.resourceRepository.FindConsistencyToken(reporterResourceKey)
+	tx, err := uc.resourceRepository.Begin()
 	if err != nil {
 		return "", err
 	}
-	if token == "" {
-		uc.Log.WithContext(ctx).Warnf("Resource not found in inventory, falling back to minimize_latency for ref: %v", resourceRef)
-		return "", nil
+	defer func() { _ = tx.Rollback() }()
+
+	res, err := tx.FindResourceByKeys(reporterResourceKey)
+	if err != nil {
+		if errors.Is(err, model.ErrResourceNotFound) {
+			uc.Log.WithContext(ctx).Warnf("Resource not found in inventory, falling back to minimize_latency for ref: %v", resourceRef)
+			return "", nil
+		}
+		return "", err
 	}
+
+	if err := tx.Commit(); err != nil {
+		return "", err
+	}
+	token := res.ConsistencyToken().Serialize()
 	uc.Log.WithContext(ctx).Debug("Found inventory-managed consistency token")
 	return token, nil
 }

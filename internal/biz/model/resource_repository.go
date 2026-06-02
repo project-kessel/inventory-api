@@ -13,6 +13,16 @@ type ResourceRepository interface {
 	// Begin starts a new serializable transaction and returns a ResourceTx.
 	Begin() (ResourceTx, error)
 
+	// HasTransactionIdBeenProcessed checks whether a transaction ID has
+	// already been recorded. This is a convenience method that runs in a
+	// short-lived read-only transaction.
+	HasTransactionIdBeenProcessed(transactionId TransactionId) (bool, error)
+
+	// FindConsistencyToken looks up the consistency token for a resource
+	// identified by key. Returns the serialized token if found, empty
+	// string if the resource does not exist.
+	FindConsistencyToken(key ReporterResourceKey) (string, error)
+
 	// MaxSerializationRetries returns the configured maximum number of
 	// retry attempts for serialization failures.
 	MaxSerializationRetries() int

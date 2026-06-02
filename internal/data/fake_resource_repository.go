@@ -1,6 +1,7 @@
 package data
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 	"sync"
@@ -67,6 +68,30 @@ func (f *fakeResourceRepository) MaxSerializationRetries() int {
 
 func (f *fakeResourceRepository) RecordSerializationExhaustion() {
 	// no-op for fake
+}
+
+func (f *fakeResourceRepository) HasTransactionIdBeenProcessed(transactionId bizmodel.TransactionId) (bool, error) {
+	tx, err := f.Begin()
+	if err != nil {
+		return false, err
+	}
+	return tx.HasTransactionIdBeenProcessed(transactionId)
+}
+
+func (f *fakeResourceRepository) FindConsistencyToken(key bizmodel.ReporterResourceKey) (string, error) {
+	tx, err := f.Begin()
+	if err != nil {
+		return "", err
+	}
+
+	res, err := tx.FindResourceByKeys(key)
+	if err != nil {
+		if errors.Is(err, bizmodel.ErrResourceNotFound) {
+			return "", nil
+		}
+		return "", err
+	}
+	return res.ConsistencyToken().Serialize(), nil
 }
 
 // --- fakeResourceTx implements model.ResourceTx ---

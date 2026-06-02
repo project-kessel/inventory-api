@@ -18,12 +18,6 @@ import (
 	"github.com/sony/gobreaker/v2"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"gorm.io/gorm"
-)
-
-const (
-	DeleteResourceOperationName = "DeleteResource"
-	ReportResourceOperationName = "ReportResource"
 )
 
 // Domain errors re-exported from model package.
@@ -138,12 +132,17 @@ func (uc *Usecase) ReportResource(ctx context.Context, cmd ReportResourceCommand
 		defer subscription.Unsubscribe()
 	}
 
-	// Check for duplicate transaction ID outside the serializable transaction to avoid
-	// predicate locks on the transaction_id indexes. The unique constraint on transaction_id
-	// provides the actual correctness guarantee, if a duplicate sneaks past this
-	// advisory check due to a concurrent commit.
+	// Advisory duplicate-transaction-ID check. This runs inside Transact (serializable)
+	// which may acquire predicate locks on the transaction_id indexes. The unique
+	// constraint on transaction_id provides the actual correctness guarantee; this
+	// check is an optimization to avoid the heavier write transaction when possible.
 	if uc.Config.IdempotencyCheckEnabled && cmd.TransactionId != nil {
-		alreadyProcessed, err := uc.resourceRepository.HasTransactionIdBeenProcessed(uc.resourceRepository.GetDB(), *cmd.TransactionId)
+		var alreadyProcessed bool
+		err = uc.resourceRepository.Transact(func(tx model.ResourceTx) error {
+			var txErr error
+			alreadyProcessed, txErr = tx.HasTransactionIdBeenProcessed(*cmd.TransactionId)
+			return txErr
+		})
 		if err != nil {
 			return fmt.Errorf("failed to check transaction ID: %w", err)
 		}
@@ -155,26 +154,22 @@ func (uc *Usecase) ReportResource(ctx context.Context, cmd ReportResourceCommand
 
 	var operationType model.EventOperationType
 	reportResource := func() error {
-		return uc.resourceRepository.GetTransactionManager().HandleSerializableTransaction(
-			ReportResourceOperationName,
-			uc.resourceRepository.GetDB(),
-			func(tx *gorm.DB) error {
-				res, err := uc.resourceRepository.FindResourceByKeys(tx, reporterResourceKey)
-				if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
-					return fmt.Errorf("failed to lookup existing resource: %w", err)
-				}
+		return uc.resourceRepository.Transact(func(tx model.ResourceTx) error {
+			res, err := tx.FindResourceByKeys(reporterResourceKey)
+			if err != nil && !errors.Is(err, model.ErrResourceNotFound) {
+				return fmt.Errorf("failed to lookup existing resource: %w", err)
+			}
 
-				if err == nil && res != nil {
-					log.Info("Resource already exists, updating: ")
-					operationType = model.OperationTypeUpdated
-					return uc.updateResource(tx, cmd, res, txid)
-				}
+			if err == nil && res != nil {
+				log.Info("Resource already exists, updating: ")
+				operationType = model.OperationTypeUpdated
+				return uc.updateResource(tx, cmd, res, txid)
+			}
 
-				log.Info("Creating new resource")
-				operationType = model.OperationTypeCreated
-				return uc.createResource(tx, cmd, txid)
-			},
-		)
+			log.Info("Creating new resource")
+			operationType = model.OperationTypeCreated
+			return uc.createResource(tx, cmd, txid)
+		})
 	}
 
 	err = reportResource()
@@ -270,13 +265,13 @@ func (uc *Usecase) ReportResource(ctx context.Context, cmd ReportResourceCommand
 	return nil
 }
 
-func (uc *Usecase) createResource(tx *gorm.DB, cmd ReportResourceCommand, txid model.TransactionId) error {
-	resourceId, err := uc.resourceRepository.NextResourceId()
+func (uc *Usecase) createResource(tx model.ResourceTx, cmd ReportResourceCommand, txid model.TransactionId) error {
+	resourceId, err := tx.NextResourceId()
 	if err != nil {
 		return err
 	}
 
-	reporterResourceId, err := uc.resourceRepository.NextReporterResourceId()
+	reporterResourceId, err := tx.NextReporterResourceId()
 	if err != nil {
 		return err
 	}
@@ -299,10 +294,10 @@ func (uc *Usecase) createResource(tx *gorm.DB, cmd ReportResourceCommand, txid m
 		return err
 	}
 
-	return uc.resourceRepository.Save(tx, resource, model.OperationTypeCreated, txid)
+	return tx.Save(resource, model.OperationTypeCreated, txid)
 }
 
-func (uc *Usecase) updateResource(tx *gorm.DB, cmd ReportResourceCommand, existingResource *model.Resource, txid model.TransactionId) error {
+func (uc *Usecase) updateResource(tx model.ResourceTx, cmd ReportResourceCommand, existingResource *model.Resource, txid model.TransactionId) error {
 	reporterResourceKey, err := model.NewReporterResourceKey(
 		cmd.LocalResourceId,
 		cmd.ResourceType,
@@ -326,7 +321,7 @@ func (uc *Usecase) updateResource(tx *gorm.DB, cmd ReportResourceCommand, existi
 		return fmt.Errorf("failed to update resource: %w", err)
 	}
 
-	return uc.resourceRepository.Save(tx, *existingResource, model.OperationTypeUpdated, txid)
+	return tx.Save(*existingResource, model.OperationTypeUpdated, txid)
 }
 
 func (uc *Usecase) Delete(ctx context.Context, reporterResourceKey model.ReporterResourceKey) error {
@@ -342,27 +337,23 @@ func (uc *Usecase) Delete(ctx context.Context, reporterResourceKey model.Reporte
 	// Get authz context for logging (guaranteed to exist after enforceMetaAuthzObject)
 	authzCtx, _ := authnapi.FromAuthzContext(ctx)
 
-	err = uc.resourceRepository.GetTransactionManager().HandleSerializableTransaction(
-		DeleteResourceOperationName,
-		uc.resourceRepository.GetDB(),
-		func(tx *gorm.DB) error {
-			res, err := uc.resourceRepository.FindResourceByKeys(tx, reporterResourceKey)
+	err = uc.resourceRepository.Transact(func(tx model.ResourceTx) error {
+		res, err := tx.FindResourceByKeys(reporterResourceKey)
 
-			if err == nil && res != nil {
-				log.Info("Found Resource, deleting: ", res)
-				err := res.Delete(reporterResourceKey)
-				if err != nil {
-					return fmt.Errorf("failed to delete resource: %w", err)
-				}
-				return uc.resourceRepository.Save(tx, *res, model.OperationTypeDeleted, txid)
-			} else {
-				if errors.Is(err, gorm.ErrRecordNotFound) {
-					return ErrResourceNotFound
-				}
-				return ErrDatabaseError
+		if err == nil && res != nil {
+			log.Info("Found Resource, deleting: ", res)
+			err := res.Delete(reporterResourceKey)
+			if err != nil {
+				return fmt.Errorf("failed to delete resource: %w", err)
 			}
-		},
-	)
+			return tx.Save(*res, model.OperationTypeDeleted, txid)
+		} else {
+			if errors.Is(err, model.ErrResourceNotFound) {
+				return ErrResourceNotFound
+			}
+			return ErrDatabaseError
+		}
+	})
 
 	// Extract principal for logging
 	principal := authzCtx.ExtractPrincipal()
@@ -614,18 +605,23 @@ func (uc *Usecase) lookupConsistencyTokenFromDB(ctx context.Context, resourceRef
 	if err != nil {
 		return "", fmt.Errorf("failed to build reporter resource key from reference: %w", err)
 	}
-	// Passing nil tx is deliberate: this read-only consistency lookup should not run in a transaction.
-	res, err := uc.resourceRepository.FindResourceByKeys(nil, reporterResourceKey)
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			// Resource doesn't exist in inventory, fall back to minimize_latency.
-			uc.Log.WithContext(ctx).Warnf("Resource not found in inventory, falling back to minimize_latency for ref: %v", resourceRef)
-			return "", nil
+	var token string
+	err = uc.resourceRepository.Transact(func(tx model.ResourceTx) error {
+		res, txErr := tx.FindResourceByKeys(reporterResourceKey)
+		if txErr != nil {
+			if errors.Is(txErr, model.ErrResourceNotFound) {
+				uc.Log.WithContext(ctx).Warnf("Resource not found in inventory, falling back to minimize_latency for ref: %v", resourceRef)
+				return nil
+			}
+			return txErr
 		}
+		token = res.ConsistencyToken().Serialize()
+		uc.Log.WithContext(ctx).Debug("Found inventory-managed consistency token")
+		return nil
+	})
+	if err != nil {
 		return "", err
 	}
-	token := res.ConsistencyToken().Serialize()
-	uc.Log.WithContext(ctx).Debug("Found inventory-managed consistency token")
 	return token, nil
 }
 

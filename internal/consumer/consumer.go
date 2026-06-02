@@ -120,7 +120,12 @@ func New(config CompletedConfig, db *gorm.DB, schemaRepository model.SchemaRepos
 
 	maxSerializationRetries := viper.GetInt("storage.max-serialization-retries")
 	outboxMode := viper.GetString("storage.outbox-mode")
-	resourceRepository := data.NewResourceRepository(db, data.NewGormTransactionManager(&mc, maxSerializationRetries), data.SetOutboxPublisher(outboxMode))
+	resourceRepository := data.NewResourceRepository(data.GormResourceRepositoryConfig{
+		DB:                      db,
+		OutboxPublisher:         data.SetOutboxPublisher(outboxMode),
+		MetricsCollector:        &mc,
+		MaxSerializationRetries: maxSerializationRetries,
+	})
 	schemaService := model.NewSchemaService(schemaRepository, logger)
 
 	return InventoryConsumer{
@@ -298,7 +303,13 @@ func (i *InventoryConsumer) ProcessMessage(headers map[string]string, relationsE
 		if relationsEnabled {
 			return i.processRelationsOperation(operation, txid, msg, operationConfig{
 				fetchRepresentations: func(i *InventoryConsumer, key model.ReporterResourceKey, version *model.Version) (*model.Representations, *model.Representations, error) {
-					return i.ResourceRepository.FindCurrentAndPreviousVersionedRepresentations(nil, key, version, model.OperationTypeCreated)
+					var current, previous *model.Representations
+					err := i.ResourceRepository.Transact(func(tx model.ResourceTx) error {
+						var txErr error
+						current, previous, txErr = tx.FindCurrentAndPreviousVersionedRepresentations(key, version, model.OperationTypeCreated)
+						return txErr
+					})
+					return current, previous, err
 				},
 				executeSpiceDB: func(i *InventoryConsumer, tuples model.TuplesToReplicate) (string, error) {
 					return i.CreateTuple(context.Background(), tuples.TuplesToCreate())
@@ -311,7 +322,13 @@ func (i *InventoryConsumer) ProcessMessage(headers map[string]string, relationsE
 		if relationsEnabled {
 			return i.processRelationsOperation(operation, txid, msg, operationConfig{
 				fetchRepresentations: func(i *InventoryConsumer, key model.ReporterResourceKey, version *model.Version) (*model.Representations, *model.Representations, error) {
-					return i.ResourceRepository.FindCurrentAndPreviousVersionedRepresentations(nil, key, version, model.OperationTypeUpdated)
+					var current, previous *model.Representations
+					err := i.ResourceRepository.Transact(func(tx model.ResourceTx) error {
+						var txErr error
+						current, previous, txErr = tx.FindCurrentAndPreviousVersionedRepresentations(key, version, model.OperationTypeUpdated)
+						return txErr
+					})
+					return current, previous, err
 				},
 				executeSpiceDB: func(i *InventoryConsumer, tuples model.TuplesToReplicate) (string, error) {
 					return i.UpdateTuple(context.Background(), tuples.TuplesToCreate(), tuples.TuplesToDelete())
@@ -323,7 +340,12 @@ func (i *InventoryConsumer) ProcessMessage(headers map[string]string, relationsE
 		if relationsEnabled {
 			return i.processRelationsOperation(operation, txid, msg, operationConfig{
 				fetchRepresentations: func(i *InventoryConsumer, key model.ReporterResourceKey, version *model.Version) (*model.Representations, *model.Representations, error) {
-					previous, err := i.ResourceRepository.FindLatestRepresentations(nil, key)
+					var previous *model.Representations
+					err := i.ResourceRepository.Transact(func(tx model.ResourceTx) error {
+						var txErr error
+						previous, txErr = tx.FindLatestRepresentations(key)
+						return txErr
+					})
 					return nil, previous, err
 				},
 				executeSpiceDB: func(i *InventoryConsumer, tuples model.TuplesToReplicate) (string, error) {

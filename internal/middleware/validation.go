@@ -7,6 +7,7 @@ import (
 	"buf.build/go/protovalidate"
 	"github.com/go-kratos/kratos/v2/errors"
 	"github.com/go-kratos/kratos/v2/middleware"
+	"google.golang.org/grpc"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/structpb"
 
@@ -43,6 +44,35 @@ func sanitizeReportResourceRequest(rr *pbv1beta2.ReportResourceRequest) error {
 	}
 
 	return sanitizeStruct(&rr.Representations.Reporter, "reporter")
+}
+
+// StreamValidationInterceptor returns a gRPC stream interceptor that validates
+// incoming messages using protovalidate. This ensures streaming RPCs (e.g.
+// StreamedListObjects) receive the same proto validation as unary RPCs.
+func StreamValidationInterceptor(validator protovalidate.Validator) grpc.StreamServerInterceptor {
+	return func(srv any, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
+		wrapper := &requestValidatingWrapper{ServerStream: ss, Validator: validator}
+		return handler(srv, wrapper)
+	}
+}
+
+type requestValidatingWrapper struct {
+	grpc.ServerStream
+	protovalidate.Validator
+}
+
+func (w *requestValidatingWrapper) RecvMsg(m interface{}) error {
+	if err := w.ServerStream.RecvMsg(m); err != nil {
+		return err
+	}
+
+	if v, ok := m.(proto.Message); ok {
+		if err := w.Validate(v); err != nil {
+			return errors.BadRequest("VALIDATOR", err.Error()).WithCause(err)
+		}
+	}
+
+	return nil
 }
 
 func sanitizeStruct(s **structpb.Struct, name string) error {

@@ -1,3 +1,5 @@
+//go:build sanity
+
 package sanity
 
 import (

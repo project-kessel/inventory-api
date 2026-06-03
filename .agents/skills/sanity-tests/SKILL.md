@@ -100,20 +100,23 @@ The script handles:
 
 ```bash
 # Only Check tests (Groups 1-3)
-go test -v -count=1 -run 'TestSanity_(Report|Delete|Check_)' ./test/e2e/sanity/ -timeout 10m
+go test -v -count=1 -tags=sanity -run 'TestSanity_(Report|Delete|Check_)' ./test/e2e/sanity/ -timeout 10m
 
 # Only CheckForUpdate tests (Group 4)
-go test -v -count=1 -run 'TestSanity_CheckForUpdate' ./test/e2e/sanity/ -timeout 10m
+go test -v -count=1 -tags=sanity -run 'TestSanity_CheckForUpdate' ./test/e2e/sanity/ -timeout 10m
 
 # Only Bulk tests (Group 5)
-go test -v -count=1 -run 'TestSanity_(CheckBulk|CheckSelf)' ./test/e2e/sanity/ -timeout 10m
+go test -v -count=1 -tags=sanity -run 'TestSanity_(CheckBulk|CheckSelf)' ./test/e2e/sanity/ -timeout 10m
 
 # Only Lifecycle tests (Group 6)
-go test -v -count=1 -run 'TestSanity_(Revive|MultiResource)' ./test/e2e/sanity/ -timeout 10m
+go test -v -count=1 -tags=sanity -run 'TestSanity_(Revive|MultiResource)' ./test/e2e/sanity/ -timeout 10m
 
 # Only Streaming tests (Group 7)
-go test -v -count=1 -run 'TestSanity_Streamed' ./test/e2e/sanity/ -timeout 10m
+go test -v -count=1 -tags=sanity -run 'TestSanity_Streamed' ./test/e2e/sanity/ -timeout 10m
 ```
+
+**Note**: The `-tags=sanity` flag is required. Without it, `go test ./...` skips these files
+(they use `//go:build sanity` to avoid running in CI where no database is available).
 
 ## Test Coverage
 

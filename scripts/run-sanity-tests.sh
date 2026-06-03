@@ -275,7 +275,7 @@ POSTGRES_PORT="$DB_PORT" \
 POSTGRES_USER="$POSTGRES_USER" \
 POSTGRES_PASSWORD="$POSTGRES_PASSWORD" \
 POSTGRES_DB="$POSTGRES_DB" \
-go test -v -count=1 ./test/e2e/sanity/ -timeout 10m || TEST_EXIT=$?
+go test -v -count=1 -tags=sanity ./test/e2e/sanity/ -timeout 10m || TEST_EXIT=$?
 
 echo "=============================================="
 

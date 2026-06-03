@@ -18,6 +18,8 @@ authn:
         enable: false
         transport:
           http: false
+          # setting 'true' for grpc, below, will enable for the grpc transport. If grpc-endpoints are specified, it will
+          # be enabled *only* for those endpoints. (And it *must* succeed for those endpoints or access is denied.)
           grpc: false
         config:
           insecure-client: true

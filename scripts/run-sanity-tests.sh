@@ -268,6 +268,9 @@ log_info "Port-forwards ready"
 log_info "Running sanity tests..."
 echo "=============================================="
 
+TEST_LOG=$(mktemp /tmp/sanity-test-XXXXXX.log)
+trap 'rm -f "$TEST_LOG"; cleanup' EXIT INT TERM
+
 TEST_EXIT=0
 INV_GRPC_URL="localhost:$API_PORT" \
 POSTGRES_HOST=localhost \
@@ -275,14 +278,85 @@ POSTGRES_PORT="$DB_PORT" \
 POSTGRES_USER="$POSTGRES_USER" \
 POSTGRES_PASSWORD="$POSTGRES_PASSWORD" \
 POSTGRES_DB="$POSTGRES_DB" \
-go test -v -count=1 -tags=sanity ./test/e2e/sanity/ -timeout 10m || TEST_EXIT=$?
+go test -v -count=1 -tags=sanity ./test/e2e/sanity/ -timeout 10m 2>&1 | tee "$TEST_LOG" || TEST_EXIT=${PIPESTATUS[0]}
 
 echo "=============================================="
 
+# --- Final Report ---
+echo ""
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "  SANITY TEST RUN REPORT"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
+echo "  Namespace:  $NAMESPACE"
+echo "  Branch:     $(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo 'unknown')"
+echo "  Commit:     $(git rev-parse --short HEAD 2>/dev/null || echo 'unknown')"
+if [ -n "$IMAGE_TAG" ]; then
+    echo "  Image:      ${QUAY_REPO}:${IMAGE_TAG}"
+fi
+echo "  Started:    $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+echo ""
+
+# Extract individual test results from go test output
+PASS_COUNT=0
+FAIL_COUNT=0
+SKIP_COUNT=0
+echo "  Test Results:"
+echo "  ─────────────────────────────────────────────────────────────────────────────"
+while IFS= read -r line; do
+    test_name=$(echo "$line" | sed 's/^--- \(PASS\|FAIL\|SKIP\): \(.*\) (.*/\2/')
+    duration=$(echo "$line" | grep -oE '\([0-9]+\.[0-9]+s\)' || echo "")
+    if echo "$line" | grep -q "^--- PASS:"; then
+        PASS_COUNT=$((PASS_COUNT + 1))
+        printf "    ${GREEN}✓${NC}  %-60s %s\n" "$test_name" "$duration"
+    elif echo "$line" | grep -q "^--- FAIL:"; then
+        FAIL_COUNT=$((FAIL_COUNT + 1))
+        printf "    ${RED}✗${NC}  %-60s %s\n" "$test_name" "$duration"
+    elif echo "$line" | grep -q "^--- SKIP:"; then
+        SKIP_COUNT=$((SKIP_COUNT + 1))
+        printf "    ${YELLOW}○${NC}  %-60s %s\n" "$test_name" "$duration"
+    fi
+done < <(grep -E "^--- (PASS|FAIL|SKIP):" "$TEST_LOG")
+
+TOTAL=$((PASS_COUNT + FAIL_COUNT + SKIP_COUNT))
+echo "  ─────────────────────────────────────────────────────────────────────────────"
+printf "    Total: %d  |  ${GREEN}Passed: %d${NC}  |  ${RED}Failed: %d${NC}  |  ${YELLOW}Skipped: %d${NC}\n" \
+    "$TOTAL" "$PASS_COUNT" "$FAIL_COUNT" "$SKIP_COUNT"
+echo ""
+
+# Show failure details if any
+if [ $FAIL_COUNT -gt 0 ]; then
+    echo "  Failed Test Details:"
+    echo "  ─────────────────────────────────────────────────────────────────────────────"
+    # For each failed test, extract the error output
+    grep -E "^--- FAIL:" "$TEST_LOG" | while IFS= read -r fail_line; do
+        failed_test=$(echo "$fail_line" | sed 's/^--- FAIL: \(.*\) (.*/\1/')
+        echo ""
+        printf "    ${RED}✗ %s${NC}\n" "$failed_test"
+        # Show the last few lines before the FAIL line for this test (error messages)
+        grep -B5 "FAIL: $failed_test" "$TEST_LOG" | grep -E "Error|assert|require|FATAL|fatal|panic|timeout|Fatalf" | while IFS= read -r err_line; do
+            echo "      $err_line"
+        done
+    done
+    echo ""
+fi
+
+# Overall duration from go test output
+OVERALL_DURATION=$(grep -oE '^(ok|FAIL)\s+\S+\s+[0-9]+\.[0-9]+s' "$TEST_LOG" | grep -oE '[0-9]+\.[0-9]+s' || echo "unknown")
+echo "  Duration:   $OVERALL_DURATION"
+echo ""
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
 if [ $TEST_EXIT -eq 0 ]; then
+    echo ""
     log_info "All sanity tests PASSED"
 else
+    echo ""
     log_error "Sanity tests FAILED (exit code: $TEST_EXIT)"
+    echo ""
+    log_info "Full test log: $TEST_LOG"
+    # Don't delete the log on failure so it can be inspected
+    trap 'cleanup' EXIT INT TERM
 fi
 
 exit $TEST_EXIT

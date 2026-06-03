@@ -2156,6 +2156,89 @@ func TestInventoryService_StreamedListSubjects_ValidationRejectsMissingRelation(
 	assert.Equal(t, codes.InvalidArgument, grpcStatus.Code())
 }
 
+// --- Streaming proto-level validation (interceptor-dependent) ---
+//
+// These tests verify that protovalidate constraints (patterns, required fields)
+// are enforced on streaming RPCs via the StreamValidationInterceptor. They use
+// inputs that violate proto constraints but would pass handler-level validation,
+// so they fail if the interceptor is removed.
+
+func TestInventoryService_StreamedListObjects_ProtoPatternRejectsHyphen(t *testing.T) {
+	claims := &authnapi.Claims{
+		SubjectId: authnapi.SubjectId("user-abc"),
+		AuthType:  authnapi.AuthTypeXRhIdentity,
+	}
+
+	simpleAuthz := data.NewSimpleRelationsRepository()
+	uc := newTestUsecase(t, testUsecaseConfig{Relations: simpleAuthz})
+	client := newTestServer(t, TestServerConfig{
+		Usecase:       uc,
+		Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+	})
+
+	reporterType := "hbi"
+	req := &pb.StreamedListObjectsRequest{
+		ObjectType: &pb.RepresentationType{
+			ResourceType: "host-type",
+			ReporterType: &reporterType,
+		},
+		Relation: "view",
+		Subject: &pb.SubjectReference{
+			Resource: &pb.ResourceReference{
+				ResourceType: "principal",
+				ResourceId:   "subject-xyz",
+				Reporter:     &pb.ReporterReference{Type: "rbac"},
+			},
+		},
+	}
+
+	stream, err := client.StreamedListObjects(context.Background(), req)
+	require.NoError(t, err)
+
+	_, err = stream.Recv()
+	require.Error(t, err)
+	grpcStatus, ok := status.FromError(err)
+	require.True(t, ok)
+	assert.Equal(t, codes.InvalidArgument, grpcStatus.Code())
+	assert.Contains(t, grpcStatus.Message(), "does not match regex pattern")
+}
+
+func TestInventoryService_StreamedListSubjects_ProtoPatternRejectsHyphen(t *testing.T) {
+	claims := &authnapi.Claims{
+		SubjectId: authnapi.SubjectId("user-abc"),
+		AuthType:  authnapi.AuthTypeXRhIdentity,
+	}
+
+	simpleAuthz := data.NewSimpleRelationsRepository()
+	uc := newTestUsecase(t, testUsecaseConfig{Relations: simpleAuthz})
+	client := newTestServer(t, TestServerConfig{
+		Usecase:       uc,
+		Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+	})
+
+	req := &pb.StreamedListSubjectsRequest{
+		Resource: &pb.ResourceReference{
+			ResourceType: "host",
+			ResourceId:   "host-1",
+			Reporter:     &pb.ReporterReference{Type: "hbi"},
+		},
+		Relation: "view",
+		SubjectType: &pb.RepresentationType{
+			ResourceType: "user-principal",
+		},
+	}
+
+	stream, err := client.StreamedListSubjects(context.Background(), req)
+	require.NoError(t, err)
+
+	_, err = stream.Recv()
+	require.Error(t, err)
+	grpcStatus, ok := status.FromError(err)
+	require.True(t, ok)
+	assert.Equal(t, codes.InvalidArgument, grpcStatus.Code())
+	assert.Contains(t, grpcStatus.Message(), "does not match regex pattern")
+}
+
 // --- CheckForUpdate with NoIdentity ---
 
 func TestInventoryService_CheckForUpdate_NoIdentity(t *testing.T) {

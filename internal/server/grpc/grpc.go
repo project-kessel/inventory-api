@@ -133,7 +133,9 @@ func NewWithDeps(deps ServerConfig) (*kgrpc.Server, error) {
 		unaryInterceptor := []grpc.UnaryServerInterceptor{
 			m.UnaryReadOnlyInterceptor(),
 		}
-		opts = append(opts, kgrpc.Options(grpc.ChainUnaryInterceptor(unaryInterceptor...)))
+		opts = append(opts, kgrpc.Options(
+			grpc.ChainStreamInterceptor(streamingInterceptor...),
+			grpc.ChainUnaryInterceptor(unaryInterceptor...)))
 	}
 	opts = append(opts, deps.ServerOptions...)
 	srv := kgrpc.NewServer(opts...)

@@ -96,7 +96,13 @@ func NewForProtocol(config CompletedConfig, protocol Protocol, logger *log.Helpe
 			if chainConfig.OIDCConfig == nil {
 				return nil, fmt.Errorf("oidc authenticator requires config at chain index %d", i)
 			}
-			logger.Infof("Loading OIDC info from %s", chainConfig.OIDCConfig.AuthorizationServerURL)
+			if len(chainConfig.OIDCConfig.GrpcEndpoints) > 0 {
+				logger.Infof("Loading OIDC authenticator from %s for specific endpoints: %v",
+					chainConfig.OIDCConfig.AuthorizationServerURL, chainConfig.OIDCConfig.GrpcEndpoints)
+			} else {
+				logger.Infof("Loading OIDC authenticator from %s for all endpoints",
+					chainConfig.OIDCConfig.AuthorizationServerURL)
+			}
 			auth, err = factory.CreateAuthenticator(factory.TypeOIDC, chainConfig.OIDCConfig)
 			if err != nil {
 				return nil, fmt.Errorf("failed to create oidc authenticator: %w", err)

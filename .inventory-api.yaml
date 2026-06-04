@@ -18,10 +18,18 @@ authn:
         enable: false
         transport:
           http: false
+          # setting 'true' for grpc, below, will enable for the grpc transport. If grpc-endpoints are specified, it will
+          # be enabled *only* for those endpoints. (And it *must* succeed for those endpoints or access is denied.)
           grpc: false
         config:
           insecure-client: true
           authn-server-url: http://127.0.0.1:8085/realms/redhat-external
+          client-id: "tuple-service-account"
+          grpc-endpoints:
+            - "/kessel.inventory.v1beta2.KesselTupleService/CreateTuples"
+            - "/kessel.inventory.v1beta2.KesselTupleService/DeleteTuples"
+            - "/kessel.inventory.v1beta2.KesselTupleService/ReadTuples"
+            - "/kessel.inventory.v1beta2.KesselTupleService/AcquireLock"
           skip-client-id-check: true
           skip-issuer-check: true
           principal-user-domain: localhost

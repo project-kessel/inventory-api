@@ -43,11 +43,44 @@ func New(c CompletedConfig) (*OAuth2Authenticator, error) {
 }
 
 func (o *OAuth2Authenticator) Authenticate(ctx context.Context, t transport.Transporter) (*api.Claims, api.Decision) {
+	// Endpoint filtering: if endpoints are specified, only authenticate requests to those endpoints
+	if len(o.GrpcEndpoints) > 0 {
+		currentEndpoint := t.Operation()
+		matched := false
+		for _, endpoint := range o.GrpcEndpoints {
+			if endpoint == currentEndpoint {
+				matched = true
+				break
+			}
+		}
+		if !matched {
+			// This OIDC authenticator doesn't apply to this endpoint
+			return nil, api.Ignore
+		}
+		// Endpoint matched - OIDC authentication is REQUIRED for this endpoint
+		// Continue to token extraction, but return Deny (not Ignore) if no token present
+	}
+
 	// get the token from the request
 	rawToken := util.GetBearerToken(t)
 
 	// ensure we got one
 	if rawToken == "" {
+		if len(o.GrpcEndpoints) > 0 {
+			// GrpcEndpoints specified and matched, but no token present - DENY
+			// OIDC is required for this endpoint
+			return nil, api.Deny
+
+			// TODO: We would like to be able to return 'api.Ignore' here (as below), and (depending on the authn
+			// aggregator used) potentially provide for another authenticator to authenticate the call. The problem is
+			// that, with current configuration in many envs, "type: allow-unauthenticated" is the last authenticator in
+			// the chain, thus we default to 'api.Allow'. We therefore have no other way of enforcing OIDC on the
+			// endpoints without returning a 'api.Deny' here. In the future when we default to deny in the chain, we can
+			// remove this endpoints specific logic and go with the below behaviour. (See RHCLOUD-47724.)
+			// NOTE: since the "restricted by GrpcEndpoints" feature was introduced to support the deprecated Tuple CRUD
+			// endpoints, it may equally be removed in the meantime.
+		}
+		// No endpoints specified - current behavior (OIDC optional)
 		return nil, api.Ignore
 	}
 

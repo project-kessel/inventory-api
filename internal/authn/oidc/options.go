@@ -12,6 +12,12 @@ type Options struct {
 	EnforceAudCheck        bool   `mapstructure:"enforce-aud-check"`
 	SkipIssuerCheck        bool   `mapstructure:"skip-issuer-check"`
 	PrincipalUserDomain    string `mapstructure:"principal-user-domain"`
+
+	// GrpcEndpoints specifies which gRPC endpoints this OIDC authenticator applies to (optional).
+	// If specified, the authenticator only participates for gRPC requests to these endpoints.
+	// If omitted or empty, the authenticator applies to all endpoints (current behavior).
+	// This feature is specific to deprecated tuple CRUD endpoints and will be removed in the future.
+	GrpcEndpoints []string `mapstructure:"grpc-endpoints"`
 }
 
 func NewOptions() *Options {

@@ -92,4 +92,121 @@ func TestConfigComplete_EnableHTTP_EnableGRPC_RequiresAtLeastOneAuthenticatorPer
 	})
 }
 
+func TestConfigComplete_WithGrpcEndpoints(t *testing.T) {
+	t.Run("grpc-endpoints converted from config map to OIDC options", func(t *testing.T) {
+		c := &Config{
+			Authenticator: &AuthenticatorConfig{
+				Type: "first_match",
+				Chain: []ChainEntry{
+					{
+						Type:      "oidc",
+						Transport: &Transport{HTTP: boolPtr(false), GRPC: boolPtr(true)},
+						Config: map[string]interface{}{
+							"authn-server-url": "https://example.com",
+							"client-id":        "test-client",
+							"grpc-endpoints": []interface{}{
+								"/kessel.inventory.v1beta2.KesselTupleService/CreateTuples",
+								"/kessel.inventory.v1beta2.KesselTupleService/DeleteTuples",
+							},
+						},
+					},
+					{Type: "allow-unauthenticated", Transport: &Transport{HTTP: boolPtr(true), GRPC: boolPtr(true)}},
+				},
+			},
+		}
+
+		completed, errs := c.Complete()
+		assert.Empty(t, errs)
+		assert.NotNil(t, completed.Authenticator)
+		assert.Len(t, completed.Authenticator.ChainConfigs, 2)
+
+		// Verify conversion from []interface{} (config map) to []string (GrpcEndpoints field)
+		oidcChainConfig := completed.Authenticator.ChainConfigs[0]
+		assert.Equal(t, "oidc", oidcChainConfig.Type)
+		assert.NotNil(t, oidcChainConfig.OIDCConfig)
+		assert.Equal(t, []string{
+			"/kessel.inventory.v1beta2.KesselTupleService/CreateTuples",
+			"/kessel.inventory.v1beta2.KesselTupleService/DeleteTuples",
+		}, oidcChainConfig.OIDCConfig.GrpcEndpoints)
+	})
+
+	t.Run("grpc-endpoints rejects empty string", func(t *testing.T) {
+		c := &Config{
+			Authenticator: &AuthenticatorConfig{
+				Type: "first_match",
+				Chain: []ChainEntry{
+					{
+						Type:      "oidc",
+						Transport: &Transport{HTTP: boolPtr(false), GRPC: boolPtr(true)},
+						Config: map[string]interface{}{
+							"authn-server-url": "https://example.com",
+							"client-id":        "test-client",
+							"grpc-endpoints": []interface{}{
+								"/kessel.inventory.v1beta2.KesselTupleService/CreateTuples",
+								"", // Empty string - should fail
+							},
+						},
+					},
+					{Type: "allow-unauthenticated", Transport: &Transport{HTTP: boolPtr(true), GRPC: boolPtr(true)}},
+				},
+			},
+		}
+
+		_, errs := c.Complete()
+		assert.NotEmpty(t, errs)
+		assert.Contains(t, errs[0].Error(), "grpc-endpoints[1] is empty")
+	})
+
+	t.Run("grpc-endpoints rejects non-string element", func(t *testing.T) {
+		c := &Config{
+			Authenticator: &AuthenticatorConfig{
+				Type: "first_match",
+				Chain: []ChainEntry{
+					{
+						Type:      "oidc",
+						Transport: &Transport{HTTP: boolPtr(false), GRPC: boolPtr(true)},
+						Config: map[string]interface{}{
+							"authn-server-url": "https://example.com",
+							"client-id":        "test-client",
+							"grpc-endpoints": []interface{}{
+								"/kessel.inventory.v1beta2.KesselTupleService/CreateTuples",
+								123, // Non-string - should fail
+							},
+						},
+					},
+					{Type: "allow-unauthenticated", Transport: &Transport{HTTP: boolPtr(true), GRPC: boolPtr(true)}},
+				},
+			},
+		}
+
+		_, errs := c.Complete()
+		assert.NotEmpty(t, errs)
+		assert.Contains(t, errs[0].Error(), "grpc-endpoints[1] is not a string")
+	})
+
+	t.Run("grpc-endpoints rejects wrong type", func(t *testing.T) {
+		c := &Config{
+			Authenticator: &AuthenticatorConfig{
+				Type: "first_match",
+				Chain: []ChainEntry{
+					{
+						Type:      "oidc",
+						Transport: &Transport{HTTP: boolPtr(false), GRPC: boolPtr(true)},
+						Config: map[string]interface{}{
+							"authn-server-url": "https://example.com",
+							"client-id":        "test-client",
+							"grpc-endpoints":   "not-an-array", // Wrong type - should fail
+						},
+					},
+					{Type: "allow-unauthenticated", Transport: &Transport{HTTP: boolPtr(true), GRPC: boolPtr(true)}},
+				},
+			},
+		}
+
+		_, errs := c.Complete()
+		assert.NotEmpty(t, errs)
+		assert.Contains(t, errs[0].Error(), "grpc-endpoints must be an array")
+	})
+}
+
 func boolPtr(v bool) *bool { return &v }

@@ -2,8 +2,10 @@ package tuples
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/go-kratos/kratos/v2/log"
+	authnapi "github.com/project-kessel/inventory-api/internal/authn/api"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
 	"github.com/project-kessel/inventory-api/internal/biz/usecase/metaauthorizer"
 )
@@ -34,6 +36,10 @@ func (uc *TupleCrudUseCase) CreateTuples(ctx context.Context, cmd CreateTuplesCo
 		return nil, err
 	}
 
+	// Get authz context for logging
+	authzCtx, _ := authnapi.FromAuthzContext(ctx)
+	principal := authzCtx.ExtractPrincipal()
+
 	var fencing *model.FencingCheck
 	if cmd.FencingCheck != nil {
 		fc := model.NewFencingCheck(cmd.FencingCheck.LockId, cmd.FencingCheck.LockToken)
@@ -42,8 +48,26 @@ func (uc *TupleCrudUseCase) CreateTuples(ctx context.Context, cmd CreateTuplesCo
 
 	result, err := uc.Authz.CreateTuples(ctx, cmd.Tuples, cmd.Upsert, fencing)
 	if err != nil {
+		// CRUD operation failed - SEC-MON-REQ-1 compliance (EOI-1 pii_manipulation, EOI-11 warnings_or_errors)
+		uc.Log.Warnw("msg", "Create tuples failed",
+			"action", "CREATE",
+			"resource_type", "tuple",
+			"resource_id", fmt.Sprintf("batch_%d_tuples", len(cmd.Tuples)),
+			"principal", principal,
+			"outcome", "failure",
+			"reason", err.Error(),
+		)
 		return nil, err
 	}
+
+	// CRUD operation - SEC-MON-REQ-1 compliance (EOI-1 pii_manipulation)
+	uc.Log.Infow("msg", "Tuples created",
+		"action", "CREATE",
+		"resource_type", "tuple",
+		"resource_id", fmt.Sprintf("batch_%d_tuples", len(cmd.Tuples)),
+		"principal", principal,
+		"outcome", "success",
+	)
 
 	return &CreateTuplesResult{
 		ConsistencyToken: result.ConsistencyToken(),
@@ -59,6 +83,10 @@ func (uc *TupleCrudUseCase) DeleteTuples(ctx context.Context, cmd DeleteTuplesCo
 		return nil, err
 	}
 
+	// Get authz context for logging
+	authzCtx, _ := authnapi.FromAuthzContext(ctx)
+	principal := authzCtx.ExtractPrincipal()
+
 	var fencing *model.FencingCheck
 	if cmd.FencingCheck != nil {
 		fc := model.NewFencingCheck(cmd.FencingCheck.LockId, cmd.FencingCheck.LockToken)
@@ -67,8 +95,26 @@ func (uc *TupleCrudUseCase) DeleteTuples(ctx context.Context, cmd DeleteTuplesCo
 
 	result, err := uc.Authz.DeleteTuples(ctx, cmd.Filter, fencing)
 	if err != nil {
+		// CRUD operation failed - SEC-MON-REQ-1 compliance (EOI-1 pii_manipulation, EOI-11 warnings_or_errors)
+		uc.Log.Warnw("msg", "Delete tuples failed",
+			"action", "DELETE",
+			"resource_type", "tuple",
+			"resource_id", "filtered_delete",
+			"principal", principal,
+			"outcome", "failure",
+			"reason", err.Error(),
+		)
 		return nil, err
 	}
+
+	// CRUD operation - SEC-MON-REQ-1 compliance (EOI-1 pii_manipulation)
+	uc.Log.Infow("msg", "Tuples deleted",
+		"action", "DELETE",
+		"resource_type", "tuple",
+		"resource_id", "filtered_delete",
+		"principal", principal,
+		"outcome", "success",
+	)
 
 	return &DeleteTuplesResult{
 		ConsistencyToken: result.ConsistencyToken(),

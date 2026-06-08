@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 
+	"github.com/go-kratos/kratos/v2/log"
 	authnapi "github.com/project-kessel/inventory-api/internal/authn/api"
 )
 
@@ -32,6 +33,36 @@ func EnforceMetaAuthzObject(ctx context.Context, authorizer MetaAuthorizer, rela
 		return err
 	}
 	if !allowed {
+		// Extract principal from authzCtx
+		principal := authzCtx.ExtractPrincipal()
+
+		// Extract resource information from MetaObject
+		resourceType := "unknown"
+		resourceId := "unknown"
+		switch obj := metaObject.(type) {
+		case InventoryResource:
+			resourceType = obj.ResourceType().String()
+			resourceId = string(obj.LocalResourceId())
+		case ResourceTypeRef:
+			resourceType = obj.ResourceType().String()
+			resourceId = "type_level_operation"
+		case TupleSystem:
+			resourceType = "tuple_system"
+			resourceId = "system"
+		}
+
+		// Auth failure - SEC-MON-REQ-1 compliance (EOI-8 authorization_failure, EOI-1 pii_manipulation)
+		logger := log.NewHelper(log.DefaultLogger)
+		logger.Warnw("msg", "Permission denied",
+			"event", "authorization_failure",
+			"action", "authorize_resource_access",
+			"principal", principal,
+			"resource_type", resourceType,
+			"resource_id", resourceId,
+			"required_permission", string(relation),
+			"outcome", "failure",
+		)
+
 		return ErrMetaAuthorizationDenied
 	}
 	return nil

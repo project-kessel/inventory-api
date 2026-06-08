@@ -313,6 +313,19 @@ func NewCommand(
 			hb.RegisterKesselInventoryHealthServiceServer(server.GrpcServer, health_service)
 			hb.RegisterKesselInventoryHealthServiceHTTPServer(server.HttpServer, health_service)
 
+			// Service startup - SEC-MON-REQ-1 compliance (EOI-5 process_status)
+			logHelper := log.NewHelper(logger)
+			logHelper.Infow("msg", "Inventory API starting",
+				"event", "startup",
+				"version", loggerOptions.ServiceVersion,
+				"log_level", common.GetLogLevel(),
+				"consumer_enabled", consumerOptions.Enabled,
+				"read_after_write_enabled", consistencyOptions.ReadAfterWriteEnabled,
+				"database", storageConfig.Options.Database,
+				"read_only_mode", serverOptions.ReadOnlyMode,
+				// DO NOT LOG: DB passwords, Kafka credentials, OIDC client secrets
+			)
+
 			srvErrs := make(chan error)
 			go func() {
 				srvErrs <- server.Run(ctx)
@@ -395,6 +408,12 @@ func NewCommand(
 func shutdown(db *gorm.DB, srv *server.Server, pprofSrv *pprof.Server, cm *consumer.InventoryConsumer, logger *log.Helper) func(reason interface{}) {
 	return func(reason interface{}) {
 		log.Info(fmt.Sprintf("Server Shutdown: %s", reason))
+
+		// Service shutdown - SEC-MON-REQ-1 compliance (EOI-5 process_status)
+		logger.Infow("msg", "Inventory API shutting down",
+			"event", "shutdown",
+			"reason", fmt.Sprintf("%v", reason),
+		)
 
 		timeout := srv.HttpServer.ReadTimeout
 		ctx, cancel := context.WithTimeout(context.Background(), timeout)

@@ -95,7 +95,14 @@ func (o *OAuth2Authenticator) Authenticate(ctx context.Context, t transport.Tran
 		// 2. Invalid tokens should be rejected, not ignored (which would allow fallback to guest)
 		// 3. This prevents attackers from bypassing authentication by sending malformed tokens
 		// 4. The first_match aggregator strategy ensures denial propagates (stricter security policy)
-		log.Debugf("OIDC token verification failed (invalid token or not an OIDC ID token): %v", err)
+
+		// Authentication failure - SEC-MON-REQ-1 compliance (EOI-7 invalid_login)
+		log.NewHelper(log.DefaultLogger).Warnw("msg", "OIDC token verification failed",
+			"event", "authentication_failure",
+			"auth_method", "oidc",
+			"outcome", "failure",
+			"reason", "invalid_token_or_not_oidc_id_token",
+		)
 		return nil, api.Deny
 	}
 
@@ -104,13 +111,27 @@ func (o *OAuth2Authenticator) Authenticate(ctx context.Context, t transport.Tran
 	u := &TokenClaims{}
 	err = tok.Claims(u)
 	if err != nil {
-		log.Errorf("failed to extract claims: %v", err)
+		// Authentication failure - SEC-MON-REQ-1 compliance (EOI-7 invalid_login)
+		log.NewHelper(log.DefaultLogger).Warnw("msg", "OIDC claims extraction failed",
+			"event", "authentication_failure",
+			"auth_method", "oidc",
+			"outcome", "failure",
+			"reason", "invalid_claims_payload",
+		)
 		return nil, api.Deny
 	}
 
 	if o.EnforceAudCheck {
 		if u.Audience != o.ClientId {
-			log.Debugf("aud does not match the requesting client-id -- decision DENY")
+			// Authentication failure - SEC-MON-REQ-1 compliance (EOI-7 invalid_login)
+			log.NewHelper(log.DefaultLogger).Warnw("msg", "OIDC audience mismatch",
+				"event", "authentication_failure",
+				"auth_method", "oidc",
+				"outcome", "failure",
+				"reason", "audience_mismatch",
+				"expected_client_id", o.ClientId,
+				"actual_audience", u.Audience,
+			)
 			return nil, api.Deny
 		}
 	}

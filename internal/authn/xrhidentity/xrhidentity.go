@@ -3,6 +3,7 @@ package xrhidentity
 import (
 	"context"
 
+	"github.com/go-kratos/kratos/v2/log"
 	"github.com/go-kratos/kratos/v2/transport"
 
 	"github.com/project-kessel/inventory-api/internal/authn/api"
@@ -40,7 +41,14 @@ func (a *XRhIdentityAuthenticator) Authenticate(ctx context.Context, t transport
 	// Parse the identity header using platform-go-middlewares
 	xrhid, err := identity.DecodeAndCheckIdentity(identityHeader)
 	if err != nil {
-		// Header present but invalid - deny
+		// Authentication failure - SEC-MON-REQ-1 compliance (EOI-7 invalid_login)
+		log.NewHelper(log.DefaultLogger).Warnw("msg", "x-rh-identity authentication failed",
+			"event", "authentication_failure",
+			"auth_method", "x-rh-identity",
+			"outcome", "failure",
+			"reason", "invalid_identity_header",
+			// Note: Cannot log principal (org_id, user_id) when authentication fails
+		)
 		return nil, api.Deny
 	}
 

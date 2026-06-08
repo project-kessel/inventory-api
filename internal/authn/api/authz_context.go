@@ -38,3 +38,19 @@ func FromAuthzContext(ctx context.Context) (AuthzContext, bool) {
 	authzCtx, ok := ctx.Value(authzContextKey{}).(AuthzContext)
 	return authzCtx, ok
 }
+
+// ExtractPrincipal returns the principal identifier from an AuthzContext for logging.
+// Returns "unknown" if the context has no authenticated subject.
+// Prefers ClientID over SubjectId when both are present.
+func (a AuthzContext) ExtractPrincipal() string {
+	if a.Subject == nil {
+		return "unknown"
+	}
+	if a.Subject.ClientID != "" {
+		return string(a.Subject.ClientID)
+	}
+	if a.Subject.SubjectId != "" {
+		return string(a.Subject.SubjectId)
+	}
+	return "unknown"
+}

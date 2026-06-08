@@ -3650,8 +3650,6 @@ data:
             "wideLayout": true
           },
           "pluginVersion": "11.6.11",
-          "repeat": "instance",
-          "repeatDirection": "h",
           "targets": [
             {
               "datasource": {
@@ -4565,7 +4563,7 @@ data:
       "timezone": "",
       "title": "Kessel Inventory - Kafka Connect",
       "uid": "AEaSQ97mq",
-      "version": 4
+      "version": 5
     }
 kind: ConfigMap
 metadata:

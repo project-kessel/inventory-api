@@ -51,37 +51,16 @@ data:
           },
           "fieldConfig": {
             "defaults": {
-              "decimals": 0,
-              "mappings": [
-                {
-                  "options": {
-                    "match": "null",
-                    "result": {
-                      "text": "N/A"
-                    }
-                  },
-                  "type": "special"
-                }
-              ],
-              "max": 100,
-              "min": 0,
+              "mappings": [],
               "thresholds": {
                 "mode": "absolute",
                 "steps": [
                   {
                     "color": "#299c46"
-                  },
-                  {
-                    "color": "rgba(237, 129, 40, 0.89)",
-                    "value": 10000
-                  },
-                  {
-                    "color": "#d44a3a",
-                    "value": 60000
                   }
                 ]
               },
-              "unit": "s"
+              "unit": "ops"
             },
             "overrides": []
           },
@@ -110,7 +89,7 @@ data:
             "textMode": "auto",
             "wideLayout": true
           },
-          "pluginVersion": "11.6.3",
+          "pluginVersion": "11.6.11",
           "targets": [
             {
               "datasource": {
@@ -118,14 +97,14 @@ data:
                 "uid": "$datasource"
               },
               "editorMode": "code",
-              "expr": "(debezium_metrics_millisecondssincelastevent{plugin=\"$connector_type\",name=\"$connector_name\",context=~\"(binlog|streaming)\"}) / 1000",
+              "expr": "kafka_connect_source_task_source_record_poll_rate{job=\"$job\",connector=\"$kafka_connector\",task!=\"\"}",
               "format": "time_series",
               "intervalFactor": 1,
               "range": true,
               "refId": "A"
             }
           ],
-          "title": "Time since last event",
+          "title": "Source Record Poll Rate",
           "type": "stat"
         },
         {
@@ -207,7 +186,7 @@ data:
             "textMode": "auto",
             "wideLayout": true
           },
-          "pluginVersion": "11.6.3",
+          "pluginVersion": "11.6.11",
           "targets": [
             {
               "datasource": {
@@ -215,14 +194,14 @@ data:
                 "uid": "$datasource"
               },
               "editorMode": "code",
-              "expr": "debezium_metrics_connected{plugin=\"$connector_type\",name=\"$connector_name\",context=~\"(binlog|streaming)\"}",
+              "expr": "kafka_connect_connector_task_status{job=\"$job\",connector=\"$kafka_connector\",status=\"running\"}",
               "format": "time_series",
               "intervalFactor": 1,
               "range": true,
               "refId": "A"
             }
           ],
-          "title": "Connected",
+          "title": "Task Running",
           "type": "stat"
         },
         {
@@ -305,7 +284,7 @@ data:
               "sort": "none"
             }
           },
-          "pluginVersion": "11.6.3",
+          "pluginVersion": "11.6.11",
           "targets": [
             {
               "datasource": {
@@ -313,11 +292,11 @@ data:
                 "uid": "$datasource"
               },
               "editorMode": "code",
-              "expr": "debezium_metrics_totalnumberofeventsseen{plugin=\"$connector_type\",name=\"$connector_name\",context=~\"(binlog|streaming)\"}",
+              "expr": "kafka_connect_source_task_source_record_poll_total{job=\"$job\",connector=\"$kafka_connector\",task!=\"\"}",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 1,
-              "legendFormat": "Total events received",
+              "legendFormat": "Total records polled",
               "range": true,
               "refId": "A"
             },
@@ -327,15 +306,15 @@ data:
                 "uid": "$datasource"
               },
               "editorMode": "code",
-              "expr": "debezium_metrics_numberofeventsskipped{plugin=\"$connector_type\",name=\"$connector_name\",context=~\"(binlog|streaming)\"}",
+              "expr": "kafka_connect_source_task_source_record_write_total{job=\"$job\",connector=\"$kafka_connector\",task!=\"\"}",
               "format": "time_series",
               "intervalFactor": 1,
-              "legendFormat": "Events skipped",
+              "legendFormat": "Total records written",
               "range": true,
               "refId": "B"
             }
           ],
-          "title": "Event count",
+          "title": "Source Record Count",
           "type": "timeseries"
         },
         {
@@ -410,7 +389,7 @@ data:
             "textMode": "auto",
             "wideLayout": true
           },
-          "pluginVersion": "11.6.3",
+          "pluginVersion": "11.6.11",
           "targets": [
             {
               "datasource": {
@@ -488,7 +467,7 @@ data:
             "textMode": "auto",
             "wideLayout": true
           },
-          "pluginVersion": "11.6.3",
+          "pluginVersion": "11.6.11",
           "targets": [
             {
               "datasource": {
@@ -582,7 +561,7 @@ data:
             "textMode": "auto",
             "wideLayout": true
           },
-          "pluginVersion": "11.6.3",
+          "pluginVersion": "11.6.11",
           "targets": [
             {
               "datasource": {
@@ -675,7 +654,7 @@ data:
             "textMode": "auto",
             "wideLayout": true
           },
-          "pluginVersion": "11.6.3",
+          "pluginVersion": "11.6.11",
           "targets": [
             {
               "datasource": {
@@ -768,7 +747,7 @@ data:
             "textMode": "auto",
             "wideLayout": true
           },
-          "pluginVersion": "11.6.3",
+          "pluginVersion": "11.6.11",
           "targets": [
             {
               "datasource": {
@@ -866,7 +845,7 @@ data:
               "sort": "none"
             }
           },
-          "pluginVersion": "11.6.3",
+          "pluginVersion": "11.6.11",
           "targets": [
             {
               "datasource": {
@@ -1013,7 +992,7 @@ data:
             },
             "showHeader": true
           },
-          "pluginVersion": "11.6.3",
+          "pluginVersion": "11.6.11",
           "targets": [
             {
               "datasource": {
@@ -1091,7 +1070,7 @@ data:
             "textMode": "auto",
             "wideLayout": true
           },
-          "pluginVersion": "11.6.3",
+          "pluginVersion": "11.6.11",
           "targets": [
             {
               "datasource": {
@@ -1155,7 +1134,7 @@ data:
             "textMode": "auto",
             "wideLayout": true
           },
-          "pluginVersion": "11.6.3",
+          "pluginVersion": "11.6.11",
           "targets": [
             {
               "datasource": {
@@ -1223,7 +1202,7 @@ data:
             "textMode": "auto",
             "wideLayout": true
           },
-          "pluginVersion": "11.6.3",
+          "pluginVersion": "11.6.11",
           "targets": [
             {
               "datasource": {
@@ -1291,7 +1270,7 @@ data:
             "textMode": "auto",
             "wideLayout": true
           },
-          "pluginVersion": "11.6.3",
+          "pluginVersion": "11.6.11",
           "targets": [
             {
               "datasource": {
@@ -1359,7 +1338,7 @@ data:
             "textMode": "auto",
             "wideLayout": true
           },
-          "pluginVersion": "11.6.3",
+          "pluginVersion": "11.6.11",
           "targets": [
             {
               "datasource": {
@@ -1427,7 +1406,7 @@ data:
             "textMode": "auto",
             "wideLayout": true
           },
-          "pluginVersion": "11.6.3",
+          "pluginVersion": "11.6.11",
           "targets": [
             {
               "datasource": {
@@ -1533,7 +1512,7 @@ data:
               "sort": "none"
             }
           },
-          "pluginVersion": "11.6.3",
+          "pluginVersion": "11.6.11",
           "targets": [
             {
               "datasource": {
@@ -1693,7 +1672,7 @@ data:
               "sort": "none"
             }
           },
-          "pluginVersion": "11.6.3",
+          "pluginVersion": "11.6.11",
           "targets": [
             {
               "datasource": {
@@ -1906,7 +1885,7 @@ data:
               "sort": "none"
             }
           },
-          "pluginVersion": "11.6.3",
+          "pluginVersion": "11.6.11",
           "targets": [
             {
               "datasource": {
@@ -2089,7 +2068,7 @@ data:
               "sort": "none"
             }
           },
-          "pluginVersion": "11.6.3",
+          "pluginVersion": "11.6.11",
           "targets": [
             {
               "datasource": {
@@ -2268,7 +2247,7 @@ data:
               "sort": "none"
             }
           },
-          "pluginVersion": "11.6.3",
+          "pluginVersion": "11.6.11",
           "targets": [
             {
               "datasource": {
@@ -2372,7 +2351,7 @@ data:
               "sort": "none"
             }
           },
-          "pluginVersion": "11.6.3",
+          "pluginVersion": "11.6.11",
           "targets": [
             {
               "datasource": {
@@ -2489,7 +2468,7 @@ data:
               "sort": "none"
             }
           },
-          "pluginVersion": "11.6.3",
+          "pluginVersion": "11.6.11",
           "targets": [
             {
               "datasource": {
@@ -2587,7 +2566,7 @@ data:
               "sort": "none"
             }
           },
-          "pluginVersion": "11.6.3",
+          "pluginVersion": "11.6.11",
           "targets": [
             {
               "datasource": {
@@ -2699,7 +2678,7 @@ data:
               "sort": "none"
             }
           },
-          "pluginVersion": "11.6.3",
+          "pluginVersion": "11.6.11",
           "targets": [
             {
               "datasource": {
@@ -2813,7 +2792,7 @@ data:
               "sort": "none"
             }
           },
-          "pluginVersion": "11.6.3",
+          "pluginVersion": "11.6.11",
           "targets": [
             {
               "datasource": {
@@ -2957,7 +2936,7 @@ data:
               "sort": "none"
             }
           },
-          "pluginVersion": "11.6.3",
+          "pluginVersion": "11.6.11",
           "targets": [
             {
               "datasource": {
@@ -3064,7 +3043,7 @@ data:
               "sort": "none"
             }
           },
-          "pluginVersion": "11.6.3",
+          "pluginVersion": "11.6.11",
           "targets": [
             {
               "datasource": {
@@ -3171,7 +3150,7 @@ data:
               "sort": "none"
             }
           },
-          "pluginVersion": "11.6.3",
+          "pluginVersion": "11.6.11",
           "targets": [
             {
               "datasource": {
@@ -3277,7 +3256,7 @@ data:
               "sort": "none"
             }
           },
-          "pluginVersion": "11.6.3",
+          "pluginVersion": "11.6.11",
           "targets": [
             {
               "datasource": {
@@ -3383,7 +3362,7 @@ data:
               "sort": "none"
             }
           },
-          "pluginVersion": "11.6.3",
+          "pluginVersion": "11.6.11",
           "targets": [
             {
               "datasource": {
@@ -3489,7 +3468,7 @@ data:
               "sort": "none"
             }
           },
-          "pluginVersion": "11.6.3",
+          "pluginVersion": "11.6.11",
           "targets": [
             {
               "datasource": {
@@ -3528,7 +3507,7 @@ data:
             "type": "prometheus",
             "uid": "$datasource"
           },
-          "description": "Total number of rebalances",
+          "description": "Total number of rebalances (by instance)",
           "fieldConfig": {
             "defaults": {
               "decimals": 0,
@@ -3556,8 +3535,8 @@ data:
             "overrides": []
           },
           "gridPos": {
-            "h": 5,
-            "w": 24,
+            "h": 6,
+            "w": 12,
             "x": 0,
             "y": 69
           },
@@ -3586,7 +3565,7 @@ data:
             "textMode": "auto",
             "wideLayout": true
           },
-          "pluginVersion": "11.6.3",
+          "pluginVersion": "11.6.11",
           "targets": [
             {
               "datasource": {
@@ -3595,16 +3574,16 @@ data:
               },
               "editorMode": "code",
               "exemplar": true,
-              "expr": "kafka_connect_worker_rebalance_completed_rebalances{job=\"$job\"} >= 0",
+              "expr": "kafka_connect_worker_rebalance_completed_rebalances_total{job=\"$job\"} >= 0",
               "format": "time_series",
               "instant": false,
               "interval": "",
               "intervalFactor": 1,
-              "legendFormat": "",
+              "legendFormat": "{{pod}}",
               "refId": "A"
             }
           ],
-          "title": "($instance) Total number of rebalances",
+          "title": "Total number of rebalances ",
           "type": "stat"
         },
         {
@@ -3612,7 +3591,7 @@ data:
             "type": "prometheus",
             "uid": "$datasource"
           },
-          "description": "Time since last rebalance",
+          "description": "Time since last rebalance (by instance)",
           "fieldConfig": {
             "defaults": {
               "decimals": 0,
@@ -3640,10 +3619,10 @@ data:
             "overrides": []
           },
           "gridPos": {
-            "h": 5,
-            "w": 24,
-            "x": 0,
-            "y": 74
+            "h": 6,
+            "w": 12,
+            "x": 12,
+            "y": 69
           },
           "id": 230,
           "maxDataPoints": 100,
@@ -3657,6 +3636,7 @@ data:
             "graphMode": "none",
             "justifyMode": "auto",
             "orientation": "horizontal",
+            "percentChangeColorMode": "standard",
             "reduceOptions": {
               "calcs": [
                 "lastNotNull"
@@ -3669,7 +3649,7 @@ data:
             "textMode": "auto",
             "wideLayout": true
           },
-          "pluginVersion": "10.4.1",
+          "pluginVersion": "11.6.11",
           "repeat": "instance",
           "repeatDirection": "h",
           "targets": [
@@ -3684,120 +3664,12 @@ data:
               "instant": false,
               "interval": "",
               "intervalFactor": 1,
-              "legendFormat": "",
+              "legendFormat": "{{pod}}",
               "refId": "A"
             }
           ],
-          "title": "($instance) Time since last rebalance ",
+          "title": "Time since last rebalance ",
           "type": "stat"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "$datasource"
-          },
-          "description": "Rebalances average time",
-          "fieldConfig": {
-            "defaults": {
-              "color": {
-                "mode": "palette-classic"
-              },
-              "custom": {
-                "axisBorderShow": false,
-                "axisCenteredZero": false,
-                "axisColorMode": "text",
-                "axisLabel": "",
-                "axisPlacement": "auto",
-                "barAlignment": 0,
-                "barWidthFactor": 0.6,
-                "drawStyle": "line",
-                "fillOpacity": 30,
-                "gradientMode": "opacity",
-                "hideFrom": {
-                  "legend": false,
-                  "tooltip": false,
-                  "viz": false
-                },
-                "insertNulls": false,
-                "lineInterpolation": "linear",
-                "lineWidth": 1,
-                "pointSize": 5,
-                "scaleDistribution": {
-                  "type": "linear"
-                },
-                "showPoints": "never",
-                "spanNulls": false,
-                "stacking": {
-                  "group": "A",
-                  "mode": "none"
-                },
-                "thresholdsStyle": {
-                  "mode": "off"
-                }
-              },
-              "links": [],
-              "mappings": [],
-              "min": 0,
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  {
-                    "color": "green"
-                  },
-                  {
-                    "color": "red",
-                    "value": 80
-                  }
-                ]
-              },
-              "unit": "ms"
-            },
-            "overrides": []
-          },
-          "gridPos": {
-            "h": 8,
-            "w": 24,
-            "x": 0,
-            "y": 79
-          },
-          "id": 209,
-          "options": {
-            "legend": {
-              "calcs": [
-                "mean",
-                "lastNotNull",
-                "max"
-              ],
-              "displayMode": "table",
-              "placement": "bottom",
-              "showLegend": true
-            },
-            "tooltip": {
-              "hideZeros": false,
-              "mode": "single",
-              "sort": "none"
-            }
-          },
-          "pluginVersion": "11.6.3",
-          "targets": [
-            {
-              "datasource": {
-                "type": "prometheus",
-                "uid": "$datasource"
-              },
-              "editorMode": "code",
-              "expr": "kafka_connect_worker_rebalance_rebalance_avg_time_ms{job=\"$job\"}",
-              "format": "time_series",
-              "hide": false,
-              "instant": false,
-              "interval": "",
-              "intervalFactor": 1,
-              "legendFormat": "{{kafka_connect_cluster_id}}-{{instance}}",
-              "refId": "A"
-            }
-          ],
-          "title": "Rebalances average time",
-          "type": "timeseries"
         },
         {
           "collapsed": false,
@@ -3805,7 +3677,7 @@ data:
             "h": 1,
             "w": 24,
             "x": 0,
-            "y": 87
+            "y": 75
           },
           "id": 201,
           "panels": [],
@@ -3880,7 +3752,7 @@ data:
             "h": 7,
             "w": 8,
             "x": 0,
-            "y": 88
+            "y": 76
           },
           "id": 203,
           "options": {
@@ -3900,7 +3772,7 @@ data:
               "sort": "none"
             }
           },
-          "pluginVersion": "11.6.3",
+          "pluginVersion": "11.6.11",
           "targets": [
             {
               "datasource": {
@@ -3988,7 +3860,7 @@ data:
             "h": 7,
             "w": 8,
             "x": 8,
-            "y": 88
+            "y": 76
           },
           "id": 205,
           "options": {
@@ -4008,7 +3880,7 @@ data:
               "sort": "none"
             }
           },
-          "pluginVersion": "11.6.3",
+          "pluginVersion": "11.6.11",
           "targets": [
             {
               "datasource": {
@@ -4096,7 +3968,7 @@ data:
             "h": 7,
             "w": 8,
             "x": 16,
-            "y": 88
+            "y": 76
           },
           "id": 206,
           "options": {
@@ -4116,7 +3988,7 @@ data:
               "sort": "none"
             }
           },
-          "pluginVersion": "11.6.3",
+          "pluginVersion": "11.6.11",
           "targets": [
             {
               "datasource": {
@@ -4204,7 +4076,7 @@ data:
             "h": 7,
             "w": 12,
             "x": 0,
-            "y": 95
+            "y": 83
           },
           "id": 208,
           "options": {
@@ -4224,7 +4096,7 @@ data:
               "sort": "none"
             }
           },
-          "pluginVersion": "11.6.3",
+          "pluginVersion": "11.6.11",
           "targets": [
             {
               "datasource": {
@@ -4312,7 +4184,7 @@ data:
             "h": 7,
             "w": 12,
             "x": 12,
-            "y": 95
+            "y": 83
           },
           "id": 207,
           "options": {
@@ -4332,7 +4204,7 @@ data:
               "sort": "none"
             }
           },
-          "pluginVersion": "11.6.3",
+          "pluginVersion": "11.6.11",
           "targets": [
             {
               "datasource": {
@@ -4420,7 +4292,7 @@ data:
             "h": 7,
             "w": 12,
             "x": 0,
-            "y": 102
+            "y": 90
           },
           "id": 202,
           "options": {
@@ -4440,7 +4312,7 @@ data:
               "sort": "none"
             }
           },
-          "pluginVersion": "11.6.3",
+          "pluginVersion": "11.6.11",
           "targets": [
             {
               "datasource": {
@@ -4529,7 +4401,7 @@ data:
             "h": 7,
             "w": 12,
             "x": 12,
-            "y": 102
+            "y": 90
           },
           "id": 204,
           "options": {
@@ -4549,7 +4421,7 @@ data:
               "sort": "none"
             }
           },
-          "pluginVersion": "11.6.3",
+          "pluginVersion": "11.6.11",
           "targets": [
             {
               "datasource": {
@@ -4579,8 +4451,8 @@ data:
         "list": [
           {
             "current": {
-              "text": "crcs02ue1-prometheus",
-              "value": "PDD8BE47D10408F45"
+              "text": "hccs01ue1-prometheus",
+              "value": "P565978F9C10FC47D"
             },
             "includeAll": false,
             "label": "Datasource",
@@ -4626,10 +4498,32 @@ data:
             "type": "query"
           },
           {
+            "current": {
+              "text": "postgres",
+              "value": "postgres"
+            },
+            "datasource": {
+              "type": "prometheus",
+              "uid": "${datasource}"
+            },
+            "definition": "debezium_metrics_totalnumberofeventsseen",
+            "label": "Connector Type",
+            "name": "connector_type",
+            "options": [],
+            "query": {
+              "qryType": 4,
+              "query": "debezium_metrics_totalnumberofeventsseen",
+              "refId": "PrometheusVariableQueryEditor-VariableQuery"
+            },
+            "refresh": 1,
+            "regex": "/.*plugin=\"([^\"]+)\".*/",
+            "type": "query"
+          },
+          {
             "allowCustomValue": true,
             "current": {
-              "text": "",
-              "value": ""
+              "text": "kessel-inventory",
+              "value": "kessel-inventory"
             },
             "datasource": {
               "type": "prometheus",
@@ -4648,33 +4542,11 @@ data:
             "refresh": 1,
             "regex": "/.*[,\\(]name=\"([^\"]+)\".*/",
             "type": "query"
-          },
-          {
-            "current": {
-              "text": "",
-              "value": ""
-            },
-            "datasource": {
-              "type": "prometheus",
-              "uid": "${datasource}"
-            },
-            "definition": "debezium_metrics_totalnumberofeventsseen",
-            "label": "Connector Type",
-            "name": "connector_type",
-            "options": [],
-            "query": {
-              "qryType": 4,
-              "query": "debezium_metrics_totalnumberofeventsseen",
-              "refId": "PrometheusVariableQueryEditor-VariableQuery"
-            },
-            "refresh": 1,
-            "regex": "/.*plugin=\"([^\"]+)\".*/",
-            "type": "query"
           }
         ]
       },
       "time": {
-        "from": "now-30m",
+        "from": "now-1h",
         "to": "now"
       },
       "timepicker": {
@@ -4693,7 +4565,7 @@ data:
       "timezone": "",
       "title": "Kessel Inventory - Kafka Connect",
       "uid": "AEaSQ97mq",
-      "version": 3
+      "version": 4
     }
 kind: ConfigMap
 metadata:

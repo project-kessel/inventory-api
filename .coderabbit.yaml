@@ -1,9 +1,223 @@
 # yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
 # See https://docs.coderabbit.ai/reference/configuration for all fields and default values
+
+# Security path_instructions adapted from RedHatProductSecurity/prodsec-skills
+language: "en-US"
+
+reviews:
+  profile: "chill"
+  request_changes_workflow: true
+  high_level_summary: true
+  high_level_summary_placement: "comment"
+  collapse_walkthrough: false
+  sequence_diagrams: true
+  poem: false
+
+  path_filters:
+    - "!vendor/**"
+    - "!api/kessel/**/*.go"
+
+  auto_review:
+    enabled: true
+    auto_incremental_review: true
+    drafts: false
+    base_branches:
+      - "main"
+      - "release/.*"
+
+  path_instructions:
+
+    # ── Go security ──────────────────────────────────────────────
+    - path: "**/*.go"
+      instructions: |
+        Go security (prodsec-skills):
+        - Never ignore error returns
+        - database/sql with placeholders; no fmt.Sprintf in queries
+        - Use stdlib crypto/* and golang.org/x/crypto;
+          avoid third-party crypto libraries
+        - Integer overflow: bounds-check user-supplied sizes
+        - context.Context for cancellation and timeouts
+        - No string concatenation for SQL; use parameterized queries
+        - Validate and sanitize gRPC input at service boundaries
+
+    # ── Injection & input validation ─────────────────────────────
+    - path: "internal/service/**/*.go"
+      instructions: |
+        Injection prevention (prodsec-skills):
+        - SQL: parameterized queries only; no string concatenation
+        - Path traversal: canonicalize paths, reject ../
+        - Deserialization: no unsafe deserialization of untrusted data
+        - Validate at trust boundaries with allow-lists, not deny-lists
+
+    # ── Authentication ───────────────────────────────────────────
+    - path: "internal/authn/**/*"
+      instructions: |
+        Authentication review (prodsec-skills):
+        - JWT: verify signature, issuer, audience, expiry, nbf
+        - No ambient authority; require credentials per request
+        - Service-to-service: mTLS or short-lived tokens, not shared secrets
+        - Avoid API keys; prefer IdP-issued short-lived tokens
+        - Rate limit auth attempts where applicable
+
+    # ── Database & data layer ────────────────────────────────────
+    - path: "internal/{data,storage}/**/*"
+      instructions: |
+        Data store security (prodsec-skills):
+        - Auth: no default credentials; use IAM or IdP tokens
+        - Encryption: TLS in transit
+        - Least privilege: app user has minimal DB grants
+        - Connection strings: no embedded credentials
+        - SQL: parameterized queries only
+
+    # ── Kafka, consumer & pubsub ─────────────────────────────────
+    - path: "{internal/consumer/**/*,internal/pubsub/**/*}"
+      instructions: |
+        Messaging security (prodsec-skills):
+        - Kafka: TLS, SASL auth, per-topic ACLs
+        - No anonymous access in production
+        - Consumer: validate message schemas before processing
+
+    # ── Container & image hardening ──────────────────────────────
+    - path: "**/{Dockerfile,Containerfile}*"
+      instructions: |
+        Container security (prodsec-skills):
+        - Base image: UBI minimal or distroless from catalog.redhat.com
+        - Red Hat images: use floating tags; non-RH images: pin by digest
+        - Multi-stage builds; no build tools in final image
+        - USER non-root; never run as root
+        - COPY specific files, not entire context
+        - No secrets in ENV, ARG, or COPY
+        - Read-only rootfs where possible
+        - No package manager cache in final layer
+        - HEALTHCHECK defined
+
+    # ── Kubernetes & OpenShift manifests ──────────────────────────
+    - path: "deploy/**/*.{yaml,yml}"
+      instructions: |
+        Kubernetes/OpenShift security (prodsec-skills):
+        - securityContext: runAsNonRoot, readOnlyRootFilesystem,
+          allowPrivilegeEscalation: false
+        - Drop ALL capabilities, add only what is required
+        - Resource limits (cpu, memory) on every container
+        - No hostPID, hostNetwork, hostIPC, privileged: true
+        - Liveness + readiness probes defined
+        - automountServiceAccountToken: false unless needed
+        - RBAC: least privilege; no cluster-admin for workloads
+        - No secrets in env vars or configmaps; use Secret resources
+
+    # ── Tekton pipelines ─────────────────────────────────────────
+    - path: ".tekton/**/*"
+      instructions: |
+        CI/CD security (prodsec-skills):
+        - No secrets in logs; mask sensitive outputs
+        - Least privilege on service accounts
+        - Sign artifacts with Sigstore/cosign
+        - Validate inputs from external triggers
+
+    # ── GitHub Actions ───────────────────────────────────────────
+    - path: ".github/workflows/**/*"
+      instructions: |
+        CI/CD security (prodsec-skills):
+        - Pin actions by full SHA, not tag
+        - No secrets in logs; mask sensitive outputs
+        - Least privilege: minimize GITHUB_TOKEN permissions
+        - No pull_request_target with checkout of PR head
+        - Agentic CI actions: audit for prompt injection via
+          issue/PR title/body flowing into LLM prompts
+
+    # ── Supply chain & dependencies ──────────────────────────────
+    - path: "**/{go.mod,go.sum}"
+      instructions: |
+        Supply chain security (prodsec-skills):
+        - New deps: justify need, check license compatibility
+        - Flag known CVEs (cross-ref osv.dev)
+        - No pre-release or yanked versions in production
+
+    # ── Cryptography (catch-all for crypto-related files) ────────
+    - path: "**/*{crypt,cipher,sign,hash,tls,ssl,cert,key,token}*"
+      instructions: |
+        Cryptographic security (prodsec-skills):
+        - Banned: MD5, SHA1, DES, RC4, 3DES, Blowfish, ECB mode
+        - Symmetric: AES-256-GCM or ChaCha20-Poly1305
+        - Constant-time comparison for all secret/token data
+        - No custom crypto; use vetted libraries only
+
+    # ── Grafana dashboards ───────────────────────────────────────
+    - path: "dashboards/**/*"
+      instructions: |
+        Dashboard review:
+        - No hardcoded credentials or tokens in dashboard JSON
+        - Datasource references should use variables, not direct URLs
+        - Verify PromQL queries reference valid metric names
+
+  # ── Security scanners ────────────────────────────────────────
+  tools:
+    gitleaks:
+      enabled: true
+    semgrep:
+      enabled: true
+    checkov:
+      enabled: true
+    hadolint:
+      enabled: true
+    trivy:
+      enabled: true
+    osvScanner:
+      enabled: true
+    actionlint:
+      enabled: true
+    ast-grep:
+      essential_rules: true
+
+  # ── Pre-merge checks (hard gates) ───────────────────────────
+  pre_merge_checks:
+    description:
+      mode: "warning"
+    custom_checks:
+      - name: "no-hardcoded-secrets"
+        instructions: |
+          Flag hardcoded secrets: API keys, tokens, passwords, private
+          keys, credentials. Also flag base64 strings >32 chars in config,
+          URLs with embedded credentials, variables named api_key/secret/
+          token/password assigned string literals.
+        mode: "error"
+
+      - name: "no-weak-crypto"
+        instructions: |
+          Flag MD5, SHA1, DES, RC4, 3DES, Blowfish, ECB mode usage.
+          Flag custom crypto implementations. Flag non-constant-time
+          comparison of secrets or tokens.
+        mode: "error"
+
+      - name: "no-injection-vectors"
+        instructions: |
+          Flag SQL string concatenation, eval/exec on untrusted data,
+          fmt.Sprintf used to build SQL queries, os/exec with
+          unsanitized user input.
+        mode: "error"
+
+      - name: "container-privileges"
+        instructions: |
+          Flag privileged: true, hostPID, hostNetwork, hostIPC,
+          SYS_ADMIN capability, running as root without justification,
+          allowPrivilegeEscalation: true in container/K8s manifests.
+        mode: "error"
+
+      - name: "no-sensitive-data-in-logs"
+        instructions: |
+          Flag logging that may expose passwords, tokens, API keys,
+          PII (email, SSN), session IDs, or customer data.
+        mode: "error"
+
 knowledge_base:
   code_guidelines:
+    enabled: true
     filePatterns:
       - "docs/*-guidelines.md"
-reviews:
-  # disables the cringe
-  poem: false
+      - "**/AGENTS.md"
+      - "**/CLAUDE.md"
+      - "**/CONTRIBUTING.md"
+  issues:
+    scope: "auto"
+  pull_requests:
+    scope: "auto"

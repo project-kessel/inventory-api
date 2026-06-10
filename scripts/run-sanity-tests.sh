@@ -142,29 +142,13 @@ if [ "$BUILD_IMAGE" = true ]; then
     podman push "$FULL_IMAGE"
     log_info "Image pushed successfully"
 
-    # Update bonfire config with new image tag
+    # Update bonfire config with new image tag (surgical in-place edit)
     BONFIRE_CONFIG="$HOME/.config/bonfire/config.yaml"
     if [ -f "$BONFIRE_CONFIG" ]; then
         log_info "Updating bonfire config with IMAGE_TAG=$IMAGE_TAG, INVENTORY_IMAGE=$QUAY_REPO"
-        python3 -c "
-import yaml, sys
-with open('$BONFIRE_CONFIG', 'r') as f:
-    config = yaml.safe_load(f)
-for app in config.get('apps', []):
-    if app.get('name') == 'kessel':
-        for comp in app.get('components', []):
-            if comp.get('name') == 'kessel-inventory':
-                comp.setdefault('parameters', {})
-                comp['parameters']['INVENTORY_IMAGE'] = '$QUAY_REPO'
-                comp['parameters']['IMAGE_TAG'] = '$IMAGE_TAG'
-with open('$BONFIRE_CONFIG', 'w') as f:
-    yaml.dump(config, f, default_flow_style=False, sort_keys=False)
-" 2>/dev/null || {
-            log_warn "python3+pyyaml not available, using sed for bonfire config update"
-            sed -i.bak "s|IMAGE_TAG:.*|IMAGE_TAG: ${IMAGE_TAG}|" "$BONFIRE_CONFIG"
-            sed -i.bak "s|INVENTORY_IMAGE:.*|INVENTORY_IMAGE: ${QUAY_REPO}|" "$BONFIRE_CONFIG"
-            rm -f "${BONFIRE_CONFIG}.bak"
-        }
+        sed -i.bak "s|IMAGE_TAG:.*|IMAGE_TAG: ${IMAGE_TAG}|" "$BONFIRE_CONFIG"
+        sed -i.bak "s|INVENTORY_IMAGE:.*|INVENTORY_IMAGE: ${QUAY_REPO}|" "$BONFIRE_CONFIG"
+        rm -f "${BONFIRE_CONFIG}.bak"
         log_info "Bonfire config updated"
     else
         log_warn "Bonfire config not found at $BONFIRE_CONFIG, skipping update"

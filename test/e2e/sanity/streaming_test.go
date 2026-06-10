@@ -20,6 +20,13 @@ import (
 // --- Group 7: Streaming ListObjects / ListSubjects ---
 
 func TestSanity_StreamedListObjects_ReturnsReportedResource(t *testing.T) {
+	report.describe(t.Name(), testSpec{
+		description: "StreamedListObjects returns a resource that was just reported",
+		rpc:         "ReportResource → Check → StreamedListObjects",
+		given:       "A host resource reported by HBI with a workspace, tuple confirmed via Check",
+		when:        "StreamedListObjects is called with the workspace as subject",
+		then:        "The stream includes the reported resource ID",
+	})
 	client := newClient(t)
 	id := uniqueID("stream-obj")
 	ws := uniqueID("ws-stream-obj")
@@ -53,12 +60,23 @@ func TestSanity_StreamedListObjects_ReturnsReportedResource(t *testing.T) {
 	resourceIDs := pollStreamedListObjects(t, client, listReq, id, defaultPollTimeout)
 	assert.Contains(t, resourceIDs, id, "expected reported resource in StreamedListObjects results")
 
-	report.addStep(t.Name(),
-		fmt.Sprintf("StreamedListObjects host (workspace=%s)", ws), "",
-		fmt.Sprintf("returned %d objects, contains %s", len(resourceIDs), id))
+	report.addDetailedStep(t.Name(), stepEntry{
+		phase:  "then",
+		action: "StreamedListObjects",
+		input:  fmt.Sprintf("object_type=host/hbi relation=workspace subject=workspace/%s", ws),
+		output: fmt.Sprintf("streamed %d objects", len(resourceIDs)),
+		checkResult: fmt.Sprintf("contains %s ✓", id),
+	})
 }
 
 func TestSanity_StreamedListObjects_EmptyAfterDelete(t *testing.T) {
+	report.describe(t.Name(), testSpec{
+		description: "StreamedListObjects excludes a resource after it is deleted",
+		rpc:         "ReportResource → Check → DeleteResource → Check → StreamedListObjects",
+		given:       "A host resource that was reported, confirmed accessible, then deleted",
+		when:        "StreamedListObjects is called after deletion is confirmed",
+		then:        "The stream does not include the deleted resource ID",
+	})
 	client := newClient(t)
 	id := uniqueID("stream-del")
 	ws := uniqueID("ws-stream-del")
@@ -95,12 +113,23 @@ func TestSanity_StreamedListObjects_EmptyAfterDelete(t *testing.T) {
 	resourceIDs := collectStreamedListObjects(t, client, listReq)
 	assert.NotContains(t, resourceIDs, id, "deleted resource should not appear in StreamedListObjects")
 
-	report.addStep(t.Name(),
-		fmt.Sprintf("StreamedListObjects host after delete (workspace=%s)", ws), "",
-		fmt.Sprintf("returned %d objects, does not contain %s", len(resourceIDs), id))
+	report.addDetailedStep(t.Name(), stepEntry{
+		phase:       "then",
+		action:      "StreamedListObjects after delete",
+		input:       fmt.Sprintf("object_type=host/hbi relation=workspace subject=workspace/%s", ws),
+		output:      fmt.Sprintf("streamed %d objects", len(resourceIDs)),
+		checkResult: fmt.Sprintf("does not contain %s ✓", id),
+	})
 }
 
 func TestSanity_StreamedListObjects_MultipleResources(t *testing.T) {
+	report.describe(t.Name(), testSpec{
+		description: "StreamedListObjects returns all resources in a workspace",
+		rpc:         "ReportResource ×2 → Check ×2 → StreamedListObjects",
+		given:       "Two host resources (A, B) reported in the same workspace",
+		when:        "StreamedListObjects is called with that workspace as subject",
+		then:        "The stream includes both resource IDs",
+	})
 	client := newClient(t)
 	idA := uniqueID("stream-multi-a")
 	idB := uniqueID("stream-multi-b")
@@ -141,12 +170,23 @@ func TestSanity_StreamedListObjects_MultipleResources(t *testing.T) {
 	assert.Contains(t, resourceIDs, idA, "expected host A in StreamedListObjects")
 	assert.Contains(t, resourceIDs, idB, "expected host B in StreamedListObjects")
 
-	report.addStep(t.Name(),
-		fmt.Sprintf("StreamedListObjects host (workspace=%s)", ws), "",
-		fmt.Sprintf("returned %d objects, contains both %s and %s", len(resourceIDs), idA, idB))
+	report.addDetailedStep(t.Name(), stepEntry{
+		phase:       "then",
+		action:      "StreamedListObjects (multiple resources)",
+		input:       fmt.Sprintf("object_type=host/hbi relation=workspace subject=workspace/%s", ws),
+		output:      fmt.Sprintf("streamed %d objects", len(resourceIDs)),
+		checkResult: fmt.Sprintf("contains %s and %s ✓", idA, idB),
+	})
 }
 
 func TestSanity_StreamedListSubjects_ReturnsWorkspace(t *testing.T) {
+	report.describe(t.Name(), testSpec{
+		description: "StreamedListSubjects returns the workspace that a resource belongs to",
+		rpc:         "ReportResource → Check → StreamedListSubjects",
+		given:       "A host resource reported with a workspace, tuple confirmed via Check",
+		when:        "StreamedListSubjects is called with the host as resource and relation=workspace",
+		then:        "The stream includes the workspace ID as a subject",
+	})
 	client := newClient(t)
 	id := uniqueID("stream-subj")
 	ws := uniqueID("ws-stream-subj")
@@ -177,9 +217,13 @@ func TestSanity_StreamedListSubjects_ReturnsWorkspace(t *testing.T) {
 	subjectIDs := pollStreamedListSubjects(t, client, listReq, ws, defaultPollTimeout)
 	assert.Contains(t, subjectIDs, ws, "expected workspace in StreamedListSubjects results")
 
-	report.addStep(t.Name(),
-		fmt.Sprintf("StreamedListSubjects host/%s relation=workspace", id), "",
-		fmt.Sprintf("returned %d subjects, contains %s", len(subjectIDs), ws))
+	report.addDetailedStep(t.Name(), stepEntry{
+		phase:       "then",
+		action:      "StreamedListSubjects",
+		input:       fmt.Sprintf("resource=host/%s reporter=hbi relation=workspace subject_type=workspace/rbac", id),
+		output:      fmt.Sprintf("streamed %d subjects", len(subjectIDs)),
+		checkResult: fmt.Sprintf("contains workspace %s ✓", ws),
+	})
 }
 
 // --- Streaming helpers ---

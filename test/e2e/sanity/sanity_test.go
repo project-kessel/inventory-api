@@ -33,8 +33,19 @@ var (
 
 // --- Test report infrastructure ---
 
+type testSpec struct {
+	description string
+	given       string
+	when        string
+	then        string
+	rpc         string
+}
+
 type stepEntry struct {
+	phase       string // "given", "when", "then"
 	action      string
+	input       string
+	output      string
 	dbState     string
 	checkResult string
 }
@@ -42,14 +53,22 @@ type stepEntry struct {
 type testReportCollector struct {
 	mu      sync.Mutex
 	order   []string
+	specs   map[string]testSpec
 	steps   map[string][]stepEntry
 	results map[string]string
 	count   int
 }
 
 var report = &testReportCollector{
+	specs:   make(map[string]testSpec),
 	steps:   make(map[string][]stepEntry),
 	results: make(map[string]string),
+}
+
+func (r *testReportCollector) describe(testName string, spec testSpec) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.specs[testName] = spec
 }
 
 func (r *testReportCollector) startTest(testName string) int {
@@ -60,6 +79,9 @@ func (r *testReportCollector) startTest(testName string) int {
 	sep := strings.Repeat("─", 80)
 	_, _ = fmt.Fprintf(os.Stdout, "\n%s%s%s\n", colorDim, sep, colorReset)
 	_, _ = fmt.Fprintf(os.Stdout, "%s[%d] %s%s\n", colorBold, n, testName, colorReset)
+	if spec, ok := r.specs[testName]; ok {
+		_, _ = fmt.Fprintf(os.Stdout, "  %s%s%s\n", colorDim, spec.description, colorReset)
+	}
 	_, _ = fmt.Fprintf(os.Stdout, "%s%s%s\n", colorDim, sep, colorReset)
 	return n
 }
@@ -77,6 +99,15 @@ func (r *testReportCollector) addStep(testName, action, dbState, checkResult str
 	})
 }
 
+func (r *testReportCollector) addDetailedStep(testName string, step stepEntry) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if _, exists := r.steps[testName]; !exists {
+		r.order = append(r.order, testName)
+	}
+	r.steps[testName] = append(r.steps[testName], step)
+}
+
 func (r *testReportCollector) setResult(testName, result string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -89,6 +120,7 @@ const (
 	colorGreen  = "\033[32m"
 	colorYellow = "\033[33m"
 	colorCyan   = "\033[36m"
+	colorBlue   = "\033[34m"
 	colorBold   = "\033[1m"
 	colorDim    = "\033[2m"
 )
@@ -97,7 +129,7 @@ func printReport() {
 	report.mu.Lock()
 	defer report.mu.Unlock()
 
-	separator := strings.Repeat("═", 80)
+	separator := strings.Repeat("═", 90)
 	_, _ = fmt.Fprintf(os.Stdout, "\n%s%s%s\n", colorBold, separator, colorReset)
 	_, _ = fmt.Fprintf(os.Stdout, "%s  SANITY TEST REPORT%s\n", colorBold, colorReset)
 	_, _ = fmt.Fprintf(os.Stdout, "%s%s%s\n\n", colorBold, separator, colorReset)
@@ -122,33 +154,51 @@ func printReport() {
 		_, _ = fmt.Fprintf(os.Stdout, "%s▸ [%d] %s%s  %s[%s]%s\n",
 			colorBold, total, name, colorReset, resultColor, result, colorReset)
 
+		if spec, ok := report.specs[name]; ok {
+			_, _ = fmt.Fprintf(os.Stdout, "  %sDescription:%s %s\n", colorDim, colorReset, spec.description)
+			_, _ = fmt.Fprintf(os.Stdout, "  %sRPC:%s         %s\n", colorDim, colorReset, spec.rpc)
+			_, _ = fmt.Fprintf(os.Stdout, "  %sGiven:%s       %s\n", colorBlue, colorReset, spec.given)
+			_, _ = fmt.Fprintf(os.Stdout, "  %sWhen:%s        %s\n", colorBlue, colorReset, spec.when)
+			_, _ = fmt.Fprintf(os.Stdout, "  %sThen:%s        %s\n", colorBlue, colorReset, spec.then)
+		}
+
+		_, _ = fmt.Fprintf(os.Stdout, "  %sSteps:%s\n", colorDim, colorReset)
 		steps := report.steps[name]
 		for i, s := range steps {
 			stepNum := fmt.Sprintf("%d", i+1)
 
-			_, _ = fmt.Fprintf(os.Stdout, "  %s%s.%s %s\n",
-				colorCyan, stepNum, colorReset, s.action)
+			phaseLabel := ""
+			if s.phase != "" {
+				phaseLabel = fmt.Sprintf(" %s[%s]%s", colorBlue, s.phase, colorReset)
+			}
 
+			_, _ = fmt.Fprintf(os.Stdout, "    %s%s.%s%s %s\n",
+				colorCyan, stepNum, colorReset, phaseLabel, s.action)
+
+			if s.input != "" {
+				_, _ = fmt.Fprintf(os.Stdout, "       %sInput:  %s%s\n", colorDim, s.input, colorReset)
+			}
 			if s.dbState != "" {
-				_, _ = fmt.Fprintf(os.Stdout, "     %sDB: %s%s\n",
-					colorDim, s.dbState, colorReset)
+				_, _ = fmt.Fprintf(os.Stdout, "       %sDB:     %s%s\n", colorDim, s.dbState, colorReset)
+			}
+			if s.output != "" {
+				_, _ = fmt.Fprintf(os.Stdout, "       %sOutput: %s%s\n", colorDim, s.output, colorReset)
 			}
 			if s.checkResult != "" {
 				resultColor := colorGreen
 				if strings.Contains(s.checkResult, "FALSE") || strings.Contains(s.checkResult, "TIMEOUT") || strings.Contains(s.checkResult, "error") {
 					resultColor = colorYellow
 				}
-				_, _ = fmt.Fprintf(os.Stdout, "     %s→ %s%s\n",
-					resultColor, s.checkResult, colorReset)
+				_, _ = fmt.Fprintf(os.Stdout, "       %s→ %s%s\n", resultColor, s.checkResult, colorReset)
 			}
 		}
 		_, _ = fmt.Fprintln(os.Stdout)
 	}
 
-	_, _ = fmt.Fprintf(os.Stdout, "%s%s%s\n", colorBold, strings.Repeat("─", 80), colorReset)
+	_, _ = fmt.Fprintf(os.Stdout, "%s%s%s\n", colorBold, strings.Repeat("─", 90), colorReset)
 	_, _ = fmt.Fprintf(os.Stdout, "  Total: %d  |  %sPassed: %d%s  |  %sFailed: %d%s\n",
 		total, colorGreen, passed, colorReset, colorRed, failed, colorReset)
-	_, _ = fmt.Fprintf(os.Stdout, "%s%s%s\n\n", colorBold, strings.Repeat("─", 80), colorReset)
+	_, _ = fmt.Fprintf(os.Stdout, "%s%s%s\n\n", colorBold, strings.Repeat("─", 90), colorReset)
 }
 
 // --- TestMain ---
@@ -266,9 +316,13 @@ func reportResource(t *testing.T, client pb.KesselInventoryServiceClient,
 	require.NoError(t, err, "ReportResource failed")
 
 	dbState := snapshotDBState(localResourceId, reporterType, resourceType)
-	report.addStep(t.Name(),
-		fmt.Sprintf("ReportResource %s/%s (%s, workspace=%s)", resourceType, localResourceId, reporterType, workspaceId),
-		dbState, "")
+	report.addDetailedStep(t.Name(), stepEntry{
+		phase:  "given",
+		action: fmt.Sprintf("ReportResource %s/%s (%s)", resourceType, localResourceId, reporterType),
+		input:  fmt.Sprintf("type=%s reporter=%s instance=%s local_id=%s workspace=%s", resourceType, reporterType, instanceId, localResourceId, workspaceId),
+		output: "ok",
+		dbState: dbState,
+	})
 }
 
 func deleteResource(t *testing.T, client pb.KesselInventoryServiceClient,
@@ -288,9 +342,13 @@ func deleteResource(t *testing.T, client pb.KesselInventoryServiceClient,
 	require.NoError(t, err, "DeleteResource failed")
 
 	dbState := snapshotDBState(localResourceId, reporterType, resourceType)
-	report.addStep(t.Name(),
-		fmt.Sprintf("DeleteResource %s/%s (%s)", resourceType, localResourceId, reporterType),
-		dbState, "")
+	report.addDetailedStep(t.Name(), stepEntry{
+		phase:   "when",
+		action:  fmt.Sprintf("DeleteResource %s/%s (%s)", resourceType, localResourceId, reporterType),
+		input:   fmt.Sprintf("type=%s local_id=%s reporter=%s instance=%s", resourceType, localResourceId, reporterType, instanceId),
+		output:  "ok",
+		dbState: dbState,
+	})
 }
 
 func makeCheckReq(resourceType, resourceId, reporterType string, instanceId *string, workspaceId string) *pb.CheckRequest {
@@ -357,12 +415,22 @@ func pollCheck(t *testing.T, client pb.KesselInventoryServiceClient,
 	connErrors := 0
 	label := checkActionLabel(req)
 
+	inputDesc := fmt.Sprintf("object=%s/%s relation=%s subject=%s/%s",
+		req.GetObject().GetResourceType(), req.GetObject().GetResourceId(),
+		req.GetRelation(),
+		req.GetSubject().GetResource().GetResourceType(), req.GetSubject().GetResource().GetResourceId())
+
 	for i := 0; i < timeoutSec; i++ {
 		resp, err := client.Check(ctx, req)
 		if err == nil && resp.GetAllowed() == expected {
 			t.Logf("Check returned %v on attempt %d", expected, i+1)
-			report.addStep(t.Name(), label, "",
-				fmt.Sprintf("%v (attempt %d)", expected, i+1))
+			report.addDetailedStep(t.Name(), stepEntry{
+				phase:       "then",
+				action:      label,
+				input:       inputDesc,
+				output:      fmt.Sprintf("allowed=%v", expected),
+				checkResult: fmt.Sprintf("%v (attempt %d)", expected, i+1),
+			})
 			return resp.GetConsistencyToken()
 		}
 		if err != nil {
@@ -370,8 +438,12 @@ func pollCheck(t *testing.T, client pb.KesselInventoryServiceClient,
 			if isConnectionError(err) {
 				connErrors++
 				if connErrors >= maxConsecutiveConnErrors {
-					report.addStep(t.Name(), label, "",
-						fmt.Sprintf("UNREACHABLE after %d conn errors", connErrors))
+					report.addDetailedStep(t.Name(), stepEntry{
+						phase:       "then",
+						action:      label,
+						input:       inputDesc,
+						checkResult: fmt.Sprintf("UNREACHABLE after %d conn errors", connErrors),
+					})
 					t.Fatalf("Service unreachable after %d consecutive connection errors", connErrors)
 				}
 			}
@@ -381,8 +453,12 @@ func pollCheck(t *testing.T, client pb.KesselInventoryServiceClient,
 		}
 		time.Sleep(1 * time.Second)
 	}
-	report.addStep(t.Name(), label, "",
-		fmt.Sprintf("TIMEOUT waiting for %v after %ds", expected, timeoutSec))
+	report.addDetailedStep(t.Name(), stepEntry{
+		phase:       "then",
+		action:      label,
+		input:       inputDesc,
+		checkResult: fmt.Sprintf("TIMEOUT waiting for %v after %ds", expected, timeoutSec),
+	})
 	t.Fatalf("Check did not return %v within %ds", expected, timeoutSec)
 	return nil
 }
@@ -402,6 +478,11 @@ func pollCheckForUpdate(t *testing.T, client pb.KesselInventoryServiceClient,
 	connErrors := 0
 	label := checkForUpdateActionLabel(req)
 
+	inputDesc := fmt.Sprintf("object=%s/%s relation=%s subject=%s/%s",
+		req.GetObject().GetResourceType(), req.GetObject().GetResourceId(),
+		req.GetRelation(),
+		req.GetSubject().GetResource().GetResourceType(), req.GetSubject().GetResource().GetResourceId())
+
 	for i := 0; i < timeoutSec; i++ {
 		resp, err := client.CheckForUpdate(ctx, req)
 		if err == nil && resp.GetAllowed() == expected {
@@ -410,8 +491,13 @@ func pollCheckForUpdate(t *testing.T, client pb.KesselInventoryServiceClient,
 			if resp.GetConsistencyToken() != nil && resp.GetConsistencyToken().GetToken() != "" {
 				tokenInfo = " +token"
 			}
-			report.addStep(t.Name(), label, "",
-				fmt.Sprintf("%v (attempt %d)%s", expected, i+1, tokenInfo))
+			report.addDetailedStep(t.Name(), stepEntry{
+				phase:       "then",
+				action:      label,
+				input:       inputDesc,
+				output:      fmt.Sprintf("allowed=%v%s", expected, tokenInfo),
+				checkResult: fmt.Sprintf("%v (attempt %d)%s", expected, i+1, tokenInfo),
+			})
 			return resp
 		}
 		if err != nil {
@@ -419,8 +505,12 @@ func pollCheckForUpdate(t *testing.T, client pb.KesselInventoryServiceClient,
 			if isConnectionError(err) {
 				connErrors++
 				if connErrors >= maxConsecutiveConnErrors {
-					report.addStep(t.Name(), label, "",
-						fmt.Sprintf("UNREACHABLE after %d conn errors", connErrors))
+					report.addDetailedStep(t.Name(), stepEntry{
+						phase:       "then",
+						action:      label,
+						input:       inputDesc,
+						checkResult: fmt.Sprintf("UNREACHABLE after %d conn errors", connErrors),
+					})
 					t.Fatalf("Service unreachable after %d consecutive connection errors", connErrors)
 				}
 			}
@@ -430,8 +520,12 @@ func pollCheckForUpdate(t *testing.T, client pb.KesselInventoryServiceClient,
 		}
 		time.Sleep(1 * time.Second)
 	}
-	report.addStep(t.Name(), label, "",
-		fmt.Sprintf("TIMEOUT waiting for %v after %ds", expected, timeoutSec))
+	report.addDetailedStep(t.Name(), stepEntry{
+		phase:       "then",
+		action:      label,
+		input:       inputDesc,
+		checkResult: fmt.Sprintf("TIMEOUT waiting for %v after %ds", expected, timeoutSec),
+	})
 	t.Fatalf("CheckForUpdate did not return %v within %ds", expected, timeoutSec)
 	return nil
 }
@@ -449,13 +543,23 @@ func isConnectionError(err error) bool {
 // recordBulkResult records a bulk check result in the report without polling.
 func recordBulkResult(t *testing.T, action string, results []string) {
 	t.Helper()
-	report.addStep(t.Name(), action, "", strings.Join(results, ", "))
+	report.addDetailedStep(t.Name(), stepEntry{
+		phase:       "then",
+		action:      action,
+		output:      strings.Join(results, ", "),
+		checkResult: fmt.Sprintf("%d results returned", len(results)),
+	})
 }
 
 // recordError records an expected error in the report.
 func recordError(t *testing.T, action string, err error) {
 	t.Helper()
-	report.addStep(t.Name(), action, "", fmt.Sprintf("error: %v", err))
+	report.addDetailedStep(t.Name(), stepEntry{
+		phase:       "then",
+		action:      action,
+		output:      fmt.Sprintf("error: %v", err),
+		checkResult: "expected error received ✓",
+	})
 }
 
 // --- DB assertion helpers ---

@@ -13,6 +13,13 @@ import (
 // --- Group 6: Lifecycle / Churn ---
 
 func TestSanity_ReportDeleteReReport_Revive(t *testing.T) {
+	report.describe(t.Name(), testSpec{
+		description: "A deleted resource can be revived by re-reporting, restoring access",
+		rpc:         "ReportResource → Check → DeleteResource → Check → ReportResource → Check",
+		given:       "A host resource that was reported, confirmed accessible, then deleted",
+		when:        "The same resource is re-reported (revived)",
+		then:        "Access is restored (ALLOWED_TRUE), generation increments to 1, tombstone cleared",
+	})
 	client := newClient(t)
 	id := uniqueID("revive-host")
 	ws := uniqueID("ws-revive")
@@ -50,6 +57,13 @@ func TestSanity_ReportDeleteReReport_Revive(t *testing.T) {
 }
 
 func TestSanity_MultiResourceChurn(t *testing.T) {
+	report.describe(t.Name(), testSpec{
+		description: "Deleting individual resources only revokes access for those resources",
+		rpc:         "ReportResource ×3 → Check ×3 → DeleteResource → Check → DeleteResource ×2 → Check ×2",
+		given:       "Three host resources (A, B, C) reported in the same workspace",
+		when:        "Host B is deleted, then A and C are deleted",
+		then:        "Only the deleted hosts lose access; remaining hosts are unaffected until deleted",
+	})
 	client := newClient(t)
 	idA := uniqueID("churn-a")
 	idB := uniqueID("churn-b")

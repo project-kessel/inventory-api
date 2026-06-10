@@ -13,6 +13,13 @@ import (
 // --- Group 1: Report + Check (Access Exists) ---
 
 func TestSanity_ReportHost_CheckAllowed(t *testing.T) {
+	report.describe(t.Name(), testSpec{
+		description: "Reporting a resource creates a workspace tuple that grants access",
+		rpc:         "ReportResource → Check",
+		given:       "A host resource reported by HBI with a workspace",
+		when:        "Check is called with the correct workspace as subject",
+		then:        "Check returns ALLOWED_TRUE and DB shows ver=0, gen=0, tombstone=false",
+	})
 	client := newClient(t)
 	id := uniqueID("sanity-host")
 	ws := uniqueID("ws")
@@ -34,6 +41,13 @@ func TestSanity_ReportHost_CheckAllowed(t *testing.T) {
 }
 
 func TestSanity_Check_WrongWorkspace(t *testing.T) {
+	report.describe(t.Name(), testSpec{
+		description: "Check denies access when the workspace does not match",
+		rpc:         "ReportResource → Check",
+		given:       "A host resource reported with workspace-A",
+		when:        "Check is called with workspace-B as subject",
+		then:        "Check returns ALLOWED_FALSE",
+	})
 	client := newClient(t)
 	id := uniqueID("sanity-host-wrong")
 	wsRight := uniqueID("ws-right")
@@ -55,6 +69,13 @@ func TestSanity_Check_WrongWorkspace(t *testing.T) {
 // --- Group 2: Delete + Check (Access Lost) ---
 
 func TestSanity_DeleteHost_AccessLost(t *testing.T) {
+	report.describe(t.Name(), testSpec{
+		description: "Deleting a resource removes the workspace tuple and revokes access",
+		rpc:         "ReportResource → Check → DeleteResource → Check",
+		given:       "A host resource with confirmed ALLOWED_TRUE access",
+		when:        "The resource is deleted",
+		then:        "Check returns ALLOWED_FALSE and DB shows tombstone=true",
+	})
 	client := newClient(t)
 	id := uniqueID("sanity-del-host")
 	ws := uniqueID("ws")
@@ -82,6 +103,13 @@ func TestSanity_DeleteHost_AccessLost(t *testing.T) {
 // --- Group 3: Check Combinations (table-driven) ---
 
 func TestSanity_Check_Combinations(t *testing.T) {
+	report.describe(t.Name(), testSpec{
+		description: "Check returns correct results across workspace and instance_id combinations",
+		rpc:         "ReportResource → Check",
+		given:       "A host resource reported with a specific workspace",
+		when:        "Check is called with matching/non-matching workspace, with/without instance_id",
+		then:        "Each combination returns the expected ALLOWED_TRUE or ALLOWED_FALSE",
+	})
 	tests := []struct {
 		name        string
 		wsReport    string

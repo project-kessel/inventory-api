@@ -18,6 +18,13 @@ import (
 // --- Group 5: CheckBulk + CheckSelf ---
 
 func TestSanity_CheckBulk_MultipleHosts(t *testing.T) {
+	report.describe(t.Name(), testSpec{
+		description: "CheckBulk returns correct results for multiple host/workspace pairs in one call",
+		rpc:         "ReportResource ×2 → Check ×2 → CheckBulk",
+		given:       "Two hosts (A, B) reported in different workspaces (ws-A, ws-B)",
+		when:        "CheckBulk is called with hostA+wsA, hostB+wsB, and hostA+wsWrong",
+		then:        "First two pairs return ALLOWED_TRUE, third returns ALLOWED_FALSE",
+	})
 	client := newClient(t)
 	hostA := uniqueID("bulk-host-a")
 	hostB := uniqueID("bulk-host-b")
@@ -119,6 +126,13 @@ func TestSanity_CheckBulk_MultipleHosts(t *testing.T) {
 }
 
 func TestSanity_CheckSelf_ReturnsError(t *testing.T) {
+	report.describe(t.Name(), testSpec{
+		description: "CheckSelf fails in unauthenticated mode (no caller identity)",
+		rpc:         "ReportResource → CheckSelf",
+		given:       "A host resource reported by HBI",
+		when:        "CheckSelf is called (requires caller identity from auth context)",
+		then:        "Returns an error because ephemeral uses allow-unauthenticated mode",
+	})
 	client := newClient(t)
 	id := uniqueID("self-host")
 	ws := uniqueID("ws-self")
@@ -144,6 +158,13 @@ func TestSanity_CheckSelf_ReturnsError(t *testing.T) {
 }
 
 func TestSanity_CheckSelfBulk_ReturnsError(t *testing.T) {
+	report.describe(t.Name(), testSpec{
+		description: "CheckSelfBulk fails in unauthenticated mode (no caller identity)",
+		rpc:         "ReportResource → CheckSelfBulk",
+		given:       "A host resource reported by HBI",
+		when:        "CheckSelfBulk is called (requires caller identity from auth context)",
+		then:        "Returns an error because ephemeral uses allow-unauthenticated mode",
+	})
 	client := newClient(t)
 	id := uniqueID("selfbulk-host")
 	ws := uniqueID("ws-selfbulk")

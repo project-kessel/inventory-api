@@ -17,6 +17,13 @@ import (
 // --- Group 4: CheckForUpdate combinations ---
 
 func TestSanity_CheckForUpdate_Combinations(t *testing.T) {
+	report.describe(t.Name(), testSpec{
+		description: "CheckForUpdate returns correct allowed status and consistency tokens",
+		rpc:         "ReportResource → CheckForUpdate",
+		given:       "A host resource reported with a workspace",
+		when:        "CheckForUpdate is called with matching, non-matching, and post-delete scenarios",
+		then:        "Matching returns ALLOWED_TRUE+token, non-matching returns ALLOWED_FALSE, deleted returns ALLOWED_FALSE",
+	})
 	tests := []struct {
 		name        string
 		wsReport    string
@@ -68,6 +75,13 @@ func TestSanity_CheckForUpdate_Combinations(t *testing.T) {
 }
 
 func TestSanity_CheckForUpdateBulk_MixedResults(t *testing.T) {
+	report.describe(t.Name(), testSpec{
+		description: "CheckForUpdateBulk returns mixed TRUE/FALSE for multiple workspace checks",
+		rpc:         "ReportResource → Check → CheckForUpdateBulk",
+		given:       "A host resource reported with workspace-A",
+		when:        "CheckForUpdateBulk is called with workspace-A (match) and workspace-B (no match)",
+		then:        "First pair returns ALLOWED_TRUE, second returns ALLOWED_FALSE",
+	})
 	client := newClient(t)
 	id := uniqueID("cfubulk")
 	wsA := uniqueID("ws-cfubulk-a")

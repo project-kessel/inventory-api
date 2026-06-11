@@ -53,4 +53,24 @@ make docker-build-push
 - **CQRS**: Read-after-write consistency with Relations API integration
 - **Hexagonal**: Port abstractions for external dependencies
 
+## Ongoing Initiatives
+
+### Merge Relations-API into Inventory-API
+
+**Status**: Active - Currently in Phase 2
+
+**Context File**: [`AGENT_initiatives/MERGE-RELATIONS-API.md`](./AGENT_initiatives/MERGE-RELATIONS-API.md)
+
+**IMPORTANT**: When working on this initiative, **ALWAYS read `AGENT_initiatives/MERGE-RELATIONS-API.md`** first. That file contains:
+- Complete initiative plan and phase details
+- Current objectives and work in progress
+- Jira issue configuration and conventions
+- Customer requirements and endpoint analysis
+- Standard operating procedures
+
+**Quick Links**:
+- Parent Epic: [RHCLOUD-44628](https://issues.redhat.com/browse/RHCLOUD-44628)
+- Initiative Plan: [Google Doc](https://docs.google.com/document/d/1_VZvitlp7Db2AQbXqoe5KnqR3o35ekXsAgJDhi1ALk4/edit)
+- Customer Analysis: [Google Sheet](https://docs.google.com/spreadsheets/d/1SrhiWuJYvsYwzYRrUq52htpEE1ft2zAq-8WdDbBV8Ak/edit?usp=sharing)
+
 @AGENTS.md

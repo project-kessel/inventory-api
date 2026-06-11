@@ -40,7 +40,23 @@ Ask the user which mode unless they've already specified:
 | **Build + deploy + test** | `-b` | Test the current branch from scratch (requires `QUAY_REPO`) |
 | **Deploy + test** | `-d` | Deploy whatever is in bonfire config (no local build) |
 
-### 3. Set QUAY_REPO (if using `-b` mode)
+### 3. Confirm the target namespace
+
+Before running, confirm which namespace the tests will target:
+
+```bash
+# Show current namespace and any reserved namespaces for the user
+oc project -q 2>/dev/null || echo "(no current project)"
+bonfire namespace list 2>/dev/null | grep "$(whoami)" || echo "(no reserved namespaces)"
+```
+
+Present the namespace to the user and ask them to confirm it is the correct environment:
+- **Tests only mode**: The user must have an existing namespace. Show the current one and ask "Run tests against `ephemeral-XXXXX`?"
+- **Deploy modes (`-b`/`-d`)**: Ask if they want to deploy to a specific existing namespace (`-n <ns>`) or let bonfire reserve a new one. Show any currently reserved namespaces so they can choose.
+
+Only proceed once the user confirms the target. Pass `-n <namespace>` to the script if they chose a specific one.
+
+### 4. Set QUAY_REPO (if using `-b` mode)
 
 The user needs a Quay.io repo to push images to. Check if it's set:
 
@@ -50,7 +66,7 @@ echo "QUAY_REPO=${QUAY_REPO:-<not set>}"
 
 If not set, ask the user for their Quay repo (e.g. `quay.io/<username>/kessel`).
 
-### 4. Run the sanity tests
+### 5. Run the sanity tests
 
 ```bash
 # Tests only (environment already deployed)
@@ -87,7 +103,7 @@ The script handles:
 - Running `go test -v -count=1 ./test/e2e/sanity/ -timeout 10m`
 - Cleaning up port-forwards on exit
 
-### 5. Interpret results
+### 6. Interpret results
 
 - **PASS**: All tests passed. The branch is safe to merge.
 - **FAIL**: Report which tests failed and the error messages. The most common failures:
@@ -96,7 +112,7 @@ The script handles:
   - Connection errors: port-forward may have dropped; restart and retry
   - `ReportDeleteReReport_Revive` timeout: known flake due to consumer latency; safe to re-run
 
-### 6. Run specific test groups (optional)
+### 7. Run specific test groups (optional)
 
 ```bash
 # Only Check tests (Groups 1-3)

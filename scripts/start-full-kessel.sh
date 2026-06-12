@@ -70,4 +70,4 @@ echo "Extracted $(ls "${RBAC_DEFS_DIR}"/*.json 2>/dev/null | wc -l) RBAC role de
 ${DOCKER} compose --env-file "${ENV_FILE}" \
   --profile relations --profile consumer --profile rbac "$@" \
   -f "${COMPOSE_DIR}/docker-compose.yaml" \
-  up --pull always -d
+  up --pull "${COMPOSE_PULL_MODE:-always}" -d

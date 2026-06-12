@@ -62,6 +62,12 @@ INVENTORY_CONSUMER_IMAGE=quay.io/redhat-services-prod/project-kessel-tenant/kess
 RBAC_IMAGE=quay.io/redhat-services-prod/hcc-accessmanagement-tenant/insights-rbac:latest
 ```
 
+By default, `make kessel-up` pulls the latest image from the registry on every run (`--pull always`). When using locally-built images (e.g., `localhost/...`), set `COMPOSE_PULL_MODE` to avoid overwriting them:
+
+```shell
+COMPOSE_PULL_MODE=missing make kessel-up
+```
+
 ### Using a Custom SpiceDB Schema
 
 To use a local schema file instead of downloading from GitHub:

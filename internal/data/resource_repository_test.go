@@ -1744,6 +1744,7 @@ func TestSerializableUpdateFails(t *testing.T) {
 			err = tx.Save(resource, bizmodel.OperationTypeCreated, bizmodel.NewTransactionId("tx-initial"))
 			assert.NoError(t, err)
 			err = tx.Commit()
+			require.NoError(t, err)
 
 			// Prepare an updated version
 			key, err := bizmodel.NewReporterResourceKey("serializable-update-conflict", "k8s_cluster", "ocm", "ocm-instance-1")
@@ -2323,6 +2324,7 @@ func TestFindCurrentAndPreviousVersionedRepresentations(t *testing.T) {
 				err = tx.Save(resource, bizmodel.OperationTypeUpdated, bizmodel.NewTransactionId("tx-ws-update"))
 				require.NoError(t, err)
 				err = tx.Commit()
+				require.NoError(t, err)
 
 				// Get current and previous versions
 				version := bizmodel.NewVersion(1)
@@ -2991,6 +2993,7 @@ func TestCommonVersionAfterDeleteAndRecreate(t *testing.T) {
 	err = tx.Save(resource1, bizmodel.OperationTypeCreated, emptyTxId)
 	require.NoError(t, err)
 	err = tx.Commit()
+	require.NoError(t, err)
 
 	var found *bizmodel.Resource
 	tx, err = repo.Begin("")
@@ -3010,6 +3013,7 @@ func TestCommonVersionAfterDeleteAndRecreate(t *testing.T) {
 	err = tx.Save(*found, bizmodel.OperationTypeUpdated, emptyTxId)
 	require.NoError(t, err)
 	err = tx.Commit()
+	require.NoError(t, err)
 
 	tx, err = repo.Begin("")
 	require.NoError(t, err)
@@ -3028,6 +3032,7 @@ func TestCommonVersionAfterDeleteAndRecreate(t *testing.T) {
 	err = tx.Save(*found, bizmodel.OperationTypeUpdated, emptyTxId)
 	require.NoError(t, err)
 	err = tx.Commit()
+	require.NoError(t, err)
 
 	tx, err = repo.Begin("")
 	require.NoError(t, err)
@@ -3045,6 +3050,7 @@ func TestCommonVersionAfterDeleteAndRecreate(t *testing.T) {
 	err = tx.Save(*found, bizmodel.OperationTypeDeleted, emptyTxId)
 	require.NoError(t, err)
 	err = tx.Commit()
+	require.NoError(t, err)
 
 	// --- Second lifecycle: new UUIDs, same logical identity ---
 	// The system always generates fresh UUIDs on recreation; common_representations
@@ -3072,6 +3078,7 @@ func TestCommonVersionAfterDeleteAndRecreate(t *testing.T) {
 	err = tx.Save(resource2, bizmodel.OperationTypeCreated, emptyTxId)
 	require.NoError(t, err)
 	err = tx.Commit()
+	require.NoError(t, err)
 
 	tx, err = repo.Begin("")
 	require.NoError(t, err)
@@ -3094,6 +3101,7 @@ func TestCommonVersionAfterDeleteAndRecreate(t *testing.T) {
 	err = tx.Save(*found, bizmodel.OperationTypeUpdated, emptyTxId)
 	require.NoError(t, err)
 	err = tx.Commit()
+	require.NoError(t, err)
 
 	tx, err = repo.Begin("")
 	require.NoError(t, err)

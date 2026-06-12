@@ -302,57 +302,57 @@ func (i *InventoryConsumer) ProcessMessage(headers map[string]string, relationsE
 	case string(model.OperationTypeCreated):
 		if relationsEnabled {
 			return i.processRelationsOperation(operation, txid, msg, operationConfig{
-			fetchRepresentations: func(i *InventoryConsumer, key model.ReporterResourceKey, version *model.Version) (*model.Representations, *model.Representations, error) {
-				tx, err := i.ResourceRepository.Begin("")
-				if err != nil {
-					return nil, nil, err
-				}
-				defer func() { _ = tx.Rollback() }()
-				current, previous, err := tx.FindCurrentAndPreviousVersionedRepresentations(key, version, model.OperationTypeCreated)
-				if err != nil {
-					return nil, nil, err
-				}
-				if err := tx.Commit(); err != nil {
-					return nil, nil, err
-				}
-				return current, previous, nil
-			},
-			executeSpiceDB: func(i *InventoryConsumer, tuples model.TuplesToReplicate) (string, error) {
-				return i.CreateTuple(context.Background(), tuples.TuplesToCreate())
-			},
-			metricName: "CreateTuple",
-		})
-	}
+				fetchRepresentations: func(i *InventoryConsumer, key model.ReporterResourceKey, version *model.Version) (*model.Representations, *model.Representations, error) {
+					tx, err := i.ResourceRepository.Begin("")
+					if err != nil {
+						return nil, nil, err
+					}
+					defer func() { _ = tx.Rollback() }()
+					current, previous, err := tx.FindCurrentAndPreviousVersionedRepresentations(key, version, model.OperationTypeCreated)
+					if err != nil {
+						return nil, nil, err
+					}
+					if err := tx.Commit(); err != nil {
+						return nil, nil, err
+					}
+					return current, previous, nil
+				},
+				executeSpiceDB: func(i *InventoryConsumer, tuples model.TuplesToReplicate) (string, error) {
+					return i.CreateTuple(context.Background(), tuples.TuplesToCreate())
+				},
+				metricName: "CreateTuple",
+			})
+		}
 
 	case string(model.OperationTypeUpdated):
-	if relationsEnabled {
-		return i.processRelationsOperation(operation, txid, msg, operationConfig{
-			fetchRepresentations: func(i *InventoryConsumer, key model.ReporterResourceKey, version *model.Version) (*model.Representations, *model.Representations, error) {
-				tx, err := i.ResourceRepository.Begin("")
-				if err != nil {
-					return nil, nil, err
-				}
-				defer func() { _ = tx.Rollback() }()
-				current, previous, err := tx.FindCurrentAndPreviousVersionedRepresentations(key, version, model.OperationTypeUpdated)
-				if err != nil {
-					return nil, nil, err
-				}
-				if err := tx.Commit(); err != nil {
-					return nil, nil, err
-				}
-				return current, previous, nil
-			},
-			executeSpiceDB: func(i *InventoryConsumer, tuples model.TuplesToReplicate) (string, error) {
-				return i.UpdateTuple(context.Background(), tuples.TuplesToCreate(), tuples.TuplesToDelete())
-			},
-			metricName: "UpdateTuple",
-		})
-	}
+		if relationsEnabled {
+			return i.processRelationsOperation(operation, txid, msg, operationConfig{
+				fetchRepresentations: func(i *InventoryConsumer, key model.ReporterResourceKey, version *model.Version) (*model.Representations, *model.Representations, error) {
+					tx, err := i.ResourceRepository.Begin("")
+					if err != nil {
+						return nil, nil, err
+					}
+					defer func() { _ = tx.Rollback() }()
+					current, previous, err := tx.FindCurrentAndPreviousVersionedRepresentations(key, version, model.OperationTypeUpdated)
+					if err != nil {
+						return nil, nil, err
+					}
+					if err := tx.Commit(); err != nil {
+						return nil, nil, err
+					}
+					return current, previous, nil
+				},
+				executeSpiceDB: func(i *InventoryConsumer, tuples model.TuplesToReplicate) (string, error) {
+					return i.UpdateTuple(context.Background(), tuples.TuplesToCreate(), tuples.TuplesToDelete())
+				},
+				metricName: "UpdateTuple",
+			})
+		}
 	case string(model.OperationTypeDeleted):
-	if relationsEnabled {
-		return i.processRelationsOperation(operation, txid, msg, operationConfig{
-			fetchRepresentations: func(i *InventoryConsumer, key model.ReporterResourceKey, version *model.Version) (*model.Representations, *model.Representations, error) {
-				tx, err := i.ResourceRepository.Begin("")
+		if relationsEnabled {
+			return i.processRelationsOperation(operation, txid, msg, operationConfig{
+				fetchRepresentations: func(i *InventoryConsumer, key model.ReporterResourceKey, version *model.Version) (*model.Representations, *model.Representations, error) {
+					tx, err := i.ResourceRepository.Begin("")
 					if err != nil {
 						return nil, nil, err
 					}

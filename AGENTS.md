@@ -13,6 +13,7 @@ The following domain-specific guidelines provide detailed, repo-specific convent
 - [Database Guidelines](docs/database-guidelines.md) - GORM models, transactions, migrations, outbox patterns, and query conventions
 - [Testing Guidelines](docs/testing-guidelines.md) - Test organization, infrastructure, fixtures, authorization testing, and coverage
 - [Integration Guidelines](docs/integration-guidelines.md) - Kafka consumers, Relations API, health checks, observability, and configuration
+- [Sanity Tests](.agents/skills/sanity-tests/SKILL.md) - Run E2E sanity tests against ephemeral OpenShift environments
 
 ## AI Guidance and Repo Conventions
 

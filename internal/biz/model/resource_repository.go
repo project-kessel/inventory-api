@@ -8,20 +8,17 @@ import "errors"
 var ErrSerializationFailure = errors.New("serialization failure")
 
 // ResourceRepository is the entry point for resource persistence operations.
-// Callers obtain a ResourceTx via Begin and manage its lifecycle explicitly.
 type ResourceRepository interface {
 	// Begin starts a new serializable transaction and returns a ResourceTx.
-	// operationName labels the transaction for metrics (e.g. "ReportResource",
-	// "DeleteResource"). Pass "" for read-only or unlabeled transactions.
+	// The caller is responsible for calling Commit or Rollback.
+	// operationName labels the transaction for metrics. Pass "" for
+	// read-only or unlabeled transactions.
 	Begin(operationName string) (ResourceTx, error)
 
-	// MaxSerializationRetries returns the configured maximum number of
-	// retry attempts for serialization failures.
-	MaxSerializationRetries() int
-
-	// RecordSerializationExhaustion records a metric when all retry attempts
-	// are exhausted. Called by the caller after the retry loop exits.
-	RecordSerializationExhaustion(operationName string)
+	// Transact runs fn inside a serializable transaction with automatic
+	// retry on serialization conflicts. The repository handles Begin,
+	// Commit, Rollback, retry, and exhaustion metrics internally.
+	Transact(operationName string, fn func(ResourceTx) error) error
 }
 
 // ResourceTx provides resource operations scoped to a serializable transaction.

@@ -256,61 +256,22 @@ func (uc *Usecase) ReportResource(ctx context.Context, cmd ReportResourceCommand
 }
 
 func (uc *Usecase) reportResourceWithRetry(reporterResourceKey model.ReporterResourceKey, cmd ReportResourceCommand, txid model.TransactionId, operationType *model.EventOperationType) error {
-	maxRetries := uc.resourceRepository.MaxSerializationRetries()
-	var lastErr error
-	for attempt := 0; attempt < maxRetries; attempt++ {
-		tx, err := uc.resourceRepository.Begin(ReportResourceOperationName)
-		if err != nil {
-			return err
-		}
-
+	return uc.resourceRepository.Transact(ReportResourceOperationName, func(tx model.ResourceTx) error {
 		res, err := tx.FindResourceByKeys(reporterResourceKey)
 		if err != nil && !errors.Is(err, model.ErrResourceNotFound) {
-			_ = tx.Rollback()
-			if errors.Is(err, model.ErrSerializationFailure) {
-				lastErr = err
-				continue
-			}
 			return fmt.Errorf("failed to lookup existing resource: %w", err)
 		}
 
 		if err == nil && res != nil {
 			log.Info("Resource already exists, updating: ")
 			*operationType = model.OperationTypeUpdated
-			if err := uc.updateResource(tx, cmd, res, txid); err != nil {
-				_ = tx.Rollback()
-				if errors.Is(err, model.ErrSerializationFailure) {
-					lastErr = err
-					continue
-				}
-				return err
-			}
-		} else {
-			log.Info("Creating new resource")
-			*operationType = model.OperationTypeCreated
-			if err := uc.createResource(tx, cmd, txid); err != nil {
-				_ = tx.Rollback()
-				if errors.Is(err, model.ErrSerializationFailure) {
-					lastErr = err
-					continue
-				}
-				return err
-			}
+			return uc.updateResource(tx, cmd, res, txid)
 		}
 
-		if err := tx.Commit(); err != nil {
-			_ = tx.Rollback()
-			if errors.Is(err, model.ErrSerializationFailure) {
-				lastErr = err
-				continue
-			}
-			return err
-		}
-		return nil
-	}
-	uc.resourceRepository.RecordSerializationExhaustion(ReportResourceOperationName)
-	log.Errorf("transaction failed after %d attempts: %v", maxRetries, lastErr)
-	return fmt.Errorf("transaction failed after %d attempts: %w", maxRetries, lastErr)
+		log.Info("Creating new resource")
+		*operationType = model.OperationTypeCreated
+		return uc.createResource(tx, cmd, txid)
+	})
 }
 
 func (uc *Usecase) createResource(tx model.ResourceTx, cmd ReportResourceCommand, txid model.TransactionId) error {
@@ -385,88 +346,53 @@ func (uc *Usecase) Delete(ctx context.Context, reporterResourceKey model.Reporte
 	// Get authz context for logging (guaranteed to exist after enforceMetaAuthzObject)
 	authzCtx, _ := authnapi.FromAuthzContext(ctx)
 
-	maxRetries := uc.resourceRepository.MaxSerializationRetries()
-	var lastErr error
-	for attempt := 0; attempt < maxRetries; attempt++ {
-		tx, beginErr := uc.resourceRepository.Begin(DeleteResourceOperationName)
-		if beginErr != nil {
-			return beginErr
-		}
-
+	err = uc.resourceRepository.Transact(DeleteResourceOperationName, func(tx model.ResourceTx) error {
 		res, findErr := tx.FindResourceByKeys(reporterResourceKey)
 		if findErr != nil {
-			_ = tx.Rollback()
-			if errors.Is(findErr, model.ErrSerializationFailure) {
-				lastErr = findErr
-				continue
-			}
 			if errors.Is(findErr, model.ErrResourceNotFound) {
 				return ErrResourceNotFound
 			}
-			return ErrDatabaseError
+			return findErr
 		}
 
 		log.Info("Found Resource, deleting: ", res)
 		if deleteErr := res.Delete(reporterResourceKey); deleteErr != nil {
-			_ = tx.Rollback()
 			return fmt.Errorf("failed to delete resource: %w", deleteErr)
 		}
 
-		if saveErr := tx.Save(*res, model.OperationTypeDeleted, txid); saveErr != nil {
-			_ = tx.Rollback()
-			if errors.Is(saveErr, model.ErrSerializationFailure) {
-				lastErr = saveErr
-				continue
-			}
-			return saveErr
-		}
+		return tx.Save(*res, model.OperationTypeDeleted, txid)
+	})
 
-		if commitErr := tx.Commit(); commitErr != nil {
-			_ = tx.Rollback()
-			if errors.Is(commitErr, model.ErrSerializationFailure) {
-				lastErr = commitErr
-				continue
-			}
-			return commitErr
-		}
+	principal := authzCtx.ExtractPrincipal()
 
-		// Extract principal for success logging
-		principal := authzCtx.ExtractPrincipal()
-
-		// DELETE operation - SEC-MON-REQ-1 compliance (EOI-1 pii_manipulation)
-		uc.Log.Infow("msg", "Resource deleted",
+	if err != nil {
+		// DELETE operation failed - SEC-MON-REQ-1 compliance (EOI-1 pii_manipulation, EOI-11 warnings_or_errors)
+		uc.Log.Warnw("msg", "Delete resource failed",
 			"action", "DELETE",
 			"resource_type", reporterResourceKey.ResourceType().String(),
 			"resource_id", reporterResourceKey.LocalResourceId(),
 			"reporter_type", reporterResourceKey.ReporterType().String(),
 			"reporter_instance_id", reporterResourceKey.ReporterInstanceId().String(),
 			"principal", principal,
-			"outcome", "success",
+			"outcome", "failure",
+			"reason", err.Error(),
 		)
-
-		// Increment outbox metrics only after successful transaction commit
-		metricscollector.Incr(uc.MetricsCollector.OutboxEventWrites, string(model.OperationTypeDeleted.OperationType()))
-		return nil
+		return err
 	}
 
-	// Extract principal for failure logging
-	principal := authzCtx.ExtractPrincipal()
-
-	// DELETE operation failed - SEC-MON-REQ-1 compliance (EOI-1 pii_manipulation, EOI-11 warnings_or_errors)
-	uc.Log.Warnw("msg", "Delete resource failed",
+	// DELETE operation - SEC-MON-REQ-1 compliance (EOI-1 pii_manipulation)
+	uc.Log.Infow("msg", "Resource deleted",
 		"action", "DELETE",
 		"resource_type", reporterResourceKey.ResourceType().String(),
 		"resource_id", reporterResourceKey.LocalResourceId(),
 		"reporter_type", reporterResourceKey.ReporterType().String(),
 		"reporter_instance_id", reporterResourceKey.ReporterInstanceId().String(),
 		"principal", principal,
-		"outcome", "failure",
-		"reason", fmt.Sprintf("%v", lastErr),
+		"outcome", "success",
 	)
 
-	uc.resourceRepository.RecordSerializationExhaustion(DeleteResourceOperationName)
-	log.Errorf("delete transaction failed after %d attempts: %v", maxRetries, lastErr)
-	return fmt.Errorf("transaction failed after %d attempts: %w", maxRetries, lastErr)
+	metricscollector.Incr(uc.MetricsCollector.OutboxEventWrites, string(model.OperationTypeDeleted.OperationType()))
+	return nil
 }
 
 // Check verifies if a subject has the specified relation/permission on a resource.

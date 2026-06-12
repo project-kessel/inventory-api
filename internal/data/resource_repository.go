@@ -149,12 +149,37 @@ func (r *resourceRepository) Begin(operationName string) (bizmodel.ResourceTx, e
 	}, nil
 }
 
-func (r *resourceRepository) MaxSerializationRetries() int {
-	return r.maxSerializationRetries
-}
+func (r *resourceRepository) Transact(operationName string, fn func(bizmodel.ResourceTx) error) error {
+	var lastErr error
+	for attempt := 0; attempt < r.maxSerializationRetries; attempt++ {
+		tx, err := r.Begin(operationName)
+		if err != nil {
+			return err
+		}
 
-func (r *resourceRepository) RecordSerializationExhaustion(operationName string) {
-	metricscollector.Incr(r.metricsCollector.SerializationExhaustions, operationName)
+		if err := fn(tx); err != nil {
+			_ = tx.Rollback()
+			if errors.Is(err, bizmodel.ErrSerializationFailure) {
+				lastErr = err
+				continue
+			}
+			return err
+		}
+
+		if err := tx.Commit(); err != nil {
+			_ = tx.Rollback()
+			if errors.Is(err, bizmodel.ErrSerializationFailure) {
+				lastErr = err
+				continue
+			}
+			return err
+		}
+		return nil
+	}
+	if r.metricsCollector != nil {
+		metricscollector.Incr(r.metricsCollector.SerializationExhaustions, operationName)
+	}
+	return fmt.Errorf("transaction failed after %d attempts: %w", r.maxSerializationRetries, lastErr)
 }
 
 func isSerializationFailure(err error) bool {

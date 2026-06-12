@@ -2,10 +2,8 @@ package data
 
 import (
 	"errors"
-	"fmt"
 	"testing"
 
-	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -50,12 +48,75 @@ func TestBeginRollback_Success(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestMaxSerializationRetries(t *testing.T) {
+// =============================================================================
+// Transact tests
+// =============================================================================
+
+func TestTransact_Success(t *testing.T) {
 	repo := newTestRepo(t)
-	assert.Equal(t, 3, repo.MaxSerializationRetries())
+
+	called := false
+	err := repo.Transact("TestOp", func(tx bizmodel.ResourceTx) error {
+		called = true
+		return nil
+	})
+
+	assert.NoError(t, err)
+	assert.True(t, called)
 }
 
-func TestMaxSerializationRetries_DefaultsTo3(t *testing.T) {
+func TestTransact_FnError_NoRetry(t *testing.T) {
+	repo := newTestRepo(t)
+
+	expectedErr := errors.New("business logic error")
+	callCount := 0
+	err := repo.Transact("TestOp", func(tx bizmodel.ResourceTx) error {
+		callCount++
+		return expectedErr
+	})
+
+	assert.ErrorIs(t, err, expectedErr)
+	assert.Equal(t, 1, callCount, "non-serialization errors should not retry")
+}
+
+func TestTransact_SerializationFailure_Retries(t *testing.T) {
+	repo := newTestRepo(t)
+
+	callCount := 0
+	err := repo.Transact("TestOp", func(tx bizmodel.ResourceTx) error {
+		callCount++
+		if callCount < 3 {
+			return bizmodel.ErrSerializationFailure
+		}
+		return nil
+	})
+
+	assert.NoError(t, err)
+	assert.Equal(t, 3, callCount, "should retry on serialization failure and succeed on third attempt")
+}
+
+func TestTransact_SerializationExhaustion(t *testing.T) {
+	db := setupInMemoryDB(t)
+	mc := metricscollector.NewFakeMetricsCollector()
+	repo := NewResourceRepository(GormResourceRepositoryConfig{
+		DB:                      db,
+		OutboxPublisher:         noopOutboxPublisher,
+		MetricsCollector:        mc,
+		MaxSerializationRetries: 2,
+	})
+
+	callCount := 0
+	err := repo.Transact("TestOp", func(tx bizmodel.ResourceTx) error {
+		callCount++
+		return bizmodel.ErrSerializationFailure
+	})
+
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "transaction failed after 2 attempts")
+	assert.Equal(t, 2, callCount, "should exhaust all retry attempts")
+}
+
+func TestTransact_DefaultRetries(t *testing.T) {
 	db := setupInMemoryDB(t)
 	mc := metricscollector.NewFakeMetricsCollector()
 	repo := NewResourceRepository(GormResourceRepositoryConfig{
@@ -64,104 +125,19 @@ func TestMaxSerializationRetries_DefaultsTo3(t *testing.T) {
 		MetricsCollector:        mc,
 		MaxSerializationRetries: 0,
 	})
-	assert.Equal(t, 3, repo.MaxSerializationRetries())
-}
-
-func TestCommit_WrapsSerializationFailure(t *testing.T) {
-	db := setupInMemoryDB(t)
-	mc := metricscollector.NewFakeMetricsCollector()
-	repo := NewResourceRepository(GormResourceRepositoryConfig{
-		DB:                      db,
-		OutboxPublisher:         noopOutboxPublisher,
-		MetricsCollector:        mc,
-		MaxSerializationRetries: 3,
-	})
-
-	tx, err := repo.Begin("")
-	require.NoError(t, err)
-
-	err = tx.Commit()
-	assert.NoError(t, err)
-}
-
-func TestSerializationRetry_ManualLoop(t *testing.T) {
-	db := setupInMemoryDB(t)
-	mc := metricscollector.NewFakeMetricsCollector()
-	maxRetries := 3
-	repo := NewResourceRepository(GormResourceRepositoryConfig{
-		DB:                      db,
-		OutboxPublisher:         noopOutboxPublisher,
-		MetricsCollector:        mc,
-		MaxSerializationRetries: maxRetries,
-	})
-
-	serializationError := &pgconn.PgError{
-		Code:    "40001",
-		Message: "could not serialize access due to concurrent update",
-	}
 
 	callCount := 0
-	var lastErr error
-	for attempt := 0; attempt < repo.MaxSerializationRetries(); attempt++ {
-		tx, err := repo.Begin("")
-		require.NoError(t, err)
-
+	err := repo.Transact("TestOp", func(tx bizmodel.ResourceTx) error {
 		callCount++
-		// Simulate a fn error that's a serialization failure
-		fnErr := serializationError
-		_ = tx.Rollback()
-
-		// The raw pgx error won't match the sentinel, but wrapSerializationError
-		// in the real gormResourceTx methods would wrap it. For this test, we
-		// simulate what the caller sees when mid-tx methods wrap the error.
-		wrappedErr := fmt.Errorf("%w: %v", bizmodel.ErrSerializationFailure, fnErr)
-		if errors.Is(wrappedErr, bizmodel.ErrSerializationFailure) {
-			lastErr = wrappedErr
-			continue
-		}
-	}
-
-	assert.Equal(t, maxRetries, callCount)
-	assert.True(t, errors.Is(lastErr, bizmodel.ErrSerializationFailure))
-}
-
-func TestSerializationRecovery_ManualLoop(t *testing.T) {
-	db := setupInMemoryDB(t)
-	mc := metricscollector.NewFakeMetricsCollector()
-	repo := NewResourceRepository(GormResourceRepositoryConfig{
-		DB:                      db,
-		OutboxPublisher:         noopOutboxPublisher,
-		MetricsCollector:        mc,
-		MaxSerializationRetries: 5,
+		return bizmodel.ErrSerializationFailure
 	})
 
-	callCount := 0
-	var finalErr error
-	for attempt := 0; attempt < repo.MaxSerializationRetries(); attempt++ {
-		tx, err := repo.Begin("")
-		require.NoError(t, err)
-
-		callCount++
-		if callCount <= 2 {
-			_ = tx.Rollback()
-			continue
-		}
-
-		err = tx.Commit()
-		if err == nil {
-			finalErr = nil
-			break
-		}
-		_ = tx.Rollback()
-		finalErr = err
-	}
-
-	assert.Equal(t, 3, callCount)
-	assert.NoError(t, finalErr)
+	assert.Error(t, err)
+	assert.Equal(t, 3, callCount, "MaxSerializationRetries 0 should default to 3")
 }
 
 // =============================================================================
-// FakeResourceRepository Begin/Commit/Rollback tests
+// FakeResourceRepository tests
 // =============================================================================
 
 func TestFakeResourceRepository_BeginCommit(t *testing.T) {
@@ -185,7 +161,26 @@ func TestFakeResourceRepository_BeginRollback(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestFakeResourceRepository_MaxSerializationRetries(t *testing.T) {
+func TestFakeResourceRepository_Transact_Success(t *testing.T) {
 	repo := NewFakeResourceRepository()
-	assert.Equal(t, 3, repo.MaxSerializationRetries())
+
+	called := false
+	err := repo.Transact("TestOp", func(tx bizmodel.ResourceTx) error {
+		called = true
+		return nil
+	})
+
+	assert.NoError(t, err)
+	assert.True(t, called)
+}
+
+func TestFakeResourceRepository_Transact_Error(t *testing.T) {
+	repo := NewFakeResourceRepository()
+
+	expectedErr := errors.New("test error")
+	err := repo.Transact("TestOp", func(tx bizmodel.ResourceTx) error {
+		return expectedErr
+	})
+
+	assert.ErrorIs(t, err, expectedErr)
 }

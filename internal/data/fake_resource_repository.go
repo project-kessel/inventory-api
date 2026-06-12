@@ -61,12 +61,16 @@ func (f *fakeResourceRepository) Begin(_ string) (bizmodel.ResourceTx, error) {
 	return &fakeResourceTx{repo: f}, nil
 }
 
-func (f *fakeResourceRepository) MaxSerializationRetries() int {
-	return 3
-}
-
-func (f *fakeResourceRepository) RecordSerializationExhaustion(_ string) {
-	// no-op for fake
+func (f *fakeResourceRepository) Transact(_ string, fn func(bizmodel.ResourceTx) error) error {
+	tx, err := f.Begin("")
+	if err != nil {
+		return err
+	}
+	if err := fn(tx); err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+	return tx.Commit()
 }
 
 // --- fakeResourceTx implements model.ResourceTx ---

@@ -461,7 +461,7 @@ func (uc *Usecase) Delete(ctx context.Context, reporterResourceKey model.Reporte
 		"reporter_instance_id", reporterResourceKey.ReporterInstanceId().String(),
 		"principal", principal,
 		"outcome", "failure",
-		"reason", lastErr.Error(),
+		"reason", fmt.Sprintf("%v", lastErr),
 	)
 
 	uc.resourceRepository.RecordSerializationExhaustion(DeleteResourceOperationName)

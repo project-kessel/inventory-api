@@ -363,3 +363,60 @@ func findResourceTypeFromJsonKey(jsonKey string, resourceTypes []model.ResourceT
 
 	return "", ""
 }
+
+// NewInMemorySchemaRepositoryFromUnifiedYAMLDir loads schemas from unified YAML files.
+// The directory should contain *.yaml files (e.g., host.yaml, k8s_cluster.yaml).
+// Each YAML file uses embedded JSON Schema with a custom relations section.
+func NewInMemorySchemaRepositoryFromUnifiedYAMLDir(ctx context.Context, dir string) (*InMemorySchemaRepository, error) {
+	// Load all YAML schemas from directory
+	schemas, err := LoadUnifiedSchemasFromDirectory(dir)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load unified schemas: %w", err)
+	}
+
+	repository := &InMemorySchemaRepository{
+		content: map[model.ResourceType]*resourceEntry{},
+	}
+
+	// Process each schema file (one resource per file now)
+	for _, schema := range schemas {
+		resourceType, err := schema.ResourceType()
+		if err != nil {
+			return nil, fmt.Errorf("invalid resource type %q: %w", schema.Name, err)
+		}
+
+		// Create ResourceSchemaRepresentation from common schema
+		commonSchema := NewUnifiedSchemaImpl(schema.Common.Schema, schema.Common.Relations)
+		resourceSchemaRep, err := model.NewResourceSchemaRepresentation(resourceType, commonSchema)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create resource schema for %q: %w", schema.Name, err)
+		}
+
+		// Add resource to repository
+		if err := repository.CreateResourceSchema(ctx, resourceSchemaRep); err != nil {
+			return nil, fmt.Errorf("failed to add resource schema for %q: %w", schema.Name, err)
+		}
+
+		// Process each reporter
+		for _, reporter := range schema.Reporters {
+			reporterType, err := reporter.ReporterType()
+			if err != nil {
+				return nil, fmt.Errorf("invalid reporter type %q for resource %q: %w", reporter.Name, schema.Name, err)
+			}
+
+			// Create ReporterSchemaRepresentation from reporter schema
+			reporterSchema := NewUnifiedSchemaImpl(reporter.Schema, reporter.Relations)
+			reporterSchemaRep, err := model.NewReporterSchemaRepresentation(resourceType, reporterType, reporterSchema)
+			if err != nil {
+				return nil, fmt.Errorf("failed to create reporter schema for %q:%q: %w", schema.Name, reporter.Name, err)
+			}
+
+			// Add reporter to repository
+			if err := repository.CreateReporterSchema(ctx, reporterSchemaRep); err != nil {
+				return nil, fmt.Errorf("failed to add reporter schema for %q:%q: %w", schema.Name, reporter.Name, err)
+			}
+		}
+	}
+
+	return repository, nil
+}

@@ -1,0 +1,55 @@
+# Compiled Schema for Host Resource
+# This is the serialized/compiled format loaded by Inventory API at runtime
+# Source: Converted from data/schema/resources/host/{common_representation.json,reporters/hbi/host.json,config.yaml}
+
+schema_version: "1.0"
+name: host
+description: "A physical or virtual host in the inventory system"
+
+common:
+  # JSON Schema embedded in YAML
+  schema:
+    type: object
+    properties:
+      workspace_id:
+        type: string
+    required:
+      - workspace_id
+
+  # Custom relations section for tuple generation
+  relations:
+    - name: workspace
+      target: rbac/workspace
+      field: workspace_id
+      cardinality: one
+
+reporters:
+  - name: hbi
+    description: "Host-based inventory reporter"
+    # JSON Schema embedded in YAML
+    schema:
+      type: object
+      properties:
+        satellite_id:
+          oneOf:
+            - type: string
+              format: uuid
+            - type: string
+              pattern: "^\\d{10}$"
+            - type: "null"
+        subscription_manager_id:
+          oneOf:
+            - type: string
+              format: uuid
+            - type: "null"
+        insights_id:
+          oneOf:
+            - type: string
+              format: uuid
+            - type: "null"
+        ansible_host:
+          oneOf:
+            - type: string
+              maxLength: 255
+            - type: "null"
+      required: []

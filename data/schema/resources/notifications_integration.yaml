@@ -1,0 +1,49 @@
+# Compiled Schema for Notifications Integration Resource
+# This is the serialized/compiled format loaded by Inventory API at runtime
+# Source: Converted from data/schema/resources/notifications_integration/{common_representation.json,reporters/notifications/notifications_integration.json,config.yaml}
+
+schema_version: "1.0"
+
+resources:
+  - name: notifications_integration
+    description: "A notifications service integration"
+
+    common:
+      # JSON Schema embedded in YAML
+      schema:
+        type: object
+        properties:
+          workspace_id:
+            type: string
+        required:
+          - workspace_id
+
+      # Custom relations section for tuple generation
+      relations:
+        - name: workspace
+          target: rbac/workspace
+          field: workspace_id
+          cardinality: one
+
+    reporters:
+      - name: notifications
+        description: "Notifications service reporter"
+        # JSON Schema embedded in YAML
+        schema:
+          type: object
+          properties:
+            reporter_type:
+              type: string
+              description: "The type of reporter, fixed to 'NOTIFICATIONS' for this schema"
+              enum:
+                - NOTIFICATIONS
+            reporter_instance_id:
+              type: string
+              description: "A unique identifier for the reporter instance, such as a service account"
+            local_resource_id:
+              type: string
+              description: "A string representing the local identifier of the resource"
+          required:
+            - reporter_type
+            - reporter_instance_id
+            - local_resource_id

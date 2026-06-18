@@ -110,7 +110,7 @@ func TestUnifiedSchemaImpl_Validate(t *testing.T) {
 }
 
 func TestUnifiedSchemaImpl_CalculateTuples(t *testing.T) {
-	t.Run("delegates to DefaultSchema in Phase 1", func(t *testing.T) {
+	t.Run("creates tuple for new workspace", func(t *testing.T) {
 		schema := map[string]interface{}{
 			"type": "object",
 			"properties": map[string]interface{}{
@@ -146,8 +146,167 @@ func TestUnifiedSchemaImpl_CalculateTuples(t *testing.T) {
 		tuples, err := impl.CalculateTuples(current, nil, key)
 		require.NoError(t, err)
 
-		// Should delegate to DefaultSchema which creates workspace tuple
+		// Should create workspace tuple
 		assert.True(t, tuples.HasTuplesToCreate())
 		assert.False(t, tuples.HasTuplesToDelete())
+
+		// Verify tuple structure
+		created := tuples.TuplesToCreate()
+		require.NotNil(t, created)
+		require.Len(t, *created, 1)
+		assert.Equal(t, "workspace", (*created)[0].Relation().Serialize())
+	})
+
+	t.Run("deletes old tuple when workspace changes", func(t *testing.T) {
+		relations := []model.RelationDefinition{
+			{
+				Name:        "workspace",
+				Target:      "rbac/workspace",
+				Field:       "workspace_id",
+				Cardinality: "one",
+			},
+		}
+
+		impl := NewUnifiedSchemaImpl(map[string]interface{}{}, relations)
+
+		resourceType, _ := model.NewResourceType("host")
+		reporterType, _ := model.NewReporterType("hbi")
+		reporterInstanceId, _ := model.NewReporterInstanceId("test-instance")
+		key, _ := model.NewReporterResourceKey(
+			model.LocalResourceId("test-resource"),
+			resourceType, reporterType, reporterInstanceId,
+		)
+
+		ver := model.NewVersion(0)
+		previous, _ := model.NewRepresentations(
+			model.Representation(map[string]interface{}{"workspace_id": "ws-old"}),
+			&ver, nil, nil,
+		)
+
+		ver2 := model.NewVersion(1)
+		current, _ := model.NewRepresentations(
+			model.Representation(map[string]interface{}{"workspace_id": "ws-new"}),
+			&ver2, nil, nil,
+		)
+
+		tuples, err := impl.CalculateTuples(current, previous, key)
+		require.NoError(t, err)
+
+		// Should create tuple for new workspace and delete old one
+		assert.True(t, tuples.HasTuplesToCreate())
+		assert.True(t, tuples.HasTuplesToDelete())
+
+		created := tuples.TuplesToCreate()
+		deleted := tuples.TuplesToDelete()
+		require.NotNil(t, created)
+		require.NotNil(t, deleted)
+		require.Len(t, *created, 1)
+		require.Len(t, *deleted, 1)
+	})
+
+	t.Run("no tuples when workspace unchanged", func(t *testing.T) {
+		relations := []model.RelationDefinition{
+			{
+				Name:        "workspace",
+				Target:      "rbac/workspace",
+				Field:       "workspace_id",
+				Cardinality: "one",
+			},
+		}
+
+		impl := NewUnifiedSchemaImpl(map[string]interface{}{}, relations)
+
+		resourceType, _ := model.NewResourceType("host")
+		reporterType, _ := model.NewReporterType("hbi")
+		reporterInstanceId, _ := model.NewReporterInstanceId("test-instance")
+		key, _ := model.NewReporterResourceKey(
+			model.LocalResourceId("test-resource"),
+			resourceType, reporterType, reporterInstanceId,
+		)
+
+		ver := model.NewVersion(0)
+		previous, _ := model.NewRepresentations(
+			model.Representation(map[string]interface{}{"workspace_id": "ws-1"}),
+			&ver, nil, nil,
+		)
+
+		ver2 := model.NewVersion(1)
+		current, _ := model.NewRepresentations(
+			model.Representation(map[string]interface{}{"workspace_id": "ws-1"}),
+			&ver2, nil, nil,
+		)
+
+		tuples, err := impl.CalculateTuples(current, previous, key)
+		require.NoError(t, err)
+
+		// Workspace unchanged - no tuples needed
+		assert.False(t, tuples.HasTuplesToCreate())
+		assert.False(t, tuples.HasTuplesToDelete())
+	})
+
+	t.Run("handles multiple relations", func(t *testing.T) {
+		relations := []model.RelationDefinition{
+			{
+				Name:        "workspace",
+				Target:      "rbac/workspace",
+				Field:       "workspace_id",
+				Cardinality: "one",
+			},
+			{
+				Name:        "tenant",
+				Target:      "rbac/tenant",
+				Field:       "tenant_id",
+				Cardinality: "one",
+			},
+		}
+
+		impl := NewUnifiedSchemaImpl(map[string]interface{}{}, relations)
+
+		resourceType, _ := model.NewResourceType("host")
+		reporterType, _ := model.NewReporterType("hbi")
+		reporterInstanceId, _ := model.NewReporterInstanceId("test-instance")
+		key, _ := model.NewReporterResourceKey(
+			model.LocalResourceId("test-resource"),
+			resourceType, reporterType, reporterInstanceId,
+		)
+
+		ver := model.NewVersion(0)
+		current, _ := model.NewRepresentations(
+			model.Representation(map[string]interface{}{
+				"workspace_id": "ws-1",
+				"tenant_id":    "tenant-1",
+			}),
+			&ver, nil, nil,
+		)
+
+		tuples, err := impl.CalculateTuples(current, nil, key)
+		require.NoError(t, err)
+
+		// Should create tuples for both relations
+		assert.True(t, tuples.HasTuplesToCreate())
+		created := tuples.TuplesToCreate()
+		require.NotNil(t, created)
+		require.Len(t, *created, 2)
+
+		// Verify both relation types are present
+		relationNames := make(map[string]bool)
+		for _, tuple := range *created {
+			relationNames[tuple.Relation().Serialize()] = true
+		}
+		assert.True(t, relationNames["workspace"])
+		assert.True(t, relationNames["tenant"])
+	})
+
+	t.Run("parses target correctly", func(t *testing.T) {
+		namespace, resourceType, err := parseTarget("rbac/workspace")
+		require.NoError(t, err)
+		assert.Equal(t, "rbac", namespace)
+		assert.Equal(t, "workspace", resourceType)
+	})
+
+	t.Run("rejects invalid target format", func(t *testing.T) {
+		_, _, err := parseTarget("invalid")
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "namespace/resource_type")
 	})
 }

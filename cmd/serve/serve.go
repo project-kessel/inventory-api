@@ -470,10 +470,10 @@ func newSchemaRepository(ctx context.Context, c schema.CompletedConfig, logger *
 			return data.NewInMemorySchemaRepository(), nil
 		case inmemoryConfig.JSONRepository:
 			logger.Infof("Using json in-memory schema repository from path %q", c.InMemory.Path)
-			return data.NewInMemorySchemaRepositoryFromJsonFile(ctx, c.InMemory.Path, data.NewJsonSchemaWithWorkspacesFromString)
+			return data.NewInMemorySchemaRepositoryFromJsonFile(ctx, c.InMemory.Path, data.NewFeaturesAwareSchemaFactory())
 		case inmemoryConfig.DirRepository:
 			logger.Infof("Using dir in-memory schema repository from path %q", c.InMemory.Path)
-			return data.NewInMemorySchemaRepositoryFromDir(ctx, c.InMemory.Path, data.NewJsonSchemaWithWorkspacesFromString)
+			return data.NewInMemorySchemaRepositoryFromDir(ctx, c.InMemory.Path, data.NewFeaturesAwareSchemaFactory())
 		default:
 			return nil, fmt.Errorf("invalid repository type: %s/%s", c.Repository, c.InMemory.Type)
 		}

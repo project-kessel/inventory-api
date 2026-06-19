@@ -1,9 +1,5 @@
 package model
 
-import (
-	"strings"
-)
-
 // RelationsTuple represents a stored relationship fact.
 // Structurally identical to Relationship but semantically distinct:
 // a Relationship is a query ("does this hold?"), a RelationsTuple is a persisted fact.
@@ -31,6 +27,20 @@ const (
 )
 
 func NewWorkspaceRelationsTuple(workspaceID string, key ReporterResourceKey) RelationsTuple {
+	return NewRelationTupleForSubject(key, WorkspaceRelation, RbacNamespace, WorkspaceRelation, workspaceID)
+}
+
+// NewRelationTupleForSubject builds a RelationsTuple for an arbitrary relation and subject.
+// This generalizes NewWorkspaceRelationsTuple to support any relation name, subject namespace,
+// and subject resource type — needed for Features service relations like allowed_workspaces,
+// billing_account, and parent.
+func NewRelationTupleForSubject(
+	key ReporterResourceKey,
+	relationName string,
+	subjectNamespace string,
+	subjectResourceType string,
+	subjectId string,
+) RelationsTuple {
 	reporter := NewReporterReference(key.ReporterType(), nil)
 	object := NewResourceReference(
 		key.ResourceType(),
@@ -38,19 +48,18 @@ func NewWorkspaceRelationsTuple(workspaceID string, key ReporterResourceKey) Rel
 		&reporter,
 	)
 
-	workspaceSubjectId := DeserializeLocalResourceId(workspaceID)
-	workspaceReporterType := DeserializeReporterType(RbacNamespace)
-	workspaceReporter := NewReporterReference(workspaceReporterType, nil)
-	workspaceResource := NewResourceReference(
-		DeserializeResourceType(WorkspaceRelation),
-		workspaceSubjectId,
-		&workspaceReporter,
+	subjectReporterType := DeserializeReporterType(subjectNamespace)
+	subjectReporter := NewReporterReference(subjectReporterType, nil)
+	subjectResource := NewResourceReference(
+		DeserializeResourceType(subjectResourceType),
+		DeserializeLocalResourceId(subjectId),
+		&subjectReporter,
 	)
-	subject := NewSubjectReferenceWithoutRelation(workspaceResource)
+	subject := NewSubjectReferenceWithoutRelation(subjectResource)
 
 	return RelationsTuple{
 		object:   object,
-		relation: DeserializeRelation(strings.ToLower(WorkspaceRelation)),
+		relation: DeserializeRelation(relationName),
 		subject:  subject,
 	}
 }

@@ -352,7 +352,7 @@ func TestInMemorySchemaRepository_GetResourceReporters(t *testing.T) {
 
 func TestNewFromDir_InvalidDirectory(t *testing.T) {
 	ctx := context.Background()
-	service, err := NewInMemorySchemaRepositoryFromDir(ctx, "/tmp/wrong/dir", NewJsonSchemaWithWorkspacesFromString)
+	service, err := NewInMemorySchemaRepositoryFromDir(ctx, "/tmp/wrong/dir", DefaultSchemaFactory)
 	assert.Error(t, err)
 	assert.Nil(t, service)
 	assert.Contains(t, err.Error(), "failed to read schema directory \"/tmp/wrong/dir\"")
@@ -380,7 +380,7 @@ func TestNewFromDir_ValidDirectory(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Test NewFromDir
-	repo, err := NewInMemorySchemaRepositoryFromDir(ctx, tmpDir, NewJsonSchemaWithWorkspacesFromString)
+	repo, err := NewInMemorySchemaRepositoryFromDir(ctx, tmpDir, DefaultSchemaFactory)
 	assert.NoError(t, err)
 	assert.NotNil(t, repo)
 
@@ -405,7 +405,7 @@ func TestNewFromDir_ValidDirectory(t *testing.T) {
 
 func TestNewFromJsonFile_InvalidFile(t *testing.T) {
 	ctx := context.Background()
-	repo, err := NewInMemorySchemaRepositoryFromJsonFile(ctx, "/tmp/nonexistent.json", NewJsonSchemaWithWorkspacesFromString)
+	repo, err := NewInMemorySchemaRepositoryFromJsonFile(ctx, "/tmp/nonexistent.json", DefaultSchemaFactory)
 	assert.Error(t, err)
 	assert.Nil(t, repo)
 	assert.Contains(t, err.Error(), "failed to read schema cache file")
@@ -425,7 +425,7 @@ func TestNewFromJsonFile_ValidFile(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Test NewFromJsonFile
-	repo, err := NewInMemorySchemaRepositoryFromJsonFile(ctx, tmpFile, NewJsonSchemaWithWorkspacesFromString)
+	repo, err := NewInMemorySchemaRepositoryFromJsonFile(ctx, tmpFile, DefaultSchemaFactory)
 	assert.NoError(t, err)
 	assert.NotNil(t, repo)
 
@@ -456,7 +456,7 @@ func TestNewFromJsonBytes_ValidJSON(t *testing.T) {
 		"k8s_cluster:acm": "{\"type\": \"object\"}"
 	}`)
 
-	repo, err := NewFromJsonBytes(ctx, jsonContent, NewJsonSchemaWithWorkspacesFromString)
+	repo, err := NewFromJsonBytes(ctx, jsonContent, DefaultSchemaFactory)
 	assert.NoError(t, err)
 	assert.NotNil(t, repo)
 
@@ -492,7 +492,7 @@ func TestNewFromJsonBytes_InvalidJSON(t *testing.T) {
 
 	invalidJSON := []byte(`{invalid json`)
 
-	repo, err := NewFromJsonBytes(ctx, invalidJSON, NewJsonSchemaWithWorkspacesFromString)
+	repo, err := NewFromJsonBytes(ctx, invalidJSON, DefaultSchemaFactory)
 	assert.Error(t, err)
 	assert.Nil(t, repo)
 	assert.Contains(t, err.Error(), "failed to unmarshal schema cache JSON")
@@ -506,7 +506,7 @@ func TestNewFromJsonBytes_OnlyCommonSchemas(t *testing.T) {
 		"common:k8s_cluster": "{\"type\": \"object\"}"
 	}`)
 
-	repo, err := NewFromJsonBytes(ctx, jsonContent, NewJsonSchemaWithWorkspacesFromString)
+	repo, err := NewFromJsonBytes(ctx, jsonContent, DefaultSchemaFactory)
 	assert.NoError(t, err)
 	assert.NotNil(t, repo)
 

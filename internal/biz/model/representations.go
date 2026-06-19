@@ -68,10 +68,43 @@ func (r *Representations) HasCommon() bool {
 // WorkspaceID returns the workspace_id from the common representation data.
 // Returns empty string if not present or if common representation is not available.
 func (r *Representations) WorkspaceID() string {
+	return r.StringField("workspace_id")
+}
+
+// StringField returns a single string value from the common representation.
+// Returns empty string if not present, not a string, or if common representation is unavailable.
+func (r *Representations) StringField(fieldName string) string {
 	if r != nil && r.HasCommon() {
-		if workspaceID, ok := r.commonData["workspace_id"].(string); ok {
-			return workspaceID
+		if value, ok := r.commonData[fieldName].(string); ok {
+			return value
 		}
 	}
 	return ""
+}
+
+// StringSliceField returns a string slice from the common representation.
+// Returns nil if not present, not an array, or if common representation is unavailable.
+// Non-string elements within the array are silently skipped.
+func (r *Representations) StringSliceField(fieldName string) []string {
+	if r == nil || !r.HasCommon() {
+		return nil
+	}
+	raw, ok := r.commonData[fieldName]
+	if !ok || raw == nil {
+		return nil
+	}
+	arr, ok := raw.([]interface{})
+	if !ok {
+		return nil
+	}
+	result := make([]string, 0, len(arr))
+	for _, item := range arr {
+		if s, ok := item.(string); ok {
+			result = append(result, s)
+		}
+	}
+	if len(result) == 0 {
+		return nil
+	}
+	return result
 }

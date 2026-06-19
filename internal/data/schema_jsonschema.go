@@ -23,7 +23,11 @@ func NewJsonSchemaWithWorkspacesFromString(jsonSchema string) model.Schema {
 
 // Validate validates the given data against the JSON schema.
 func (jschema JsonSchemaWithWorkspaces) Validate(data interface{}) (bool, error) {
-	schemaLoader := gojsonschema.NewStringLoader(jschema.jsonSchema)
+	return validateJsonSchema(jschema.jsonSchema, data)
+}
+
+func validateJsonSchema(jsonSchema string, data interface{}) (bool, error) {
+	schemaLoader := gojsonschema.NewStringLoader(jsonSchema)
 	dataLoader := gojsonschema.NewGoLoader(data)
 	result, err := gojsonschema.Validate(schemaLoader, dataLoader)
 	if err != nil {

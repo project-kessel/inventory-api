@@ -56,6 +56,12 @@ func (d DefaultSchema) CalculateTuples(currentRepresentation, previousRepresenta
 // from a string representation (typically a JSON schema definition).
 type SchemaFromString func(string) Schema
 
+// ResourceTypeSchemaFactory is a factory function that creates a Schema
+// with awareness of the resource type. This enables per-resource-type
+// Schema implementations (e.g., Features service schemas produce different
+// tuple patterns than workspace-only schemas).
+type ResourceTypeSchemaFactory func(resourceType ResourceType, jsonSchema string) Schema
+
 // ResourceSchemaRepresentation holds a resource schema with its validation and tuple logic.
 type ResourceSchemaRepresentation struct {
 	resourceType ResourceType

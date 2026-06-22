@@ -13,11 +13,26 @@ objects:
           max-serialization-retries: 10
           outbox-mode: wal
         authn:
-          allow-unauthenticated: true
+          authenticator:
+            type: first_match
+            chain:
+              - type: x-rh-identity
+                transport:
+                  http: true
+                  grpc: false
+              - type: allow-unauthenticated
         authz:
           kessel:
             insecure-client: true
             enable-oidc-auth: false
+        selfsubjectstrategy:
+          redhatRbacSelfSubjectStrategy:
+            enabled: true
+            issuerDomain: redhat
+            # oidcIssuerDomains is unused in ephemeral (no OIDC in the authn chain) but required by validation
+            oidcIssuerDomains:
+              - iss: https://not-used.example.com
+                domain: redhat
         consumer:
           enabled: true
           topic: outbox.event.kessel.tuples

@@ -47,11 +47,12 @@ func (r *healthRepo) IsBackendAvailable(ctx context.Context) (model.HealthResult
 		log.Errorf("RELATIONS-API UNHEALTHY")
 		return model.NewHealthResult("RELATIONS-API UNHEALTHY", 500), nil
 	}
-	if relations.CheckRelationsImpl(r.RelationsConfig) == "Kessel" {
+	relImpl := relations.CheckRelationsImpl(r.RelationsConfig)
+	if relImpl == relations.Kessel || relImpl == relations.SpiceDB {
 		if viper.GetBool("log.readyz") {
-			log.Infof("Storage type %s and relations-api %s", storageType, health.Status())
+			log.Infof("Storage type %s and relations (%s) %s", storageType, relImpl, health.Status())
 		}
-		return model.NewHealthResult("STORAGE "+storageType+" and RELATIONS-API", 200), nil
+		return model.NewHealthResult("STORAGE "+storageType+" and RELATIONS-API ("+relImpl+")", 200), nil
 	}
 
 	return model.NewHealthResult("Storage type "+storageType, 200), nil
@@ -63,10 +64,11 @@ func (r *healthRepo) IsRelationsAvailable(ctx context.Context) (model.HealthResu
 		log.Errorf("RELATIONS-API UNHEALTHY")
 		return model.NewHealthResult("RELATIONS-API UNHEALTHY", 500), nil
 	}
-	if relations.CheckRelationsImpl(r.RelationsConfig) == "Kessel" {
+	relImpl := relations.CheckRelationsImpl(r.RelationsConfig)
+	if relImpl == relations.Kessel || relImpl == relations.SpiceDB {
 		if viper.GetBool("log.readyz") {
-			log.Infof("relations-api %s", health.Status())
+			log.Infof("relations (%s) %s", relImpl, health.Status())
 		}
 	}
-	return model.NewHealthResult("RELATIONS-API", 200), nil
+	return model.NewHealthResult("RELATIONS-API ("+relImpl+")", 200), nil
 }

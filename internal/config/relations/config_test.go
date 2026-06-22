@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/project-kessel/inventory-api/internal/config/relations/kessel"
+	"github.com/project-kessel/inventory-api/internal/config/relations/spicedb"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -20,6 +21,26 @@ func TestConfig_Complete_AllowAll_Success(t *testing.T) {
 	assert.Nil(t, errs, "AllowAll config should complete without errors")
 	assert.NotNil(t, completed.completedConfig, "Completed config should not be nil")
 	assert.Equal(t, AllowAll, completed.Authz, "Authz should be AllowAll")
+}
+
+func TestConfig_Complete_SpiceDB_Success(t *testing.T) {
+	spicedbCfg := spicedb.NewConfig(&spicedb.Options{
+		Endpoint:   "localhost:50051",
+		TokenFile:  "/tmp/token",
+		SchemaFile: "/tmp/schema.zed",
+		UseTLS:     false,
+	})
+
+	cfg := &Config{
+		Authz:   SpiceDB,
+		SpiceDB: spicedbCfg,
+	}
+
+	completed, errs := cfg.Complete(context.Background())
+
+	assert.Nil(t, errs, "SpiceDB config should complete without errors")
+	assert.NotNil(t, completed.completedConfig, "Completed config should not be nil")
+	assert.Equal(t, SpiceDB, completed.Authz, "Authz should be SpiceDB")
 }
 
 func TestConfig_Complete_Kessel_SwallowsErrors(t *testing.T) {
@@ -75,24 +96,29 @@ func TestCheckRelationsImpl_AllCases(t *testing.T) {
 		expectedType string
 	}{
 		{
-			name:         "AllowAll returns AllowAll",
+			name:         "AllowAll returns allow-all",
 			authz:        AllowAll,
-			expectedType: "AllowAll",
+			expectedType: AllowAll,
 		},
 		{
-			name:         "Kessel returns Kessel",
+			name:         "Kessel returns kessel",
 			authz:        Kessel,
-			expectedType: "Kessel",
+			expectedType: Kessel,
 		},
 		{
-			name:         "Unknown value returns Unknown",
+			name:         "SpiceDB returns spicedb",
+			authz:        SpiceDB,
+			expectedType: SpiceDB,
+		},
+		{
+			name:         "Unknown value returns unknown",
 			authz:        "some-random-value",
-			expectedType: "Unknown",
+			expectedType: "unknown",
 		},
 		{
-			name:         "Empty string returns Unknown",
+			name:         "Empty string returns unknown",
 			authz:        "",
-			expectedType: "Unknown",
+			expectedType: "unknown",
 		},
 	}
 

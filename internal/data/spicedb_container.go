@@ -14,6 +14,7 @@ import (
 
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
+	"github.com/project-kessel/inventory-api/internal/config/relations/spicedb"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/network"
 	"github.com/testcontainers/testcontainers-go/wait"
@@ -159,6 +160,18 @@ type SpiceDBConfig struct {
 	SchemaFile      string
 	UseTLS          bool
 	FullyConsistent bool
+}
+
+// NewSpiceDBConfigFromCompleted builds a SpiceDBConfig from a completed spicedb config.
+func NewSpiceDBConfigFromCompleted(c spicedb.CompletedConfig) *SpiceDBConfig {
+	return &SpiceDBConfig{
+		Endpoint:        c.Endpoint,
+		Token:           c.Token,
+		TokenFile:       c.TokenFile,
+		SchemaFile:      c.SchemaFile,
+		UseTLS:          c.UseTLS,
+		FullyConsistent: c.FullyConsistent,
+	}
 }
 
 // CreateSpiceDbRepository creates a repository that connects to the containerized SpiceDB instance

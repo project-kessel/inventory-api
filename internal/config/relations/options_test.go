@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/project-kessel/inventory-api/internal/config/relations/kessel"
+	"github.com/project-kessel/inventory-api/internal/config/relations/spicedb"
 	"github.com/project-kessel/inventory-api/internal/helpers"
 	"github.com/spf13/pflag"
 	"github.com/stretchr/testify/assert"
@@ -16,8 +17,9 @@ func TestNewOptions(t *testing.T) {
 	}{
 		options: NewOptions(),
 		expectedOptions: &Options{
-			Authz:  AllowAll,
-			Kessel: kessel.NewOptions(),
+			Authz:   AllowAll,
+			Kessel:  kessel.NewOptions(),
+			SpiceDB: spicedb.NewOptions(),
 		},
 	}
 	assert.Equal(t, test.expectedOptions, NewOptions())
@@ -34,9 +36,9 @@ func TestOptions_AddFlags(t *testing.T) {
 	test.options.AddFlags(fs, prefix)
 
 	// the below logic ensures that every possible option defined in the Options type
-	// has a defined flag for that option; kessel section is skipped
+	// has a defined flag for that option; kessel and spicedb sections are skipped
 	// in favor of testing in their own packages or via config files
-	helpers.AllOptionsHaveFlags(t, prefix, fs, *test.options, []string{"kessel"})
+	helpers.AllOptionsHaveFlags(t, prefix, fs, *test.options, []string{"kessel", "spicedb"})
 }
 
 func TestOptions_Validate(t *testing.T) {
@@ -58,6 +60,18 @@ func TestOptions_Validate(t *testing.T) {
 				Authz: "kessel",
 				Kessel: &kessel.Options{
 					URL: "relations-api",
+				},
+			},
+			expectError: false,
+		},
+		{
+			name: "spicedb impl",
+			options: &Options{
+				Authz: "spicedb",
+				SpiceDB: &spicedb.Options{
+					Endpoint:   "localhost:50051",
+					TokenFile:  "/tmp/token",
+					SchemaFile: "/tmp/schema.zed",
 				},
 			},
 			expectError: false,

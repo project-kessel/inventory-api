@@ -154,7 +154,7 @@ func TestInventoryAPIHTTP_Readyz(t *testing.T) {
 	resp, err := healthClient.GetReadyz(context.Background(), &v1.GetReadyzRequest{})
 	assert.NoError(t, err)
 	assert.NotNil(t, resp)
-	expectedStatus := "STORAGE postgres and RELATIONS-API"
+	expectedStatus := "STORAGE postgres and RELATIONS-API (kessel)"
 	expectedCode := uint32(200)
 	assert.Equal(t, expectedStatus, resp.Status)
 	assert.Equal(t, expectedCode, resp.Code)

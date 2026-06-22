@@ -4,28 +4,35 @@ import (
 	"context"
 
 	"github.com/project-kessel/inventory-api/internal/config/relations/kessel"
+	"github.com/project-kessel/inventory-api/internal/config/relations/spicedb"
 )
 
 type Config struct {
-	Authz  string
-	Kessel *kessel.Config
+	Authz   string
+	Kessel  *kessel.Config
+	SpiceDB *spicedb.Config
 }
 
 func NewConfig(o *Options) *Config {
-	var kcfg *kessel.Config
-	if o.Authz == Kessel {
-		kcfg = kessel.NewConfig(o.Kessel)
+	cfg := &Config{
+		Authz: o.Authz,
 	}
 
-	return &Config{
-		Authz:  o.Authz,
-		Kessel: kcfg,
+	if o.Authz == Kessel {
+		cfg.Kessel = kessel.NewConfig(o.Kessel)
 	}
+
+	if o.Authz == SpiceDB {
+		cfg.SpiceDB = spicedb.NewConfig(o.SpiceDB)
+	}
+
+	return cfg
 }
 
 type completedConfig struct {
-	Authz  string
-	Kessel kessel.CompletedConfig
+	Authz   string
+	Kessel  kessel.CompletedConfig
+	SpiceDB spicedb.CompletedConfig
 }
 
 type CompletedConfig struct {
@@ -45,18 +52,22 @@ func (c *Config) Complete(ctx context.Context) (CompletedConfig, []error) {
 		}
 	}
 
+	if c.Authz == SpiceDB {
+		if sdb, errs := c.SpiceDB.Complete(); errs != nil {
+			return CompletedConfig{}, errs
+		} else {
+			cfg.SpiceDB = sdb
+		}
+	}
+
 	return CompletedConfig{cfg}, nil
 }
 
 func CheckRelationsImpl(config CompletedConfig) string {
-	var authType string
 	switch config.Authz {
-	case AllowAll:
-		authType = "AllowAll"
-	case Kessel:
-		authType = "Kessel"
+	case AllowAll, Kessel, SpiceDB:
+		return config.Authz
 	default:
-		authType = "Unknown"
+		return "unknown"
 	}
-	return authType
 }

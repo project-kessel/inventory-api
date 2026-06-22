@@ -234,7 +234,7 @@ func NewCommand(
 			}
 
 			// construct relations repository
-			relationsRepo, err := data.NewRelationsRepository(ctx, authzConfig, log.NewHelper(log.With(logger, "subsystem", "relations")))
+			relationsRepo, err := data.NewRelationsRepository(ctx, authzConfig, log.With(logger, "subsystem", "relations"))
 			if err != nil {
 				return err
 			}
@@ -299,9 +299,15 @@ func NewCommand(
 			pbv1beta2.RegisterKesselInventoryServiceHTTPServer(server.HttpServer, inventory_service)
 
 			// DEPRECATED: Legacy tuple service for RBAC-only backward compatibility
+			var tupleMetaAuthorizer metaauthorizer.MetaAuthorizer
+			if authnOptions.AllowUnauthenticated != nil && *authnOptions.AllowUnauthenticated {
+				tupleMetaAuthorizer = metaauthorizer.NewSimpleMetaAuthorizer()
+			} else {
+				tupleMetaAuthorizer = metaauthorizer.NewWhitelistMetaAuthorizer(metaAuthorizerConfig.TupleCrudAllowlist)
+			}
 			tuple_crud_usecase := tuplesctl.New(
 				relationsRepo,
-				metaauthorizer.NewWhitelistMetaAuthorizer(metaAuthorizerConfig.TupleCrudAllowlist),
+				tupleMetaAuthorizer,
 				log.With(logger, "subsystem", "tuple_crud_controller"),
 			)
 			tuple_service := tuplesvc.New(tuple_crud_usecase)

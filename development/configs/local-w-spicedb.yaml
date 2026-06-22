@@ -1,0 +1,39 @@
+server:
+  http:
+    address: 0.0.0.0:8000
+  grpc:
+    address: 0.0.0.0:9000
+authn:
+  allow-unauthenticated: true
+authz:
+  impl: spicedb
+  spicedb:
+    endpoint: spicedb:50051
+    token: foobar
+    schema-file: /schema.zed
+    use-tls: false
+    fully-consistent: true
+eventing:
+  eventer: stdout
+  kafka:
+storage:
+  max-serialization-retries: 10
+  outbox-mode: wal
+  database: postgres
+  postgres:
+    host: "invdatabase"
+    port: "5433"
+    user: "postgres"
+    password: "yPsw5e6ab4bvAGe5H"
+    dbname: "spicedb"
+schema:
+  repository: in-memory
+  in-memory:
+    type: json
+    path: schema_cache.json
+consumer:
+  enabled: false
+log:
+  level: "info"
+  livez: true
+  readyz: true

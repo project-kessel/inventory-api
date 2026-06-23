@@ -18,7 +18,7 @@ func setupFeaturesRepo(t *testing.T) *data.InMemorySchemaRepository {
 	repo, err := data.NewInMemorySchemaRepositoryFromDir(
 		ctx,
 		"../../../data/schema/resources",
-		data.NewFeaturesAwareSchemaFactory(),
+		data.FeaturesAwareSchemaFactory,
 	)
 	require.NoError(t, err)
 	return repo
@@ -65,10 +65,9 @@ func TestFeaturesService_CreateTuples(t *testing.T) {
 	ver := model.NewVersion(0)
 	current, err := model.NewRepresentations(
 		model.Representation(map[string]interface{}{
-			"workspace_id":         "ws-main",
 			"allowed_workspace_ids": []interface{}{"ws-1", "ws-2"},
-			"billing_account_ids":  []interface{}{"ba-100"},
-			"parent_service_id":    "parent-svc",
+			"billing_account_ids":   []interface{}{"ba-100"},
+			"parent_service_id":     "parent-svc",
 		}),
 		&ver, nil, nil,
 	)
@@ -114,10 +113,9 @@ func TestFeaturesService_UpdateTuples(t *testing.T) {
 	ver1 := model.NewVersion(1)
 	previous, err := model.NewRepresentations(
 		model.Representation(map[string]interface{}{
-			"workspace_id":         "ws-main",
 			"allowed_workspace_ids": []interface{}{"ws-1", "ws-2"},
-			"billing_account_ids":  []interface{}{"ba-100"},
-			"parent_service_id":    "parent-svc",
+			"billing_account_ids":   []interface{}{"ba-100"},
+			"parent_service_id":     "parent-svc",
 		}),
 		&ver1, nil, nil,
 	)
@@ -126,10 +124,9 @@ func TestFeaturesService_UpdateTuples(t *testing.T) {
 	ver2 := model.NewVersion(2)
 	current, err := model.NewRepresentations(
 		model.Representation(map[string]interface{}{
-			"workspace_id":         "ws-main",
 			"allowed_workspace_ids": []interface{}{"ws-2", "ws-3"},
-			"billing_account_ids":  []interface{}{"ba-200"},
-			"parent_service_id":    "parent-svc",
+			"billing_account_ids":   []interface{}{"ba-200"},
+			"parent_service_id":     "parent-svc",
 		}),
 		&ver2, nil, nil,
 	)
@@ -182,10 +179,9 @@ func TestFeaturesService_DeleteTuples(t *testing.T) {
 	ver := model.NewVersion(1)
 	previous, err := model.NewRepresentations(
 		model.Representation(map[string]interface{}{
-			"workspace_id":         "ws-main",
 			"allowed_workspace_ids": []interface{}{"ws-1"},
-			"billing_account_ids":  []interface{}{"ba-100"},
-			"parent_service_id":    "parent-svc",
+			"billing_account_ids":   []interface{}{"ba-100"},
+			"parent_service_id":     "parent-svc",
 		}),
 		&ver, nil, nil,
 	)
@@ -208,10 +204,9 @@ func TestFeaturesService_NoChange(t *testing.T) {
 	key := serviceKey(t)
 
 	sameData := map[string]interface{}{
-		"workspace_id":         "ws-main",
 		"allowed_workspace_ids": []interface{}{"ws-1"},
-		"billing_account_ids":  []interface{}{"ba-100"},
-		"parent_service_id":    "parent-svc",
+		"billing_account_ids":   []interface{}{"ba-100"},
+		"parent_service_id":     "parent-svc",
 	}
 
 	ver1 := model.NewVersion(1)

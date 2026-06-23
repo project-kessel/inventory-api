@@ -12,12 +12,11 @@ var serviceJsonSchema = `{
 	"$schema": "http://json-schema.org/draft-07/schema#",
 	"type": "object",
 	"properties": {
-		"workspace_id": { "type": "string" },
 		"allowed_workspace_ids": { "type": "array", "items": { "type": "string" } },
 		"billing_account_ids": { "type": "array", "items": { "type": "string" } },
 		"parent_service_id": { "type": "string" }
 	},
-	"required": ["workspace_id", "allowed_workspace_ids", "billing_account_ids"]
+	"required": ["allowed_workspace_ids", "billing_account_ids"]
 }`
 
 func newServiceKey(t *testing.T) model.ReporterResourceKey {
@@ -41,10 +40,9 @@ func TestFeaturesServiceSchema_Validate(t *testing.T) {
 
 	t.Run("valid data passes", func(t *testing.T) {
 		valid, err := schema.Validate(map[string]interface{}{
-			"workspace_id":         "ws-1",
 			"allowed_workspace_ids": []interface{}{"ws-1", "ws-2"},
-			"billing_account_ids":  []interface{}{"ba-1"},
-			"parent_service_id":    "parent-svc-1",
+			"billing_account_ids":   []interface{}{"ba-1"},
+			"parent_service_id":     "parent-svc-1",
 		})
 		assert.True(t, valid)
 		assert.NoError(t, err)
@@ -58,9 +56,8 @@ func TestFeaturesServiceSchema_Validate(t *testing.T) {
 
 	t.Run("wrong type fails", func(t *testing.T) {
 		valid, err := schema.Validate(map[string]interface{}{
-			"workspace_id":         "ws-1",
 			"allowed_workspace_ids": "not-an-array",
-			"billing_account_ids":  []interface{}{"ba-1"},
+			"billing_account_ids":   []interface{}{"ba-1"},
 		})
 		assert.False(t, valid)
 		assert.Error(t, err)
@@ -75,10 +72,9 @@ func TestFeaturesServiceSchema_CalculateTuples_Create(t *testing.T) {
 	ver := model.NewVersion(0)
 	current, err := model.NewRepresentations(
 		model.Representation(map[string]interface{}{
-			"workspace_id":         "ws-1",
 			"allowed_workspace_ids": []interface{}{"ws-1", "ws-2"},
-			"billing_account_ids":  []interface{}{"ba-1"},
-			"parent_service_id":    "parent-svc",
+			"billing_account_ids":   []interface{}{"ba-1"},
+			"parent_service_id":     "parent-svc",
 		}),
 		&ver, nil, nil,
 	)
@@ -110,9 +106,8 @@ func TestFeaturesServiceSchema_CalculateTuples_Update(t *testing.T) {
 	curVer := model.NewVersion(1)
 	current, err := model.NewRepresentations(
 		model.Representation(map[string]interface{}{
-			"workspace_id":         "ws-1",
 			"allowed_workspace_ids": []interface{}{"ws-2", "ws-3"},
-			"billing_account_ids":  []interface{}{"ba-1"},
+			"billing_account_ids":   []interface{}{"ba-1"},
 		}),
 		&curVer, nil, nil,
 	)
@@ -121,9 +116,8 @@ func TestFeaturesServiceSchema_CalculateTuples_Update(t *testing.T) {
 	prevVer := curVer.Decrement()
 	previous, err := model.NewRepresentations(
 		model.Representation(map[string]interface{}{
-			"workspace_id":         "ws-1",
 			"allowed_workspace_ids": []interface{}{"ws-1", "ws-2"},
-			"billing_account_ids":  []interface{}{"ba-1"},
+			"billing_account_ids":   []interface{}{"ba-1"},
 		}),
 		&prevVer, nil, nil,
 	)
@@ -152,10 +146,9 @@ func TestFeaturesServiceSchema_CalculateTuples_ScalarUpdate(t *testing.T) {
 	curVer := model.NewVersion(1)
 	current, err := model.NewRepresentations(
 		model.Representation(map[string]interface{}{
-			"workspace_id":         "ws-1",
 			"allowed_workspace_ids": []interface{}{"ws-1"},
-			"billing_account_ids":  []interface{}{"ba-new"},
-			"parent_service_id":    "parent-new",
+			"billing_account_ids":   []interface{}{"ba-new"},
+			"parent_service_id":     "parent-new",
 		}),
 		&curVer, nil, nil,
 	)
@@ -164,10 +157,9 @@ func TestFeaturesServiceSchema_CalculateTuples_ScalarUpdate(t *testing.T) {
 	prevVer := curVer.Decrement()
 	previous, err := model.NewRepresentations(
 		model.Representation(map[string]interface{}{
-			"workspace_id":         "ws-1",
 			"allowed_workspace_ids": []interface{}{"ws-1"},
-			"billing_account_ids":  []interface{}{"ba-old"},
-			"parent_service_id":    "parent-old",
+			"billing_account_ids":   []interface{}{"ba-old"},
+			"parent_service_id":     "parent-old",
 		}),
 		&prevVer, nil, nil,
 	)
@@ -192,9 +184,8 @@ func TestFeaturesServiceSchema_CalculateTuples_NoChange(t *testing.T) {
 	curVer := model.NewVersion(1)
 	current, err := model.NewRepresentations(
 		model.Representation(map[string]interface{}{
-			"workspace_id":         "ws-1",
 			"allowed_workspace_ids": []interface{}{"ws-1"},
-			"billing_account_ids":  []interface{}{"ba-1"},
+			"billing_account_ids":   []interface{}{"ba-1"},
 		}),
 		&curVer, nil, nil,
 	)
@@ -203,9 +194,8 @@ func TestFeaturesServiceSchema_CalculateTuples_NoChange(t *testing.T) {
 	prevVer := curVer.Decrement()
 	previous, err := model.NewRepresentations(
 		model.Representation(map[string]interface{}{
-			"workspace_id":         "ws-1",
 			"allowed_workspace_ids": []interface{}{"ws-1"},
-			"billing_account_ids":  []interface{}{"ba-1"},
+			"billing_account_ids":   []interface{}{"ba-1"},
 		}),
 		&prevVer, nil, nil,
 	)
@@ -223,10 +213,9 @@ func TestFeaturesServiceSchema_CalculateTuples_Delete(t *testing.T) {
 	prevVer := model.NewVersion(0)
 	previous, err := model.NewRepresentations(
 		model.Representation(map[string]interface{}{
-			"workspace_id":         "ws-1",
 			"allowed_workspace_ids": []interface{}{"ws-1"},
-			"billing_account_ids":  []interface{}{"ba-1"},
-			"parent_service_id":    "parent-svc",
+			"billing_account_ids":   []interface{}{"ba-1"},
+			"parent_service_id":     "parent-svc",
 		}),
 		&prevVer, nil, nil,
 	)
@@ -248,10 +237,9 @@ func TestFeaturesServiceSchema_CalculateTuples_SubjectTypes(t *testing.T) {
 	ver := model.NewVersion(0)
 	current, err := model.NewRepresentations(
 		model.Representation(map[string]interface{}{
-			"workspace_id":         "ws-1",
 			"allowed_workspace_ids": []interface{}{"ws-1"},
-			"billing_account_ids":  []interface{}{"ba-1"},
-			"parent_service_id":    "parent-svc",
+			"billing_account_ids":   []interface{}{"ba-1"},
+			"parent_service_id":     "parent-svc",
 		}),
 		&ver, nil, nil,
 	)

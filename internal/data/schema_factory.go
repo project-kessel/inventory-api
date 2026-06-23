@@ -11,21 +11,21 @@ func DefaultSchemaFactory(_ model.ResourceType, jsonSchema string) model.Schema 
 	return NewJsonSchemaWithWorkspacesFromString(jsonSchema)
 }
 
-// NewFeaturesAwareSchemaFactory returns a ResourceTypeSchemaFactory that
-// dispatches to per-resource-type Schema implementations for Features
-// service types, falling back to JsonSchemaWithWorkspaces for everything else.
-func NewFeaturesAwareSchemaFactory() model.ResourceTypeSchemaFactory {
-	serviceType := model.DeserializeResourceType("service")
-	billingAccountType := model.DeserializeResourceType("billing_account")
+var (
+	serviceType        = model.DeserializeResourceType("service")
+	billingAccountType = model.DeserializeResourceType("billing_account")
+)
 
-	return func(resourceType model.ResourceType, jsonSchema string) model.Schema {
-		switch resourceType {
-		case serviceType:
-			return NewFeaturesServiceSchemaFromString(jsonSchema)
-		case billingAccountType:
-			return NewFeaturesBillingAccountSchemaFromString(jsonSchema)
-		default:
-			return NewJsonSchemaWithWorkspacesFromString(jsonSchema)
-		}
+// FeaturesAwareSchemaFactory dispatches to per-resource-type Schema
+// implementations for Features service types, falling back to
+// JsonSchemaWithWorkspaces for everything else.
+func FeaturesAwareSchemaFactory(resourceType model.ResourceType, jsonSchema string) model.Schema {
+	switch resourceType {
+	case serviceType:
+		return NewFeaturesServiceSchemaFromString(jsonSchema)
+	case billingAccountType:
+		return NewFeaturesBillingAccountSchemaFromString(jsonSchema)
+	default:
+		return NewJsonSchemaWithWorkspacesFromString(jsonSchema)
 	}
 }

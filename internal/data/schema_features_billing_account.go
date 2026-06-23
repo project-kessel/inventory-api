@@ -5,7 +5,7 @@ import (
 )
 
 var billingAccountRelations = []relationDef{
-	{"workspace_ids", "workspace", rbacNamespace, "workspace", true},
+	{"workspace_ids", "workspace", model.RbacNamespace, "workspace", true},
 }
 
 func NewFeaturesBillingAccountSchemaFromString(jsonSchema string) model.Schema {

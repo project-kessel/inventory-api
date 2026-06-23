@@ -4,10 +4,7 @@ import (
 	"github.com/project-kessel/inventory-api/internal/biz/model"
 )
 
-const (
-	featureNamespace = "features"
-	rbacNamespace    = "rbac"
-)
+const featureNamespace = "features"
 
 type relationDef struct {
 	fieldName           string
@@ -61,7 +58,7 @@ func (s relationDefsSchema) CalculateTuples(
 }
 
 var serviceRelations = []relationDef{
-	{"allowed_workspace_ids", "allowed_workspaces", rbacNamespace, "workspace", true},
+	{"allowed_workspace_ids", "allowed_workspaces", model.RbacNamespace, "workspace", true},
 	{"billing_account_ids", "billing_account", featureNamespace, "billing_account", true},
 	{"parent_service_id", "parent", featureNamespace, "service", false},
 }

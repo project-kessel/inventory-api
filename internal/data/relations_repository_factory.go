@@ -9,12 +9,19 @@ import (
 	"github.com/project-kessel/inventory-api/internal/config/relations"
 )
 
-func NewRelationsRepository(ctx context.Context, config relations.CompletedConfig, logger *log.Helper) (model.RelationsRepository, error) {
+func NewRelationsRepository(ctx context.Context, config relations.CompletedConfig, logger log.Logger) (model.RelationsRepository, error) {
+	helper := log.NewHelper(logger)
 	switch config.Authz {
 	case relations.AllowAll:
-		return NewAllowAllRelationsRepository(logger), nil
+		return NewAllowAllRelationsRepository(helper), nil
 	case relations.Kessel:
-		return NewGRPCRelationsRepository(ctx, config.Kessel, logger)
+		return NewGRPCRelationsRepository(ctx, config.Kessel, helper)
+	case relations.SpiceDB:
+		repo, _, err := NewSpiceDBRelationsRepository(NewSpiceDBConfigFromCompleted(config.SpiceDB), logger)
+		if err != nil {
+			return nil, fmt.Errorf("error creating spicedb relations repository: %w", err)
+		}
+		return repo, nil
 	default:
 		return nil, fmt.Errorf("unrecognized relations implementation: %s", config.Authz)
 	}

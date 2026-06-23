@@ -6,25 +6,29 @@ import (
 	"github.com/spf13/pflag"
 
 	"github.com/project-kessel/inventory-api/internal/config/relations/kessel"
+	"github.com/project-kessel/inventory-api/internal/config/relations/spicedb"
 )
 
 type Options struct {
-	// Authz selects the relations implementation ("allow-all" or "kessel").
+	// Authz selects the relations implementation ("allow-all", "kessel", or "spicedb").
 	// Named "Authz" for backward compatibility with the --authz.* CLI flags.
-	Authz  string          `mapstructure:"impl"`
-	Kessel *kessel.Options `mapstructure:"kessel"`
+	Authz   string           `mapstructure:"impl"`
+	Kessel  *kessel.Options  `mapstructure:"kessel"`
+	SpiceDB *spicedb.Options `mapstructure:"spicedb"`
 }
 
 const (
 	AllowAll     = "allow-all"
 	Kessel       = "kessel"
+	SpiceDB      = "spicedb"
 	RelationsAPI = "kessel-relations"
 )
 
 func NewOptions() *Options {
 	return &Options{
-		Authz:  AllowAll,
-		Kessel: kessel.NewOptions(),
+		Authz:   AllowAll,
+		Kessel:  kessel.NewOptions(),
+		SpiceDB: spicedb.NewOptions(),
 	}
 }
 
@@ -33,19 +37,24 @@ func (o *Options) AddFlags(fs *pflag.FlagSet, prefix string) {
 		prefix = prefix + "."
 	}
 
-	fs.StringVar(&o.Authz, prefix+"impl", o.Authz, "Authz impl to use.  Options are 'allow-all' and 'kessel'.")
+	fs.StringVar(&o.Authz, prefix+"impl", o.Authz, "Authz impl to use.  Options are 'allow-all', 'kessel', and 'spicedb'.")
 	o.Kessel.AddFlags(fs, prefix+"kessel")
+	o.SpiceDB.AddFlags(fs, prefix+"spicedb")
 }
 
 func (o *Options) Validate() []error {
 	var errs []error
 
-	if o.Authz != AllowAll && o.Authz != Kessel {
-		errs = append(errs, fmt.Errorf("invalid authz.impl: %s.  Options are 'allow-all' and 'kessel'", o.Authz))
+	if o.Authz != AllowAll && o.Authz != Kessel && o.Authz != SpiceDB {
+		errs = append(errs, fmt.Errorf("invalid authz.impl: %s.  Options are 'allow-all', 'kessel', and 'spicedb'", o.Authz))
 	}
 
 	if o.Authz == Kessel {
 		errs = append(errs, o.Kessel.Validate()...)
+	}
+
+	if o.Authz == SpiceDB {
+		errs = append(errs, o.SpiceDB.Validate()...)
 	}
 
 	return errs

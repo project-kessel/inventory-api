@@ -89,11 +89,18 @@ func LogConfigurationInfo(options *OptionsConfig) {
 		)
 	}
 
-	if options.Authz.Authz == relations.Kessel {
+	switch options.Authz.Authz {
+	case relations.Kessel:
 		log.Debugf("Authz Configuration: URL: %s, Insecure?: %t, OIDC?: %t",
 			options.Authz.Kessel.URL,
 			options.Authz.Kessel.Insecure,
 			options.Authz.Kessel.EnableOidcAuth,
+		)
+	case relations.SpiceDB:
+		log.Debugf("Authz Configuration: SpiceDB Endpoint: %s, TLS?: %t, FullyConsistent?: %t",
+			options.Authz.SpiceDB.Endpoint,
+			options.Authz.SpiceDB.UseTLS,
+			options.Authz.SpiceDB.FullyConsistent,
 		)
 	}
 

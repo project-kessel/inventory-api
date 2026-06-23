@@ -2,7 +2,6 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "type": "object",
   "properties": {
-    "workspace_id": { "type": "string" },
     "allowed_workspace_ids": {
       "type": "array",
       "items": { "type": "string" }
@@ -13,5 +12,5 @@
     },
     "parent_service_id": { "type": "string" }
   },
-  "required": ["workspace_id", "allowed_workspace_ids", "billing_account_ids"]
+  "required": ["allowed_workspace_ids", "billing_account_ids"]
 }

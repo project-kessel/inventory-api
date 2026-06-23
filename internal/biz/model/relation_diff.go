@@ -22,7 +22,7 @@ func DiffRelationValues(
 		currentSet[v] = struct{}{}
 	}
 
-	for _, v := range currentValues {
+	for v := range currentSet {
 		if _, exists := previousSet[v]; !exists {
 			tuplesToCreate = append(tuplesToCreate, NewRelationTupleForSubject(
 				key, relationName, subjectNamespace, subjectResourceType, v,
@@ -30,7 +30,7 @@ func DiffRelationValues(
 		}
 	}
 
-	for _, v := range previousValues {
+	for v := range previousSet {
 		if _, exists := currentSet[v]; !exists {
 			tuplesToDelete = append(tuplesToDelete, NewRelationTupleForSubject(
 				key, relationName, subjectNamespace, subjectResourceType, v,

@@ -405,7 +405,21 @@ func NewInMemorySchemaRepositoryFromUnifiedYAMLDir(ctx context.Context, dir stri
 			}
 
 			// Create ReporterSchemaRepresentation from reporter schema
-			reporterSchema := NewUnifiedSchemaImpl(reporter.Schema, reporter.Relations)
+			// Phase 4a: Include reporter-specific relations
+			var reporterSchema *UnifiedSchemaImpl
+			if len(reporter.Relations) > 0 {
+				// Reporter has its own relations - use the Phase 4a constructor
+				reporterSchema = NewUnifiedSchemaImplWithReporterRelations(
+					reporter.Schema,
+					schema.Common.Relations, // Common relations
+					reporter.Name,           // Reporter type string
+					reporter.Relations,      // Reporter-specific relations
+				)
+			} else {
+				// No reporter relations - use standard constructor
+				reporterSchema = NewUnifiedSchemaImpl(reporter.Schema, schema.Common.Relations)
+			}
+
 			reporterSchemaRep, err := model.NewReporterSchemaRepresentation(resourceType, reporterType, reporterSchema)
 			if err != nil {
 				return nil, fmt.Errorf("failed to create reporter schema for %q:%q: %w", schema.Name, reporter.Name, err)

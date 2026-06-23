@@ -11,15 +11,21 @@ import (
 // and schema-defined relations for tuple calculation.
 //
 // Phase 1: Validation works, tuple calculation delegates to DefaultSchema.
-// Phase 2: Tuple calculation will use relations from the schema.
+// Phase 2: Tuple calculation uses relations from the schema.
+// Phase 4a: Supports reporter-specific relations extracted from reporter data.
 type UnifiedSchemaImpl struct {
 	// Schema is the embedded JSON Schema object for validation.
 	// Passed directly to gojsonschema - no conversion needed.
 	schema map[string]interface{}
 
-	// Relations define the tuples to create/delete (Phase 2).
-	// For Phase 1, this is populated but not used - we delegate to DefaultSchema.
+	// Relations define the common tuples to create/delete.
+	// These are extracted from the common representation.
 	relations []model.RelationDefinition
+
+	// reporterRelations maps reporter type to reporter-specific relations (Phase 4a).
+	// These are extracted from the reporter representation.
+	// Map key is the reporter type string (e.g., "hbi", "ocm").
+	reporterRelations map[string][]model.RelationDefinition
 
 	// schemaLoader is cached for performance.
 	schemaLoader gojsonschema.JSONLoader
@@ -28,9 +34,31 @@ type UnifiedSchemaImpl struct {
 // NewUnifiedSchemaImpl creates a new UnifiedSchemaImpl from a schema and relations.
 func NewUnifiedSchemaImpl(schema map[string]interface{}, relations []model.RelationDefinition) *UnifiedSchemaImpl {
 	return &UnifiedSchemaImpl{
-		schema:       schema,
-		relations:    relations,
-		schemaLoader: gojsonschema.NewGoLoader(schema),
+		schema:            schema,
+		relations:         relations,
+		reporterRelations: make(map[string][]model.RelationDefinition),
+		schemaLoader:      gojsonschema.NewGoLoader(schema),
+	}
+}
+
+// NewUnifiedSchemaImplWithReporterRelations creates a new UnifiedSchemaImpl with reporter relations.
+// This is used when creating reporter-specific schemas that have their own relations (Phase 4a).
+func NewUnifiedSchemaImplWithReporterRelations(
+	schema map[string]interface{},
+	commonRelations []model.RelationDefinition,
+	reporterType string,
+	reporterRelations []model.RelationDefinition,
+) *UnifiedSchemaImpl {
+	reporterRelationsMap := make(map[string][]model.RelationDefinition)
+	if len(reporterRelations) > 0 {
+		reporterRelationsMap[reporterType] = reporterRelations
+	}
+
+	return &UnifiedSchemaImpl{
+		schema:            schema,
+		relations:         commonRelations,
+		reporterRelations: reporterRelationsMap,
+		schemaLoader:      gojsonschema.NewGoLoader(schema),
 	}
 }
 
@@ -105,12 +133,50 @@ func (s *UnifiedSchemaImpl) CalculateTuples(
 		}
 	}
 
+	// Process reporter-specific relations (Phase 4a)
+	// These are extracted from the reporter representation instead of common
+	reporterType := key.ReporterType().String()
+	if reporterRelations, exists := s.reporterRelations[reporterType]; exists {
+		for _, relation := range reporterRelations {
+			// Extract field values from reporter representation
+			currentValue := extractReporterFieldValue(currentRepresentation, relation.Field)
+			previousValue := extractReporterFieldValue(previousRepresentation, relation.Field)
+
+			// Skip if both values are empty (no relation exists)
+			if currentValue == "" && previousValue == "" {
+				continue
+			}
+
+			// If values are the same, tuple already exists - no action needed
+			if currentValue == previousValue {
+				continue
+			}
+
+			// Create tuple for new value
+			if currentValue != "" {
+				tuple, err := buildRelationTuple(key, relation, currentValue)
+				if err != nil {
+					return model.TuplesToReplicate{}, fmt.Errorf("failed to build reporter tuple for relation %q: %w", relation.Name, err)
+				}
+				tuplesToCreate = append(tuplesToCreate, tuple)
+			}
+
+			// Delete tuple for old value
+			if previousValue != "" {
+				tuple, err := buildRelationTuple(key, relation, previousValue)
+				if err != nil {
+					return model.TuplesToReplicate{}, fmt.Errorf("failed to build delete reporter tuple for relation %q: %w", relation.Name, err)
+				}
+				tuplesToDelete = append(tuplesToDelete, tuple)
+			}
+		}
+	}
+
 	return model.NewTuplesToReplicate(tuplesToCreate, tuplesToDelete)
 }
 
-// extractFieldValue extracts a field value from representations.
-// Phase 1: Only checks common data (where workspace_id lives).
-// Phase 4: Will also check reporter data for reporter-specific relations.
+// extractFieldValue extracts a field value from common representations.
+// This is used for common relations defined in the common schema.
 func extractFieldValue(representations *model.Representations, fieldName string) string {
 	if representations == nil {
 		return ""
@@ -125,8 +191,24 @@ func extractFieldValue(representations *model.Representations, fieldName string)
 		}
 	}
 
-	// Phase 4: Add reporter data support when reporter-specific relations are implemented
-	// For now, all Phase 1 relations are in common data
+	return ""
+}
+
+// extractReporterFieldValue extracts a field value from reporter representations (Phase 4a).
+// This is used for reporter-specific relations defined in the reporter schema.
+func extractReporterFieldValue(representations *model.Representations, fieldName string) string {
+	if representations == nil {
+		return ""
+	}
+
+	// Check reporter data
+	if representations.HasReporter() {
+		if value, ok := representations.ReporterData()[fieldName]; ok {
+			if strValue, ok := value.(string); ok && strValue != "" {
+				return strValue
+			}
+		}
+	}
 
 	return ""
 }

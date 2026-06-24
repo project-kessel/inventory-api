@@ -12,7 +12,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	grpcinsecure "google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/structpb"
 
@@ -1722,12 +1724,15 @@ func TestInventoryAPIHTTP_v1beta2_ReportResource_EmptyRepresentationData(t *test
 			},
 		}
 
-		_, err := client.ReportResource(ctx, req)
+		rpcCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+		_, err := client.ReportResource(rpcCtx, req)
+		cancel()
 		assert.NoError(t, err, "ReportResource with empty reporter and valid common should succeed")
 
 		// Cleanup
 		if err == nil {
-			_, delErr := client.DeleteResource(ctx, &pbv1beta2.DeleteResourceRequest{
+			delCtx, delCancel := context.WithTimeout(ctx, 10*time.Second)
+			_, delErr := client.DeleteResource(delCtx, &pbv1beta2.DeleteResourceRequest{
 				Reference: &pbv1beta2.ResourceReference{
 					ResourceType: "host",
 					ResourceId:   resourceId,
@@ -1736,6 +1741,7 @@ func TestInventoryAPIHTTP_v1beta2_ReportResource_EmptyRepresentationData(t *test
 					},
 				},
 			})
+			delCancel()
 			assert.NoError(t, delErr, "Failed to delete resource during cleanup")
 		}
 	})
@@ -1763,12 +1769,15 @@ func TestInventoryAPIHTTP_v1beta2_ReportResource_EmptyRepresentationData(t *test
 			},
 		}
 
-		_, err = client.ReportResource(ctx, req)
+		rpcCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+		_, err = client.ReportResource(rpcCtx, req)
+		cancel()
 		assert.NoError(t, err, "ReportResource with valid reporter and empty common should succeed")
 
 		// Cleanup
 		if err == nil {
-			_, delErr := client.DeleteResource(ctx, &pbv1beta2.DeleteResourceRequest{
+			delCtx, delCancel := context.WithTimeout(ctx, 10*time.Second)
+			_, delErr := client.DeleteResource(delCtx, &pbv1beta2.DeleteResourceRequest{
 				Reference: &pbv1beta2.ResourceReference{
 					ResourceType: "host",
 					ResourceId:   resourceId,
@@ -1777,6 +1786,7 @@ func TestInventoryAPIHTTP_v1beta2_ReportResource_EmptyRepresentationData(t *test
 					},
 				},
 			})
+			delCancel()
 			assert.NoError(t, delErr, "Failed to delete resource during cleanup")
 		}
 	})
@@ -1803,12 +1813,15 @@ func TestInventoryAPIHTTP_v1beta2_ReportResource_EmptyRepresentationData(t *test
 			},
 		}
 
-		_, err := client.ReportResource(ctx, req)
+		rpcCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+		_, err := client.ReportResource(rpcCtx, req)
+		cancel()
 		assert.NoError(t, err, "ReportResource with nil reporter and valid common should succeed")
 
 		// Cleanup
 		if err == nil {
-			_, delErr := client.DeleteResource(ctx, &pbv1beta2.DeleteResourceRequest{
+			delCtx, delCancel := context.WithTimeout(ctx, 10*time.Second)
+			_, delErr := client.DeleteResource(delCtx, &pbv1beta2.DeleteResourceRequest{
 				Reference: &pbv1beta2.ResourceReference{
 					ResourceType: "host",
 					ResourceId:   resourceId,
@@ -1817,6 +1830,7 @@ func TestInventoryAPIHTTP_v1beta2_ReportResource_EmptyRepresentationData(t *test
 					},
 				},
 			})
+			delCancel()
 			assert.NoError(t, delErr, "Failed to delete resource during cleanup")
 		}
 	})
@@ -1838,9 +1852,14 @@ func TestInventoryAPIHTTP_v1beta2_ReportResource_EmptyRepresentationData(t *test
 			},
 		}
 
-		_, err := client.ReportResource(ctx, req)
+		rpcCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+		_, err := client.ReportResource(rpcCtx, req)
+		cancel()
 		require.Error(t, err, "ReportResource with both empty representations should fail")
-		assert.Contains(t, err.Error(), "at least one of reporterRepresentation or commonRepresentation must be provided")
+		st, ok := status.FromError(err)
+		require.True(t, ok, "expected gRPC status error")
+		assert.Equal(t, codes.InvalidArgument, st.Code())
+		assert.Contains(t, st.Message(), "at least one of reporterRepresentation or commonRepresentation must be provided")
 	})
 
 	// Subtest: both nil should fail
@@ -1860,8 +1879,13 @@ func TestInventoryAPIHTTP_v1beta2_ReportResource_EmptyRepresentationData(t *test
 			},
 		}
 
-		_, err := client.ReportResource(ctx, req)
+		rpcCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+		_, err := client.ReportResource(rpcCtx, req)
+		cancel()
 		require.Error(t, err, "ReportResource with both nil representations should fail")
-		assert.Contains(t, err.Error(), "at least one of reporterRepresentation or commonRepresentation must be provided")
+		st, ok := status.FromError(err)
+		require.True(t, ok, "expected gRPC status error")
+		assert.Equal(t, codes.InvalidArgument, st.Code())
+		assert.Contains(t, st.Message(), "at least one of reporterRepresentation or commonRepresentation must be provided")
 	})
 }

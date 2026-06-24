@@ -3141,3 +3141,211 @@ func TestCommonVersionFirstAddedOnUpdate(t *testing.T) {
 	require.NotNil(t, snap.CommonVersion, "CommonVersion should be set after first update with common rep")
 	assert.Equal(t, uint(0), *snap.CommonVersion, "CommonVersion should initialize to 0 on first addition via update")
 }
+
+func TestEmptyAndNilRepresentationPersistence(t *testing.T) {
+	t.Run("nil reporter representation with valid common stores successfully", func(t *testing.T) {
+		db := setupInMemoryDB(t)
+		mc := metricscollector.NewFakeMetricsCollector()
+		tm := NewGormTransactionManager(mc, 3)
+		repo := NewResourceRepository(db, tm, noopOutboxPublisher)
+
+		localResourceIdType, err := bizmodel.NewLocalResourceId("nil-reporter-valid-common")
+		require.NoError(t, err)
+		resourceType, err := bizmodel.NewResourceType("k8s_cluster")
+		require.NoError(t, err)
+		reporterType, err := bizmodel.NewReporterType("ocm")
+		require.NoError(t, err)
+		reporterInstanceId, err := bizmodel.NewReporterInstanceId("ocm-instance-1")
+		require.NoError(t, err)
+		apiHref, err := bizmodel.NewApiHref("/api/resources/nil-reporter")
+		require.NoError(t, err)
+		resourceIdType, err := bizmodel.NewResourceId(uuid.New())
+		require.NoError(t, err)
+		reporterResourceIdType, err := bizmodel.NewReporterResourceId(uuid.New())
+		require.NoError(t, err)
+
+		commonRepresentation, err := bizmodel.NewRepresentation(internal.JsonObject{"workspace_id": "ws-nil-reporter"})
+		require.NoError(t, err)
+
+		// nil reporter + valid common → NewResource auto-fills reporter with empty representation
+		resource, err := bizmodel.NewResource(
+			resourceIdType, localResourceIdType, resourceType, reporterType,
+			reporterInstanceId, newUniqueTxID("nil-reporter-test"), reporterResourceIdType,
+			apiHref, nil, nil, &commonRepresentation, nil,
+		)
+		require.NoError(t, err)
+
+		err = repo.Save(db, resource, bizmodel.OperationTypeCreated, emptyTxId)
+		require.NoError(t, err, "Should save resource with nil reporter representation")
+
+		key, err := bizmodel.NewReporterResourceKey(localResourceIdType, resourceType, reporterType, reporterInstanceId)
+		require.NoError(t, err)
+
+		found, err := repo.FindResourceByKeys(db, key)
+		require.NoError(t, err, "Should find resource with nil reporter representation")
+		require.NotNil(t, found, "Found resource should not be nil")
+
+		snap, _, _, _, err := found.Serialize()
+		require.NoError(t, err)
+		require.NotNil(t, snap.CommonVersion, "CommonVersion should be set when common representation was provided")
+		assert.Equal(t, uint(0), *snap.CommonVersion)
+
+		// Verify reporter representation row was created (with empty data)
+		var repCount int64
+		db.Table("reporter_representations").Count(&repCount)
+		assert.Equal(t, int64(1), repCount, "Should have one reporter representation row (auto-filled empty)")
+
+		// Verify common representation row was created
+		var commonCount int64
+		db.Table("common_representations").Count(&commonCount)
+		assert.Equal(t, int64(1), commonCount, "Should have one common representation row")
+	})
+
+	t.Run("valid reporter with nil common representation stores successfully", func(t *testing.T) {
+		db := setupInMemoryDB(t)
+		mc := metricscollector.NewFakeMetricsCollector()
+		tm := NewGormTransactionManager(mc, 3)
+		repo := NewResourceRepository(db, tm, noopOutboxPublisher)
+
+		localResourceIdType, err := bizmodel.NewLocalResourceId("valid-reporter-nil-common")
+		require.NoError(t, err)
+		resourceType, err := bizmodel.NewResourceType("k8s_cluster")
+		require.NoError(t, err)
+		reporterType, err := bizmodel.NewReporterType("ocm")
+		require.NoError(t, err)
+		reporterInstanceId, err := bizmodel.NewReporterInstanceId("ocm-instance-1")
+		require.NoError(t, err)
+		apiHref, err := bizmodel.NewApiHref("/api/resources/nil-common")
+		require.NoError(t, err)
+		resourceIdType, err := bizmodel.NewResourceId(uuid.New())
+		require.NoError(t, err)
+		reporterResourceIdType, err := bizmodel.NewReporterResourceId(uuid.New())
+		require.NoError(t, err)
+
+		reporterRepresentation, err := bizmodel.NewRepresentation(internal.JsonObject{"cluster_id": "test-cluster"})
+		require.NoError(t, err)
+
+		// valid reporter + nil common → no common representation row
+		resource, err := bizmodel.NewResource(
+			resourceIdType, localResourceIdType, resourceType, reporterType,
+			reporterInstanceId, newUniqueTxID("nil-common-test"), reporterResourceIdType,
+			apiHref, nil, &reporterRepresentation, nil, nil,
+		)
+		require.NoError(t, err)
+
+		err = repo.Save(db, resource, bizmodel.OperationTypeCreated, emptyTxId)
+		require.NoError(t, err, "Should save resource with nil common representation")
+
+		key, err := bizmodel.NewReporterResourceKey(localResourceIdType, resourceType, reporterType, reporterInstanceId)
+		require.NoError(t, err)
+
+		found, err := repo.FindResourceByKeys(db, key)
+		require.NoError(t, err, "Should find resource with nil common representation")
+		require.NotNil(t, found, "Found resource should not be nil")
+
+		snap, _, _, _, err := found.Serialize()
+		require.NoError(t, err)
+		assert.Nil(t, snap.CommonVersion, "CommonVersion should be nil when no common representation was provided")
+
+		// Verify reporter representation row was created
+		var repCount int64
+		db.Table("reporter_representations").Count(&repCount)
+		assert.Equal(t, int64(1), repCount, "Should have one reporter representation row")
+
+		// Verify no common representation row was created
+		var commonCount int64
+		db.Table("common_representations").Count(&commonCount)
+		assert.Equal(t, int64(0), commonCount, "Should have no common representation rows")
+	})
+
+	t.Run("empty reporter representation with valid common stores successfully", func(t *testing.T) {
+		db := setupInMemoryDB(t)
+		mc := metricscollector.NewFakeMetricsCollector()
+		tm := NewGormTransactionManager(mc, 3)
+		repo := NewResourceRepository(db, tm, noopOutboxPublisher)
+
+		localResourceIdType, err := bizmodel.NewLocalResourceId("empty-reporter-valid-common")
+		require.NoError(t, err)
+		resourceType, err := bizmodel.NewResourceType("k8s_cluster")
+		require.NoError(t, err)
+		reporterType, err := bizmodel.NewReporterType("ocm")
+		require.NoError(t, err)
+		reporterInstanceId, err := bizmodel.NewReporterInstanceId("ocm-instance-1")
+		require.NoError(t, err)
+		apiHref, err := bizmodel.NewApiHref("/api/resources/empty-reporter")
+		require.NoError(t, err)
+		resourceIdType, err := bizmodel.NewResourceId(uuid.New())
+		require.NoError(t, err)
+		reporterResourceIdType, err := bizmodel.NewReporterResourceId(uuid.New())
+		require.NoError(t, err)
+
+		emptyReporter := bizmodel.NewEmptyRepresentation()
+		commonRepresentation, err := bizmodel.NewRepresentation(internal.JsonObject{"workspace_id": "ws-empty-reporter"})
+		require.NoError(t, err)
+
+		// empty reporter (len=0) + valid common
+		resource, err := bizmodel.NewResource(
+			resourceIdType, localResourceIdType, resourceType, reporterType,
+			reporterInstanceId, newUniqueTxID("empty-reporter-test"), reporterResourceIdType,
+			apiHref, nil, &emptyReporter, &commonRepresentation, nil,
+		)
+		require.NoError(t, err)
+
+		err = repo.Save(db, resource, bizmodel.OperationTypeCreated, emptyTxId)
+		require.NoError(t, err, "Should save resource with empty reporter representation")
+
+		key, err := bizmodel.NewReporterResourceKey(localResourceIdType, resourceType, reporterType, reporterInstanceId)
+		require.NoError(t, err)
+
+		found, err := repo.FindResourceByKeys(db, key)
+		require.NoError(t, err, "Should find resource with empty reporter representation")
+		require.NotNil(t, found, "Found resource should not be nil")
+
+		snap, _, _, _, err := found.Serialize()
+		require.NoError(t, err)
+		require.NotNil(t, snap.CommonVersion, "CommonVersion should be set when common representation was provided")
+
+		// Verify reporter representation with empty data was created
+		var repCount int64
+		db.Table("reporter_representations").Count(&repCount)
+		assert.Equal(t, int64(1), repCount, "Should have one reporter representation row (with empty data)")
+
+		// Verify common representation was created
+		var commonCount int64
+		db.Table("common_representations").Count(&commonCount)
+		assert.Equal(t, int64(1), commonCount, "Should have one common representation row")
+	})
+
+	t.Run("empty common representation is rejected by domain model", func(t *testing.T) {
+		// Empty common (len=0) with valid reporter → domain rejects because
+		// NewCommonRepresentation validates data is non-empty. The service layer
+		// handles this by converting empty protobuf structs to nil pointers before
+		// reaching the domain.
+		localResourceIdType, err := bizmodel.NewLocalResourceId("valid-reporter-empty-common")
+		require.NoError(t, err)
+		resourceType, err := bizmodel.NewResourceType("k8s_cluster")
+		require.NoError(t, err)
+		reporterType, err := bizmodel.NewReporterType("ocm")
+		require.NoError(t, err)
+		reporterInstanceId, err := bizmodel.NewReporterInstanceId("ocm-instance-1")
+		require.NoError(t, err)
+		apiHref, err := bizmodel.NewApiHref("/api/resources/empty-common")
+		require.NoError(t, err)
+		resourceIdType, err := bizmodel.NewResourceId(uuid.New())
+		require.NoError(t, err)
+		reporterResourceIdType, err := bizmodel.NewReporterResourceId(uuid.New())
+		require.NoError(t, err)
+
+		reporterRepresentation, err := bizmodel.NewRepresentation(internal.JsonObject{"cluster_id": "test-cluster"})
+		require.NoError(t, err)
+		emptyCommon := bizmodel.NewEmptyRepresentation()
+
+		_, err = bizmodel.NewResource(
+			resourceIdType, localResourceIdType, resourceType, reporterType,
+			reporterInstanceId, newUniqueTxID("empty-common-test"), reporterResourceIdType,
+			apiHref, nil, &reporterRepresentation, &emptyCommon, nil,
+		)
+		require.Error(t, err, "Empty common representation should be rejected by the domain model")
+		assert.Contains(t, err.Error(), "CommonRepresentation")
+	})
+}

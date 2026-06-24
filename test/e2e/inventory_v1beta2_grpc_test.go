@@ -1678,3 +1678,190 @@ func TestInventoryAPIHTTP_v1beta2_CheckBulk_OrderAndEcho(t *testing.T) {
 	}
 	assert.True(t, observed, "CheckBulk order/echo expectations not met within timeout")
 }
+
+func TestInventoryAPIHTTP_v1beta2_ReportResource_EmptyRepresentationData(t *testing.T) {
+	enableShortMode(t)
+
+	ctx := context.Background()
+
+	conn, err := grpc.NewClient(
+		inventoryapi_grpc_url,
+		grpc.WithTransportCredentials(grpcinsecure.NewCredentials()),
+		grpc.WithPerRPCCredentials(&bearerAuth{token: "1234"}),
+	)
+	require.NoError(t, err, "Failed to create gRPC client")
+	defer func() {
+		if connErr := conn.Close(); connErr != nil {
+			t.Logf("Failed to close gRPC connection: %v", connErr)
+		}
+	}()
+
+	conn.Connect()
+
+	client := pbv1beta2.NewKesselInventoryServiceClient(conn)
+
+	// Subtest: empty reporter with valid common should succeed
+	t.Run("empty reporter with valid common", func(t *testing.T) {
+		resourceId := "e2e-empty-reporter-valid-common"
+		req := &pbv1beta2.ReportResourceRequest{
+			WriteVisibility:    pbv1beta2.WriteVisibility_MINIMIZE_LATENCY,
+			Type:               "host",
+			ReporterType:       "hbi",
+			ReporterInstanceId: "testuser-example-com",
+			Representations: &pbv1beta2.ResourceRepresentations{
+				Metadata: &pbv1beta2.RepresentationMetadata{
+					LocalResourceId: resourceId,
+					ApiHref:         "https://example.com/api",
+				},
+				Common: &structpb.Struct{
+					Fields: map[string]*structpb.Value{
+						"workspace_id": structpb.NewStringValue("ws-e2e-empty-reporter"),
+					},
+				},
+				Reporter: &structpb.Struct{}, // empty reporter
+			},
+		}
+
+		_, err := client.ReportResource(ctx, req)
+		assert.NoError(t, err, "ReportResource with empty reporter and valid common should succeed")
+
+		// Cleanup
+		if err == nil {
+			_, delErr := client.DeleteResource(ctx, &pbv1beta2.DeleteResourceRequest{
+				Reference: &pbv1beta2.ResourceReference{
+					ResourceType: "host",
+					ResourceId:   resourceId,
+					Reporter: &pbv1beta2.ReporterReference{
+						Type: "hbi",
+					},
+				},
+			})
+			assert.NoError(t, delErr, "Failed to delete resource during cleanup")
+		}
+	})
+
+	// Subtest: valid reporter with empty common should succeed
+	t.Run("valid reporter with empty common", func(t *testing.T) {
+		resourceId := "e2e-valid-reporter-empty-common"
+		reporterStruct, err := structpb.NewStruct(map[string]interface{}{
+			"satellite_id": "550e8400-e29b-41d4-a716-446655440000",
+		})
+		require.NoError(t, err, "Failed to create structpb for reporter")
+
+		req := &pbv1beta2.ReportResourceRequest{
+			WriteVisibility:    pbv1beta2.WriteVisibility_MINIMIZE_LATENCY,
+			Type:               "host",
+			ReporterType:       "hbi",
+			ReporterInstanceId: "testuser-example-com",
+			Representations: &pbv1beta2.ResourceRepresentations{
+				Metadata: &pbv1beta2.RepresentationMetadata{
+					LocalResourceId: resourceId,
+					ApiHref:         "https://example.com/api",
+				},
+				Common:   &structpb.Struct{}, // empty common
+				Reporter: reporterStruct,
+			},
+		}
+
+		_, err = client.ReportResource(ctx, req)
+		assert.NoError(t, err, "ReportResource with valid reporter and empty common should succeed")
+
+		// Cleanup
+		if err == nil {
+			_, delErr := client.DeleteResource(ctx, &pbv1beta2.DeleteResourceRequest{
+				Reference: &pbv1beta2.ResourceReference{
+					ResourceType: "host",
+					ResourceId:   resourceId,
+					Reporter: &pbv1beta2.ReporterReference{
+						Type: "hbi",
+					},
+				},
+			})
+			assert.NoError(t, delErr, "Failed to delete resource during cleanup")
+		}
+	})
+
+	// Subtest: nil reporter with valid common should succeed
+	t.Run("nil reporter with valid common", func(t *testing.T) {
+		resourceId := "e2e-nil-reporter-valid-common"
+		req := &pbv1beta2.ReportResourceRequest{
+			WriteVisibility:    pbv1beta2.WriteVisibility_MINIMIZE_LATENCY,
+			Type:               "host",
+			ReporterType:       "hbi",
+			ReporterInstanceId: "testuser-example-com",
+			Representations: &pbv1beta2.ResourceRepresentations{
+				Metadata: &pbv1beta2.RepresentationMetadata{
+					LocalResourceId: resourceId,
+					ApiHref:         "https://example.com/api",
+				},
+				Common: &structpb.Struct{
+					Fields: map[string]*structpb.Value{
+						"workspace_id": structpb.NewStringValue("ws-e2e-nil-reporter"),
+					},
+				},
+				Reporter: nil, // nil reporter
+			},
+		}
+
+		_, err := client.ReportResource(ctx, req)
+		assert.NoError(t, err, "ReportResource with nil reporter and valid common should succeed")
+
+		// Cleanup
+		if err == nil {
+			_, delErr := client.DeleteResource(ctx, &pbv1beta2.DeleteResourceRequest{
+				Reference: &pbv1beta2.ResourceReference{
+					ResourceType: "host",
+					ResourceId:   resourceId,
+					Reporter: &pbv1beta2.ReporterReference{
+						Type: "hbi",
+					},
+				},
+			})
+			assert.NoError(t, delErr, "Failed to delete resource during cleanup")
+		}
+	})
+
+	// Subtest: both empty should fail
+	t.Run("both empty representations should fail", func(t *testing.T) {
+		req := &pbv1beta2.ReportResourceRequest{
+			WriteVisibility:    pbv1beta2.WriteVisibility_MINIMIZE_LATENCY,
+			Type:               "host",
+			ReporterType:       "hbi",
+			ReporterInstanceId: "testuser-example-com",
+			Representations: &pbv1beta2.ResourceRepresentations{
+				Metadata: &pbv1beta2.RepresentationMetadata{
+					LocalResourceId: "e2e-both-empty",
+					ApiHref:         "https://example.com/api",
+				},
+				Common:   &structpb.Struct{},
+				Reporter: &structpb.Struct{},
+			},
+		}
+
+		_, err := client.ReportResource(ctx, req)
+		require.Error(t, err, "ReportResource with both empty representations should fail")
+		assert.Contains(t, err.Error(), "at least one of reporterRepresentation or commonRepresentation must be provided")
+	})
+
+	// Subtest: both nil should fail
+	t.Run("both nil representations should fail", func(t *testing.T) {
+		req := &pbv1beta2.ReportResourceRequest{
+			WriteVisibility:    pbv1beta2.WriteVisibility_MINIMIZE_LATENCY,
+			Type:               "host",
+			ReporterType:       "hbi",
+			ReporterInstanceId: "testuser-example-com",
+			Representations: &pbv1beta2.ResourceRepresentations{
+				Metadata: &pbv1beta2.RepresentationMetadata{
+					LocalResourceId: "e2e-both-nil",
+					ApiHref:         "https://example.com/api",
+				},
+				Common:   nil,
+				Reporter: nil,
+			},
+		}
+
+		_, err := client.ReportResource(ctx, req)
+		require.Error(t, err, "ReportResource with both nil representations should fail")
+		assert.Contains(t, err.Error(), "at least one of reporterRepresentation or commonRepresentation must be provided")
+	})
+}

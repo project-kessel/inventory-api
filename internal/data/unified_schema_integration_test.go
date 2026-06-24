@@ -259,7 +259,7 @@ func TestUnifiedSchema_MultipleRelations(t *testing.T) {
 			"tenant_id":    "tenant-1",
 		}
 		currentData := map[string]interface{}{
-			"workspace_id": "ws-2", // Changed
+			"workspace_id": "ws-2",     // Changed
 			"tenant_id":    "tenant-1", // Unchanged
 		}
 
@@ -310,10 +310,10 @@ func TestUnifiedSchema_RepositoryIntegration(t *testing.T) {
 
 	// Expected resources and reporters
 	expectedResources := map[string][]string{
-		"host":                       {"hbi"},
-		"k8s_cluster":                {"acm", "acs", "ocm"},
-		"k8s_policy":                 {"acm"},
-		"notifications_integration":  {"notifications"},
+		"host":                      {"hbi"},
+		"k8s_cluster":               {"acm", "acs", "ocm"},
+		"k8s_policy":                {"acm"},
+		"notifications_integration": {"notifications"},
 	}
 
 	for resourceName, expectedReporters := range expectedResources {

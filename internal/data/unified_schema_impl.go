@@ -100,47 +100,19 @@ func (s *UnifiedSchemaImpl) CalculateTuples(
 
 	// Process each relation defined in the schema
 	for _, relation := range s.relations {
-		// Extract field values from representations
-		currentValue := extractFieldValue(currentRepresentation, relation.Field)
-		previousValue := extractFieldValue(previousRepresentation, relation.Field)
-
-		// Skip if both values are empty (no relation exists)
-		if currentValue == "" && previousValue == "" {
-			continue
-		}
-
-		// If values are the same, tuple already exists - no action needed
-		if currentValue == previousValue {
-			continue
-		}
-
-		// Create tuple for new value
-		if currentValue != "" {
-			tuple, err := buildRelationTuple(key, relation, currentValue)
+		if relation.Cardinality == "many" {
+			// Handle many cardinality - extract array and create tuples for each element
+			createTuples, deleteTuples, err := processManyCardinality(currentRepresentation, previousRepresentation, key, relation, extractFieldArray)
 			if err != nil {
-				return model.TuplesToReplicate{}, fmt.Errorf("failed to build tuple for relation %q: %w", relation.Name, err)
+				return model.TuplesToReplicate{}, fmt.Errorf("failed to process many cardinality for relation %q: %w", relation.Name, err)
 			}
-			tuplesToCreate = append(tuplesToCreate, tuple)
-		}
-
-		// Delete tuple for old value
-		if previousValue != "" {
-			tuple, err := buildRelationTuple(key, relation, previousValue)
-			if err != nil {
-				return model.TuplesToReplicate{}, fmt.Errorf("failed to build delete tuple for relation %q: %w", relation.Name, err)
-			}
-			tuplesToDelete = append(tuplesToDelete, tuple)
-		}
-	}
-
-	// Process reporter-specific relations (Phase 4a)
-	// These are extracted from the reporter representation instead of common
-	reporterType := key.ReporterType().String()
-	if reporterRelations, exists := s.reporterRelations[reporterType]; exists {
-		for _, relation := range reporterRelations {
-			// Extract field values from reporter representation
-			currentValue := extractReporterFieldValue(currentRepresentation, relation.Field)
-			previousValue := extractReporterFieldValue(previousRepresentation, relation.Field)
+			tuplesToCreate = append(tuplesToCreate, createTuples...)
+			tuplesToDelete = append(tuplesToDelete, deleteTuples...)
+		} else {
+			// Handle one cardinality (default behavior)
+			// Extract field values from representations
+			currentValue := extractFieldValue(currentRepresentation, relation.Field)
+			previousValue := extractFieldValue(previousRepresentation, relation.Field)
 
 			// Skip if both values are empty (no relation exists)
 			if currentValue == "" && previousValue == "" {
@@ -156,7 +128,7 @@ func (s *UnifiedSchemaImpl) CalculateTuples(
 			if currentValue != "" {
 				tuple, err := buildRelationTuple(key, relation, currentValue)
 				if err != nil {
-					return model.TuplesToReplicate{}, fmt.Errorf("failed to build reporter tuple for relation %q: %w", relation.Name, err)
+					return model.TuplesToReplicate{}, fmt.Errorf("failed to build tuple for relation %q: %w", relation.Name, err)
 				}
 				tuplesToCreate = append(tuplesToCreate, tuple)
 			}
@@ -165,9 +137,59 @@ func (s *UnifiedSchemaImpl) CalculateTuples(
 			if previousValue != "" {
 				tuple, err := buildRelationTuple(key, relation, previousValue)
 				if err != nil {
-					return model.TuplesToReplicate{}, fmt.Errorf("failed to build delete reporter tuple for relation %q: %w", relation.Name, err)
+					return model.TuplesToReplicate{}, fmt.Errorf("failed to build delete tuple for relation %q: %w", relation.Name, err)
 				}
 				tuplesToDelete = append(tuplesToDelete, tuple)
+			}
+		}
+	}
+
+	// Process reporter-specific relations (Phase 4a)
+	// These are extracted from the reporter representation instead of common
+	reporterType := key.ReporterType().String()
+	if reporterRelations, exists := s.reporterRelations[reporterType]; exists {
+		for _, relation := range reporterRelations {
+			if relation.Cardinality == "many" {
+				// Handle many cardinality for reporter relations
+				createTuples, deleteTuples, err := processManyCardinality(currentRepresentation, previousRepresentation, key, relation, extractReporterFieldArray)
+				if err != nil {
+					return model.TuplesToReplicate{}, fmt.Errorf("failed to process many cardinality for reporter relation %q: %w", relation.Name, err)
+				}
+				tuplesToCreate = append(tuplesToCreate, createTuples...)
+				tuplesToDelete = append(tuplesToDelete, deleteTuples...)
+			} else {
+				// Handle one cardinality (default behavior)
+				// Extract field values from reporter representation
+				currentValue := extractReporterFieldValue(currentRepresentation, relation.Field)
+				previousValue := extractReporterFieldValue(previousRepresentation, relation.Field)
+
+				// Skip if both values are empty (no relation exists)
+				if currentValue == "" && previousValue == "" {
+					continue
+				}
+
+				// If values are the same, tuple already exists - no action needed
+				if currentValue == previousValue {
+					continue
+				}
+
+				// Create tuple for new value
+				if currentValue != "" {
+					tuple, err := buildRelationTuple(key, relation, currentValue)
+					if err != nil {
+						return model.TuplesToReplicate{}, fmt.Errorf("failed to build reporter tuple for relation %q: %w", relation.Name, err)
+					}
+					tuplesToCreate = append(tuplesToCreate, tuple)
+				}
+
+				// Delete tuple for old value
+				if previousValue != "" {
+					tuple, err := buildRelationTuple(key, relation, previousValue)
+					if err != nil {
+						return model.TuplesToReplicate{}, fmt.Errorf("failed to build delete reporter tuple for relation %q: %w", relation.Name, err)
+					}
+					tuplesToDelete = append(tuplesToDelete, tuple)
+				}
 			}
 		}
 	}
@@ -284,4 +306,117 @@ func joinErrors(errors []string) string {
 		result += "; " + errors[i]
 	}
 	return result
+}
+
+// extractFieldArray extracts an array field from common representations (Phase 4b).
+// Returns a slice of string values from the array field.
+func extractFieldArray(representations *model.Representations, fieldName string) []string {
+	if representations == nil {
+		return nil
+	}
+
+	if representations.HasCommon() {
+		if value, ok := representations.CommonData()[fieldName]; ok {
+			return arrayToStringSlice(value)
+		}
+	}
+
+	return nil
+}
+
+// extractReporterFieldArray extracts an array field from reporter representations (Phase 4b).
+// Returns a slice of string values from the array field.
+func extractReporterFieldArray(representations *model.Representations, fieldName string) []string {
+	if representations == nil {
+		return nil
+	}
+
+	if representations.HasReporter() {
+		if value, ok := representations.ReporterData()[fieldName]; ok {
+			return arrayToStringSlice(value)
+		}
+	}
+
+	return nil
+}
+
+// arrayToStringSlice converts an interface{} that should be an array to []string.
+// Skips empty strings and non-string elements.
+func arrayToStringSlice(value interface{}) []string {
+	// Handle []interface{} (common from JSON unmarshaling)
+	if arr, ok := value.([]interface{}); ok {
+		var result []string
+		for _, elem := range arr {
+			if str, ok := elem.(string); ok && str != "" {
+				result = append(result, str)
+			}
+		}
+		return result
+	}
+
+	// Handle []string directly
+	if arr, ok := value.([]string); ok {
+		var result []string
+		for _, str := range arr {
+			if str != "" {
+				result = append(result, str)
+			}
+		}
+		return result
+	}
+
+	return nil
+}
+
+// arrayExtractor is a function type that extracts an array from representations.
+type arrayExtractor func(*model.Representations, string) []string
+
+// processManyCardinality handles relations with cardinality "many" (Phase 4b).
+// It computes the diff between current and previous arrays and returns tuples to create/delete.
+func processManyCardinality(
+	currentRepresentation, previousRepresentation *model.Representations,
+	key model.ReporterResourceKey,
+	relation model.RelationDefinition,
+	extractor arrayExtractor,
+) ([]model.RelationsTuple, []model.RelationsTuple, error) {
+	var tuplesToCreate, tuplesToDelete []model.RelationsTuple
+
+	// Extract arrays
+	currentArray := extractor(currentRepresentation, relation.Field)
+	previousArray := extractor(previousRepresentation, relation.Field)
+
+	// Build sets for efficient diff
+	currentSet := make(map[string]bool)
+	for _, value := range currentArray {
+		currentSet[value] = true
+	}
+
+	previousSet := make(map[string]bool)
+	for _, value := range previousArray {
+		previousSet[value] = true
+	}
+
+	// Create tuples for elements in current but not in previous
+	for value := range currentSet {
+		if !previousSet[value] {
+			tuple, err := buildRelationTuple(key, relation, value)
+			if err != nil {
+				return nil, nil, fmt.Errorf("failed to build tuple for value %q: %w", value, err)
+			}
+			tuplesToCreate = append(tuplesToCreate, tuple)
+		}
+	}
+
+	// Delete tuples for elements in previous but not in current
+	for value := range previousSet {
+		if !currentSet[value] {
+			tuple, err := buildRelationTuple(key, relation, value)
+			if err != nil {
+				return nil, nil, fmt.Errorf("failed to build delete tuple for value %q: %w", value, err)
+			}
+			tuplesToDelete = append(tuplesToDelete, tuple)
+		}
+	}
+
+	return tuplesToCreate, tuplesToDelete, nil
 }

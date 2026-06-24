@@ -274,7 +274,7 @@ func TestNullableRelation_RequiredFieldMustBePresent(t *testing.T) {
 	// Create resource with some data but workspace_id is empty string
 	current, err := model.NewRepresentations(
 		model.Representation(map[string]interface{}{
-			"workspace_id": "", // Explicitly empty
+			"workspace_id": "",      // Explicitly empty
 			"other_field":  "value", // Need at least one field for valid representation
 		}),
 		&ver, nil, nil,

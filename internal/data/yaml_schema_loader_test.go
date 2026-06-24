@@ -99,11 +99,11 @@ reporters:
 		assert.Contains(t, err.Error(), "cardinality")
 	})
 
-	t.Run("validates Phase 1 constraint: no cardinality many", func(t *testing.T) {
+	t.Run("supports cardinality many (Phase 4b)", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		manyCardinalityPath := filepath.Join(tmpDir, "many_cardinality.yaml")
 
-		// Valid structure, but "many" not allowed in Phase 1
+		// Cardinality "many" is now supported (Phase 4b)
 		manyCardinalityYAML := `
 schema_version: "1.0"
 name: test_resource
@@ -114,7 +114,7 @@ common:
     - name: tags
       target: common/tag
       field: tags
-      cardinality: many  # Valid in structure, but blocked in Phase 1
+      cardinality: many
 reporters:
   - name: test
     schema:
@@ -123,9 +123,11 @@ reporters:
 		err := os.WriteFile(manyCardinalityPath, []byte(manyCardinalityYAML), 0644)
 		require.NoError(t, err)
 
-		_, err = LoadUnifiedSchemaFromFile(manyCardinalityPath)
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "cardinality 'many' is not yet supported")
+		schema, err := LoadUnifiedSchemaFromFile(manyCardinalityPath)
+		assert.NoError(t, err, "cardinality 'many' should be supported in Phase 4b")
+		assert.Equal(t, "test_resource", schema.Name)
+		assert.Len(t, schema.Common.Relations, 1)
+		assert.Equal(t, "many", schema.Common.Relations[0].Cardinality)
 	})
 
 	t.Run("validates required reporter fields via JSON Schema", func(t *testing.T) {

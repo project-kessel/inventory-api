@@ -14,8 +14,8 @@ import (
 // of our YAML schema files. This provides self-validation using the same
 // JSON Schema approach we use for resource validation.
 var unifiedSchemaStructureSchema = map[string]interface{}{
-	"$schema": "http://json-schema.org/draft-07/schema#",
-	"type":    "object",
+	"$schema":  "http://json-schema.org/draft-07/schema#",
+	"type":     "object",
 	"required": []interface{}{"schema_version", "name", "common", "reporters"},
 	"properties": map[string]interface{}{
 		"schema_version": map[string]interface{}{
@@ -103,10 +103,11 @@ var unifiedSchemaStructureSchema = map[string]interface{}{
 // Each YAML file should contain a single UnifiedSchema (one resource per file).
 //
 // The directory structure should be:
-//   data/schema/resources/
-//     host.yaml
-//     k8s_cluster.yaml
-//     k8s_policy.yaml
+//
+//	data/schema/resources/
+//	  host.yaml
+//	  k8s_cluster.yaml
+//	  k8s_policy.yaml
 //
 // Returns all loaded schemas or an error if any file fails to load.
 func LoadUnifiedSchemasFromDirectory(dir string) ([]model.UnifiedSchema, error) {
@@ -150,11 +151,6 @@ func LoadUnifiedSchemaFromFile(path string) (model.UnifiedSchema, error) {
 		return model.UnifiedSchema{}, fmt.Errorf("schema validation failed: %w", err)
 	}
 
-	// Phase 1: Validate that cardinality "many" is not used
-	if err := validatePhase1Constraints(schema); err != nil {
-		return model.UnifiedSchema{}, fmt.Errorf("phase 1 constraint validation failed: %w", err)
-	}
-
 	return schema, nil
 }
 
@@ -187,27 +183,6 @@ func validateUnifiedSchema(schema model.UnifiedSchema) error {
 			errors += fmt.Sprintf("- %s\n", err)
 		}
 		return fmt.Errorf("schema structure validation failed:\n%s", errors)
-	}
-
-	return nil
-}
-
-// validatePhase1Constraints validates Phase 1 specific constraints.
-func validatePhase1Constraints(schema model.UnifiedSchema) error {
-	// Check common relations
-	for _, relation := range schema.Common.Relations {
-		if relation.Cardinality == "many" {
-			return fmt.Errorf("common.relations: cardinality 'many' is not yet supported (Phase 4 feature)")
-		}
-	}
-
-	// Check reporter relations
-	for _, reporter := range schema.Reporters {
-		for _, relation := range reporter.Relations {
-			if relation.Cardinality == "many" {
-				return fmt.Errorf("reporter %q: cardinality 'many' is not yet supported (Phase 4 feature)", reporter.Name)
-			}
-		}
 	}
 
 	return nil

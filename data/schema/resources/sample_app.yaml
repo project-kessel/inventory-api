@@ -1,0 +1,185 @@
+# Sample Application Resource - Comprehensive Test Schema
+# Demonstrates all Phase 4 features:
+# - Common relations with cardinality "one"
+# - Nullable relations (optional tenant)
+# - Relations with cardinality "many" (tags, owner_ids)
+# - Reporter-specific relations (OCM: subscription + clusters, HBI: hosts)
+
+schema_version: "1.0"
+name: sample_app
+description: "Sample application resource demonstrating all relation features"
+
+common:
+  # JSON Schema for common representation
+  schema:
+    type: object
+    properties:
+      workspace_id:
+        type: string
+        description: "Required workspace - cardinality one"
+
+      tenant_id:
+        type: string
+        description: "Optional tenant - nullable relation"
+
+      tag_ids:
+        type: array
+        description: "Application tags - cardinality many"
+        items:
+          type: string
+
+      owner_ids:
+        type: array
+        description: "Application owners - cardinality many"
+        items:
+          type: string
+
+      app_name:
+        type: string
+        description: "Application name"
+
+      environment:
+        type: string
+        enum:
+          - development
+          - staging
+          - production
+        description: "Deployment environment"
+
+    required:
+      - workspace_id
+      - app_name
+      - environment
+
+  # Common relations - apply to all reporters
+  relations:
+    # Required one-to-one relation
+    - name: workspace
+      target: rbac/workspace
+      field: workspace_id
+      cardinality: one
+      nullable: false
+
+    # Optional one-to-one relation (Phase 4a: Nullable)
+    - name: tenant
+      target: rbac/tenant
+      field: tenant_id
+      cardinality: one
+      nullable: true
+
+    # Many-to-many relation for tags (Phase 4b: Many cardinality)
+    - name: tag
+      target: rbac/tag
+      field: tag_ids
+      cardinality: many
+      nullable: false
+
+    # Many-to-many relation for owners (Phase 4b: Many cardinality)
+    - name: owner
+      target: rbac/user
+      field: owner_ids
+      cardinality: many
+      nullable: false
+
+reporters:
+  # OCM Reporter with reporter-specific relations (Phase 4a)
+  - name: ocm
+    description: "OpenShift Cluster Manager reporter"
+    schema:
+      type: object
+      properties:
+        subscription_id:
+          type: string
+          description: "OCM subscription ID"
+
+        cluster_ids:
+          type: array
+          description: "List of cluster IDs where app is deployed"
+          items:
+            type: string
+
+        deployment_count:
+          type: integer
+          description: "Number of deployments"
+
+        last_sync:
+          type: string
+          format: date-time
+          description: "Last sync timestamp"
+
+      required:
+        - subscription_id
+
+    # Reporter-specific relations (Phase 4a + 4b)
+    relations:
+      # One-to-one relation from reporter data
+      - name: subscription
+        target: ocm/subscription
+        field: subscription_id
+        cardinality: one
+        nullable: false
+
+      # Many-to-many relation from reporter data
+      - name: cluster
+        target: ocm/cluster
+        field: cluster_ids
+        cardinality: many
+        nullable: false
+
+  # HBI Reporter with reporter-specific relations
+  - name: hbi
+    description: "Host-Based Inventory reporter"
+    schema:
+      type: object
+      properties:
+        host_ids:
+          type: array
+          description: "List of host IDs where app is installed"
+          items:
+            type: string
+
+        installation_method:
+          type: string
+          enum:
+            - rpm
+            - container
+            - source
+          description: "How the app was installed"
+
+        version:
+          type: string
+          description: "Application version"
+
+      required:
+        - installation_method
+
+    # Reporter-specific relations
+    relations:
+      # Many-to-many relation from reporter data
+      - name: host
+        target: hbi/host
+        field: host_ids
+        cardinality: many
+        nullable: false
+
+  # ACM Reporter without relations (tests fallback)
+  - name: acm
+    description: "Advanced Cluster Management reporter (no relations)"
+    schema:
+      type: object
+      properties:
+        policy_ids:
+          type: array
+          description: "Related policy IDs"
+          items:
+            type: string
+
+        compliance_status:
+          type: string
+          enum:
+            - compliant
+            - non_compliant
+            - pending
+
+      required:
+        - compliance_status

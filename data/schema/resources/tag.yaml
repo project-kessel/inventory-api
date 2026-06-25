@@ -1,0 +1,16 @@
+schema_version: "1.0"
+name: tag
+description: "Tag for categorization and filtering"
+
+common:
+  # Empty schema - no relations
+  schema:
+    type: object
+    properties: {}
+
+  # No relations for tag
+  relations: []
+
+reporters:
+  - name: rbac
+    description: "RBAC service reporter for tag management"

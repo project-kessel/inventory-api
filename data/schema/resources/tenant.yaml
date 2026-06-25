@@ -1,0 +1,27 @@
+schema_version: "1.0"
+name: tenant
+description: "Tenant for multi-tenancy isolation"
+
+common:
+  # Minimal schema - only fields needed for relations
+  schema:
+    type: object
+    properties:
+      platform_id:
+        type: string
+        description: "Platform ID"
+
+    required:
+      - platform_id
+
+  # Relations for tenant
+  relations:
+    # Platform relation
+    - name: platform
+      target: rbac/platform
+      field: platform_id
+      cardinality: one
+
+reporters:
+  - name: rbac
+    description: "RBAC service reporter for tenant management"

@@ -1,0 +1,17 @@
+schema_version: "1.0"
+name: platform
+description: "Platform-level scope"
+
+common:
+  # Empty schema - no fields needed for relations currently
+  schema:
+    type: object
+    properties: {}
+
+  # No relations for platform currently
+  # (binding relation is reverse - role_bindings point to platform)
+  relations: []
+
+reporters:
+  - name: rbac
+    description: "RBAC service reporter for platform management"

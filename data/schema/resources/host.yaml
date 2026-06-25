@@ -1,7 +1,3 @@
-# Compiled Schema for Host Resource
-# This is the serialized/compiled format loaded by Inventory API at runtime
-# Source: Converted from data/schema/resources/host/{common_representation.json,reporters/hbi/host.json,config.yaml}
-
 schema_version: "1.0"
 name: host
 description: "A physical or virtual host in the inventory system"
@@ -16,7 +12,7 @@ common:
     required:
       - workspace_id
 
-  # Custom relations section for tuple generation
+  # Custom relations section for relationship generation
   relations:
     - name: workspace
       target: rbac/workspace
@@ -52,4 +48,3 @@ reporters:
             - type: string
               maxLength: 255
             - type: "null"
-      required: []

@@ -1,7 +1,3 @@
-# Compiled Schema for K8s Cluster Resource
-# This is the serialized/compiled format loaded by Inventory API at runtime
-# Source: Converted from data/schema/resources/k8s_cluster/{common_representation.json,reporters/*/k8s_cluster.json,config.yaml}
-
 schema_version: "1.0"
 name: k8s_cluster
 description: "A Kubernetes cluster"
@@ -16,7 +12,7 @@ common:
     required:
       - workspace_id
 
-  # Custom relations section for tuple generation
+  # Custom relations section for relationship generation
   relations:
     - name: workspace
       target: rbac/workspace

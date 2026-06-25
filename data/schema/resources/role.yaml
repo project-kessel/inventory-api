@@ -1,0 +1,26 @@
+schema_version: "1.0"
+name: role
+description: "Defines a set of permissions"
+
+common:
+  # Minimal schema - only fields needed for relations
+  schema:
+    type: object
+    properties:
+      child_role_ids:
+        type: array
+        items:
+          type: string
+        description: "Child role IDs for role hierarchy"
+
+  # Relations for role
+  relations:
+    # Child roles for hierarchy
+    - name: child
+      target: rbac/role
+      field: child_role_ids
+      cardinality: many
+
+reporters:
+  - name: rbac
+    description: "RBAC service reporter for role management"

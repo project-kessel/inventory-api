@@ -7,4 +7,4 @@ export GRPC_PORT=1
 
 # Function to check if a command is available
 source ./scripts/check_docker_podman.sh
-${DOCKER} compose -f development/docker-compose.yaml down
+${DOCKER} compose -f development/docker-compose.yaml -f development/docker-compose.spicedb.yaml down

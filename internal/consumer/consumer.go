@@ -168,14 +168,18 @@ func (i *InventoryConsumer) Consume() error {
 	sigchan := make(chan os.Signal, 1)
 	signal.Notify(sigchan, syscall.SIGINT, syscall.SIGTERM)
 
+	// Both gRPC (relations-api) and SpiceDB (direct) backends write tuples;
+	// only allow-all is a no-op. The type switch gates the consumer's tuple
+	// write path so new RelationsRepository implementations must opt-in here.
 	var relationsEnabled bool
 	switch i.Relations.(type) {
 	case *data.GRPCRelationsRepository:
 		relationsEnabled = true
+	case *data.SpiceDBRelationsRepository:
+		relationsEnabled = true
 	case *data.AllowAllRelationsRepository:
 		relationsEnabled = false
 	}
-
 	// Process messages
 	run := true
 	i.Logger.Info("Consumer ready: waiting for messages...")
@@ -292,7 +296,6 @@ func (i *InventoryConsumer) Consume() error {
 func (i *InventoryConsumer) ProcessMessage(headers map[string]string, relationsEnabled bool, msg *kafka.Message) (string, error) {
 	operation := headers["operation"]
 	txid := headers["txid"]
-
 	switch operation {
 	case string(model.OperationTypeCreated):
 		if relationsEnabled {

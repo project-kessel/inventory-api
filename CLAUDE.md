@@ -13,7 +13,7 @@ This is the Kessel Inventory API, a Go-based microservice for resource inventory
 
 ```bash
 # Build the project
-make local-build
+make build
 
 # Run tests
 make test

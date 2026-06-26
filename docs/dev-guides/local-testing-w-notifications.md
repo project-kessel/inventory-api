@@ -33,7 +33,7 @@ When done, SpiceDB and Postgres should be running in Podman/Docker, and Relation
 ### Running Inventory:
 1) Change to the Inventory API code path: `cd /path/to/inventory-api`
 
-2) Build the Inventory API binary: `make local-build`
+2) Build the Inventory API binary: `make build`
 
 3) Create and setup the database:
 

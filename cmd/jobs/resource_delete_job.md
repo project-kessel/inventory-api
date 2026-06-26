@@ -42,7 +42,7 @@ You can do this via any means you prefer
 
 ### 3. Build the Inventory API binary
 ```bash
-make local-build
+make build
 ```
 
 ### 4. Run the job via the Inventory API binary

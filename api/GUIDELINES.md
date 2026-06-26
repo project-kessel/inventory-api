@@ -1,28 +1,26 @@
 # API Contract Guidelines - Kessel Inventory API
 
-## Repository-Specific Patterns
-
-### Package Structure and Naming
+## Package Structure and Naming
 - All protobuf definitions use package `kessel.inventory.{version}`
 - Go package: `github.com/project-kessel/inventory-api/api/kessel/inventory/{version}`
 - Java package: `org.project_kessel.api.inventory.{version}`
 - Resource types use snake_case (e.g., `k8s_cluster`, `notifications_integration`)
 - Reporter types use lowercase alphanumeric with underscores (e.g., `hbi`, `acm`, `acs`)
 
-### Versioning Strategy
+## Versioning Strategy
 - Main API in `v1beta2` - actively developed
 - Health endpoints in stable `v1`
 - Breaking changes tracked via buf.build BSR: `buf.build/project-kessel/inventory-api`
 - Use `buf breaking --against` for compatibility checks
 
-### HTTP/gRPC Mapping Conventions
+## HTTP/gRPC Mapping Conventions
 - Most endpoints use POST, health checks use GET
 - URL pattern: `/api/kessel/{version}/{operation}`
 - Bulk operations append "bulk" to endpoint name
 - Self operations append "self" to endpoint name
 - Resource CRUD uses `/resources` path with appropriate HTTP methods
 
-### Request Validation Patterns
+## Request Validation Patterns
 ```proto
 // Required fields
 ResourceReference object = 1 [(buf.validate.field).required = true];
@@ -40,7 +38,7 @@ repeated CheckBulkResponsePair pairs = 1 [(buf.validate.field).repeated.min_item
 uint32 limit = 1 [(buf.validate.field).uint32 = {gt: 0}];
 ```
 
-### Consistency Model Implementation
+## Consistency Model Implementation
 Three consistency levels available:
 1. `minimize_latency` - fastest, eventually consistent
 2. `at_least_as_fresh` - token-based consistency
@@ -51,12 +49,12 @@ Usage pattern:
 - Use `at_least_as_acknowledged` for write-then-read scenarios
 - Use `at_least_as_fresh` for coordinated reads across operations
 
-### Write Visibility Patterns
+## Write Visibility Patterns
 - `MINIMIZE_LATENCY` (default): Async writes, higher throughput
 - `IMMEDIATE`: Synchronous writes, read-your-writes consistency
 - Use `IMMEDIATE` when subsequent Check operations depend on the write
 
-### Resource Reference Structure
+## Resource Reference Structure
 ```proto
 message ResourceReference {
   string resource_type = 1;     // Validated: ^[A-Za-z0-9_]+$
@@ -65,13 +63,13 @@ message ResourceReference {
 }
 ```
 
-### Bulk Operation Guidelines
+## Bulk Operation Guidelines
 - Bulk endpoints maintain request/response order
 - Consider bulk operations for multiple individual operations
 - Bulk responses include per-item status
 - All bulk operations require min_items = 1 validation
 
-### Pagination Implementation
+## Pagination Implementation
 ```proto
 message RequestPagination {
   uint32 limit = 1;                      // Must be > 0
@@ -81,13 +79,13 @@ message RequestPagination {
 - Use continuation tokens, not offset-based pagination
 - Consider streaming operations for large result sets
 
-### Test Structure Requirements
+## Test Structure Requirements
 Protobuf test files include:
 - `TestXxx_FullRoundTrip()` - JSON marshal/unmarshal
 - `TestXxx_Reset()` - Reset method validation  
 - Additional proto-related tests for String representation, interface compliance, reflection capabilities, nil pointer safety, and zero value handling
 
-### Code Generation Setup
+## Code Generation Setup
 Required buf.gen.yaml plugins:
 ```yaml
 plugins:
@@ -97,13 +95,13 @@ plugins:
   - remote: buf.build/community/google-gnostic-openapi  # OpenAPI spec
 ```
 
-### Schema Organization
+## Schema Organization
 Resource schemas stored in `data/schema/resources/{resource_type}/`:
 - `config.yaml` - Resource type configuration
 - `common_representation.json` - Shared attributes
 - `reporters/{reporter_type}/` - Reporter-specific schemas
 
-### Service Documentation Standards
+## Service Documentation Standards
 Every RPC method must include:
 - Purpose statement answering "What does this do?"
 - Question format: "Does subject X have relation Y on object Z?"
@@ -111,13 +109,13 @@ Every RPC method must include:
 - Consistency guarantees
 - Performance characteristics for bulk operations
 
-### Error Handling Patterns
+## Error Handling Patterns
 - Use `google.rpc.Status` for error responses
 - Return `codes.InvalidArgument` for validation failures
 - Include client-safe error details only (no secrets/PII/internal stack traces)
 - Preserve error context through service layers
 
-### Resource Type Validation
+## Resource Type Validation
 
 **Context-specific patterns** (different validation rules apply in different contexts):
 
@@ -132,16 +130,14 @@ Every RPC method must include:
 **Rule**: Use dashes for reporting/input, normalize to underscores for references/storage
 - All identifiers require min_len = 1
 
-### Streaming Response Guidelines
+## Streaming Response Guidelines
 - Consider server streaming for list operations returning large result sets
 - Include pagination in streaming requests
 - Maintain consistency guarantees across stream chunks
 - Handle client disconnection gracefully
 
-### Dependency Management
+## Dependency Management
 - googleapis for HTTP annotations
 - protovalidate v0.14.1+ for validation
 - Kratos v2 for HTTP transport generation
 - Lock dependencies in buf.lock for reproducible builds
-
-These guidelines reflect the actual patterns used in the Kessel Inventory API codebase and should be followed for consistency and maintainability.

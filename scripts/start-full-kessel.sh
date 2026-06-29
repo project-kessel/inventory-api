@@ -42,7 +42,7 @@ if [ -n "${SCHEMA_ZED_FILE}" ]; then
   echo "Using local schema file: ${SCHEMA_ZED_FILE}"
   cp "${SCHEMA_ZED_FILE}" "${SCHEMA_DEST}"
 else
-  SCHEMA_URL="${SCHEMA_ZED_URL:-https://raw.githubusercontent.com/RedHatInsights/rbac-config/refs/heads/master/configs/stage/schemas/schema.zed}"
+  SCHEMA_URL="${SCHEMA_ZED_URL:-https://raw.githubusercontent.com/project-kessel/rbac-config/refs/heads/master/configs/stage/schemas/schema.zed}"
   echo "Downloading schema.zed from ${SCHEMA_URL}"
   curl -fsSL -o "${SCHEMA_DEST}" "${SCHEMA_URL}"
 fi
@@ -56,7 +56,7 @@ if [ -n "${RBAC_CONFIG_FILE}" ]; then
   echo "Using local RBAC config: ${RBAC_CONFIG_FILE}"
   RBAC_CONFIG_SRC="${RBAC_CONFIG_FILE}"
 else
-  RBAC_CONFIG_URL="${RBAC_CONFIG_URL:-https://raw.githubusercontent.com/RedHatInsights/rbac-config/refs/heads/master/_private/configmaps/stage/rbac-config.yml}"
+  RBAC_CONFIG_URL="${RBAC_CONFIG_URL:-https://raw.githubusercontent.com/project-kessel/rbac-config/refs/heads/master/_private/configmaps/stage/rbac-config.yml}"
   RBAC_CONFIG_SRC=$(mktemp)
   trap "rm -f ${RBAC_CONFIG_SRC}" EXIT
   echo "Downloading RBAC role definitions from ${RBAC_CONFIG_URL}"

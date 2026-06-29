@@ -37,6 +37,13 @@ func (o *Options) AddFlags(fs *pflag.FlagSet, prefix string) {
 		prefix = prefix + "."
 	}
 
+	if o.Kessel == nil {
+		o.Kessel = kessel.NewOptions()
+	}
+	if o.SpiceDB == nil {
+		o.SpiceDB = spicedb.NewOptions()
+	}
+
 	fs.StringVar(&o.Authz, prefix+"impl", o.Authz, "Authz impl to use.  Options are 'allow-all', 'kessel', and 'spicedb'.")
 	o.Kessel.AddFlags(fs, prefix+"kessel")
 	o.SpiceDB.AddFlags(fs, prefix+"spicedb")
@@ -50,11 +57,19 @@ func (o *Options) Validate() []error {
 	}
 
 	if o.Authz == Kessel {
-		errs = append(errs, o.Kessel.Validate()...)
+		if o.Kessel == nil {
+			errs = append(errs, fmt.Errorf("authz.kessel config is required when authz.impl=%q", Kessel))
+		} else {
+			errs = append(errs, o.Kessel.Validate()...)
+		}
 	}
 
 	if o.Authz == SpiceDB {
-		errs = append(errs, o.SpiceDB.Validate()...)
+		if o.SpiceDB == nil {
+			errs = append(errs, fmt.Errorf("authz.spicedb config is required when authz.impl=%q", SpiceDB))
+		} else {
+			errs = append(errs, o.SpiceDB.Validate()...)
+		}
 	}
 
 	return errs

@@ -11,6 +11,7 @@
 | `make inventory-up-relations-ready` | Inventory API (built from source, x-rh-identity auth) | Testing with external Relations API |
 | `make inventory-up-w-monitoring` | Inventory API + monitoring stack | Inventory metrics testing |
 | `make inventory-up-sso` | Inventory API + Keycloak SSO | Testing OIDC authentication |
+| `make inventory-up-spicedb` | Inventory API + SpiceDB + Kafka | Testing embedded SpiceDB authz |
 | `make inventory-up-split` | Infra only (Postgres, Kafka, Connect) | Debugging with local binary + debugger |
 | `make inventory-up-split-relations-ready` | Infra only (relations-compatible ports) | Debugging with local binary + Relations |
 | `make monitoring-only` | Prometheus/Grafana/Alertmanager for ephemeral | Monitoring an ephemeral namespace |
@@ -29,7 +30,7 @@ Deploy the entire Kessel suite locally with a single command: Inventory API, Rel
 make kessel-up
 ```
 
-This starts all services using the compose file at `development/full-kessel/docker-compose.yaml`. The SpiceDB schema is automatically downloaded from the [stage rbac-config repo](https://raw.githubusercontent.com/RedHatInsights/rbac-config/refs/heads/master/configs/stage/schemas/schema.zed) at startup.
+This starts all services using the compose file at `development/full-kessel/docker-compose.yaml`. The SpiceDB schema is automatically downloaded from the [stage rbac-config repo](https://raw.githubusercontent.com/project-kessel/rbac-config/refs/heads/master/configs/stage/schemas/schema.zed) at startup.
 
 ### Ports
 
@@ -184,6 +185,24 @@ make get-token
 export TOKEN=<output>
 curl -H "Authorization: bearer ${TOKEN}" http://localhost:8081/api/kessel/v1/livez
 ```
+
+### With Embedded SpiceDB
+
+Deploys Inventory API with its own SpiceDB instance (and backing Postgres), Kafka, and the Inventory Consumer for testing the full embedded SpiceDB authz pipeline. Resources reported via `ReportResource` flow through the consumer to SpiceDB as tuples automatically. Also supports manual tuple management via `CreateTuples` and permission checks (Check, LookupObjects, LookupSubjects). Uses the compose overlay at `development/docker-compose.spicedb.yaml`.
+
+```shell
+make inventory-up-spicedb
+```
+
+The startup script downloads the SpiceDB schema from the [stage rbac-config repo](https://raw.githubusercontent.com/project-kessel/rbac-config/refs/heads/master/configs/stage/schemas/schema.zed) automatically. To use a local schema file instead, set `SCHEMA_ZED_FILE`:
+
+```shell
+SCHEMA_ZED_FILE=/path/to/schema.zed make inventory-up-spicedb
+```
+
+Inventory API is available at `localhost:8000` (HTTP) and `localhost:9000` (gRPC). SpiceDB gRPC is on port `50051`.
+
+For a full walkthrough of writing the schema, creating tuples, and checking permissions, see the [SpiceDB E2E test guide](embedded-spicedb-e2e-test.md).
 
 ---
 

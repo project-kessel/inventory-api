@@ -2,6 +2,7 @@ package relations
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/project-kessel/inventory-api/internal/config/relations/kessel"
 	"github.com/project-kessel/inventory-api/internal/config/relations/spicedb"
@@ -53,6 +54,9 @@ func (c *Config) Complete(ctx context.Context) (CompletedConfig, []error) {
 	}
 
 	if c.Authz == SpiceDB {
+		if c.SpiceDB == nil {
+			return CompletedConfig{}, []error{fmt.Errorf("authz.spicedb config is required when authz.impl=%q", SpiceDB)}
+		}
 		if sdb, errs := c.SpiceDB.Complete(); errs != nil {
 			return CompletedConfig{}, errs
 		} else {

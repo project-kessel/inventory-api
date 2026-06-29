@@ -186,6 +186,10 @@ inventory-up-split:
 inventory-up-split-relations-ready:
 	./scripts/start-inventory.sh base 8081 9081 invmigrate kafka-connect-setup kafka-setup
 
+.PHONY: inventory-up-spicedb
+inventory-up-spicedb:
+	./scripts/start-inventory-spicedb.sh
+
 .PHONY: inventory-up-sso
 inventory-up-sso:
 	./scripts/start-inventory.sh authn-sso 8081 9081 inventory-api kafka-connect-setup kafka-setup keycloak

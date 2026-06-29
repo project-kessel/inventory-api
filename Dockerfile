@@ -20,6 +20,7 @@ RUN VERSION=${VERSION} make build
 
 # Runtime stage — set GODEBUG so the binary runs in FIPS mode.
 FROM registry.access.redhat.com/hi/core-runtime:2.42-openssl-fips
+WORKDIR /
 COPY --from=builder /workspace/bin/inventory-api /usr/local/bin/
 
 EXPOSE 8081

@@ -50,8 +50,7 @@ for information on the different parameters.
 
 3. Build the project
     ```shell
-    # when building locally, use the local-build option as FIPS_ENABLED is set by default for builds
-    make local-build
+    make build
     ```
 
 4. Setup and start the local Postgres database

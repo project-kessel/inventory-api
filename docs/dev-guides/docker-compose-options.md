@@ -195,7 +195,7 @@ Run Inventory API as a local binary (great for debugging with `dlv` or your IDE)
 
 ```shell
 make inventory-up-split
-make local-build
+make build
 
 ./bin/inventory-api serve --config development/configs/base.yaml \
   --storage.postgres.host localhost \
@@ -209,7 +209,7 @@ Uses ports `8081`/`9081` to avoid conflicts with a locally running Relations API
 
 ```shell
 make inventory-up-split-relations-ready
-make local-build
+make build
 
 ./bin/inventory-api serve --config development/configs/base.yaml \
   --storage.postgres.host localhost \
@@ -229,7 +229,7 @@ To run Relations locally, see the [Relations README](https://github.com/project-
 
 For Inventory, use the relations-compatible config:
 ```shell
-make local-build
+make build
 make migrate
 
 ./bin/inventory-api serve --config development/configs/local-w-relations.yaml

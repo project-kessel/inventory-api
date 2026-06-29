@@ -1,4 +1,4 @@
-FROM registry.access.redhat.com/ubi9/ubi-minimal:9.8-1779809423
+FROM registry.access.redhat.com/hi/core-runtime:2.42-openssl-fips-builder
 
 USER root
 
@@ -6,12 +6,17 @@ USER root
 # Kafka is hardcoded for 3.9.x in the installer script
 ENV SCALA_VERSION=2.13
 
+# librdkafka is required by kcat -- versions below represent the latest from mirrors
+# see the README tools/kessel-debug-container/README.md for details on updating
+ENV LIBRDKAFKA_VERSION=1.6.1-102
+ENV KCAT_VERSION=1.7.1-1
+
+
 COPY ./installer.sh /tmp
 COPY ./scripts/* /usr/local/bin/
 
 RUN /tmp/installer.sh
 
-# starts in Kafka Home for shorter command paths
 WORKDIR /opt/kafka
 
 CMD ["sleep", "7200"]

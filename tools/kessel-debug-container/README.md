@@ -92,3 +92,26 @@ oc process --local \
     -f https://raw.githubusercontent.com/project-kessel/inventory-api/refs/heads/main/tools/kessel-debug-container/kessel-debug-deploy.yaml \
     -p ENV=<target-environment (stage/prod)> | oc delete -f -
 ```
+
+### Updating Kessel Debug
+
+Packages installed via the package manager (`dnf`) are automatically updated on each build. However, some packages installed from external RPM mirrors are pinned to specific versions in the Dockerfile and must be updated manually:
+
+- **librdkafka** — installed from the CentOS 9-stream AppStream mirror
+- **kcat** — installed from the Fedora EPEL 9 mirror
+
+To check for newer versions and update the Dockerfile:
+
+```shell
+make update-kessel-debug
+```
+
+This fetches the latest x86_64 RPM versions from each mirror and updates the `LIBRDKAFKA_VERSION` and `KCAT_VERSION` environment variables in the Dockerfile if newer versions are available. If versions are already current, no changes are made.
+
+After updating, rebuild the debug image to verify the new versions install correctly:
+
+```shell
+make build-kessel-debug
+```
+
+This builds the image locally as `localhost/kessel-debug:latest`. Once verified, push the updated Dockerfile changes and the image will be rebuilt in CI.

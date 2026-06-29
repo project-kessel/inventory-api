@@ -8,7 +8,7 @@ KCAT_MIRROR="https://dl.fedoraproject.org/pub/epel/9/Everything/x86_64/Packages/
 
 echo "Checking for latest librdkafka x86_64 RPM..."
 LIBRDKAFKA_LATEST=$(curl -fsSL "$LIBRDKAFKA_MIRROR" \
-  | grep -oP 'href="librdkafka-\K[^"]+(?=\.el9\.x86_64\.rpm")' \
+  | grep -oP 'href="librdkafka-\K[0-9][^"]+(?=\.el9\.x86_64\.rpm")' \
   | sort -V \
   | tail -n 1)
 

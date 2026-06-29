@@ -57,7 +57,7 @@ jobs:
           path: v1beta2-coverage.out
       - name: Upload main coverage to Codecov
         id: code-cov-report
-        uses: codecov/codecov-action@v6
+        uses: codecov/codecov-action@v7
         with:
           files: coverage.txt
           flags: main
@@ -65,7 +65,7 @@ jobs:
           verbose: true
           token: ${{ secrets.CODECOV_TOKEN }}
       - name: Upload v1beta2 coverage to Codecov
-        uses: codecov/codecov-action@v6
+        uses: codecov/codecov-action@v7
         with:
           files: v1beta2-coverage.out
           flags: v1beta2

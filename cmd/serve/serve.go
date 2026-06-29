@@ -474,6 +474,9 @@ func newSchemaRepository(ctx context.Context, c schema.CompletedConfig, logger *
 		case inmemoryConfig.DirRepository:
 			logger.Infof("Using dir in-memory schema repository from path %q", c.InMemory.Path)
 			return data.NewInMemorySchemaRepositoryFromDir(ctx, c.InMemory.Path, data.NewJsonSchemaWithWorkspacesFromString)
+		case inmemoryConfig.UnifiedYAMLRepository:
+			logger.Infof("Using unified YAML in-memory schema repository from path %q", c.InMemory.Path)
+			return data.NewInMemorySchemaRepositoryFromUnifiedYAMLDir(ctx, c.InMemory.Path)
 		default:
 			return nil, fmt.Errorf("invalid repository type: %s/%s", c.Repository, c.InMemory.Type)
 		}

@@ -1,0 +1,16 @@
+schema_version: "1.0"
+name: principal
+description: "Represents a user principal"
+
+common:
+  # Empty schema - no relations
+  schema:
+    type: object
+    properties: {}
+
+  # No relations for principal
+  relations: []
+
+reporters:
+  - name: rbac
+    description: "RBAC service reporter for principal management"

@@ -1,0 +1,166 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "$id": "https://project-kessel.org/schemas/unified-schema-format.json",
+  "title": "Unified YAML Schema Format",
+  "description": "Schema defining the structure of unified YAML resource schemas for Kessel Inventory API",
+  "type": "object",
+  "required": ["schema_version", "name", "description", "common", "reporters"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "description": "Version of the unified schema format",
+      "pattern": "^\\d+\\.\\d+$",
+      "examples": ["1.0"]
+    },
+    "name": {
+      "type": "string",
+      "description": "Resource name (must match filename without .yaml extension)",
+      "pattern": "^[a-z][a-z0-9_]*$",
+      "examples": ["host", "k8s_cluster", "workspace"]
+    },
+    "description": {
+      "type": "string",
+      "description": "Human-readable description of the resource",
+      "minLength": 1
+    },
+    "common": {
+      "type": "object",
+      "description": "Common schema and relations shared across all reporters",
+      "required": ["schema", "relations"],
+      "additionalProperties": false,
+      "properties": {
+        "schema": {
+          "type": "object",
+          "description": "JSON Schema for common resource fields (must be valid JSON Schema Draft 7)",
+          "required": ["type", "properties"],
+          "properties": {
+            "type": {
+              "const": "object"
+            },
+            "properties": {
+              "type": "object"
+            },
+            "required": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "relations": {
+          "type": "array",
+          "description": "Relations for authorization relationship generation",
+          "items": {
+            "type": "object",
+            "required": ["name", "target", "field", "cardinality"],
+            "additionalProperties": false,
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "Relation name (SpiceDB relation name, prefixed with t_ in schema)",
+                "pattern": "^[a-z][a-z0-9_]*$",
+                "examples": ["workspace", "tenant", "parent", "owner"]
+              },
+              "target": {
+                "type": "string",
+                "description": "Target resource type in format: {reporter}/{resource}",
+                "pattern": "^[a-z][a-z0-9_]*/[a-z][a-z0-9_]*$",
+                "examples": ["rbac/workspace", "rbac/tenant", "rbac/user"]
+              },
+              "field": {
+                "type": "string",
+                "description": "Field name in the schema containing the relation ID(s)",
+                "pattern": "^[a-z][a-z0-9_]*$",
+                "examples": ["workspace_id", "tenant_id", "parent_id", "owner_ids"]
+              },
+              "cardinality": {
+                "type": "string",
+                "description": "Cardinality of the relation",
+                "enum": ["one", "many"]
+              },
+              "description": {
+                "type": "string",
+                "description": "Optional human-readable description of the relation",
+                "minLength": 1
+              }
+            }
+          }
+        }
+      }
+    },
+    "reporters": {
+      "type": "array",
+      "description": "Reporter-specific schemas",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["name", "description"],
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Reporter name (lowercase, no special characters)",
+            "pattern": "^[a-z][a-z0-9_]*$",
+            "examples": ["hbi", "acm", "acs", "ocm", "rbac", "notifications"]
+          },
+          "description": {
+            "type": "string",
+            "description": "Human-readable description of the reporter",
+            "minLength": 1
+          },
+          "schema": {
+            "type": "object",
+            "description": "JSON Schema for reporter-specific fields (must be valid JSON Schema Draft 7)",
+            "properties": {
+              "type": {
+                "const": "object"
+              },
+              "properties": {
+                "type": "object"
+              },
+              "required": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "relations": {
+            "type": "array",
+            "description": "Reporter-specific relations (Phase 4)",
+            "items": {
+              "type": "object",
+              "required": ["name", "target", "field", "cardinality"],
+              "additionalProperties": false,
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9_]*$"
+                },
+                "target": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9_]*/[a-z][a-z0-9_]*$"
+                },
+                "field": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9_]*$"
+                },
+                "cardinality": {
+                  "type": "string",
+                  "enum": ["one", "many"]
+                },
+                "description": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

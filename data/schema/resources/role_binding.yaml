@@ -1,0 +1,38 @@
+schema_version: "1.0"
+name: role_binding
+description: "Binds roles to principals in a scope"
+
+common:
+  # Minimal schema - only fields needed for relations
+  schema:
+    type: object
+    properties:
+      role_id:
+        type: string
+        description: "Role ID"
+
+      principal_id:
+        type: string
+        description: "Principal ID (user or group)"
+
+    required:
+      - role_id
+      - principal_id
+
+  # Relations for role_binding
+  relations:
+    # Role being bound
+    - name: role
+      target: rbac/role
+      field: role_id
+      cardinality: one
+
+    # Principal receiving the role
+    - name: principal
+      target: rbac/principal
+      field: principal_id
+      cardinality: one
+
+reporters:
+  - name: rbac
+    description: "RBAC service reporter for role binding management"

@@ -1,0 +1,39 @@
+schema_version: "1.0"
+name: group
+description: "Group of principals"
+
+common:
+  # Minimal schema - only fields needed for relations
+  schema:
+    type: object
+    properties:
+      member_ids:
+        type: array
+        items:
+          type: string
+        description: "Member principal IDs"
+
+      owner_id:
+        type: string
+        description: "Owner tenant ID"
+
+    required:
+      - owner_id
+
+  # Relations for group
+  relations:
+    # Members of the group
+    - name: member
+      target: rbac/principal
+      field: member_ids
+      cardinality: many
+
+    # Owner/parent tenant
+    - name: owner
+      target: rbac/tenant
+      field: owner_id
+      cardinality: one
+
+reporters:
+  - name: rbac
+    description: "RBAC service reporter for group management"

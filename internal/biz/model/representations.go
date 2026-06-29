@@ -65,6 +65,16 @@ func (r *Representations) HasCommon() bool {
 	return len(r.commonData) > 0 && r.commonVersion != nil
 }
 
+// ReporterData returns the reporter representation data, or nil if not present (Phase 4a).
+func (r *Representations) ReporterData() Representation {
+	return r.reporterData
+}
+
+// HasReporter returns true if reporter representation is present (Phase 4a).
+func (r *Representations) HasReporter() bool {
+	return len(r.reporterData) > 0 && r.reporterRepresentationVersion != nil
+}
+
 // WorkspaceID returns the workspace_id from the common representation data.
 // Returns empty string if not present or if common representation is not available.
 func (r *Representations) WorkspaceID() string {

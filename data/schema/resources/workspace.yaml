@@ -1,0 +1,38 @@
+schema_version: "1.0"
+name: workspace
+description: "Workspace for resource organization and permission scoping"
+
+common:
+  # Minimal schema - only fields needed for relations
+  schema:
+    type: object
+    properties:
+      parent_id:
+        type: string
+        description: "Parent workspace ID for hierarchy"
+
+      tenant_id:
+        type: string
+        description: "Tenant ID that owns this workspace"
+
+    required:
+      - tenant_id
+
+  # Relations for workspace
+  relations:
+    # Parent workspace for hierarchy
+    - name: parent
+      target: rbac/workspace
+      field: parent_id
+      cardinality: one
+
+    # Tenant that owns this workspace
+    - name: tenant
+      target: rbac/tenant
+      field: tenant_id
+      cardinality: one
+
+# RBAC reporter - likely empty as RBAC resources are managed differently
+reporters:
+  - name: rbac
+    description: "RBAC service reporter for workspace management"

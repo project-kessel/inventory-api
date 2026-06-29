@@ -19,4 +19,6 @@ RUN /tmp/installer.sh
 
 WORKDIR /opt/kafka
 
+USER 1001
+
 CMD ["sleep", "7200"]

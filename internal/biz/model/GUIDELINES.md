@@ -24,7 +24,7 @@ func NewReporterResource(...) (*ReporterResource, error) {
 }
 ```
 
-Validation uses `bizmodel.AggregateErrors()` for collecting all validation errors in one pass.
+Validation uses `model.AggregateErrors()` for collecting all validation errors in one pass.
 
 ## Snapshot Serialization Pattern
 Models provide serialization to/from snapshots for domain layer interaction:

@@ -155,7 +155,8 @@ func (o *Options) Complete() []error {
 
 // 5. Configuration validation
 func (o *Options) Validate() []error {
-    // Return all validation errors as slice
+    var errs []error
+    // Collect and return all validation errors
     return errs
 }
 ```

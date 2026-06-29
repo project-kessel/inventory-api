@@ -13,7 +13,7 @@ This file covers the Kafka consumer under `internal/consumer/`. For cross-cuttin
 ### Consumer Configuration
 - Bootstrap servers from environment or ClowdApp config via `InjectClowdAppConfig()`
 - Use **SASL authentication** when `AuthConfig.Enabled` is true
-- Configure **retry policies** with exponential backoff: `BackoffFactor`, `MaxBackoffSeconds`
+- Configure **retry policies** with linear backoff: `BackoffFactor`, `MaxBackoffSeconds`
 - Set **statistics interval** for metrics collection (default: consumer stats every interval)
 
 ## Error Handling
@@ -61,7 +61,7 @@ type InventoryConsumer struct {
 
 ### Retry and Backoff Strategy
 ```go
-// Exponential backoff with limits
+// Linear backoff with limits
 backoff := min(
     time.Duration(retryOptions.BackoffFactor*attempts*300)*time.Millisecond,
     time.Duration(retryOptions.MaxBackoffSeconds)*time.Second

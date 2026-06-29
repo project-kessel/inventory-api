@@ -27,6 +27,8 @@ Use `middleware.MapError()` for consistent error-to-status mapping:
 ### gRPC Streaming
 ```go
 func (s *InventoryService) StreamedListObjects(req *pb.StreamedListObjectsRequest, stream pb.KesselInventoryService_StreamedListObjectsServer) error {
+    clientStream, err := s.Ctl.LookupObjects(stream.Context(), ToLookupObjectsCommand(req))
+    if err != nil { return err }
     for {
         resp, err := clientStream.Recv()
         if err == io.EOF { return nil }

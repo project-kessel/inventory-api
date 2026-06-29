@@ -278,26 +278,9 @@ check_connector_readiness "kessel-inventory-source-connector"
 kubectl rollout restart deployment kessel-inventory
 kubectl rollout status deployment kessel-inventory --timeout=120s
 
-echo "Waiting for inventory service HTTP readyz after restart..."
-until kubectl exec "$(kubectl get pods -l app=kessel-inventory -o jsonpath='{.items[0].metadata.name}')" -- curl -sf http://localhost:8081/api/kessel/v1/readyz 2>/dev/null; do
-  sleep 5
-done
-
-# Also verify the gRPC port is accepting connections before submitting tests.
-# The HTTP readyz can pass while gRPC is still starting up.
-echo "Waiting for gRPC port 9081 to be ready..."
-GRPC_RETRIES=0
-GRPC_MAX=30
-until kubectl exec "$(kubectl get pods -l app=kessel-inventory -o jsonpath='{.items[0].metadata.name}')" -- \
-  curl -s --connect-timeout 2 --http2-prior-knowledge -o /dev/null http://localhost:9081/ 2>/dev/null; do
-  GRPC_RETRIES=$((GRPC_RETRIES + 1))
-  if [ "$GRPC_RETRIES" -ge "$GRPC_MAX" ]; then
-    echo "ERROR: gRPC port 9081 not ready after $GRPC_MAX attempts"
-    exit 1
-  fi
-  sleep 2
-done
-echo "gRPC port 9081 is ready."
+echo "Waiting for inventory pod readiness after restart..."
+kubectl wait --for=condition=Ready pod -l app=kessel-inventory --timeout=120s
+echo "Inventory pod is ready."
 
 # Submit table-mode e2e tests
 kubectl apply -f deploy/kind/e2e/e2e-batch-outbox-table.yaml

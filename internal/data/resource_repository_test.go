@@ -3145,13 +3145,13 @@ func TestCommonVersionFirstAddedOnUpdate(t *testing.T) {
 func TestEmptyAndNilRepresentationPersistence(t *testing.T) {
 	// Helper to create common value objects for representation tests.
 	type resourceParams struct {
-		localResourceId        bizmodel.LocalResourceId
-		resourceType           bizmodel.ResourceType
-		reporterType           bizmodel.ReporterType
-		reporterInstanceId     bizmodel.ReporterInstanceId
-		apiHref                bizmodel.ApiHref
-		resourceId             bizmodel.ResourceId
-		reporterResourceId     bizmodel.ReporterResourceId
+		localResourceId    bizmodel.LocalResourceId
+		resourceType       bizmodel.ResourceType
+		reporterType       bizmodel.ReporterType
+		reporterInstanceId bizmodel.ReporterInstanceId
+		apiHref            bizmodel.ApiHref
+		resourceId         bizmodel.ResourceId
+		reporterResourceId bizmodel.ReporterResourceId
 	}
 
 	newResourceParams := func(t *testing.T, localId string) resourceParams {
@@ -3229,11 +3229,13 @@ func TestEmptyAndNilRepresentationPersistence(t *testing.T) {
 		assert.Equal(t, uint(0), *snap.CommonVersion)
 
 		var repCount int64
-		db.Table("reporter_representations").Count(&repCount)
+		result := db.Table("reporter_representations").Count(&repCount)
+		require.NoError(t, result.Error)
 		assert.Equal(t, int64(1), repCount, "Should have one reporter representation row (auto-filled empty)")
 
 		var commonCount int64
-		db.Table("common_representations").Count(&commonCount)
+		result = db.Table("common_representations").Count(&commonCount)
+		require.NoError(t, result.Error)
 		assert.Equal(t, int64(1), commonCount, "Should have one common representation row")
 	})
 
@@ -3246,11 +3248,13 @@ func TestEmptyAndNilRepresentationPersistence(t *testing.T) {
 		assert.Nil(t, snap.CommonVersion, "CommonVersion should be nil when no common representation was provided")
 
 		var repCount int64
-		db.Table("reporter_representations").Count(&repCount)
+		result := db.Table("reporter_representations").Count(&repCount)
+		require.NoError(t, result.Error)
 		assert.Equal(t, int64(1), repCount, "Should have one reporter representation row")
 
 		var commonCount int64
-		db.Table("common_representations").Count(&commonCount)
+		result = db.Table("common_representations").Count(&commonCount)
+		require.NoError(t, result.Error)
 		assert.Equal(t, int64(0), commonCount, "Should have no common representation rows")
 	})
 
@@ -3263,11 +3267,13 @@ func TestEmptyAndNilRepresentationPersistence(t *testing.T) {
 		require.NotNil(t, snap.CommonVersion, "CommonVersion should be set when common representation was provided")
 
 		var repCount int64
-		db.Table("reporter_representations").Count(&repCount)
+		result := db.Table("reporter_representations").Count(&repCount)
+		require.NoError(t, result.Error)
 		assert.Equal(t, int64(1), repCount, "Should have one reporter representation row (with empty data)")
 
 		var commonCount int64
-		db.Table("common_representations").Count(&commonCount)
+		result = db.Table("common_representations").Count(&commonCount)
+		require.NoError(t, result.Error)
 		assert.Equal(t, int64(1), commonCount, "Should have one common representation row")
 	})
 

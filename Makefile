@@ -235,6 +235,14 @@ inventory-down:
 inventory-down-kind:
 	./scripts/stop-inventory-kind.sh
 
+.PHONY: update-kessel-debug
+update-kessel-debug:
+	./scripts/update-kessel-debug.sh
+
+.PHONY: build-kessel-debug
+build-kessel-debug:
+	$(DOCKER) build -t localhost/kessel-debug:latest -f tools/kessel-debug-container/Dockerfile tools/kessel-debug-container
+
 .PHONY: update-local-dashboards
 update-local-dashboards:
 	./scripts/update-local-dashboards.sh

@@ -2,26 +2,28 @@
 
 set -euo pipefail
 
-echo "Setting up pre-reqs..."
-microdnf install -y jq
+echo "Installing DNF available packages..."
+dnf install -y jq curl tar gzip vim-minimal bind-utils java-21-openjdk util-linux less
 
-echo "Fetching required packages and RPM files..."
+echo "Installing remaining packages via RPMs from mirrors..."
 ZED_VERSION=$(curl -sSfL https://api.github.com/repos/authzed/zed/releases/latest | jq -er '.tag_name')
 # the tag fetched for zed will be in the format of 'vX.Y.Z', so bash substring is used below to strip the 'v'
 ZED_VERSION=${ZED_VERSION#v}
 
-# Download zed RPM and checksums
-curl -fLo /tmp/zed_${ZED_VERSION}_linux_amd64.rpm https://github.com/authzed/zed/releases/download/v${ZED_VERSION}/zed_${ZED_VERSION}_linux_amd64.rpm
-curl -fLo /tmp/zed_checksums.txt https://github.com/authzed/zed/releases/download/v${ZED_VERSION}/checksums.txt
+RPM_URLS=(
+  "https://github.com/authzed/zed/releases/download/v${ZED_VERSION}/zed_${ZED_VERSION}_linux_amd64.rpm"
+  "https://mirror.stream.centos.org/9-stream/AppStream/x86_64/os/Packages/librdkafka-${LIBRDKAFKA_VERSION}.el9.x86_64.rpm"
+  "https://dl.fedoraproject.org/pub/epel/9/Everything/x86_64/Packages/k/kcat-${KCAT_VERSION}.el9.x86_64.rpm"
+)
 
-# Verify zed checksum
-pushd /tmp
-grep "zed_${ZED_VERSION}_linux_amd64.rpm" zed_checksums.txt | sha256sum -c -
-popd
+for URL in ${RPM_URLS[*]}; do
+  dnf install -y $URL
+done
 
 # Download latest 3.9.x kafka tools
 # note currently hardcoded to only support kafka 3.9.x
 # this should remain until clusters move to 4.x
+echo "Installing Kafka tools..."
 BASE_URL="https://dlcdn.apache.org/kafka/"
 KAFKA_VERSION=$(
   curl -fsSL "$BASE_URL" \
@@ -32,14 +34,6 @@ KAFKA_VERSION=$(
 )
 
 curl -fLo /tmp/kafka.tgz https://dlcdn.apache.org/kafka/${KAFKA_VERSION}/kafka_${SCALA_VERSION}-${KAFKA_VERSION}.tgz
-
-echo "Setting up EPEL Repository..."
-rpm -ivh https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.rpm
-
-echo "Installing packages..."
-microdnf install -y tar gzip wget bind-utils nmap-ncat openssl vim java-21-openjdk kcat util-linux less
-rpm -ivh /tmp/zed_${ZED_VERSION}_linux_amd64.rpm
-
 mkdir -pv /opt/kafka
 tar -xvf /tmp/kafka.tgz -C /opt/kafka --strip-components=1
 
@@ -48,6 +42,4 @@ mv /usr/bin/zed /usr/bin/zed.original
 mv /usr/local/bin/zed-wrapper.sh /usr/local/bin/zed
 
 echo "Clean up..."
-microdnf clean all -y
-rm /tmp/*.rpm
-rm /tmp/*.txt
+dnf clean all -y

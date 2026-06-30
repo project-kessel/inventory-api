@@ -52,9 +52,9 @@ func (d DefaultSchema) CalculateTuples(currentRepresentation, previousRepresenta
 	return NewTuplesToReplicate(tuplesToCreate, tuplesToDelete)
 }
 
-// SchemaFromString is a factory function type that creates a Schema
-// from a string representation (typically a JSON schema definition).
-type SchemaFromString func(string) Schema
+// ResourceTypeSchemaFactory is a factory function that creates a Schema
+// with awareness of the resource type.
+type ResourceTypeSchemaFactory func(resourceType ResourceType, jsonSchema string) Schema
 
 // ResourceSchemaRepresentation holds a resource schema with its validation and tuple logic.
 type ResourceSchemaRepresentation struct {

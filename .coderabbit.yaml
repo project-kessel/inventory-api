@@ -210,6 +210,8 @@ reviews:
         mode: "error"
 
 knowledge_base:
+  learnings:
+    scope: global
   code_guidelines:
     enabled: true
     filePatterns:

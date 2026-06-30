@@ -40,25 +40,7 @@ err := fmt.Errorf("operation failed: %w", model.ErrResourceNotFound)
 // Should map correctly to NotFound status
 ```
 
-## Retry and Circuit Breaker Patterns
-
-### Consumer Retry Logic
-- Separate retry counts for consumer lifecycle vs individual operations
-- Use `operation-max-retries` for Relations API calls
-- Implement backoff with configurable factors
-
-### Circuit Breaker Usage
-- Use `gobreaker` for protecting against cascading failures
-- Configure for read-after-write notification waiting
-- Log state changes for monitoring
-
 ## Metrics and Observability
-
-### Error Metrics
-Track specific error categories:
-- `MsgProcessFailures` with operation labels
-- `ConsumerErrors` with error type labels  
-- `SerializationFailures` and `SerializationExhaustions`
 
 ### Error Context
 Include relevant identifiers in errors:
@@ -73,7 +55,6 @@ Include relevant identifiers in errors:
 - **Resource attributes** using semantic conventions
 
 ### Metrics Collection
-- **Consumer stats** with prefixed names: `consumer_stats_*`, `consumer_*`
 - **Relations API calls** tracked with success/failure counters per method
 - **Custom metrics** using `kessel_inventory_*` prefix for application-specific metrics
 - **Label consistency**: Use structured attributes for partition, topic, operation
@@ -89,7 +70,6 @@ metricscollector.Incr(counter, operation, attribute.String("extra", value))
 ### Context Propagation Strategy
 - Stream operations inherit context from `stream.Context()`
 - Blocking operations use dedicated timeouts: `context.WithTimeout(ctx, 30*time.Second)`
-- Consumer operations create fresh context for each timeout scope
 - Advisory lock operations use `context.Background()` during cleanup to prevent cancellation issues
 
 **Rules:**

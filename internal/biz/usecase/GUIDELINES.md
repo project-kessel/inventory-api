@@ -52,6 +52,13 @@ This file covers the application services (usecases) under `internal/biz/usecase
 - Default to **minimize_latency** consistency when no token available
 - Use **at_least_as_fresh** consistency when token is present from previous operations
 
+## Circuit Breaker
+
+Use `gobreaker` to protect the read-after-write notification wait path against cascading failures:
+- Configure `ReadyToTrip` based on consecutive failure count
+- Log state changes (`Open`, `HalfOpen`, `Closed`) for monitoring
+- Handle `gobreaker.ErrOpenState` and `gobreaker.ErrTooManyRequests` gracefully in the usecase
+
 ## Transaction Boundary
 
 Always use `HandleSerializableTransaction` for resource CRUD operations. Keep transactions lean — avoid complex multi-table operations in a single transaction. See `internal/data/GUIDELINES.md` for the full transaction management pattern and retry logic.

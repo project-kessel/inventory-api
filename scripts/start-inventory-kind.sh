@@ -276,11 +276,7 @@ check_connector_readiness "kessel-inventory-source-connector"
 
 # Restart inventory pod to pick up new config
 kubectl rollout restart deployment kessel-inventory
-kubectl rollout status deployment kessel-inventory --timeout=120s
-
-echo "Waiting for inventory pod readiness after restart..."
-kubectl wait --for=condition=Ready pod -l app=kessel-inventory --timeout=600s
-echo "Inventory pod is ready."
+kubectl rollout status deployment kessel-inventory --timeout=300s
 
 # Submit table-mode e2e tests
 kubectl apply -f deploy/kind/e2e/e2e-batch-outbox-table.yaml

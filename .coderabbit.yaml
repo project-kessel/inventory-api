@@ -213,10 +213,10 @@ knowledge_base:
   code_guidelines:
     enabled: true
     filePatterns:
-      - "docs/*-guidelines.md"
       - "**/AGENTS.md"
       - "**/CLAUDE.md"
       - "**/CONTRIBUTING.md"
+      - "**/GUIDELINES.md"
   issues:
     scope: "auto"
   pull_requests:

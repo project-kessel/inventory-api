@@ -39,7 +39,7 @@ make docker-build-push
 
 ## Development Guidelines
 
-- Follow the domain-specific guidelines in `docs/` for consistent patterns
+- Follow the layer-scoped guidelines (`GUIDELINES.md` files) placed throughout the codebase — see AGENTS.md for the full index
 - Use `buf.build` toolchain for protobuf development and breaking change detection
 - All database operations should use the transaction manager with serializable isolation
 - Write comprehensive tests following the established patterns in `testframework_test.go`

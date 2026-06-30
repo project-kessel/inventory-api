@@ -4,15 +4,24 @@
 
 **All guidelines in this file and the linked docs are mandatory, not recommendations.** Agents MUST read the relevant guideline doc before making changes in that area and MUST follow every rule. Failure to read is not an excuse for non-compliance.
 
-The following domain-specific guidelines provide detailed, repo-specific conventions for AI agents working in this codebase:
+Guidelines are organized by architectural layer and scoped to the directories they govern:
 
-- [Security Guidelines](docs/security-guidelines.md) - Authentication, authorization, TLS, input validation, and security patterns
-- [Performance Guidelines](docs/performance-guidelines.md) - Database connections, concurrency, streaming, context management, and optimization
-- [Error Handling Guidelines](docs/error-handling-guidelines.md) - Error types, mapping, consumer patterns, retries, and observability
-- [API Contracts Guidelines](docs/api-contracts-guidelines.md) - Protobuf definitions, versioning, validation, consistency models, and testing
-- [Database Guidelines](docs/database-guidelines.md) - GORM models, transactions, migrations, outbox patterns, and query conventions
-- [Testing Guidelines](docs/testing-guidelines.md) - Test organization, infrastructure, fixtures, authorization testing, and coverage
-- [Integration Guidelines](docs/integration-guidelines.md) - Kafka consumers, Relations API, health checks, observability, and configuration
+| Layer | File | Scope |
+|-------|------|-------|
+| Cross-cutting | [internal/GUIDELINES.md](internal/GUIDELINES.md) | All code under `internal/` |
+| API Definitions | [api/GUIDELINES.md](api/GUIDELINES.md) | Protobuf definitions under `api/` |
+| Presentation | [internal/service/GUIDELINES.md](internal/service/GUIDELINES.md) | gRPC/HTTP service implementations |
+| Presentation | [internal/server/GUIDELINES.md](internal/server/GUIDELINES.md) | Server setup, TLS, pprof |
+| Presentation | [internal/middleware/GUIDELINES.md](internal/middleware/GUIDELINES.md) | Auth middleware, validation, error mapping |
+| Application Services | [internal/biz/usecase/GUIDELINES.md](internal/biz/usecase/GUIDELINES.md) | Usecases, authorization, transactions |
+| Domain | [internal/biz/model/GUIDELINES.md](internal/biz/model/GUIDELINES.md) | Value objects, errors, domain rules |
+| Infrastructure (Data) | [internal/data/GUIDELINES.md](internal/data/GUIDELINES.md) | GORM, migrations, repositories, outbox |
+| Infrastructure (Auth) | [internal/authn/GUIDELINES.md](internal/authn/GUIDELINES.md) | Authentication providers, OIDC, tokens |
+| Infrastructure (Consumer) | [internal/consumer/GUIDELINES.md](internal/consumer/GUIDELINES.md) | Kafka consumer, CDC, retry |
+| Infrastructure (Storage) | [internal/storage/GUIDELINES.md](internal/storage/GUIDELINES.md) | Database drivers, connection config |
+| E2E / Integration Tests | [test/GUIDELINES.md](test/GUIDELINES.md) | E2E tests, fixtures, environment setup |
+
+Additional resources:
 - [Sanity Tests](.agents/skills/sanity-tests/SKILL.md) - Run E2E sanity tests against ephemeral OpenShift environments
 
 ## AI Guidance and Repo Conventions
@@ -72,7 +81,7 @@ When working in this codebase, AI agents should:
 2. **Maintain consistency** - Use established patterns for error handling, validation, and testing
 3. **Security awareness** - Never bypass authentication/authorization; follow security guidelines
 4. **Performance consideration** - Use appropriate transaction patterns and avoid blocking operations
-5. **Test-driven development** - Prefer writing tests first (TDD). When adding features or fixing bugs, start with a failing test, then implement the code to pass it. Follow the no-mocks philosophy in [Testing Guidelines](docs/testing-guidelines.md).
+5. **Test-driven development** - Prefer writing tests first (TDD). When adding features or fixing bugs, start with a failing test, then implement the code to pass it. Follow the no-mocks philosophy in [Testing Guidelines](test/GUIDELINES.md).
 6. **End-to-end type changes** - When replacing a type (e.g., `ReporterResourceKey` -> `ResourceReference`), propagate the change through the entire call chain. Do not insert local adapter/shim calls at the boundary (e.g., `ResourceReferenceFromKey(key)` at the call site). Instead, update the method signature, the callers, and the callers' callers until the new type flows naturally from entry point to implementation. Lossy back-and-forth conversions are a bug.
 7. **Do not remove comments** unless they are clearly wrong or obsolete. Preserve existing documentation.
 

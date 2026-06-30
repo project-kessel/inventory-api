@@ -279,7 +279,7 @@ kubectl rollout restart deployment kessel-inventory
 kubectl rollout status deployment kessel-inventory --timeout=120s
 
 echo "Waiting for inventory pod readiness after restart..."
-kubectl wait --for=condition=Ready pod -l app=kessel-inventory --timeout=300s
+kubectl wait --for=condition=Ready pod -l app=kessel-inventory --timeout=600s
 echo "Inventory pod is ready."
 
 # Submit table-mode e2e tests

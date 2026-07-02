@@ -12,6 +12,7 @@ import (
 	rpcstatus "google.golang.org/genproto/googleapis/rpc/status"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/structpb"
 )
 
 type InventoryService struct {
@@ -756,30 +757,14 @@ func toReportResourceCommand(r *pb.ReportResourceRequest) (resources.ReportResou
 		reporterVersion = &rv
 	}
 
-	var reporterRepresentation *model.Representation
-	if r.GetRepresentations().GetReporter() != nil {
-		reporterMap := r.GetRepresentations().GetReporter().AsMap()
-		if len(reporterMap) == 0 {
-			return resources.ReportResourceCommand{}, fmt.Errorf("representation data cannot be empty")
-		}
-		rep, err := model.NewRepresentation(reporterMap)
-		if err != nil {
-			return resources.ReportResourceCommand{}, fmt.Errorf("invalid reporter representation: %w", err)
-		}
-		reporterRepresentation = &rep
+	reporterRepresentation, err := representationFromProtoStruct(r.GetRepresentations().GetReporter(), "reporter")
+	if err != nil {
+		return resources.ReportResourceCommand{}, err
 	}
 
-	var commonRepresentation *model.Representation
-	if r.GetRepresentations().GetCommon() != nil {
-		commonMap := r.GetRepresentations().GetCommon().AsMap()
-		if len(commonMap) == 0 {
-			return resources.ReportResourceCommand{}, fmt.Errorf("representation data cannot be empty")
-		}
-		rep, err := model.NewRepresentation(commonMap)
-		if err != nil {
-			return resources.ReportResourceCommand{}, fmt.Errorf("invalid common representation: %w", err)
-		}
-		commonRepresentation = &rep
+	commonRepresentation, err := representationFromProtoStruct(r.GetRepresentations().GetCommon(), "common")
+	if err != nil {
+		return resources.ReportResourceCommand{}, err
 	}
 
 	var transactionId *model.TransactionId
@@ -803,6 +788,23 @@ func toReportResourceCommand(r *pb.ReportResourceRequest) (resources.ReportResou
 		CommonRepresentation:   commonRepresentation,
 		WriteVisibility:        writeVisibility,
 	}, nil
+}
+
+// representationFromProtoStruct converts a protobuf Struct to a domain Representation pointer.
+// Returns nil when the struct is nil or empty (no fields set).
+func representationFromProtoStruct(s *structpb.Struct, name string) (*model.Representation, error) {
+	if s == nil {
+		return nil, nil
+	}
+	m := s.AsMap()
+	if len(m) == 0 {
+		return nil, nil
+	}
+	rep, err := model.NewRepresentation(m)
+	if err != nil {
+		return nil, fmt.Errorf("invalid %s representation: %w", name, err)
+	}
+	return &rep, nil
 }
 
 // writeVisibilityFromProto converts a protobuf WriteVisibility to domain WriteVisibility.

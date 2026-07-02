@@ -207,7 +207,6 @@ objects:
           replicas: 3
       dependencies:
         - kessel-relations
-      optionalDependencies:
         - kessel-kafkaconnect
       deployments:
         - name: api

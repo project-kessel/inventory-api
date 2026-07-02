@@ -205,7 +205,7 @@ objects:
         - topicName: outbox.event.kessel.resources
           partitions: 1
           replicas: 3
-      optionalDependencies:
+      dependencies:
         - kessel-relations
         - kessel-kafkaconnect
       deployments:

@@ -135,7 +135,7 @@ There are numerous ways to run Inventory API using Docker Compose for various te
 
 ### Running in Ephemeral Cluster with Relations API using Bonfire
 
-See [Testing Inventory in Ephemeral](./docs/ephemeral-testing.md) for instructions on how to deploy Kessel Inventory in the ephemeral cluster.
+See [Testing Inventory in Ephemeral](./docs/dev-guides/ephemeral-testing.md) for instructions on how to deploy Kessel Inventory in the ephemeral cluster.
 
 ### API/Proto files Changes
 

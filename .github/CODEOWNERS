@@ -6,8 +6,8 @@
 # Default owners for everything in the repo
 * @tonytheleg @tylercreller @Rajagopalan-Ranganathan @akoserwal @lennysgarage @wscalf @Adam0Brien
 
-# All GitHub configuration requires review from admins
-.github/** @project-kessel/admins
+# All GitHub configuration requires review from core maintainers
+.github/** @tonytheleg @tylercreller @Rajagopalan-Ranganathan @akoserwal @lennysgarage @wscalf @Adam0Brien
 
 # CODEOWNERS self-protection — must come AFTER the wildcard (last match wins)
-.github/CODEOWNERS @project-kessel/admins
+.github/CODEOWNERS @tonytheleg @tylercreller @Rajagopalan-Ranganathan @akoserwal @lennysgarage @wscalf @Adam0Brien

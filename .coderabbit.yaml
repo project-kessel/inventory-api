@@ -150,6 +150,101 @@ reviews:
         - Datasource references should use variables, not direct URLs
         - Verify PromQL queries reference valid metric names
 
+    # ── Documentation gap detection ──────────────────────────────
+    #
+    # Flag PRs that introduce new features, change behavior, or
+    # make non-obvious modifications without a documentation update.
+    # Considers both in-repo docs and the Kessel Docs repo.
+    #
+    # In-repo doc locations:
+    #   docs/dev-guides/    — developer how-to guides
+    #   docs/runbooks/      — operational runbooks
+    #   README.md           — project overview, setup, API examples
+    #   CONTRIBUTING.md     — contribution workflow
+    #   AGENTS.md           — AI agent guidelines and docs index
+    #   internal/*/GUIDELINES.md — layer-specific coding guidelines
+    #
+    # Cross-repo target:
+    #   github.com/project-kessel/docs — Kessel user-facing docs
+
+    - path: "**/*.go"
+      instructions: |
+        Documentation gap check (skip for pure refactors, test-only
+        changes, or trivial bug fixes that do not alter observable
+        behavior):
+
+        When a PR adds a new feature, changes existing behavior,
+        adds/removes/renames a config key or CLI flag, or modifies
+        a public API contract, check whether documentation was
+        updated alongside the code:
+
+        1. In-repo docs — does a relevant guide in docs/dev-guides/
+           or the layer's GUIDELINES.md cover this area? Is it now
+           stale because of this change?
+        2. Cross-repo docs — for user-facing changes (new resource
+           types, changed API behavior, new auth modes, new
+           endpoints), the Kessel Docs repo
+           (github.com/project-kessel/docs) likely needs a
+           corresponding update as well. Flag if none is present.
+        3. Config/flag docs — changes to configuration handling
+           should be reflected in README.md and
+           docs/dev-guides/docker-compose-options.md.
+
+        Be specific: name the doc file and section that appears
+        stale or missing, describe what should be documented, and
+        suggest whether the update belongs in-repo or in the
+        Kessel Docs repo. Do not leave a generic "please update
+        docs" comment.
+
+    - path: "api/**/*.proto"
+      instructions: |
+        Documentation gap check:
+
+        Protobuf changes (new RPCs, modified messages, added or
+        removed fields, changed comments) almost always require
+        documentation updates. Flag if this PR does not include
+        changes to:
+        - README.md API examples or endpoint descriptions
+        - The Kessel Docs repo (github.com/project-kessel/docs)
+          for API reference and integration guides
+        - docs/dev-guides/ if the change affects developer workflow
+
+        Name the specific proto change (e.g. "new ListFoo RPC
+        added but no docs updated") and which documentation target
+        needs a corresponding update.
+
+    - path: "development/**"
+      instructions: |
+        Documentation gap check:
+
+        Docker Compose files, development configs, or setup script
+        changes must be reflected in
+        docs/dev-guides/docker-compose-options.md and the README.md
+        local development section. New services, changed ports,
+        renamed config variants, or new make targets all need
+        documentation. Flag if the corresponding doc update is
+        missing from this PR.
+
+    - path: "Makefile"
+      instructions: |
+        Documentation gap check:
+
+        New, renamed, or removed Make targets should be reflected in:
+        - README.md (build and test commands)
+        - docs/dev-guides/docker-compose-options.md (dev targets)
+        - CLAUDE.md (build command reference for AI agents)
+        Flag the specific target change and which doc is now stale.
+
+    - path: "internal/consumer/**/*.go"
+      instructions: |
+        Documentation gap check:
+
+        Consumer behavior changes (new message types, changed retry
+        logic, error handling, CDC integration changes) should be
+        reflected in the operational runbooks under docs/runbooks/.
+        Flag if a runbook appears stale after this change, naming
+        the specific runbook and what should be updated.
+
   # ── Security scanners ────────────────────────────────────────
   tools:
     gitleaks:

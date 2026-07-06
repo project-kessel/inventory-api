@@ -12,5 +12,5 @@
     },
     "parent_service_id": { "type": "string" }
   },
-  "required": ["allowed_workspace_ids", "billing_account_ids"]
+  "required": []
 }

@@ -62,7 +62,7 @@ objects:
     metadata:
       name: resources-tarball
     binaryData:
-      resources.tar.gz: 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
+      resources.tar.gz: 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
   - apiVersion: v1
     kind: Secret
     metadata:
@@ -96,44 +96,44 @@ objects:
             app: kessel-spicedb-postgres
         spec:
           containers:
-          - env:
-            - name: POSTGRESQL_DATABASE
-              valueFrom:
-                secretKeyRef:
-                  name: kessel-spicedb-postgres-secret
-                  key: POSTGRESQL_DATABASE
-            - name: POSTGRESQL_USER
-              valueFrom:
-                secretKeyRef:
-                  name: kessel-spicedb-postgres-secret
-                  key: POSTGRESQL_USER
-            - name: POSTGRESQL_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: kessel-spicedb-postgres-secret
-                  key: POSTGRESQL_PASSWORD
-            - name: PGDATA
-              value: /var/lib/pgsql/data
-            image: registry.redhat.io/rhel9/postgresql-16:9.5-1744136555
-            imagePullPolicy: Always
-            name: postgres
-            ports:
-            - containerPort: 5432
-              protocol: TCP
-            resources:
-              limits:
-                cpu: ${SPICEDB_POSTGRES_CPU_LIMIT}
-                memory: ${SPICEDB_POSTGRES_MEMORY_LIMIT}
-              requests:
-                cpu: ${SPICEDB_POSTGRES_CPU_REQUEST}
-                memory: ${SPICEDB_POSTGRES_MEMORY_REQUEST}
-            volumeMounts:
-            - name: kessel-spicedb-postgres-data
-              mountPath: /var/lib/pgsql/data
+            - env:
+                - name: POSTGRESQL_DATABASE
+                  valueFrom:
+                    secretKeyRef:
+                      name: kessel-spicedb-postgres-secret
+                      key: POSTGRESQL_DATABASE
+                - name: POSTGRESQL_USER
+                  valueFrom:
+                    secretKeyRef:
+                      name: kessel-spicedb-postgres-secret
+                      key: POSTGRESQL_USER
+                - name: POSTGRESQL_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: kessel-spicedb-postgres-secret
+                      key: POSTGRESQL_PASSWORD
+                - name: PGDATA
+                  value: /var/lib/pgsql/data
+              image: registry.redhat.io/rhel9/postgresql-16:9.5-1744136555
+              imagePullPolicy: Always
+              name: postgres
+              ports:
+                - containerPort: 5432
+                  protocol: TCP
+              resources:
+                limits:
+                  cpu: ${SPICEDB_POSTGRES_CPU_LIMIT}
+                  memory: ${SPICEDB_POSTGRES_MEMORY_LIMIT}
+                requests:
+                  cpu: ${SPICEDB_POSTGRES_CPU_REQUEST}
+                  memory: ${SPICEDB_POSTGRES_MEMORY_REQUEST}
+              volumeMounts:
+                - name: kessel-spicedb-postgres-data
+                  mountPath: /var/lib/pgsql/data
           volumes:
-          - name: kessel-spicedb-postgres-data
-            persistentVolumeClaim:
-              claimName: kessel-spicedb-postgres-data
+            - name: kessel-spicedb-postgres-data
+              persistentVolumeClaim:
+                claimName: kessel-spicedb-postgres-data
           restartPolicy: Always
   - apiVersion: v1
     kind: PersistentVolumeClaim
@@ -153,9 +153,9 @@ objects:
       name: kessel-spicedb-postgres
     spec:
       ports:
-      - name: http
-        port: 5432
-        protocol: TCP
+        - name: http
+          port: 5432
+          protocol: TCP
       selector:
         app: kessel-spicedb-postgres
   - apiVersion: authzed.com/v1alpha1
@@ -170,25 +170,25 @@ objects:
         image: ${{SPICEDB_IMAGE}}
       secretName: kessel-spicedb-config
       patches:
-      - kind: Deployment
-        patch:
-          spec:
-            template:
-              spec:
-                containers:
-                - name: spicedb
-                  resources:
-                    requests:
-                      memory: ${SPICEDB_MEMORY_REQUEST}
-                      cpu: ${SPICEDB_CPU_REQUEST}
-                    limits:
-                      memory: ${SPICEDB_MEMORY_LIMIT}
-                      cpu: ${SPICEDB_CPU_LIMIT}
-                  env:
-                    - name: SPICEDB_DISPATCH_CLUSTER_ENABLED
-                      value: "false"
-                    - name: SPICEDB_DISPATCH_UPSTREAM_ADDR
-                      value: ""
+        - kind: Deployment
+          patch:
+            spec:
+              template:
+                spec:
+                  containers:
+                    - name: spicedb
+                      resources:
+                        requests:
+                          memory: ${SPICEDB_MEMORY_REQUEST}
+                          cpu: ${SPICEDB_CPU_REQUEST}
+                        limits:
+                          memory: ${SPICEDB_MEMORY_LIMIT}
+                          cpu: ${SPICEDB_CPU_LIMIT}
+                      env:
+                        - name: SPICEDB_DISPATCH_CLUSTER_ENABLED
+                          value: "false"
+                        - name: SPICEDB_DISPATCH_UPSTREAM_ADDR
+                          value: ""
   - apiVersion: cloud.redhat.com/v1alpha1
     kind: ClowdApp
     metadata:

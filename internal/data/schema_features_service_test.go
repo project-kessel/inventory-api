@@ -16,7 +16,7 @@ var serviceJsonSchema = `{
 		"billing_account_ids": { "type": "array", "items": { "type": "string" } },
 		"parent_service_id": { "type": "string" }
 	},
-	"required": ["allowed_workspace_ids", "billing_account_ids"]
+	"required": []
 }`
 
 func newServiceKey(t *testing.T) model.ReporterResourceKey {
@@ -48,10 +48,10 @@ func TestFeaturesServiceSchema_Validate(t *testing.T) {
 		assert.NoError(t, err)
 	})
 
-	t.Run("missing required fields fails", func(t *testing.T) {
+	t.Run("empty object passes with no required fields", func(t *testing.T) {
 		valid, err := schema.Validate(map[string]interface{}{})
-		assert.False(t, valid)
-		assert.Error(t, err)
+		assert.True(t, valid)
+		assert.NoError(t, err)
 	})
 
 	t.Run("wrong type fails", func(t *testing.T) {

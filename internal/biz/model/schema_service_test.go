@@ -443,6 +443,205 @@ func TestCalculateTuples_OperationTypeScenarios(t *testing.T) {
 	}
 }
 
+func newRelationDef(t *testing.T, fieldName, relationName, subjectNamespace, subjectResourceType string, multiValued bool) model.RelationDef {
+	t.Helper()
+	rd, err := model.NewRelationDef(fieldName, relationName, subjectNamespace, subjectResourceType, multiValued)
+	require.NoError(t, err)
+	return rd
+}
+
+func TestCalculateTuplesFromRelationDefs(t *testing.T) {
+	type expectedTuple struct {
+		relation    string
+		subjectId   string
+		subjectType string
+		namespace   string
+	}
+
+	allRelations := []model.RelationDef{
+		newRelationDef(t, "allowed_workspaces", "allowed_workspaces", "rbac", "workspace", true),
+		newRelationDef(t, "billing_account", "billing_account", "features", "billing_account", true),
+		newRelationDef(t, "parent", "parent", "features", "service", false),
+	}
+
+	tests := []struct {
+		name                 string
+		relations            []model.RelationDef
+		currentData          map[string]interface{}
+		previousData         map[string]interface{}
+		expectTuplesToCreate bool
+		expectTuplesToDelete bool
+		expectedCreates      []expectedTuple
+		expectedDeletes      []expectedTuple
+	}{
+		{
+			name:      "initial creation produces creates for all relations",
+			relations: allRelations,
+			currentData: map[string]interface{}{
+				"allowed_workspaces": []interface{}{"ws-1", "ws-2"},
+				"billing_account":    []interface{}{"ba-1"},
+				"parent":             "parent-svc",
+			},
+			previousData:         nil,
+			expectTuplesToCreate: true,
+			expectTuplesToDelete: false,
+			expectedCreates: []expectedTuple{
+				{"allowed_workspaces", "ws-1", "workspace", "rbac"},
+				{"allowed_workspaces", "ws-2", "workspace", "rbac"},
+				{"billing_account", "ba-1", "billing_account", "features"},
+				{"parent", "parent-svc", "service", "features"},
+			},
+		},
+		{
+			name:      "multi-valued update creates and deletes changed values",
+			relations: allRelations[:2],
+			currentData: map[string]interface{}{
+				"allowed_workspaces": []interface{}{"ws-2", "ws-3"},
+				"billing_account":    []interface{}{"ba-1"},
+			},
+			previousData: map[string]interface{}{
+				"allowed_workspaces": []interface{}{"ws-1", "ws-2"},
+				"billing_account":    []interface{}{"ba-1"},
+			},
+			expectTuplesToCreate: true,
+			expectTuplesToDelete: true,
+			expectedCreates: []expectedTuple{
+				{"allowed_workspaces", "ws-3", "workspace", "rbac"},
+			},
+			expectedDeletes: []expectedTuple{
+				{"allowed_workspaces", "ws-1", "workspace", "rbac"},
+			},
+		},
+		{
+			name: "scalar field change creates new and deletes old",
+			relations: []model.RelationDef{
+				newRelationDef(t, "parent", "parent", "features", "service", false),
+			},
+			currentData:          map[string]interface{}{"parent": "new-parent"},
+			previousData:         map[string]interface{}{"parent": "old-parent"},
+			expectTuplesToCreate: true,
+			expectTuplesToDelete: true,
+			expectedCreates: []expectedTuple{
+				{"parent", "new-parent", "service", "features"},
+			},
+			expectedDeletes: []expectedTuple{
+				{"parent", "old-parent", "service", "features"},
+			},
+		},
+		{
+			name:      "same data produces no tuples",
+			relations: allRelations,
+			currentData: map[string]interface{}{
+				"allowed_workspaces": []interface{}{"ws-1"},
+				"parent":             "parent-svc",
+			},
+			previousData: map[string]interface{}{
+				"allowed_workspaces": []interface{}{"ws-1"},
+				"parent":             "parent-svc",
+			},
+			expectTuplesToCreate: false,
+			expectTuplesToDelete: false,
+		},
+		{
+			name:        "nil current produces only deletes",
+			relations:   allRelations,
+			currentData: nil,
+			previousData: map[string]interface{}{
+				"allowed_workspaces": []interface{}{"ws-1"},
+				"parent":             "parent-svc",
+			},
+			expectTuplesToCreate: false,
+			expectTuplesToDelete: true,
+			expectedDeletes: []expectedTuple{
+				{"allowed_workspaces", "ws-1", "workspace", "rbac"},
+				{"parent", "parent-svc", "service", "features"},
+			},
+		},
+		{
+			name:                 "empty relations produces no tuples",
+			relations:            nil,
+			currentData:          map[string]interface{}{"some_field": "value"},
+			previousData:         nil,
+			expectTuplesToCreate: false,
+			expectTuplesToDelete: false,
+		},
+		{
+			name: "missing field in representation produces no tuples",
+			relations: []model.RelationDef{
+				newRelationDef(t, "parent", "parent", "features", "service", false),
+			},
+			currentData:          map[string]interface{}{"unrelated_field": "value"},
+			previousData:         nil,
+			expectTuplesToCreate: false,
+			expectTuplesToDelete: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			key := newTestReporterResourceKey(t)
+
+			var current, previous *model.Representations
+
+			if tt.currentData != nil {
+				ver := model.NewVersion(1)
+				c, err := model.NewRepresentations(model.Representation(tt.currentData), &ver, nil, nil)
+				require.NoError(t, err)
+				current = c
+			}
+
+			if tt.previousData != nil {
+				prevVer := model.NewVersion(0)
+				p, err := model.NewRepresentations(model.Representation(tt.previousData), &prevVer, nil, nil)
+				require.NoError(t, err)
+				previous = p
+			}
+
+			result, err := model.CalculateTuplesFromRelationDefs(tt.relations, current, previous, key)
+			require.NoError(t, err)
+
+			assert.Equal(t, tt.expectTuplesToCreate, result.HasTuplesToCreate())
+			assert.Equal(t, tt.expectTuplesToDelete, result.HasTuplesToDelete())
+
+			if tt.expectTuplesToCreate {
+				creates := *result.TuplesToCreate()
+				assert.Len(t, creates, len(tt.expectedCreates))
+				for _, exp := range tt.expectedCreates {
+					found := false
+					for _, tuple := range creates {
+						if tuple.Relation().Serialize() == exp.relation &&
+							tuple.Subject().Resource().ResourceId().Serialize() == exp.subjectId &&
+							tuple.Subject().Resource().ResourceType().Serialize() == exp.subjectType &&
+							tuple.Subject().Resource().Reporter().ReporterType().Serialize() == exp.namespace {
+							found = true
+							break
+						}
+					}
+					assert.True(t, found, "expected create tuple %+v not found", exp)
+				}
+			}
+
+			if tt.expectTuplesToDelete {
+				deletes := *result.TuplesToDelete()
+				assert.Len(t, deletes, len(tt.expectedDeletes))
+				for _, exp := range tt.expectedDeletes {
+					found := false
+					for _, tuple := range deletes {
+						if tuple.Relation().Serialize() == exp.relation &&
+							tuple.Subject().Resource().ResourceId().Serialize() == exp.subjectId &&
+							tuple.Subject().Resource().ResourceType().Serialize() == exp.subjectType &&
+							tuple.Subject().Resource().Reporter().ReporterType().Serialize() == exp.namespace {
+							found = true
+							break
+						}
+					}
+					assert.True(t, found, "expected delete tuple %+v not found", exp)
+				}
+			}
+		})
+	}
+}
+
 func TestValidateReportAgainstSchema(t *testing.T) {
 	ctx := context.Background()
 

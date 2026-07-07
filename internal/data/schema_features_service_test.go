@@ -3,9 +3,7 @@ package data
 import (
 	"testing"
 
-	"github.com/project-kessel/inventory-api/internal/biz/model"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 var serviceJsonSchema = `{
@@ -19,21 +17,14 @@ var serviceJsonSchema = `{
 	"required": []
 }`
 
-func newServiceKey(t *testing.T) model.ReporterResourceKey {
-	t.Helper()
-	resourceType, err := model.NewResourceType("service")
-	require.NoError(t, err)
-	reporterType, err := model.NewReporterType("features")
-	require.NoError(t, err)
-	reporterInstanceId, err := model.NewReporterInstanceId("test-instance")
-	require.NoError(t, err)
-	key, err := model.NewReporterResourceKey(
-		model.DeserializeLocalResourceId("svc-001"),
-		resourceType, reporterType, reporterInstanceId,
-	)
-	require.NoError(t, err)
-	return key
-}
+var billingAccountJsonSchema = `{
+	"$schema": "http://json-schema.org/draft-07/schema#",
+	"type": "object",
+	"properties": {
+		"workspaces": { "type": "array", "items": { "type": "string" } }
+	},
+	"required": []
+}`
 
 func TestFeaturesServiceSchema_Validate(t *testing.T) {
 	schema := NewFeaturesServiceSchemaFromString(serviceJsonSchema)
@@ -65,205 +56,29 @@ func TestFeaturesServiceSchema_Validate(t *testing.T) {
 	})
 }
 
-func TestFeaturesServiceSchema_CalculateTuples_Create(t *testing.T) {
-	schema := NewFeaturesServiceSchemaFromString(serviceJsonSchema)
-	key := newServiceKey(t)
+func TestFeaturesBillingAccountSchema_Validate(t *testing.T) {
+	schema := NewFeaturesBillingAccountSchemaFromString(billingAccountJsonSchema)
 
-	ver := model.NewVersion(0)
-	current, err := model.NewRepresentations(
-		model.Representation(map[string]interface{}{
-			"allowed_workspaces": []interface{}{"ws-1", "ws-2"},
-			"billing_account":    []interface{}{"ba-1"},
-			"parent":             "parent-svc",
-		}),
-		&ver, nil, nil,
-	)
-	require.NoError(t, err)
+	t.Run("valid data passes", func(t *testing.T) {
+		valid, err := schema.Validate(map[string]interface{}{
+			"workspaces": []interface{}{"ws-1", "ws-2"},
+		})
+		assert.True(t, valid)
+		assert.NoError(t, err)
+	})
 
-	result, err := schema.CalculateTuples(current, nil, key)
-	require.NoError(t, err)
-	assert.True(t, result.HasTuplesToCreate())
-	assert.False(t, result.HasTuplesToDelete())
+	t.Run("empty object passes with no required fields", func(t *testing.T) {
+		valid, err := schema.Validate(map[string]interface{}{})
+		assert.True(t, valid)
+		assert.NoError(t, err)
+	})
 
-	creates := *result.TuplesToCreate()
-	assert.Len(t, creates, 4) // 2 workspaces + 1 billing + 1 parent
-
-	relations := make(map[string][]string)
-	for _, tuple := range creates {
-		rel := tuple.Relation().Serialize()
-		subjectId := tuple.Subject().Resource().ResourceId().Serialize()
-		relations[rel] = append(relations[rel], subjectId)
-	}
-	assert.ElementsMatch(t, []string{"ws-1", "ws-2"}, relations["allowed_workspaces"])
-	assert.ElementsMatch(t, []string{"ba-1"}, relations["billing_account"])
-	assert.ElementsMatch(t, []string{"parent-svc"}, relations["parent"])
-}
-
-func TestFeaturesServiceSchema_CalculateTuples_Update(t *testing.T) {
-	schema := NewFeaturesServiceSchemaFromString(serviceJsonSchema)
-	key := newServiceKey(t)
-
-	curVer := model.NewVersion(1)
-	current, err := model.NewRepresentations(
-		model.Representation(map[string]interface{}{
-			"allowed_workspaces": []interface{}{"ws-2", "ws-3"},
-			"billing_account":    []interface{}{"ba-1"},
-		}),
-		&curVer, nil, nil,
-	)
-	require.NoError(t, err)
-
-	prevVer := curVer.Decrement()
-	previous, err := model.NewRepresentations(
-		model.Representation(map[string]interface{}{
-			"allowed_workspaces": []interface{}{"ws-1", "ws-2"},
-			"billing_account":    []interface{}{"ba-1"},
-		}),
-		&prevVer, nil, nil,
-	)
-	require.NoError(t, err)
-
-	result, err := schema.CalculateTuples(current, previous, key)
-	require.NoError(t, err)
-	assert.True(t, result.HasTuplesToCreate())
-	assert.True(t, result.HasTuplesToDelete())
-
-	creates := *result.TuplesToCreate()
-	assert.Len(t, creates, 1) // ws-3 added
-	assert.Equal(t, "allowed_workspaces", creates[0].Relation().Serialize())
-	assert.Equal(t, "ws-3", creates[0].Subject().Resource().ResourceId().Serialize())
-
-	deletes := *result.TuplesToDelete()
-	assert.Len(t, deletes, 1) // ws-1 removed
-	assert.Equal(t, "allowed_workspaces", deletes[0].Relation().Serialize())
-	assert.Equal(t, "ws-1", deletes[0].Subject().Resource().ResourceId().Serialize())
-}
-
-func TestFeaturesServiceSchema_CalculateTuples_ScalarUpdate(t *testing.T) {
-	schema := NewFeaturesServiceSchemaFromString(serviceJsonSchema)
-	key := newServiceKey(t)
-
-	curVer := model.NewVersion(1)
-	current, err := model.NewRepresentations(
-		model.Representation(map[string]interface{}{
-			"allowed_workspaces": []interface{}{"ws-1"},
-			"billing_account":    []interface{}{"ba-new"},
-			"parent":             "parent-new",
-		}),
-		&curVer, nil, nil,
-	)
-	require.NoError(t, err)
-
-	prevVer := curVer.Decrement()
-	previous, err := model.NewRepresentations(
-		model.Representation(map[string]interface{}{
-			"allowed_workspaces": []interface{}{"ws-1"},
-			"billing_account":    []interface{}{"ba-old"},
-			"parent":             "parent-old",
-		}),
-		&prevVer, nil, nil,
-	)
-	require.NoError(t, err)
-
-	result, err := schema.CalculateTuples(current, previous, key)
-	require.NoError(t, err)
-	assert.True(t, result.HasTuplesToCreate())
-	assert.True(t, result.HasTuplesToDelete())
-
-	creates := *result.TuplesToCreate()
-	assert.Len(t, creates, 2) // ba-new + parent-new
-
-	deletes := *result.TuplesToDelete()
-	assert.Len(t, deletes, 2) // ba-old + parent-old
-}
-
-func TestFeaturesServiceSchema_CalculateTuples_NoChange(t *testing.T) {
-	schema := NewFeaturesServiceSchemaFromString(serviceJsonSchema)
-	key := newServiceKey(t)
-
-	curVer := model.NewVersion(1)
-	current, err := model.NewRepresentations(
-		model.Representation(map[string]interface{}{
-			"allowed_workspaces": []interface{}{"ws-1"},
-			"billing_account":    []interface{}{"ba-1"},
-		}),
-		&curVer, nil, nil,
-	)
-	require.NoError(t, err)
-
-	prevVer := curVer.Decrement()
-	previous, err := model.NewRepresentations(
-		model.Representation(map[string]interface{}{
-			"allowed_workspaces": []interface{}{"ws-1"},
-			"billing_account":    []interface{}{"ba-1"},
-		}),
-		&prevVer, nil, nil,
-	)
-	require.NoError(t, err)
-
-	result, err := schema.CalculateTuples(current, previous, key)
-	require.NoError(t, err)
-	assert.True(t, result.IsEmpty())
-}
-
-func TestFeaturesServiceSchema_CalculateTuples_Delete(t *testing.T) {
-	schema := NewFeaturesServiceSchemaFromString(serviceJsonSchema)
-	key := newServiceKey(t)
-
-	prevVer := model.NewVersion(0)
-	previous, err := model.NewRepresentations(
-		model.Representation(map[string]interface{}{
-			"allowed_workspaces": []interface{}{"ws-1"},
-			"billing_account":    []interface{}{"ba-1"},
-			"parent":             "parent-svc",
-		}),
-		&prevVer, nil, nil,
-	)
-	require.NoError(t, err)
-
-	result, err := schema.CalculateTuples(nil, previous, key)
-	require.NoError(t, err)
-	assert.False(t, result.HasTuplesToCreate())
-	assert.True(t, result.HasTuplesToDelete())
-
-	deletes := *result.TuplesToDelete()
-	assert.Len(t, deletes, 3) // 1 workspace + 1 billing + 1 parent
-}
-
-func TestFeaturesServiceSchema_CalculateTuples_SubjectTypes(t *testing.T) {
-	schema := NewFeaturesServiceSchemaFromString(serviceJsonSchema)
-	key := newServiceKey(t)
-
-	ver := model.NewVersion(0)
-	current, err := model.NewRepresentations(
-		model.Representation(map[string]interface{}{
-			"allowed_workspaces": []interface{}{"ws-1"},
-			"billing_account":    []interface{}{"ba-1"},
-			"parent":             "parent-svc",
-		}),
-		&ver, nil, nil,
-	)
-	require.NoError(t, err)
-
-	result, err := schema.CalculateTuples(current, nil, key)
-	require.NoError(t, err)
-
-	creates := *result.TuplesToCreate()
-	subjectByRelation := make(map[string]struct{ namespace, resourceType string })
-	for _, tuple := range creates {
-		rel := tuple.Relation().Serialize()
-		subjectByRelation[rel] = struct{ namespace, resourceType string }{
-			namespace:    tuple.Subject().Resource().Reporter().ReporterType().Serialize(),
-			resourceType: tuple.Subject().Resource().ResourceType().Serialize(),
-		}
-	}
-
-	assert.Equal(t, "rbac", subjectByRelation["allowed_workspaces"].namespace)
-	assert.Equal(t, "workspace", subjectByRelation["allowed_workspaces"].resourceType)
-
-	assert.Equal(t, "features", subjectByRelation["billing_account"].namespace)
-	assert.Equal(t, "billing_account", subjectByRelation["billing_account"].resourceType)
-
-	assert.Equal(t, "features", subjectByRelation["parent"].namespace)
-	assert.Equal(t, "service", subjectByRelation["parent"].resourceType)
+	t.Run("wrong type fails", func(t *testing.T) {
+		valid, err := schema.Validate(map[string]interface{}{
+			"workspaces": "not-an-array",
+		})
+		assert.False(t, valid)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "validation failed")
+	})
 }

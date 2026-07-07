@@ -4,10 +4,10 @@
 # Rules are evaluated top-to-bottom; last matching pattern takes precedence.
 
 # Default owners for everything in the repo
-* @tonytheleg @tylercreller @Rajagopalan-Ranganathan @akoserwal @lennysgarage @wscalf @Adam0Brien
+* @project-kessel/resources-relations-team
 
 # All GitHub configuration requires review from core maintainers
-.github/** @tonytheleg @tylercreller @Rajagopalan-Ranganathan @akoserwal @lennysgarage @wscalf @Adam0Brien
+.github/** @project-kessel/resources-relations-team
 
 # CODEOWNERS self-protection — must come AFTER the wildcard (last match wins)
-.github/CODEOWNERS @tonytheleg @tylercreller @Rajagopalan-Ranganathan @akoserwal @lennysgarage @wscalf @Adam0Brien
+.github/CODEOWNERS @project-kessel/resources-relations-team

@@ -58,9 +58,9 @@ func (s relationDefsSchema) CalculateTuples(
 }
 
 var serviceRelations = []relationDef{
-	{"allowed_workspace_ids", "allowed_workspaces", model.RbacNamespace, "workspace", true},
-	{"billing_account_ids", "billing_account", featureNamespace, "billing_account", true},
-	{"parent_service_id", "parent", featureNamespace, "service", false},
+	{"allowed_workspaces", "allowed_workspaces", model.RbacNamespace, "workspace", true},
+	{"billing_account", "billing_account", featureNamespace, "billing_account", true},
+	{"parent", "parent", featureNamespace, "service", false},
 }
 
 func NewFeaturesServiceSchemaFromString(jsonSchema string) model.Schema {

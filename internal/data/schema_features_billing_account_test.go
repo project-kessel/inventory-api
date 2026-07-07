@@ -12,9 +12,9 @@ var billingAccountJsonSchema = `{
 	"$schema": "http://json-schema.org/draft-07/schema#",
 	"type": "object",
 	"properties": {
-		"workspace_ids": { "type": "array", "items": { "type": "string" } }
+		"workspaces": { "type": "array", "items": { "type": "string" } }
 	},
-	"required": ["workspace_ids"]
+	"required": []
 }`
 
 func newBillingAccountKey(t *testing.T) model.ReporterResourceKey {
@@ -38,21 +38,21 @@ func TestFeaturesBillingAccountSchema_Validate(t *testing.T) {
 
 	t.Run("valid data passes", func(t *testing.T) {
 		valid, err := schema.Validate(map[string]interface{}{
-			"workspace_ids": []interface{}{"ws-1", "ws-2"},
+			"workspaces": []interface{}{"ws-1", "ws-2"},
 		})
 		assert.True(t, valid)
 		assert.NoError(t, err)
 	})
 
-	t.Run("missing required fields fails", func(t *testing.T) {
+	t.Run("empty object passes with no required fields", func(t *testing.T) {
 		valid, err := schema.Validate(map[string]interface{}{})
-		assert.False(t, valid)
-		assert.Error(t, err)
+		assert.True(t, valid)
+		assert.NoError(t, err)
 	})
 
 	t.Run("wrong type fails", func(t *testing.T) {
 		valid, err := schema.Validate(map[string]interface{}{
-			"workspace_ids": "not-an-array",
+			"workspaces": "not-an-array",
 		})
 		assert.False(t, valid)
 		assert.Error(t, err)
@@ -67,7 +67,7 @@ func TestFeaturesBillingAccountSchema_CalculateTuples_Create(t *testing.T) {
 	ver := model.NewVersion(0)
 	current, err := model.NewRepresentations(
 		model.Representation(map[string]interface{}{
-			"workspace_ids": []interface{}{"ws-1", "ws-2"},
+			"workspaces": []interface{}{"ws-1", "ws-2"},
 		}),
 		&ver, nil, nil,
 	)
@@ -97,7 +97,7 @@ func TestFeaturesBillingAccountSchema_CalculateTuples_Update(t *testing.T) {
 	curVer := model.NewVersion(1)
 	current, err := model.NewRepresentations(
 		model.Representation(map[string]interface{}{
-			"workspace_ids": []interface{}{"ws-2", "ws-3"},
+			"workspaces": []interface{}{"ws-2", "ws-3"},
 		}),
 		&curVer, nil, nil,
 	)
@@ -106,7 +106,7 @@ func TestFeaturesBillingAccountSchema_CalculateTuples_Update(t *testing.T) {
 	prevVer := curVer.Decrement()
 	previous, err := model.NewRepresentations(
 		model.Representation(map[string]interface{}{
-			"workspace_ids": []interface{}{"ws-1", "ws-2"},
+			"workspaces": []interface{}{"ws-1", "ws-2"},
 		}),
 		&prevVer, nil, nil,
 	)
@@ -135,7 +135,7 @@ func TestFeaturesBillingAccountSchema_CalculateTuples_NoChange(t *testing.T) {
 	curVer := model.NewVersion(1)
 	current, err := model.NewRepresentations(
 		model.Representation(map[string]interface{}{
-			"workspace_ids": []interface{}{"ws-1"},
+			"workspaces": []interface{}{"ws-1"},
 		}),
 		&curVer, nil, nil,
 	)
@@ -144,7 +144,7 @@ func TestFeaturesBillingAccountSchema_CalculateTuples_NoChange(t *testing.T) {
 	prevVer := curVer.Decrement()
 	previous, err := model.NewRepresentations(
 		model.Representation(map[string]interface{}{
-			"workspace_ids": []interface{}{"ws-1"},
+			"workspaces": []interface{}{"ws-1"},
 		}),
 		&prevVer, nil, nil,
 	)
@@ -162,7 +162,7 @@ func TestFeaturesBillingAccountSchema_CalculateTuples_Delete(t *testing.T) {
 	prevVer := model.NewVersion(0)
 	previous, err := model.NewRepresentations(
 		model.Representation(map[string]interface{}{
-			"workspace_ids": []interface{}{"ws-1", "ws-2"},
+			"workspaces": []interface{}{"ws-1", "ws-2"},
 		}),
 		&prevVer, nil, nil,
 	)
@@ -184,7 +184,7 @@ func TestFeaturesBillingAccountSchema_CalculateTuples_SubjectTypes(t *testing.T)
 	ver := model.NewVersion(0)
 	current, err := model.NewRepresentations(
 		model.Representation(map[string]interface{}{
-			"workspace_ids": []interface{}{"ws-1"},
+			"workspaces": []interface{}{"ws-1"},
 		}),
 		&ver, nil, nil,
 	)

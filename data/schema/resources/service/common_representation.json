@@ -2,15 +2,15 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "type": "object",
   "properties": {
-    "allowed_workspace_ids": {
+    "allowed_workspaces": {
       "type": "array",
-      "items": { "type": "string" }
+      "items": { "format": "uuid", "type": "string" }
     },
-    "billing_account_ids": {
+    "billing_account": {
       "type": "array",
-      "items": { "type": "string" }
+      "items": { "format": "uuid", "type": "string" }
     },
-    "parent_service_id": { "type": "string" }
+    "parent": { "format": "uuid", "type": "string" }
   },
   "required": []
 }

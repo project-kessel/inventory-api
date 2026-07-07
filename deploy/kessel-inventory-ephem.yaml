@@ -97,29 +97,29 @@ objects:
         spec:
           containers:
           - env:
-              - name: POSTGRESQL_DATABASE
-                valueFrom:
-                  secretKeyRef:
-                    name: kessel-spicedb-postgres-secret
-                    key: POSTGRESQL_DATABASE
-              - name: POSTGRESQL_USER
-                valueFrom:
-                  secretKeyRef:
-                    name: kessel-spicedb-postgres-secret
-                    key: POSTGRESQL_USER
-              - name: POSTGRESQL_PASSWORD
-                valueFrom:
-                  secretKeyRef:
-                    name: kessel-spicedb-postgres-secret
-                    key: POSTGRESQL_PASSWORD
-              - name: PGDATA
-                value: /var/lib/pgsql/data
+            - name: POSTGRESQL_DATABASE
+              valueFrom:
+                secretKeyRef:
+                  name: kessel-spicedb-postgres-secret
+                  key: POSTGRESQL_DATABASE
+            - name: POSTGRESQL_USER
+              valueFrom:
+                secretKeyRef:
+                  name: kessel-spicedb-postgres-secret
+                  key: POSTGRESQL_USER
+            - name: POSTGRESQL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: kessel-spicedb-postgres-secret
+                  key: POSTGRESQL_PASSWORD
+            - name: PGDATA
+              value: /var/lib/pgsql/data
             image: registry.redhat.io/rhel9/postgresql-16:9.5-1744136555
             imagePullPolicy: Always
             name: postgres
             ports:
-              - containerPort: 5432
-                protocol: TCP
+            - containerPort: 5432
+              protocol: TCP
             resources:
               limits:
                 cpu: ${SPICEDB_POSTGRES_CPU_LIMIT}
@@ -128,8 +128,8 @@ objects:
                 cpu: ${SPICEDB_POSTGRES_CPU_REQUEST}
                 memory: ${SPICEDB_POSTGRES_MEMORY_REQUEST}
             volumeMounts:
-              - name: kessel-spicedb-postgres-data
-                mountPath: /var/lib/pgsql/data
+            - name: kessel-spicedb-postgres-data
+              mountPath: /var/lib/pgsql/data
           volumes:
           - name: kessel-spicedb-postgres-data
             persistentVolumeClaim:
@@ -176,19 +176,19 @@ objects:
             template:
               spec:
                 containers:
-                  - name: spicedb
-                    resources:
-                      requests:
-                        memory: ${SPICEDB_MEMORY_REQUEST}
-                        cpu: ${SPICEDB_CPU_REQUEST}
-                      limits:
-                        memory: ${SPICEDB_MEMORY_LIMIT}
-                        cpu: ${SPICEDB_CPU_LIMIT}
-                    env:
-                      - name: SPICEDB_DISPATCH_CLUSTER_ENABLED
-                        value: "false"
-                      - name: SPICEDB_DISPATCH_UPSTREAM_ADDR
-                        value: ""
+                - name: spicedb
+                  resources:
+                    requests:
+                      memory: ${SPICEDB_MEMORY_REQUEST}
+                      cpu: ${SPICEDB_CPU_REQUEST}
+                    limits:
+                      memory: ${SPICEDB_MEMORY_LIMIT}
+                      cpu: ${SPICEDB_CPU_LIMIT}
+                  env:
+                    - name: SPICEDB_DISPATCH_CLUSTER_ENABLED
+                      value: "false"
+                    - name: SPICEDB_DISPATCH_UPSTREAM_ADDR
+                      value: ""
   - apiVersion: cloud.redhat.com/v1alpha1
     kind: ClowdApp
     metadata:

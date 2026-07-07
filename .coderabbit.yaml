@@ -214,6 +214,21 @@ reviews:
           for API reference and integration guides
         - docs/dev-guides/ if the change affects developer workflow
 
+        Kessel SDK update check:
+
+        Proto changes also affect downstream Kessel SDKs and client
+        libraries that are generated from or depend on these
+        definitions. When a PR modifies proto files (new RPCs,
+        changed messages, updated comments), remind the author to
+        coordinate updates to the Kessel SDKs
+        (github.com/project-kessel/kessel-sdk-go,
+        kessel-sdk-java, kessel-sdk-py, kessel-sdk-node,
+        kessel-sdk-ruby, kessel-sdk-browser) and inventory client
+        libraries (inventory-client-go, inventory-client-java,
+        inventory-client-python) so that consumers can see the
+        changes. Name the specific proto change and which SDK
+        repos are likely affected.
+
         Name the specific proto change (e.g. "new ListFoo RPC
         added but no docs updated") and which documentation target
         needs a corresponding update.

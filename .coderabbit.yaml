@@ -242,6 +242,29 @@ reviews:
         documentation. Flag if the corresponding doc update is
         missing from this PR.
 
+    - path: "deploy/*ephem*.yaml"
+      instructions: |
+        Documentation gap check (skip for pure formatting, comment-only,
+        or label-only changes):
+
+        Ephemeral deploy templates drive service-provider onboarding
+        flows. When a PR changes container images, resource limits,
+        environment variables, volume mounts, init containers, or
+        service endpoints in these templates, check:
+
+        1. In-repo docs — are docs/dev-guides/ephemeral-testing.md
+           and docs/dev-guides/ephemeral-testing-w-notifications.md
+           still accurate? Flag the specific section that is now stale
+           (e.g. "the environment variables table no longer lists
+           NEW_VAR added in this PR").
+        2. InScope docs — Kessel internal documentation on InScope
+           (private, not accessible to CodeRabbit) may also need
+           updating. Flag an FYI reminder for the author to check
+           the Kessel InScope onboarding/ephemeral docs for staleness.
+
+        Be specific: name the template change, the doc file and
+        section that appears stale, and what should be documented.
+
     - path: "Makefile"
       instructions: |
         Documentation gap check:

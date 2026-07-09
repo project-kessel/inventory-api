@@ -85,6 +85,11 @@ objects:
                   mountPath: "/data/schema/resources"
                 - name: resources-tarball
                   mountPath: "/mnt/resources"
+                - name: spicedb-schema
+                  mountPath: "/etc/spicedb-schema"
+                - name: spicedb-secret
+                  mountPath: "/etc/spicedb-secret"
+                  readOnly: true
             volumes:
               - name: config-volume
                 secret:
@@ -98,6 +103,17 @@ objects:
               - name: resources-tarball
                 configMap:
                   name: resources-tarball
+              - name: spicedb-schema
+                configMap:
+                  name: ${SPICEDB_SCHEMA_CONFIGMAP}
+                  optional: true
+              - name: spicedb-secret
+                secret:
+                  secretName: ${SPICEDB_SECRET_NAME}
+                  optional: true
+                  items:
+                    - key: preshared_key
+                      path: preshared_key
           webServices:
             public:
               enabled: true
@@ -256,3 +272,9 @@ parameters:
   - description: Suspend the metrics collection CronJob (set to true to disable)
     name: METRICS_CRONJOB_SUSPEND
     value: "false"
+  - description: K8s secret containing SpiceDB preshared key (mounted as token-file)
+    name: SPICEDB_SECRET_NAME
+    value: "spicedb-config"
+  - description: ConfigMap containing SpiceDB schema.zed
+    name: SPICEDB_SCHEMA_CONFIGMAP
+    value: "spicedb-schema"

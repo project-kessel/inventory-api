@@ -349,24 +349,9 @@ knowledge_base:
   pull_requests:
     scope: "auto"
   linked_repositories:
-    - repository: "project-kessel/kessel-sdk-go"
-      instructions: |
-        Go SDK. Generated from inventory-api protos via buf.gen.yaml (BSR module buf.build/project-kessel/inventory-api). Auto-regenerated every 6h by CI. Breaking changes to watch: renaming/removing proto messages or fields (ReportResourceRequest, DeleteResourceRequest, CheckRequest, ResourceReference, SubjectReference, etc.), renaming/removing RPCs (ReportResource, DeleteResource, Check, CheckForUpdate, StreamedListObjects, StreamedListSubjects), changing field types or numbers, removing services (KesselInventoryService, KesselTupleService, KesselInventoryHealthService). Also consumes buf.validate types -- changes to validation annotations affect generated code.
-    - repository: "project-kessel/kessel-sdk-java"
-      instructions: |
-        Java SDK. Generated from inventory-api protos via buf.gen.yaml (BSR module buf.build/project-kessel/inventory-api). Auto-regenerated every 6h by CI. Same breaking change surface as kessel-sdk-go: proto message/field/RPC renames or removals, field type changes, service removals. Java stubs live in org.project_kessel.api.inventory.v1beta2 package.
-    - repository: "project-kessel/kessel-sdk-node"
-      instructions: |
-        Node/TypeScript SDK. Generated from inventory-api protos via buf.gen.yaml using ts-proto plugin (BSR module buf.build/project-kessel/inventory-api). Auto-regenerated every 6h by CI. Same breaking change surface as other SDKs: proto message/field/RPC renames or removals, field type changes, service removals. Exports kessel/inventory/v1beta2 TypeScript modules.
-    - repository: "project-kessel/kessel-sdk-py"
-      instructions: |
-        Python SDK. Generated from inventory-api protos via buf.gen.yaml (BSR module buf.build/project-kessel/inventory-api). Auto-regenerated every 6h by CI. Same breaking change surface as other SDKs: proto message/field/RPC renames or removals, field type changes, service removals. Uses include_imports: true because buf.validate protos are not on PyPI.
-    - repository: "project-kessel/kessel-sdk-ruby"
-      instructions: |
-        Ruby SDK. Generated from inventory-api protos via buf.gen.yaml (BSR module buf.build/project-kessel/inventory-api). Auto-regenerated every 6h by CI. Same breaking change surface as other SDKs: proto message/field/RPC renames or removals, field type changes, service removals.
     - repository: "project-kessel/kessel-sdk-browser"
       instructions: |
-        Browser/React SDK (@project-kessel/react-kessel-access-check). Does NOT use proto codegen -- makes runtime HTTP calls to inventory-api's v1beta2 endpoints (checkself, checkselfbulk) with hand-written TypeScript types. Breaking changes to watch: HTTP endpoint path changes (/api/kessel/v1beta2/checkself, /api/kessel/v1beta2/checkselfbulk), request/response JSON shape changes for Check/CheckSelf operations, HTTP status code semantics, authentication flow changes affecting browser clients.
+        Browser/React SDK (@project-kessel/react-kessel-access-check). Does NOT use proto codegen -- makes runtime HTTP calls to inventory-api's v1beta2 endpoints (checkself, checkselfbulk) with hand-written TypeScript types. Breaking changes to watch: HTTP endpoint path changes (/api/kessel/v1beta2/checkself, /api/kessel/v1beta2/checkselfbulk), request/response JSON shape changes for Check/CheckSelf operations, HTTP status code semantics, authentication flow changes affecting browser clients. Not covered by buf breaking checks since it has no proto dependency.
     - repository: "project-kessel/inventory-consumer"
       instructions: |
-        Kafka consumer service that reads Debezium CDC messages and forwards them to inventory-api via gRPC (through kessel-sdk-go). Two dependency paths: (1) Go module dependency on inventory-api cmd/common package (ToPointer, InitLogger, GetLogLevel utilities -- used in tests only). (2) Runtime gRPC dependency via kessel-sdk-go on ReportResource, DeleteResource, GetLivez RPCs and their request/response types. Also depends on the Kafka/outbox event schema -- changes to outbox event format, Debezium message headers (operation, version), or CloudEvents payload structure would break message parsing.
+        Kafka consumer service that reads Debezium CDC messages and forwards them to inventory-api via gRPC (through kessel-sdk-go). Two dependency paths: (1) Go module dependency on inventory-api cmd/common package (ToPointer, InitLogger, GetLogLevel utilities -- used in tests only). (2) Runtime gRPC dependency via kessel-sdk-go on ReportResource, DeleteResource, GetLivez RPCs and their request/response types. Also depends on the Kafka/outbox event schema -- changes to outbox event format, Debezium message headers (operation, version), or CloudEvents payload structure would break message parsing. Proto-level breaking changes are caught by buf CI, but cmd/common and event schema changes are not.

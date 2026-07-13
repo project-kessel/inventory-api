@@ -7,6 +7,12 @@
     "schedule": ["* 0-7 * * 0"],
     "packageRules": [
       {
+        "matchManagers": ["gomod"],
+        "matchPackageNames": ["github.com/go-kratos/**"],
+        "matchUpdateTypes": ["major"],
+        "enabled": false
+      },
+      {
         "matchDatasources": ["go"],
         "enabled": true,
         "groupName": "Go updates",

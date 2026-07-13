@@ -1,4 +1,4 @@
-FROM registry.access.redhat.com/hi/go:1.26.4-fips AS builder
+FROM registry.access.redhat.com/hi/go:1.26.5-fips AS builder
 
 WORKDIR /workspace
 

@@ -9,17 +9,21 @@ option java_multiple_files = true;
 option java_package = "org.project_kessel.api.inventory.v1";
 
 service KesselInventoryHealthService {
-  rpc GetLivez(GetLivezRequest) returns (GetLivezResponse) {
-    option (google.api.http) = {get: "/api/kessel/v1/livez"};
-  }
-  rpc GetReadyz(GetReadyzRequest) returns (GetReadyzResponse) {
-    option (google.api.http) = {get: "/api/kessel/v1/readyz"};
-  }
+  rpc GetLivez (GetLivezRequest) returns (GetLivezResponse){
+    option (google.api.http) = {
+      get: "/api/kessel/v1/livez"
+    };
+  };
+  rpc GetReadyz (GetReadyzRequest) returns (GetReadyzResponse){
+    option (google.api.http) = {
+      get: "/api/kessel/v1/readyz"
+    };
+  };
 }
 
 message GetLivezRequest {}
 message GetLivezResponse {
-  string status = 3; // intentional break to verify `buf skip breaking`
+  string status = 1;
   uint32 code = 2;
 }
 

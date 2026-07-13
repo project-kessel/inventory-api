@@ -60,7 +60,7 @@ func (*GetLivezRequest) Descriptor() ([]byte, []int) {
 
 type GetLivezResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Status        string                 `protobuf:"bytes,3,opt,name=status,proto3" json:"status,omitempty"` // intentional break to verify `buf skip breaking`
+	Status        string                 `protobuf:"bytes,1,opt,name=status,proto3" json:"status,omitempty"`
 	Code          uint32                 `protobuf:"varint,2,opt,name=code,proto3" json:"code,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -205,7 +205,7 @@ const file_kessel_inventory_v1_health_proto_rawDesc = "" +
 	" kessel/inventory/v1/health.proto\x12\x13kessel.inventory.v1\x1a\x1cgoogle/api/annotations.proto\"\x11\n" +
 	"\x0fGetLivezRequest\">\n" +
 	"\x10GetLivezResponse\x12\x16\n" +
-	"\x06status\x18\x03 \x01(\tR\x06status\x12\x12\n" +
+	"\x06status\x18\x01 \x01(\tR\x06status\x12\x12\n" +
 	"\x04code\x18\x02 \x01(\rR\x04code\"\x12\n" +
 	"\x10GetReadyzRequest\"?\n" +
 	"\x11GetReadyzResponse\x12\x16\n" +

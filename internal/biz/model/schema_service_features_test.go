@@ -32,8 +32,10 @@ func serviceKey(t *testing.T) model.ReporterResourceKey {
 	require.NoError(t, err)
 	reporterInstanceId, err := model.NewReporterInstanceId("features-instance")
 	require.NoError(t, err)
+	localResourceId, err := model.NewLocalResourceId("svc-001")
+	require.NoError(t, err)
 	key, err := model.NewReporterResourceKey(
-		model.LocalResourceId("svc-001"),
+		localResourceId,
 		resourceType, reporterType, reporterInstanceId,
 	)
 	require.NoError(t, err)
@@ -48,8 +50,10 @@ func billingAccountKey(t *testing.T) model.ReporterResourceKey {
 	require.NoError(t, err)
 	reporterInstanceId, err := model.NewReporterInstanceId("features-instance")
 	require.NoError(t, err)
+	localResourceId, err := model.NewLocalResourceId("ba-001")
+	require.NoError(t, err)
 	key, err := model.NewReporterResourceKey(
-		model.LocalResourceId("ba-001"),
+		localResourceId,
 		resourceType, reporterType, reporterInstanceId,
 	)
 	require.NoError(t, err)
@@ -80,28 +84,13 @@ func TestFeaturesService_CreateTuples(t *testing.T) {
 	assert.False(t, result.HasTuplesToDelete())
 
 	creates := *result.TuplesToCreate()
-	assert.Len(t, creates, 4) // 2 allowed_workspaces + 1 billing_account + 1 parent
-
-	type tupleInfo struct {
-		relation        string
-		subjectType     string
-		subjectReporter string
-		subjectId       string
+	expected := []model.RelationsTuple{
+		model.NewRelationTupleForSubject(key, "allowed_workspaces", "rbac", "workspace", "ws-1"),
+		model.NewRelationTupleForSubject(key, "allowed_workspaces", "rbac", "workspace", "ws-2"),
+		model.NewRelationTupleForSubject(key, "billing_account", "features", "billing_account", "ba-100"),
+		model.NewRelationTupleForSubject(key, "parent", "features", "service", "parent-svc"),
 	}
-	var tuples []tupleInfo
-	for _, tuple := range creates {
-		tuples = append(tuples, tupleInfo{
-			relation:        tuple.Relation().Serialize(),
-			subjectType:     tuple.Subject().Resource().ResourceType().Serialize(),
-			subjectReporter: tuple.Subject().Resource().Reporter().ReporterType().Serialize(),
-			subjectId:       tuple.Subject().Resource().ResourceId().Serialize(),
-		})
-	}
-
-	assert.Contains(t, tuples, tupleInfo{"allowed_workspaces", "workspace", "rbac", "ws-1"})
-	assert.Contains(t, tuples, tupleInfo{"allowed_workspaces", "workspace", "rbac", "ws-2"})
-	assert.Contains(t, tuples, tupleInfo{"billing_account", "billing_account", "features", "ba-100"})
-	assert.Contains(t, tuples, tupleInfo{"parent", "service", "features", "parent-svc"})
+	assert.ElementsMatch(t, expected, creates)
 }
 
 func TestFeaturesService_UpdateTuples(t *testing.T) {
@@ -141,33 +130,17 @@ func TestFeaturesService_UpdateTuples(t *testing.T) {
 	creates := *result.TuplesToCreate()
 	deletes := *result.TuplesToDelete()
 
-	// ws-3 added, ba-200 added
-	assert.Len(t, creates, 2)
-	// ws-1 removed, ba-100 removed
-	assert.Len(t, deletes, 2)
+	expectedCreates := []model.RelationsTuple{
+		model.NewRelationTupleForSubject(key, "allowed_workspaces", "rbac", "workspace", "ws-3"),
+		model.NewRelationTupleForSubject(key, "billing_account", "features", "billing_account", "ba-200"),
+	}
+	assert.ElementsMatch(t, expectedCreates, creates)
 
-	type tupleInfo struct {
-		relation  string
-		subjectId string
+	expectedDeletes := []model.RelationsTuple{
+		model.NewRelationTupleForSubject(key, "allowed_workspaces", "rbac", "workspace", "ws-1"),
+		model.NewRelationTupleForSubject(key, "billing_account", "features", "billing_account", "ba-100"),
 	}
-	var createInfos, deleteInfos []tupleInfo
-	for _, tuple := range creates {
-		createInfos = append(createInfos, tupleInfo{
-			relation:  tuple.Relation().Serialize(),
-			subjectId: tuple.Subject().Resource().ResourceId().Serialize(),
-		})
-	}
-	for _, tuple := range deletes {
-		deleteInfos = append(deleteInfos, tupleInfo{
-			relation:  tuple.Relation().Serialize(),
-			subjectId: tuple.Subject().Resource().ResourceId().Serialize(),
-		})
-	}
-
-	assert.Contains(t, createInfos, tupleInfo{"allowed_workspaces", "ws-3"})
-	assert.Contains(t, createInfos, tupleInfo{"billing_account", "ba-200"})
-	assert.Contains(t, deleteInfos, tupleInfo{"allowed_workspaces", "ws-1"})
-	assert.Contains(t, deleteInfos, tupleInfo{"billing_account", "ba-100"})
+	assert.ElementsMatch(t, expectedDeletes, deletes)
 }
 
 func TestFeaturesService_DeleteTuples(t *testing.T) {
@@ -250,25 +223,11 @@ func TestFeaturesBillingAccount_MultiWorkspaceTuples(t *testing.T) {
 	assert.False(t, result.HasTuplesToDelete())
 
 	creates := *result.TuplesToCreate()
-	assert.Len(t, creates, 2)
-
-	type tupleInfo struct {
-		relation    string
-		subjectId   string
-		subjectType string
-		namespace   string
+	expected := []model.RelationsTuple{
+		model.NewRelationTupleForSubject(key, "workspace", "rbac", "workspace", "ws-billing-1"),
+		model.NewRelationTupleForSubject(key, "workspace", "rbac", "workspace", "ws-billing-2"),
 	}
-	var tuples []tupleInfo
-	for _, tuple := range creates {
-		tuples = append(tuples, tupleInfo{
-			relation:    tuple.Relation().Serialize(),
-			subjectId:   tuple.Subject().Resource().ResourceId().Serialize(),
-			subjectType: tuple.Subject().Resource().ResourceType().Serialize(),
-			namespace:   tuple.Subject().Resource().Reporter().ReporterType().Serialize(),
-		})
-	}
-	assert.Contains(t, tuples, tupleInfo{"workspace", "ws-billing-1", "workspace", "rbac"})
-	assert.Contains(t, tuples, tupleInfo{"workspace", "ws-billing-2", "workspace", "rbac"})
+	assert.ElementsMatch(t, expected, creates)
 }
 
 func TestFeaturesSchemaFactory_FallsBackForOtherTypes(t *testing.T) {
@@ -282,8 +241,10 @@ func TestFeaturesSchemaFactory_FallsBackForOtherTypes(t *testing.T) {
 	require.NoError(t, err)
 	reporterInstanceId, err := model.NewReporterInstanceId("test-instance")
 	require.NoError(t, err)
+	localResourceId, err := model.NewLocalResourceId("test-host")
+	require.NoError(t, err)
 	key, err := model.NewReporterResourceKey(
-		model.LocalResourceId("test-host"),
+		localResourceId,
 		resourceType, reporterType, reporterInstanceId,
 	)
 	require.NoError(t, err)
@@ -302,7 +263,8 @@ func TestFeaturesSchemaFactory_FallsBackForOtherTypes(t *testing.T) {
 
 	assert.True(t, result.HasTuplesToCreate())
 	creates := *result.TuplesToCreate()
-	assert.Len(t, creates, 1)
-	assert.Equal(t, "workspace", creates[0].Relation().Serialize())
-	assert.Equal(t, "ws-host", creates[0].Subject().Resource().ResourceId().Serialize())
+	expected := []model.RelationsTuple{
+		model.NewRelationTupleForSubject(key, "workspace", "rbac", "workspace", "ws-host"),
+	}
+	assert.ElementsMatch(t, expected, creates)
 }

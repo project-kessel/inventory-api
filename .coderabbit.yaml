@@ -348,3 +348,10 @@ knowledge_base:
     scope: "auto"
   pull_requests:
     scope: "auto"
+  linked_repositories:
+    - repository: "project-kessel/kessel-sdk-browser"
+      instructions: |
+        Browser/React SDK (@project-kessel/react-kessel-access-check). Does NOT use proto codegen -- makes runtime HTTP calls to inventory-api's v1beta2 endpoints (checkself, checkselfbulk) with hand-written TypeScript types. Breaking changes to watch: HTTP endpoint path changes (/api/kessel/v1beta2/checkself, /api/kessel/v1beta2/checkselfbulk), request/response JSON shape changes for Check/CheckSelf operations, HTTP status code semantics, authentication flow changes affecting browser clients. Not covered by buf breaking checks since it has no proto dependency.
+    - repository: "project-kessel/inventory-consumer"
+      instructions: |
+        Kafka consumer service that reads Debezium CDC messages and forwards them to inventory-api via gRPC (through kessel-sdk-go). Two dependency paths: (1) Go module dependency on inventory-api cmd/common package (ToPointer, InitLogger, GetLogLevel utilities -- used in tests only). (2) Runtime gRPC dependency via kessel-sdk-go on ReportResource, DeleteResource, GetLivez RPCs and their request/response types. Also depends on the Kafka/outbox event schema -- changes to outbox event format, Debezium message headers (operation, version), or CloudEvents payload structure would break message parsing. Proto-level breaking changes are caught by buf CI, but cmd/common and event schema changes are not.

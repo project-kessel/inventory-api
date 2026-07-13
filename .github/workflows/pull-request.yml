@@ -12,5 +12,5 @@ jobs:
         with:
           format: false
           lint: true
-          breaking: false
+          breaking: true
           input: "api"

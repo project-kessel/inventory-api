@@ -20,20 +20,8 @@ for URL in ${RPM_URLS[*]}; do
   dnf install -y $URL
 done
 
-# Download latest 3.9.x kafka tools
-# note currently hardcoded to only support kafka 3.9.x
-# this should remain until clusters move to 4.x
 echo "Installing Kafka tools..."
-BASE_URL="https://dlcdn.apache.org/kafka/"
-KAFKA_VERSION=$(
-  curl -fsSL "$BASE_URL" \
-    | grep -Eo 'href="3\.9\.[0-9]+/' \
-    | sed -E 's|href="||; s|/||' \
-    | sort -V \
-    | tail -n 1
-)
-
-curl -fLo /tmp/kafka.tgz https://dlcdn.apache.org/kafka/${KAFKA_VERSION}/kafka_${SCALA_VERSION}-${KAFKA_VERSION}.tgz
+curl -fLo /tmp/kafka.tgz "https://dlcdn.apache.org/kafka/${KAFKA_VERSION}/kafka_${SCALA_VERSION}-${KAFKA_VERSION}.tgz"
 mkdir -pv /opt/kafka
 tar -xvf /tmp/kafka.tgz -C /opt/kafka --strip-components=1
 

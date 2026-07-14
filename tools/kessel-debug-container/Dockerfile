@@ -3,7 +3,7 @@ FROM registry.access.redhat.com/hi/core-runtime:2.42-openssl-fips-builder
 USER root
 
 # Kafka/Scala versions are hard set to ensure compatibility with current Kafka infra
-# Kafka is hardcoded for 3.9.x in the installer script
+ENV KAFKA_VERSION=4.3.1
 ENV SCALA_VERSION=2.13
 
 # librdkafka is required by kcat -- versions below represent the latest from mirrors

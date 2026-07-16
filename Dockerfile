@@ -1,6 +1,6 @@
 # Build stage — the Go toolchain embeds the validated FIPS module
 # in all binaries automatically.
-FROM registry.access.redhat.com/hi/go:1.26.4-fips AS builder
+FROM registry.access.redhat.com/hi/go:1.26.5-fips AS builder
 
 ARG TARGETARCH
 

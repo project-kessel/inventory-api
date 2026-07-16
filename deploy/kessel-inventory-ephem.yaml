@@ -207,7 +207,6 @@ objects:
           replicas: 3
       dependencies:
         - kessel-relations
-      optionalDependencies:
         - kessel-kafkaconnect
       deployments:
         - name: api
@@ -269,11 +268,11 @@ objects:
               - name: INVENTORY_API_AUTHZ_IMPL
                 value: ${AUTHZ_IMPL}
               - name: INVENTORY_API_AUTHZ_SPICEDB_ENDPOINT
-                value: "kessel-spicedb:50051"
+                value: "relations-spicedb:50051"
               - name: INVENTORY_API_AUTHZ_SPICEDB_TOKEN
                 valueFrom:
                   secretKeyRef:
-                    name: kessel-spicedb-config
+                    name: dev-spicedb-config
                     key: preshared_key
             volumeMounts:
               - name: config-volume
@@ -438,37 +437,7 @@ parameters:
     value: "true"
   - name: AUTHZ_IMPL
     description: Authz implementation (allow-all, kessel, spicedb)
-    value: "kessel"
-  - name: SPICEDB_IMAGE
-    description: SpiceDB container image
-    value: quay.io/redhat-services-prod/project-kessel-tenant/kessel-relations/spicedb:latest
-  - name: SPICEDB_REPLICAS
-    description: Number of SpiceDB pods
-    value: "1"
-  - name: SPICEDB_CPU_REQUEST
-    description: SpiceDB CPU Request
-    value: 200m
-  - name: SPICEDB_CPU_LIMIT
-    description: SpiceDB CPU Limit
-    value: 500m
-  - name: SPICEDB_MEMORY_REQUEST
-    description: SpiceDB Memory Request
-    value: 128Mi
-  - name: SPICEDB_MEMORY_LIMIT
-    description: SpiceDB Memory Limit
-    value: 128Mi
-  - name: SPICEDB_POSTGRES_CPU_REQUEST
-    description: SpiceDB Postgres CPU Request
-    value: 200m
-  - name: SPICEDB_POSTGRES_CPU_LIMIT
-    description: SpiceDB Postgres CPU Limit
-    value: 500m
-  - name: SPICEDB_POSTGRES_MEMORY_REQUEST
-    description: SpiceDB Postgres Memory Request
-    value: 128Mi
-  - name: SPICEDB_POSTGRES_MEMORY_LIMIT
-    description: SpiceDB Postgres Memory Limit
-    value: 128Mi
+    value: "spicedb"
   - name: SCHEMA_INIT_IMAGE
     description: Image for the schema init container
     value: registry.access.redhat.com/ubi9/ubi-minimal:latest

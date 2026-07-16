@@ -1,0 +1,13 @@
+# CODEOWNERS for inventory-api
+# See: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+#
+# Rules are evaluated top-to-bottom; last matching pattern takes precedence.
+
+# Default owners for everything in the repo
+* @project-kessel/resources-relations-team
+
+# All GitHub configuration requires review from core maintainers
+.github/** @project-kessel/resources-relations-team
+
+# CODEOWNERS self-protection — must come AFTER the wildcard (last match wins)
+.github/CODEOWNERS @project-kessel/resources-relations-team

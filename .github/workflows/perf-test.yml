@@ -6,7 +6,7 @@
 #   GOSMEE_WEBHOOK_SECRET  — shared HMAC secret, must match the value in the
 #                            Gosmee client configmap on the perf cluster.
 #
-# See ci-configs/jenkins/gh-pr-testing/README.md for the full onboarding guide.
+# See https://gitlab.cee.redhat.com/redhat-performance/ci-configs/-/tree/master/jenkins/gh-pr-testing for the full onboarding guide.
 name: Performance Regression Test
 
 on:

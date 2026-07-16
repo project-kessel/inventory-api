@@ -1,7 +1,4 @@
 ---
-# Copy this file to project-kessel/inventory-api as:
-#   .github/workflows/perf-test.yml
-#
 # Required GitHub secret (set at org or repo level):
 #   GOSMEE_WEBHOOK_SECRET  — shared HMAC secret, must match the value in the
 #                            Gosmee client configmap on the perf cluster.

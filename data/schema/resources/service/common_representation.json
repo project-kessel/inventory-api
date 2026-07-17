@@ -1,0 +1,16 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "allowed_workspaces": {
+      "type": "array",
+      "items": { "format": "uuid", "type": "string" }
+    },
+    "billing_account": {
+      "type": "array",
+      "items": { "format": "uuid", "type": "string" }
+    },
+    "parent": { "format": "uuid", "type": "string" }
+  },
+  "required": []
+}

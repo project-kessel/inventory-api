@@ -3309,20 +3309,21 @@ func TestInventoryService_ReportResource_AllOptionalMetadataFields(t *testing.T)
 
 // --- ReportResource: Nil/Empty Optional Struct Combinations ---
 
-// Representation validation: both common and reporter must be non-nil and non-empty.
-// Both nil, reporter-only, common-only, or both-empty return an error.
+// Representation validation: at least one of common or reporter must contain data.
+// Both nil, both empty, or one nil and the other empty all produce the same domain error.
+// Empty reporter with valid common (or vice versa) succeeds.
 func TestInventoryService_ReportResource_NilOrEmptyRepresentationStructs(t *testing.T) {
 	claims := &authnapi.Claims{
 		SubjectId: authnapi.SubjectId("reporter-service"),
 		AuthType:  authnapi.AuthTypeXRhIdentity,
 	}
 
-	cases := []struct {
+	errorCases := []struct {
 		name            string
 		localResourceId string
 		common          *structpb.Struct
 		reporter        *structpb.Struct
-		expectMsg       string // empty string means the request is expected to succeed
+		expectMsg       string
 	}{
 		{
 			name:            "both nil",
@@ -3336,11 +3337,25 @@ func TestInventoryService_ReportResource_NilOrEmptyRepresentationStructs(t *test
 			localResourceId: "host-both-empty",
 			common:          &structpb.Struct{},
 			reporter:        &structpb.Struct{},
-			expectMsg:       "representation data cannot be empty",
+			expectMsg:       "at least one of reporterRepresentation or commonRepresentation must be provided",
+		},
+		{
+			name:            "reporter nil common empty",
+			localResourceId: "host-reporter-nil-common-empty",
+			common:          &structpb.Struct{},
+			reporter:        nil,
+			expectMsg:       "at least one of reporterRepresentation or commonRepresentation must be provided",
+		},
+		{
+			name:            "reporter empty common nil",
+			localResourceId: "host-reporter-empty-common-nil",
+			common:          nil,
+			reporter:        &structpb.Struct{},
+			expectMsg:       "at least one of reporterRepresentation or commonRepresentation must be provided",
 		},
 	}
 
-	for _, tc := range cases {
+	for _, tc := range errorCases {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
@@ -3367,6 +3382,85 @@ func TestInventoryService_ReportResource_NilOrEmptyRepresentationStructs(t *test
 						ctx := context.Background()
 						res := tr.Invoke(ctx, withBody(req, ReportResource, httpEndpoint("POST /api/kessel/v1beta2/resources")))
 						Assert(t, res, expectation)
+					}
+			})
+		})
+	}
+
+	successCases := []struct {
+		name            string
+		localResourceId string
+		common          *structpb.Struct
+		reporter        *structpb.Struct
+	}{
+		{
+			name:            "empty reporter with valid common",
+			localResourceId: "host-empty-reporter-valid-common",
+			common: &structpb.Struct{
+				Fields: map[string]*structpb.Value{
+					"workspace_id": structpb.NewStringValue("ws-empty-reporter"),
+				},
+			},
+			reporter: &structpb.Struct{},
+		},
+		{
+			name:            "nil reporter with valid common",
+			localResourceId: "host-nil-reporter-valid-common",
+			common: &structpb.Struct{
+				Fields: map[string]*structpb.Value{
+					"workspace_id": structpb.NewStringValue("ws-nil-reporter"),
+				},
+			},
+			reporter: nil,
+		},
+		{
+			name:            "valid reporter with empty common",
+			localResourceId: "host-valid-reporter-empty-common",
+			common:          &structpb.Struct{},
+			reporter: &structpb.Struct{
+				Fields: map[string]*structpb.Value{
+					"reporter_field": structpb.NewStringValue("value"),
+				},
+			},
+		},
+		{
+			name:            "valid reporter with nil common",
+			localResourceId: "host-valid-reporter-nil-common",
+			common:          nil,
+			reporter: &structpb.Struct{
+				Fields: map[string]*structpb.Value{
+					"reporter_field": structpb.NewStringValue("value"),
+				},
+			},
+		},
+	}
+
+	for _, tc := range successCases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
+				repo, _ := newSQLiteTestRepo(t)
+				uc := newTestUsecase(t, testUsecaseConfig{Repo: repo})
+				req := &pb.ReportResourceRequest{
+					Type:               "host",
+					ReporterType:       "hbi",
+					ReporterInstanceId: "instance-001",
+					Representations: &pb.ResourceRepresentations{
+						Metadata: &pb.RepresentationMetadata{
+							LocalResourceId: tc.localResourceId,
+							ApiHref:         "https://api.example.com/hosts/" + tc.localResourceId,
+						},
+						Common:   tc.common,
+						Reporter: tc.reporter,
+					},
+				}
+				return TestServerConfig{
+						Usecase:       uc,
+						Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+					}, func(t *testing.T, tr *Transport) {
+						ctx := context.Background()
+						res := tr.Invoke(ctx, withBody(req, ReportResource, httpEndpoint("POST /api/kessel/v1beta2/resources")))
+						Assert(t, res, requireSuccess())
 					}
 			})
 		})

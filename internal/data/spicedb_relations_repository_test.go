@@ -272,6 +272,56 @@ func TestIsBackendUnavailable(t *testing.T) {
 	assert.Error(t, err)
 }
 
+func TestManageSchemaFalse_DoesNotReadSchemaFile(t *testing.T) {
+	t.Parallel()
+
+	config := &SpiceDBConfig{
+		Endpoint:     "localhost:50051",
+		Token:        "foobar",
+		ManageSchema: false,
+		SchemaFile:   "/nonexistent/this-file-must-not-be-read.zed",
+	}
+	repo, _, err := NewSpiceDBRelationsRepository(config, log.GetLogger())
+	assert.NoError(t, err)
+
+	err = repo.initialize(context.Background())
+	assert.NoError(t, err)
+}
+
+func TestManageSchemaTrue_FailsWithMissingFile(t *testing.T) {
+	t.Parallel()
+
+	config := &SpiceDBConfig{
+		Endpoint:     "localhost:50051",
+		Token:        "foobar",
+		ManageSchema: true,
+		SchemaFile:   "/nonexistent/schema.zed",
+	}
+	repo, _, err := NewSpiceDBRelationsRepository(config, log.GetLogger())
+	assert.NoError(t, err)
+
+	err = repo.initialize(context.Background())
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to load schema file")
+}
+
+func TestManageSchemaTrue_LoadsValidSchemaFile(t *testing.T) {
+	t.Parallel()
+
+	config := &SpiceDBConfig{
+		Endpoint:     "localhost:50051",
+		Token:        "foobar",
+		ManageSchema: true,
+		SchemaFile:   "../../test/testdata/spicedb/basic_schema.zed",
+	}
+	repo, _, err := NewSpiceDBRelationsRepository(config, log.GetLogger())
+	assert.NoError(t, err)
+
+	err = repo.initialize(context.Background())
+	assert.Error(t, err)
+	assert.NotContains(t, err.Error(), "failed to load schema file")
+}
+
 func TestDoesNotCreateRelationshipWithSlashInSubjectType(t *testing.T) {
 	requireSpiceDBIntegration(t)
 

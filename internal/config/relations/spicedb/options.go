@@ -13,6 +13,7 @@ type Options struct {
 	SchemaFile      string `mapstructure:"schema-file"`
 	UseTLS          bool   `mapstructure:"use-tls"`
 	FullyConsistent bool   `mapstructure:"fully-consistent"`
+	ManageSchema    bool   `mapstructure:"manage-schema"`
 }
 
 func NewOptions() *Options {
@@ -32,6 +33,7 @@ func (o *Options) AddFlags(fs *pflag.FlagSet, prefix string) {
 	fs.StringVar(&o.SchemaFile, prefix+"schema-file", o.SchemaFile, "Path to SpiceDB schema file")
 	fs.BoolVar(&o.UseTLS, prefix+"use-tls", o.UseTLS, "Enable TLS for SpiceDB connection")
 	fs.BoolVar(&o.FullyConsistent, prefix+"fully-consistent", o.FullyConsistent, "Use fully consistent reads (slower but strongest consistency)")
+	fs.BoolVar(&o.ManageSchema, prefix+"manage-schema", o.ManageSchema, "Call WriteSchema on startup to manage the SpiceDB schema lifecycle")
 }
 
 func (o *Options) Validate() []error {
@@ -45,8 +47,8 @@ func (o *Options) Validate() []error {
 		errs = append(errs, fmt.Errorf("either spicedb token or token-file must be provided"))
 	}
 
-	if len(o.SchemaFile) == 0 {
-		errs = append(errs, fmt.Errorf("spicedb schema-file may not be empty"))
+	if o.ManageSchema && len(o.SchemaFile) == 0 {
+		errs = append(errs, fmt.Errorf("spicedb schema-file is required when manage-schema is enabled"))
 	}
 
 	return errs

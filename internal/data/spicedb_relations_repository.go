@@ -36,6 +36,7 @@ type SpiceDBRelationsRepository struct {
 	client                   *authzed.Client
 	healthClient             grpc_health_v1.HealthClient
 	schemaFilePath           string
+	manageSchema             bool
 	initOnce                 sync.Once
 	initErr                  error
 	fullyConsistentAsDefault bool
@@ -124,6 +125,7 @@ func NewSpiceDBRelationsRepository(config *SpiceDBConfig, logger log.Logger) (*S
 		client:                   client,
 		healthClient:             healthClient,
 		schemaFilePath:           config.SchemaFile,
+		manageSchema:             config.ManageSchema,
 		fullyConsistentAsDefault: config.FullyConsistent,
 		Logger:                   logHelper,
 		successCounter:           successCounter,
@@ -146,6 +148,10 @@ func (s *SpiceDBRelationsRepository) incrSuccessCounter(method string) {
 
 func (s *SpiceDBRelationsRepository) initialize(ctx context.Context) error {
 	s.initOnce.Do(func() {
+		if !s.manageSchema {
+			return
+		}
+
 		schema, err := readFile(s.schemaFilePath)
 		if err != nil {
 			s.initErr = fmt.Errorf("failed to load schema file: %w", err)

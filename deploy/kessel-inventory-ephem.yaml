@@ -27,6 +27,7 @@ objects:
             enable-oidc-auth: false
           spicedb:
             schema-file: "/etc/spicedb-schema/schema.zed"
+            manage-schema: true
             use-tls: false
             fully-consistent: true
         selfsubjectstrategy:

@@ -65,16 +65,40 @@ func TestOptions_Validate(t *testing.T) {
 			expectError: false,
 		},
 		{
-			name: "spicedb impl",
+			name: "spicedb impl with manage-schema and schema-file",
 			options: &Options{
 				Authz: "spicedb",
 				SpiceDB: &spicedb.Options{
-					Endpoint:   "localhost:50051",
-					TokenFile:  "/tmp/token",
-					SchemaFile: "/tmp/schema.zed",
+					Endpoint:     "localhost:50051",
+					TokenFile:    "/tmp/token",
+					SchemaFile:   "/tmp/schema.zed",
+					ManageSchema: true,
 				},
 			},
 			expectError: false,
+		},
+		{
+			name: "spicedb impl without manage-schema does not require schema-file",
+			options: &Options{
+				Authz: "spicedb",
+				SpiceDB: &spicedb.Options{
+					Endpoint:  "localhost:50051",
+					TokenFile: "/tmp/token",
+				},
+			},
+			expectError: false,
+		},
+		{
+			name: "spicedb impl with manage-schema requires schema-file",
+			options: &Options{
+				Authz: "spicedb",
+				SpiceDB: &spicedb.Options{
+					Endpoint:     "localhost:50051",
+					TokenFile:    "/tmp/token",
+					ManageSchema: true,
+				},
+			},
+			expectError: true,
 		},
 		{
 			name: "invalid impl",

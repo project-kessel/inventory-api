@@ -160,6 +160,7 @@ type SpiceDBConfig struct {
 	SchemaFile      string
 	UseTLS          bool
 	FullyConsistent bool
+	ManageSchema    bool
 }
 
 // NewSpiceDBConfigFromCompleted builds a SpiceDBConfig from a completed spicedb config.
@@ -171,6 +172,7 @@ func NewSpiceDBConfigFromCompleted(c spicedb.CompletedConfig) *SpiceDBConfig {
 		SchemaFile:      c.SchemaFile,
 		UseTLS:          c.UseTLS,
 		FullyConsistent: c.FullyConsistent,
+		ManageSchema:    c.ManageSchema,
 	}
 }
 

@@ -272,6 +272,55 @@ func TestIsBackendUnavailable(t *testing.T) {
 	assert.Error(t, err)
 }
 
+func TestEffectiveLimit(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name         string
+		pagination   *model.Pagination
+		defaultLimit uint32
+		expected     uint32
+	}{
+		{
+			name:         "nil pagination uses default",
+			pagination:   nil,
+			defaultLimit: 1000,
+			expected:     1000,
+		},
+		{
+			name:         "zero limit uses default",
+			pagination:   model.NewPagination(0, nil),
+			defaultLimit: 1000,
+			expected:     1000,
+		},
+		{
+			name:         "client limit smaller than default is used",
+			pagination:   model.NewPagination(100, nil),
+			defaultLimit: 1000,
+			expected:     100,
+		},
+		{
+			name:         "client limit equal to default is used",
+			pagination:   model.NewPagination(1000, nil),
+			defaultLimit: 1000,
+			expected:     1000,
+		},
+		{
+			name:         "client limit larger than default uses default",
+			pagination:   model.NewPagination(5000, nil),
+			defaultLimit: 1000,
+			expected:     1000,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := effectiveLimit(tt.pagination, tt.defaultLimit)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
 func TestDoesNotCreateRelationshipWithSlashInSubjectType(t *testing.T) {
 	requireSpiceDBIntegration(t)
 

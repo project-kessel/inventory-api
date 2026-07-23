@@ -25,10 +25,11 @@ import (
 )
 
 const (
-	relationPrefix      = "t_"
-	lockType            = "kessel/lock"
-	lockVersionType     = "kessel/lockversion"
-	lockVersionRelation = "version"
+	relationPrefix               = "t_"
+	lockType                     = "kessel/lock"
+	lockVersionType              = "kessel/lockversion"
+	lockVersionRelation          = "version"
+	defaultStreamingLimit uint32 = 1000
 )
 
 // SpiceDBRelationsRepository implements the Relations Repository interface using SpiceDB.
@@ -371,10 +372,7 @@ func (s *SpiceDBRelationsRepository) LookupObjects(
 		cursor = &v1.Cursor{Token: pagination.Continuation.Serialize()}
 	}
 
-	var limit uint32
-	if pagination != nil {
-		limit = pagination.Limit
-	}
+	limit := effectiveLimit(pagination, defaultStreamingLimit)
 
 	req := &v1.LookupResourcesRequest{
 		Consistency:        s.determineConsistency(consistency),
@@ -574,10 +572,7 @@ func (s *SpiceDBRelationsRepository) ReadTuples(
 		cursor = &v1.Cursor{Token: pagination.Continuation.Serialize()}
 	}
 
-	var limit uint32
-	if pagination != nil {
-		limit = pagination.Limit
-	}
+	limit := effectiveLimit(pagination, defaultStreamingLimit)
 
 	relationshipFilter, err := tupleFilterToSpiceDBFilter(filter)
 	if err != nil {
@@ -872,6 +867,13 @@ func (s *SpiceDBRelationsRepository) determineConsistency(consistency model.Cons
 			},
 		}
 	}
+}
+
+func effectiveLimit(pagination *model.Pagination, defaultLimit uint32) uint32 {
+	if pagination != nil && pagination.Limit > 0 && pagination.Limit < defaultLimit {
+		return pagination.Limit
+	}
+	return defaultLimit
 }
 
 func optionalRelationToString(r *model.Relation) string {

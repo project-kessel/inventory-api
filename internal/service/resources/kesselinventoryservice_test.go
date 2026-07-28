@@ -1401,7 +1401,7 @@ func TestInventoryService_ReportResource_Update_FieldsEffective(t *testing.T) {
 	}
 
 	runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
-		repo, db := newSQLiteTestRepo(t)
+		repo := newSQLiteTestRepo(t)
 		uc := newTestUsecase(t, testUsecaseConfig{Repo: repo})
 		key := buildReporterResourceKey(t, "update-effective-host", "host", "hbi", "instance-001")
 		return TestServerConfig{
@@ -1412,20 +1412,20 @@ func TestInventoryService_ReportResource_Update_FieldsEffective(t *testing.T) {
 				res1 := tr.Invoke(ctx, withBody(createReq, ReportResource, httpEndpoint("POST /api/kessel/v1beta2/resources")))
 				Assert(t, res1, requireSuccess())
 
-				resource1, err := repo.FindResourceByKeys(db, key)
+				resource1, err := repoFindResourceByKeys(repo, key)
 				require.NoError(t, err)
 				require.NotNil(t, resource1)
 				assert.Equal(t, "https://api.example.com/v1/hosts/original", resource1.ReporterResources()[0].ApiHref().String())
 				assert.Equal(t, originalConsoleHref, resource1.ReporterResources()[0].ConsoleHref().String())
 
-				reps1, err := repo.FindLatestRepresentations(db, key)
+				reps1, err := repoFindLatestRepresentations(repo, key)
 				require.NoError(t, err)
 				assert.Equal(t, "ws-original", reps1.CommonData()["workspace_id"])
 
 				res2 := tr.Invoke(ctx, withBody(updateReq, ReportResource, httpEndpoint("POST /api/kessel/v1beta2/resources")))
 				Assert(t, res2, requireSuccess())
 
-				resource2, err := repo.FindResourceByKeys(db, key)
+				resource2, err := repoFindResourceByKeys(repo, key)
 				require.NoError(t, err)
 				require.NotNil(t, resource2)
 				rr := resource2.ReporterResources()[0]
@@ -1433,7 +1433,7 @@ func TestInventoryService_ReportResource_Update_FieldsEffective(t *testing.T) {
 					"api_href should reflect the updated value")
 				assert.Equal(t, updatedConsoleHref, rr.ConsoleHref().String(),
 					"console_href should reflect the updated value")
-				reps2, err := repo.FindLatestRepresentations(db, key)
+				reps2, err := repoFindLatestRepresentations(repo, key)
 				require.NoError(t, err)
 				assert.Equal(t, "ws-updated", reps2.CommonData()["workspace_id"],
 					"common data should reflect the updated value")
@@ -3201,18 +3201,62 @@ func TestInventoryService_StreamedListObjects_NilRequest(t *testing.T) {
 }
 
 // newSQLiteTestRepo creates a real GORM repository backed by an in-memory SQLite
-// database with all migrations applied. Returns the repository and the underlying
-// *gorm.DB for use in assertions.
-func newSQLiteTestRepo(t *testing.T) (model.ResourceRepository, *gorm.DB) {
+// database with all migrations applied.
+func newSQLiteTestRepo(t *testing.T) model.ResourceRepository {
 	t.Helper()
 	db := testutil.NewSQLiteTestDB(t, &gorm.Config{TranslateError: true})
 	err := data.Migrate(db, nil)
 	require.NoError(t, err)
 	mc := metricscollector.NewFakeMetricsCollector()
-	tm := data.NewGormTransactionManager(mc, 3)
-	noopPublisher := func(_ *gorm.DB, _ *model_legacy.OutboxEvent) error { return nil }
-	repo := data.NewResourceRepository(db, tm, noopPublisher)
-	return repo, db
+	noopPublisher := data.OutboxPublisher(func(_ *gorm.DB, _ *model_legacy.OutboxEvent) error { return nil })
+	return data.NewResourceRepository(data.GormResourceRepositoryConfig{
+		DB:                      db,
+		OutboxPublisher:         noopPublisher,
+		MetricsCollector:        mc,
+		MaxSerializationRetries: 3,
+	})
+}
+
+func repoFindResourceByKeys(repo model.ResourceRepository, key model.ReporterResourceKey) (*model.Resource, error) {
+	tx, err := repo.Begin("")
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = tx.Rollback() }()
+	resource, err := tx.FindResourceByKeys(key)
+	if err != nil {
+		return nil, err
+	}
+	_ = tx.Commit()
+	return resource, nil
+}
+
+func repoFindLatestRepresentations(repo model.ResourceRepository, key model.ReporterResourceKey) (*model.Representations, error) {
+	tx, err := repo.Begin("")
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = tx.Rollback() }()
+	reps, err := tx.FindLatestRepresentations(key)
+	if err != nil {
+		return nil, err
+	}
+	_ = tx.Commit()
+	return reps, nil
+}
+
+func repoHasTransactionIdBeenProcessed(repo model.ResourceRepository, transactionId model.TransactionId) (bool, error) {
+	tx, err := repo.Begin("")
+	if err != nil {
+		return false, err
+	}
+	defer func() { _ = tx.Rollback() }()
+	processed, err := tx.HasTransactionIdBeenProcessed(transactionId)
+	if err != nil {
+		return false, err
+	}
+	_ = tx.Commit()
+	return processed, nil
 }
 
 // buildReporterResourceKey is a test helper that constructs a model.ReporterResourceKey
@@ -3272,7 +3316,7 @@ func TestInventoryService_ReportResource_AllOptionalMetadataFields(t *testing.T)
 	}
 
 	runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
-		repo, db := newSQLiteTestRepo(t)
+		repo := newSQLiteTestRepo(t)
 		uc := newTestUsecase(t, testUsecaseConfig{Repo: repo})
 		return TestServerConfig{
 				Usecase:       uc,
@@ -3283,7 +3327,7 @@ func TestInventoryService_ReportResource_AllOptionalMetadataFields(t *testing.T)
 				Assert(t, res, requireSuccess())
 
 				key := buildReporterResourceKey(t, "host-all-optional", "host", "hbi", "instance-001")
-				resource, err := repo.FindResourceByKeys(db, key)
+				resource, err := repoFindResourceByKeys(repo, key)
 				require.NoError(t, err)
 				require.NotNil(t, resource)
 
@@ -3295,12 +3339,12 @@ func TestInventoryService_ReportResource_AllOptionalMetadataFields(t *testing.T)
 				assert.Equal(t, "https://api.example.com/hosts/host-all-optional", rr.ApiHref().String())
 				assert.Equal(t, consoleHref, rr.ConsoleHref().String())
 
-				reps, err := repo.FindLatestRepresentations(db, key)
+				reps, err := repoFindLatestRepresentations(repo, key)
 				require.NoError(t, err)
 				require.NotNil(t, reps)
 				assert.Equal(t, "ws-all-optional", string(reps.CommonData()["workspace_id"].(string)))
 
-				processed, err := repo.HasTransactionIdBeenProcessed(db, model.NewTransactionId(txId))
+				processed, err := repoHasTransactionIdBeenProcessed(repo, model.NewTransactionId(txId))
 				require.NoError(t, err)
 				assert.True(t, processed, "transaction_id should be recorded as processed")
 			}
@@ -3359,7 +3403,7 @@ func TestInventoryService_ReportResource_NilOrEmptyRepresentationStructs(t *test
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
-				repo, _ := newSQLiteTestRepo(t)
+				repo := newSQLiteTestRepo(t)
 				uc := newTestUsecase(t, testUsecaseConfig{Repo: repo})
 				req := &pb.ReportResourceRequest{
 					Type:               "host",
@@ -3612,7 +3656,7 @@ func TestInventoryService_ReportResource_ValidationErrorFormats(t *testing.T) {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
-				repo, _ := newSQLiteTestRepo(t)
+				repo := newSQLiteTestRepo(t)
 				uc := newTestUsecase(t, testUsecaseConfig{Repo: repo})
 				req := &pb.ReportResourceRequest{
 					Type:               tc.resourceType,
@@ -3675,7 +3719,7 @@ func TestInventoryService_ReportResource_WriteVisibility(t *testing.T) {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
-				repo, db := newSQLiteTestRepo(t)
+				repo := newSQLiteTestRepo(t)
 				uc := newTestUsecase(t, testUsecaseConfig{Repo: repo})
 				req := &pb.ReportResourceRequest{
 					Type:               "host",
@@ -3708,7 +3752,7 @@ func TestInventoryService_ReportResource_WriteVisibility(t *testing.T) {
 						Assert(t, res, requireSuccess())
 
 						key := buildReporterResourceKey(t, tc.localResourceId, "host", "hbi", "instance-001")
-						resource, err := repo.FindResourceByKeys(db, key)
+						resource, err := repoFindResourceByKeys(repo, key)
 						require.NoError(t, err)
 						require.NotNil(t, resource, "resource should be persisted regardless of write_visibility")
 					}
@@ -3750,7 +3794,7 @@ func TestInventoryService_ReportResource_InventoryIdSet(t *testing.T) {
 	}
 
 	runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
-		repo, db := newSQLiteTestRepo(t)
+		repo := newSQLiteTestRepo(t)
 		uc := newTestUsecase(t, testUsecaseConfig{Repo: repo})
 		return TestServerConfig{
 				Usecase:       uc,
@@ -3761,7 +3805,7 @@ func TestInventoryService_ReportResource_InventoryIdSet(t *testing.T) {
 				Assert(t, res, requireSuccess())
 
 				key := buildReporterResourceKey(t, "host-with-inventory-id", "host", "hbi", "instance-001")
-				resource, err := repo.FindResourceByKeys(db, key)
+				resource, err := repoFindResourceByKeys(repo, key)
 				require.NoError(t, err)
 				require.NotNil(t, resource, "inventory_id should not interfere with persistence")
 			}
@@ -3898,7 +3942,7 @@ func TestInventoryService_ReportResource_TransactionIdIdempotency(t *testing.T) 
 	}
 
 	runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
-		repo, db := newSQLiteTestRepo(t)
+		repo := newSQLiteTestRepo(t)
 		uc := newTestUsecase(t, testUsecaseConfig{Repo: repo})
 		return TestServerConfig{
 				Usecase:       uc,
@@ -3911,11 +3955,11 @@ func TestInventoryService_ReportResource_TransactionIdIdempotency(t *testing.T) 
 				res1 := tr.Invoke(ctx, withBody(makeReq("https://api.example.com/v1"), ReportResource, httpEndpoint("POST /api/kessel/v1beta2/resources")))
 				Assert(t, res1, requireSuccess())
 
-				processed, err := repo.HasTransactionIdBeenProcessed(db, model.NewTransactionId(txId))
+				processed, err := repoHasTransactionIdBeenProcessed(repo, model.NewTransactionId(txId))
 				require.NoError(t, err)
 				assert.True(t, processed, "transaction_id should be recorded after first report")
 
-				resource1, err := repo.FindResourceByKeys(db, key)
+				resource1, err := repoFindResourceByKeys(repo, key)
 				require.NoError(t, err)
 				require.NotNil(t, resource1)
 				apiHrefAfterFirst := resource1.ReporterResources()[0].ApiHref().String()
@@ -3924,7 +3968,7 @@ func TestInventoryService_ReportResource_TransactionIdIdempotency(t *testing.T) 
 				res2 := tr.Invoke(ctx, withBody(makeReq("https://api.example.com/v2-should-be-ignored"), ReportResource, httpEndpoint("POST /api/kessel/v1beta2/resources")))
 				Assert(t, res2, requireSuccess())
 
-				resource2, err := repo.FindResourceByKeys(db, key)
+				resource2, err := repoFindResourceByKeys(repo, key)
 				require.NoError(t, err)
 				require.NotNil(t, resource2)
 				apiHrefAfterSecond := resource2.ReporterResources()[0].ApiHref().String()
@@ -3970,7 +4014,7 @@ func TestInventoryService_ReportResource_IdempotencyDisabled(t *testing.T) {
 	}
 
 	runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
-		repo, _ := newSQLiteTestRepo(t)
+		repo := newSQLiteTestRepo(t)
 		idempotencyOff := usecase.NewUsecaseConfig()
 		idempotencyOff.IdempotencyCheckEnabled = false
 		uc := newTestUsecase(t, testUsecaseConfig{
@@ -3988,7 +4032,7 @@ func TestInventoryService_ReportResource_IdempotencyDisabled(t *testing.T) {
 				res1 := tr.Invoke(ctx, withBody(makeReq("https://api.example.com/v1"), ReportResource, httpEndpoint("POST /api/kessel/v1beta2/resources")))
 				Assert(t, res1, requireSuccess())
 
-				resource1, err := repo.FindResourceByKeys(repo.GetDB(), key)
+				resource1, err := repoFindResourceByKeys(repo, key)
 				require.NoError(t, err)
 				require.NotNil(t, resource1)
 				apiHrefAfterFirst := resource1.ReporterResources()[0].ApiHref().String()
@@ -3998,7 +4042,7 @@ func TestInventoryService_ReportResource_IdempotencyDisabled(t *testing.T) {
 				res2 := tr.Invoke(ctx, withBody(makeReq("https://api.example.com/v2-replayed"), ReportResource, httpEndpoint("POST /api/kessel/v1beta2/resources")))
 				Assert(t, res2, requireSuccess())
 
-				resource2, err := repo.FindResourceByKeys(repo.GetDB(), key)
+				resource2, err := repoFindResourceByKeys(repo, key)
 				require.NoError(t, err)
 				require.NotNil(t, resource2)
 				apiHrefAfterSecond := resource2.ReporterResources()[0].ApiHref().String()

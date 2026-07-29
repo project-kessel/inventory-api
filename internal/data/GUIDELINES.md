@@ -107,7 +107,9 @@ Only WAL mode is supported: PostgreSQL logical decoding via `pg_logical_emit_mes
 
 ```go
 // Message published within transaction boundary
-tx.Exec("SELECT pg_logical_emit_message(true, ?, ?)", prefix, content)
+if err := tx.Exec("SELECT pg_logical_emit_message(true, ?, ?)", prefix, content).Error; err != nil {
+    return fmt.Errorf("failed to emit WAL message: %w", err)
+}
 ```
 
 WAL mode only works with PostgreSQL. SQLite (used in development/testing) does not support WAL outbox.

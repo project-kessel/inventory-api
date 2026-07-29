@@ -10,8 +10,9 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/project-kessel/inventory-api/internal/biz/model_legacy"
-	"github.com/project-kessel/inventory-api/internal/storage"
 )
+
+const OutboxModeWAL = "wal"
 
 // walOutboxMessage defines the content value of a logical decoding message
 // it mirrors the legacy outbox table to make the transition transparent to consumer processes
@@ -56,14 +57,16 @@ func mapOutboxEventToWALMessage(event *model_legacy.OutboxEvent) (walOutboxMessa
 type OutboxPublisher func(tx *gorm.DB, event *model_legacy.OutboxEvent) error
 
 // SetOutboxPublisher returns the appropriate OutboxPublisher for the given mode.
+// Currently only OutboxModeWAL is supported, this function is left for
+// potential future implementations
 func SetOutboxPublisher(mode string) OutboxPublisher {
 	switch mode {
-	case storage.OutboxModeWAL:
+	case OutboxModeWAL:
 		log.Info("Using WAL logical decoding message outbox publisher")
 		return publishOutboxEventWAL
 	default:
-		log.Info("Using table-based outbox publisher")
-		return publishOutboxEvent
+		log.Info("Invalid outbox publisher -- falling back to WAL outbox publisher")
+		return publishOutboxEventWAL
 	}
 }
 
@@ -88,16 +91,4 @@ func publishOutboxEventWAL(tx *gorm.DB, event *model_legacy.OutboxEvent) error {
 	return tx.Exec(
 		"SELECT pg_logical_emit_message(true, ?, ?)", prefix, string(content),
 	).Error
-}
-
-// original outbox implementation, kept to allow for flipping
-// to new WAL version using flag to simplify rollout
-func publishOutboxEvent(tx *gorm.DB, event *model_legacy.OutboxEvent) error {
-	if err := tx.Create(event).Error; err != nil {
-		return err
-	}
-	if err := tx.Delete(event).Error; err != nil {
-		return err
-	}
-	return nil
 }

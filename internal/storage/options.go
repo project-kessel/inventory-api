@@ -14,15 +14,11 @@ type Options struct {
 	SqlLite3                *sqlite3.Options  `mapstructure:"sqlite3"`
 	Database                string            `mapstructure:"database"`
 	MaxSerializationRetries int               `mapstructure:"max-serialization-retries"`
-	OutboxMode              string            `mapstructure:"outbox-mode"`
 }
 
 const (
 	Postgres = "postgres"
 	Sqlite3  = "sqlite3"
-
-	OutboxModeWAL   = "wal"
-	OutboxModeTable = "table"
 )
 
 func NewOptions() *Options {
@@ -31,7 +27,6 @@ func NewOptions() *Options {
 		SqlLite3:                sqlite3.NewOptions(),
 		Database:                "sqlite3",
 		MaxSerializationRetries: 10,
-		OutboxMode:              OutboxModeTable,
 	}
 }
 
@@ -42,7 +37,6 @@ func (o *Options) AddFlags(fs *pflag.FlagSet, prefix string) {
 
 	fs.StringVar(&o.Database, prefix+"database", o.Database, "The database type to use.  Either sqlite3 or postgres.")
 	fs.IntVar(&o.MaxSerializationRetries, prefix+"max-serialization-retries", o.MaxSerializationRetries, "Maximum number of retries for serialized transactions")
-	fs.StringVar(&o.OutboxMode, prefix+"outbox-mode", o.OutboxMode, "Outbox publishing mode: 'table' (outbox_events table) or 'wal' (pg_logical_emit_message)")
 
 	o.Postgres.AddFlags(fs, prefix+"postgres")
 	o.SqlLite3.AddFlags(fs, prefix+"sqlite3")
@@ -64,14 +58,5 @@ func (o *Options) Validate() []error {
 	case "sqlite3":
 		errs = append(errs, o.SqlLite3.Validate()...)
 	}
-
-	if o.OutboxMode != OutboxModeTable && o.OutboxMode != OutboxModeWAL {
-		errs = append(errs, errors.New("outbox-mode must be either 'table' or 'wal'"))
-	}
-
-	if o.OutboxMode == OutboxModeWAL && o.Database != Postgres {
-		errs = append(errs, errors.New("outbox-mode 'wal' is only supported with postgres"))
-	}
-
 	return errs
 }

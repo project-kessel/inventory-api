@@ -2247,7 +2247,7 @@ data:
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "description": "Lag from point where resource is written to outbox table, to consumed and processed by inventory consumer",
+          "description": "Lag from point where resource is written to WAL, to consumed and processed by inventory consumer",
           "fieldConfig": {
             "defaults": {
               "color": {

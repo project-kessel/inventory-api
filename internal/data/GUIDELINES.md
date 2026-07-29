@@ -6,7 +6,7 @@ This file covers the data layer under `internal/data/`. For database driver conf
 
 ### Field Size Constants
 Use predefined field size constants from `internal/data/model/common.go`:
-- `MaxFieldSize128/256/512/1024` for string fields  
+- `MaxFieldSize128/256/512/1024` for string fields
 - Specific constants like `MaxLocalResourceIDLength`, `MaxReporterTypeLength`
 - Consistent min value constants: `MinVersionValue`, `MinGenerationValue`, `MinCommonVersion`
 
@@ -98,32 +98,28 @@ type TransactionManager interface {
 - Maximum retry attempts configurable via `maxSerializationRetries`
 
 #### Outbox Pattern
-- Handle failures in both WAL and table-based modes
-- Wrap marshaling/unmarshaling errors: `fmt.Errorf("failed to marshal WAL message: %w", err)`
+- Handle failures in WAL publisher; wrap marshaling/unmarshaling errors: `fmt.Errorf("failed to marshal WAL message: %w", err)`
 
 ## Outbox Pattern Implementation
 
-### Dual Mode Support
-1. **Table Mode** (`outbox-mode=table`): Traditional outbox_events table
-2. **WAL Mode** (`outbox-mode=wal`): PostgreSQL logical decoding with `pg_logical_emit_message`
+### WAL Mode
+Only WAL mode is supported: PostgreSQL logical decoding via `pg_logical_emit_message`.
 
-### WAL Implementation
 ```go
 // Message published within transaction boundary
 tx.Exec("SELECT pg_logical_emit_message(true, ?, ?)", prefix, content)
 ```
 
-WAL mode only works with PostgreSQL and provides better performance by avoiding table-based outbox.
+WAL mode only works with PostgreSQL. SQLite (used in development/testing) does not support WAL outbox.
 
 ### Publisher Function Pattern
 ```go
 type OutboxPublisher func(tx *gorm.DB, event *model_legacy.OutboxEvent) error
 ```
 
-### Dual Publishing Strategy
-- **WAL logical decoding** mode for high performance (`storage.OutboxModeWAL`)
-- **Table-based outbox** as fallback for compatibility
-- **Message format consistency** between both approaches using `walOutboxMessage`
+### Publishing Strategy
+- **WAL logical decoding** via `pg_logical_emit_message` (`OutboxModeWAL`)
+- **Message format** defined by `walOutboxMessage` for consistency with downstream Debezium consumer processes
 
 ### Transaction Coordination
 - **Outbox events** created within same transaction as domain changes
@@ -281,7 +277,7 @@ func (o *OptionsConfig) InjectClowdAppConfig(appconfig *clowder.AppConfig) error
 ### Database Type Specifications
 ```go
 DBTypeText   = "text"     // For flexible text
-DBTypeBigInt = "bigint"   // For versions/counts  
+DBTypeBigInt = "bigint"   // For versions/counts
 DBTypeJSONB  = "jsonb"    // For structured data
 ```
 

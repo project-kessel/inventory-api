@@ -14,7 +14,7 @@ import (
 
 const OutboxModeWAL = "wal"
 
-// walOutboxMessage defines the content value of a logical decoding message
+// walOutboxMessage defines the content value of a logical decoding message emitted via pg_logical_emit_message
 // it mirrors the legacy outbox table to make the transition transparent to consumer processes
 type walOutboxMessage struct {
 	ID            string              `json:"id"`
@@ -56,9 +56,8 @@ func mapOutboxEventToWALMessage(event *model_legacy.OutboxEvent) (walOutboxMessa
 // Tests can provide a no-op implementation for SQLite compatibility.
 type OutboxPublisher func(tx *gorm.DB, event *model_legacy.OutboxEvent) error
 
-// SetOutboxPublisher returns the appropriate OutboxPublisher for the given mode.
-// Currently only OutboxModeWAL is supported, this function is left for
-// potential future implementations
+// SetOutboxPublisher returns the OutboxPublisher for the given mode.
+// Only OutboxModeWAL is supported; any other value falls back to WAL.
 func SetOutboxPublisher(mode string) OutboxPublisher {
 	switch mode {
 	case OutboxModeWAL:

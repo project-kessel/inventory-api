@@ -12,8 +12,6 @@ import (
 	"github.com/project-kessel/inventory-api/internal/biz/model_legacy"
 )
 
-const OutboxModeWAL = "wal"
-
 // walOutboxMessage defines the content value of a logical decoding message emitted via pg_logical_emit_message
 // it mirrors the legacy outbox table to make the transition transparent to consumer processes
 type walOutboxMessage struct {
@@ -58,15 +56,9 @@ type OutboxPublisher func(tx *gorm.DB, event *model_legacy.OutboxEvent) error
 
 // SetOutboxPublisher returns the OutboxPublisher for the given mode.
 // Only OutboxModeWAL is supported; any other value falls back to WAL.
-func SetOutboxPublisher(mode string) OutboxPublisher {
-	switch mode {
-	case OutboxModeWAL:
-		log.Info("Using WAL logical decoding message outbox publisher")
-		return publishOutboxEventWAL
-	default:
-		log.Info("Invalid outbox publisher -- falling back to WAL outbox publisher")
-		return publishOutboxEventWAL
-	}
+func SetOutboxPublisher() OutboxPublisher {
+	log.Info("Using WAL logical decoding message outbox publisher")
+	return publishOutboxEventWAL
 }
 
 // publishOutboxEventWAL publishes an event to WAL using logical decoding messages

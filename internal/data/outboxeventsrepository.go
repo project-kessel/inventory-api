@@ -13,8 +13,7 @@ import (
 	"github.com/project-kessel/inventory-api/internal/storage"
 )
 
-// walOutboxMessage defines the content value of a logical decoding message
-// it mirrors the legacy outbox table to make the transition transparent to consumer processes
+// walOutboxMessage defines the content value of a logical decoding message emitted via pg_logical_emit_message
 type walOutboxMessage struct {
 	ID            string              `json:"id"`
 	AggregateType string              `json:"aggregatetype"`
@@ -55,15 +54,17 @@ func mapOutboxEventToWALMessage(event *model_legacy.OutboxEvent) (walOutboxMessa
 // Tests can provide a no-op implementation for SQLite compatibility.
 type OutboxPublisher func(tx *gorm.DB, event *model_legacy.OutboxEvent) error
 
-// SetOutboxPublisher returns the appropriate OutboxPublisher for the given mode.
+// SetOutboxPublisher returns the OutboxPublisher for the given mode.
+// OutboxModeWAL uses pg_logical_emit_message (PostgreSQL only).
+// OutboxModeNone (and any unrecognised value) returns a no-op publisher.
 func SetOutboxPublisher(mode string) OutboxPublisher {
 	switch mode {
 	case storage.OutboxModeWAL:
 		log.Info("Using WAL logical decoding message outbox publisher")
 		return publishOutboxEventWAL
 	default:
-		log.Info("Using table-based outbox publisher")
-		return publishOutboxEvent
+		log.Info("Using no-op outbox publisher")
+		return publishNoOpOutboxEvent
 	}
 }
 
@@ -85,19 +86,14 @@ func publishOutboxEventWAL(tx *gorm.DB, event *model_legacy.OutboxEvent) error {
 
 	// the first arg to pg_logical_emit_message is set to 'true' to ensure the message is part of
 	// the current transaction, meaning it only appears in the WAL if the surrounding transaction commits.
-	return tx.Exec(
-		"SELECT pg_logical_emit_message(true, ?, ?)", prefix, string(content),
-	).Error
+	if err := tx.Exec("SELECT pg_logical_emit_message(true, ?, ?)", prefix, string(content)).Error; err != nil {
+		return fmt.Errorf("failed to emit WAL message: %w", err)
+	}
+	return nil
 }
 
-// original outbox implementation, kept to allow for flipping
-// to new WAL version using flag to simplify rollout
-func publishOutboxEvent(tx *gorm.DB, event *model_legacy.OutboxEvent) error {
-	if err := tx.Create(event).Error; err != nil {
-		return err
-	}
-	if err := tx.Delete(event).Error; err != nil {
-		return err
-	}
+// publishNoOpOutboxEvent is an OutboxPublisher that discards all events.
+// Use for non-PostgreSQL backends (e.g. SQLite) where no consumer pipeline is present.
+func publishNoOpOutboxEvent(tx *gorm.DB, event *model_legacy.OutboxEvent) error {
 	return nil
 }

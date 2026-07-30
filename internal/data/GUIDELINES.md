@@ -98,32 +98,33 @@ type TransactionManager interface {
 - Maximum retry attempts configurable via `maxSerializationRetries`
 
 #### Outbox Pattern
-- Handle failures in both WAL and table-based modes
 - Wrap marshaling/unmarshaling errors: `fmt.Errorf("failed to marshal WAL message: %w", err)`
 
 ## Outbox Pattern Implementation
 
-### Dual Mode Support
-1. **Table Mode** (`outbox-mode=table`): Traditional outbox_events table
-2. **WAL Mode** (`outbox-mode=wal`): PostgreSQL logical decoding with `pg_logical_emit_message`
+### Publisher Modes
+- **WAL Mode** (`outbox-mode=wal`): PostgreSQL logical decoding via `pg_logical_emit_message`. Required for the Debezium/Kafka consumer pipeline.
+- **None Mode** (`outbox-mode=none`): No-op publisher. Use with SQLite or any deployment without a consumer pipeline. Resource writes succeed but no events are emitted.
 
 ### WAL Implementation
 ```go
-// Message published within transaction boundary
-tx.Exec("SELECT pg_logical_emit_message(true, ?, ?)", prefix, content)
+// Message published within transaction boundary; error must be captured and returned
+if err := tx.Exec("SELECT pg_logical_emit_message(true, ?, ?)", prefix, content).Error; err != nil {
+    return fmt.Errorf("failed to emit WAL message: %w", err)
+}
 ```
 
-WAL mode only works with PostgreSQL and provides better performance by avoiding table-based outbox.
+WAL mode only works with PostgreSQL. SQLite (used in development/testing) does not support `pg_logical_emit_message` — use `outbox-mode=none` instead.
 
 ### Publisher Function Pattern
 ```go
 type OutboxPublisher func(tx *gorm.DB, event *model_legacy.OutboxEvent) error
 ```
 
-### Dual Publishing Strategy
-- **WAL logical decoding** mode for high performance (`storage.OutboxModeWAL`)
-- **Table-based outbox** as fallback for compatibility
-- **Message format consistency** between both approaches using `walOutboxMessage`
+### Publishing Strategy
+- **WAL logical decoding** for PostgreSQL deployments with a consumer pipeline (`storage.OutboxModeWAL`)
+- **No-op** for SQLite or standalone deployments without a consumer (`storage.OutboxModeNone`)
+- **Message format** defined by `walOutboxMessage` for WAL mode, ensuring compatibility with the Debezium Outbox Event Router SMT
 
 ### Transaction Coordination
 - **Outbox events** created within same transaction as domain changes

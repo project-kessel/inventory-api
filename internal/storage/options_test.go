@@ -21,7 +21,7 @@ func TestNewOptions(t *testing.T) {
 			SqlLite3:                sqlite3.NewOptions(),
 			Database:                "sqlite3",
 			MaxSerializationRetries: 10,
-			OutboxMode:              OutboxModeTable,
+			OutboxMode:              OutboxModeNone,
 		},
 	}
 	assert.Equal(t, test.expectedOptions, NewOptions())
@@ -53,7 +53,7 @@ func TestOptions_Validate(t *testing.T) {
 			name: "postgres database",
 			options: &Options{
 				Database:   "postgres",
-				OutboxMode: OutboxModeTable,
+				OutboxMode: OutboxModeWAL,
 				Postgres: &postgres.Options{
 					SSLMode: "",
 				},
@@ -64,9 +64,17 @@ func TestOptions_Validate(t *testing.T) {
 			name: "sqlite database",
 			options: &Options{
 				Database:   "sqlite3",
-				OutboxMode: OutboxModeTable,
+				OutboxMode: OutboxModeNone,
 			},
 			expectError: false,
+		},
+		{
+			name: "wal cannot be set with sqlite database",
+			options: &Options{
+				Database:   "sqlite3",
+				OutboxMode: OutboxModeWAL,
+			},
+			expectError: true,
 		},
 		{
 			name: "invalid database",

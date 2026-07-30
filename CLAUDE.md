@@ -49,7 +49,7 @@ make docker-build-push
 ## Architecture Notes
 
 - **Clean Architecture**: `internal/biz` (business), `internal/data` (persistence), `internal/service` (API)
-- **Event Sourcing**: Outbox pattern with WAL/table modes for reliable event publishing
+- **Event Sourcing**: Outbox pattern with WAL logical decoding for reliable event publishing (no-op mode for SQLite/standalone)
 - **CQRS**: Read-after-write consistency with Relations API integration
 - **Hexagonal**: Port abstractions for external dependencies
 

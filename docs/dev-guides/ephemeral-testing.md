@@ -115,8 +115,8 @@ Once the deployment completes, it may take a little bit of time for the Kafka se
 
 When creating a resource (in this setup, a notifications integration) in Inventory API, the expected outcome should be:
 * Resource is added to Inventory via API and reflected in Inventory DB
-* Resource is created then removed from outbox tables
-* Debezium captures the changes and produces a message to the resources and tuples outboxes
+* Resource write emits a WAL logical decoding message via `pg_logical_emit_message`
+* Debezium captures the WAL message and produces a message to the resources and tuples outboxes
 * The Inventory Consumer process captures the message in the tuples topic, and created the relationship in SpiceDB via Relations API
 * The consumer captures the consistency token in the response and updates the resource in Inventory DB with the token
 

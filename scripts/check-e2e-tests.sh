@@ -8,7 +8,6 @@ if [[ -z "$EXISTING_CLUSTER" ]]; then
 fi
 
 # check_job polls a Kubernetes Job by selector until it completes or fails.
-# Remove the e2e-inventory-outbox-table-tests call below when the outbox table is deprecated.
 check_job() {
   local job_name=$1
   local selector="job-name=${job_name}"
@@ -32,10 +31,3 @@ check_job() {
   echo "Unexpected timeout, ${job_name} did not complete"
   return 1
 }
-
-# WAL-mode tests are verified inline by start-inventory-kind.sh before the
-# table-mode run begins, so we only need to check the table-mode job here.
-check_job "e2e-inventory-outbox-table-tests"
-
-kubectl get pods
-kubectl get svc

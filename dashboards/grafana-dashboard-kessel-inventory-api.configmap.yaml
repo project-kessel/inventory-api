@@ -2247,7 +2247,7 @@ data:
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "description": "Lag from point where resource is written to outbox table, to consumed and processed by inventory consumer",
+          "description": "Write-versus-processed rate delta (events/sec written minus events/sec consumed). A sustained positive value indicates a growing processing backlog.",
           "fieldConfig": {
             "defaults": {
               "color": {

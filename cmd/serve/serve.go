@@ -291,6 +291,9 @@ func NewCommand(
 
 			//v1beta2
 			// wire together inventory service handling
+			if storageConfig.Options.Database != "postgres" {
+				return fmt.Errorf("WAL outbox publisher requires PostgreSQL; current database driver: %q", storageConfig.Options.Database)
+			}
 			resourceRepo := data.NewResourceRepository(db, transactionManager, data.SetOutboxPublisher())
 			inventory_controller := resourcesctl.New(resourceRepo, schemaRepository, relationsRepo, "notifications", log.With(logger, "subsystem", "notificationsintegrations_controller"), listenManager, waitForNotifCircuitBreaker, usecaseConfig, mc, metaauthorizer.NewSimpleMetaAuthorizer(), selfSubjectStrategy)
 

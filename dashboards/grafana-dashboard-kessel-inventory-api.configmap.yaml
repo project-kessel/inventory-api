@@ -2339,7 +2339,7 @@ data:
               "refId": "A"
             }
           ],
-          "title": "End to end replication lag",
+          "title": "Replication Rate Delta",
           "type": "timeseries"
         },
         {

@@ -6,7 +6,7 @@ This file covers the data layer under `internal/data/`. For database driver conf
 
 ### Field Size Constants
 Use predefined field size constants from `internal/data/model/common.go`:
-- `MaxFieldSize128/256/512/1024` for string fields  
+- `MaxFieldSize128/256/512/1024` for string fields
 - Specific constants like `MaxLocalResourceIDLength`, `MaxReporterTypeLength`
 - Consistent min value constants: `MinVersionValue`, `MinGenerationValue`, `MinCommonVersion`
 
@@ -45,7 +45,6 @@ Version uint `gorm:"type:bigint;check:version >= 0"`
 - **reporter_resources**: Links resources to reporters with composite natural key
 - **reporter_representations**: Versioned reporter-specific data
 - **common_representations**: Versioned common representation data
-- **outbox_events**: Event sourcing for external integrations
 
 ### Composite Key Design
 ReporterResourceKey combines 4 fields to uniquely identify resources:
@@ -282,7 +281,7 @@ func (o *OptionsConfig) InjectClowdAppConfig(appconfig *clowder.AppConfig) error
 ### Database Type Specifications
 ```go
 DBTypeText   = "text"     // For flexible text
-DBTypeBigInt = "bigint"   // For versions/counts  
+DBTypeBigInt = "bigint"   // For versions/counts
 DBTypeJSONB  = "jsonb"    // For structured data
 ```
 

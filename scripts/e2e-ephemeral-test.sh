@@ -104,21 +104,21 @@ log_info "Database pod: $DB_POD"
 # Step 3: Connect to DB and verify all tables are empty
 log_info "Verifying database tables are empty..."
 
-TABLES=("resource" "reporter_resources" "reporter_representations" "common_representations" "outbox_events")
+TABLES=("resource" "reporter_resources" "reporter_representations" "common_representations")
 
 for table in "${TABLES[@]}"; do
     log_info "Checking table: $table"
     COUNT=$(oc exec -n $NAMESPACE $DB_POD -- bash -c "psql -U postgres -d kessel-inventory -t -c \"SELECT COUNT(*) FROM $table;\"" 2>&1)
     EXIT_CODE=$?
-    
+
     if [ $EXIT_CODE -ne 0 ] || [[ "$COUNT" == *"error"* ]] || [[ "$COUNT" == *"ERROR"* ]] || [[ "$COUNT" == *"does not exist"* ]]; then
         log_warning "Could not query table '$table'"
         log_info "Skipping database verification - will verify via API behavior instead"
         break
     fi
-    
+
     COUNT=$(echo $COUNT | xargs) # trim whitespace
-    
+
     if [ "$COUNT" -eq 0 ]; then
         log_info "✓ Table '$table' is empty (count: 0)"
     else

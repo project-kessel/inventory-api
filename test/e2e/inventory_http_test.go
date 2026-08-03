@@ -119,7 +119,7 @@ func TestMain(m *testing.M) {
 func cleanupTestData() {
 	if db != nil {
 		// Clean up test data to avoid conflicts
-		db.Exec("TRUNCATE TABLE reporter_representations, common_representations, reporter_resources, resource, outbox_events CASCADE")
+		db.Exec("TRUNCATE TABLE reporter_representations, common_representations, reporter_resources, resource CASCADE")
 	}
 }
 

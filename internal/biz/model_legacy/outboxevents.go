@@ -10,7 +10,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/project-kessel/inventory-api/internal"
 	bizmodel "github.com/project-kessel/inventory-api/internal/biz/model"
-	"gorm.io/gorm"
 )
 
 type AggregateType string
@@ -21,23 +20,12 @@ const (
 )
 
 type OutboxEvent struct {
-	ID            uuid.UUID                   `gorm:"type:uuid;primarykey;not null"`
-	AggregateType AggregateType               `gorm:"column:aggregatetype;type:varchar(255);not null"`
-	AggregateID   string                      `gorm:"column:aggregateid;type:varchar(255);not null"`
-	Operation     bizmodel.EventOperationType `gorm:"type:varchar(255);not null"`
-	TxId          string                      `gorm:"column:txid;type:varchar(255)"`
+	ID            uuid.UUID
+	AggregateType AggregateType
+	AggregateID   string
+	Operation     bizmodel.EventOperationType
+	TxId          string
 	Payload       internal.JsonObject
-}
-
-func (r *OutboxEvent) BeforeCreate(db *gorm.DB) error {
-	var err error
-	if r.ID == uuid.Nil {
-		r.ID, err = uuid.NewV7()
-		if err != nil {
-			return fmt.Errorf("failed to generate uuid: %w", err)
-		}
-	}
-	return nil
 }
 
 type ResourceEvent struct {

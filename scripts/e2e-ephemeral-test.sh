@@ -131,7 +131,13 @@ log_info "Database verification complete"
 # Verify outbox_events table was dropped by the migration
 log_info "Verifying outbox_events table was dropped..."
 OUTBOX_CHECK=$(oc exec -n "$NAMESPACE" "$DB_POD" -- bash -c "psql -U postgres -d kessel-inventory -t -c \"SELECT to_regclass('public.outbox_events');\"" 2>&1)
-if [[ "$OUTBOX_CHECK" == *"outbox_events"* ]]; then
+OUTBOX_EXIT=$?
+if [ "$OUTBOX_EXIT" -ne 0 ]; then
+    log_error "Failed to query outbox_events table status: $OUTBOX_CHECK"
+    exit 1
+fi
+OUTBOX_CHECK=$(printf '%s' "$OUTBOX_CHECK" | xargs)
+if [ -n "$OUTBOX_CHECK" ]; then
     log_error "outbox_events table still exists — drop migration may not have run"
     exit 1
 fi

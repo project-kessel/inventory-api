@@ -108,7 +108,7 @@ TABLES=("resource" "reporter_resources" "reporter_representations" "common_repre
 
 for table in "${TABLES[@]}"; do
     log_info "Checking table: $table"
-    COUNT=$(oc exec -n $NAMESPACE $DB_POD -- bash -c "psql -U postgres -d kessel-inventory -t -c \"SELECT COUNT(*) FROM $table;\"" 2>&1)
+    COUNT=$(oc exec -n "$NAMESPACE" "$DB_POD" -- bash -c "psql -U postgres -d kessel-inventory -t -c \"SELECT COUNT(*) FROM $table;\"" 2>&1)
     EXIT_CODE=$?
 
     if [ $EXIT_CODE -ne 0 ] || [[ "$COUNT" == *"error"* ]] || [[ "$COUNT" == *"ERROR"* ]] || [[ "$COUNT" == *"does not exist"* ]]; then
@@ -117,7 +117,7 @@ for table in "${TABLES[@]}"; do
         break
     fi
 
-    COUNT=$(echo $COUNT | xargs) # trim whitespace
+    COUNT=$(printf '%s\n' "$COUNT" | xargs) # trim whitespace
 
     if [ "$COUNT" -eq 0 ]; then
         log_info "✓ Table '$table' is empty (count: 0)"
@@ -127,6 +127,15 @@ for table in "${TABLES[@]}"; do
 done
 
 log_info "Database verification complete"
+
+# Verify outbox_events table was dropped by the migration
+log_info "Verifying outbox_events table was dropped..."
+OUTBOX_CHECK=$(oc exec -n "$NAMESPACE" "$DB_POD" -- bash -c "psql -U postgres -d kessel-inventory -t -c \"SELECT to_regclass('public.outbox_events');\"" 2>&1)
+if [[ "$OUTBOX_CHECK" == *"outbox_events"* ]]; then
+    log_error "outbox_events table still exists — drop migration may not have run"
+    exit 1
+fi
+log_info "✓ outbox_events table has been dropped"
 
 # Step 4: Set up port-forward to inventory-api
 log_info "Setting up port-forward to kessel-inventory-api service..."

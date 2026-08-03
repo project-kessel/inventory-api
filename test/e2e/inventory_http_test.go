@@ -119,7 +119,9 @@ func TestMain(m *testing.M) {
 func cleanupTestData() {
 	if db != nil {
 		// Clean up test data to avoid conflicts
-		db.Exec("TRUNCATE TABLE reporter_representations, common_representations, reporter_resources, resource CASCADE")
+		if result := db.Exec("TRUNCATE TABLE reporter_representations, common_representations, reporter_resources, resource CASCADE"); result.Error != nil {
+			log.Fatalf("failed to truncate test data: %v", result.Error)
+		}
 	}
 }
 

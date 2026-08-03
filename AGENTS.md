@@ -38,7 +38,7 @@ This is the Kessel Inventory API, a Go-based microservice that provides resource
 ### Key Architectural Patterns
 - **Clean Architecture**: Business logic in `internal/biz`, data layer in `internal/data`, service layer in `internal/service`
 - **Domain-Driven Design**: Aggregate roots in `model` package with repository patterns
-- **Event Sourcing**: Outbox pattern with dual WAL/table modes for reliable event publishing
+- **Event Sourcing**: Outbox pattern with WAL logical decoding for reliable event publishing (no-op mode available for SQLite/standalone deployments)
 - **CQRS-like separation**: Read-after-write consistency with Relations API integration
 - **Hexagonal ports**: Abstractions for external dependencies (database, auth, messaging)
 

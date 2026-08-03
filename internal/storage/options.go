@@ -21,8 +21,11 @@ const (
 	Postgres = "postgres"
 	Sqlite3  = "sqlite3"
 
-	OutboxModeWAL   = "wal"
-	OutboxModeTable = "table"
+	OutboxModeWAL = "wal"
+	// OutboxModeNone disables outbox publishing. Use with SQLite or any deployment
+	// that does not have a Debezium/Kafka consumer pipeline. Resource writes succeed
+	// but no events are emitted downstream.
+	OutboxModeNone = "none"
 )
 
 func NewOptions() *Options {
@@ -31,7 +34,7 @@ func NewOptions() *Options {
 		SqlLite3:                sqlite3.NewOptions(),
 		Database:                "sqlite3",
 		MaxSerializationRetries: 10,
-		OutboxMode:              OutboxModeTable,
+		OutboxMode:              OutboxModeNone,
 	}
 }
 
@@ -42,7 +45,7 @@ func (o *Options) AddFlags(fs *pflag.FlagSet, prefix string) {
 
 	fs.StringVar(&o.Database, prefix+"database", o.Database, "The database type to use.  Either sqlite3 or postgres.")
 	fs.IntVar(&o.MaxSerializationRetries, prefix+"max-serialization-retries", o.MaxSerializationRetries, "Maximum number of retries for serialized transactions")
-	fs.StringVar(&o.OutboxMode, prefix+"outbox-mode", o.OutboxMode, "Outbox publishing mode: 'table' (outbox_events table) or 'wal' (pg_logical_emit_message)")
+	fs.StringVar(&o.OutboxMode, prefix+"outbox-mode", o.OutboxMode, "'wal' (pg_logical_emit_message) or 'none' for sqlite/standalone use")
 
 	o.Postgres.AddFlags(fs, prefix+"postgres")
 	o.SqlLite3.AddFlags(fs, prefix+"sqlite3")
@@ -65,8 +68,8 @@ func (o *Options) Validate() []error {
 		errs = append(errs, o.SqlLite3.Validate()...)
 	}
 
-	if o.OutboxMode != OutboxModeTable && o.OutboxMode != OutboxModeWAL {
-		errs = append(errs, errors.New("outbox-mode must be either 'table' or 'wal'"))
+	if o.OutboxMode != OutboxModeNone && o.OutboxMode != OutboxModeWAL {
+		errs = append(errs, errors.New("outbox-mode must be either 'none' or 'wal'"))
 	}
 
 	if o.OutboxMode == OutboxModeWAL && o.Database != Postgres {

@@ -59,7 +59,7 @@ resource
        └─ reporter_representations (reporter_resource_id FK → reporter_resources.id)
   └─ common_representations (resource_id FK → resource.id)
 
-outbox_events — CDC outbox for Kafka; typically empty (events are consumed and deleted)
+outbox_events — legacy CDC outbox table; always empty (table mode was removed; events are now published via WAL logical decoding). Any rows present are unexpected and diagnostically significant.
 metrics_summaries — periodic metrics snapshots; metrics column is large jsonb
 ```
 
@@ -93,7 +93,7 @@ SELECT version, reported_by_reporter_type, reported_by_reporter_instance, transa
 SELECT version, generation, reporter_version, common_version, transaction_id, tombstone, created_at, data FROM reporter_representations WHERE reporter_resource_id = '<reporter-resource-id>' ORDER BY version DESC LIMIT 1
 ```
 
-**Step 5**: Check outbox events (often empty -- events are transient)
+**Step 5**: Check outbox events (always empty -- events are published via WAL logical decoding, not this table; any rows here are unexpected and diagnostically significant)
 
 ```sql
 SELECT id, aggregatetype, operation, txid, payload FROM outbox_events WHERE aggregateid = '<resource-id>' ORDER BY id DESC LIMIT 10

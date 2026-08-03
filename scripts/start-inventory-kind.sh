@@ -240,46 +240,8 @@ if [ "$STATUS" != "Completed" ]; then
   exit 1
 fi
 
-# --- Clean up WAL job before table-mode run ---
-echo "Deleting WAL e2e job..."
+echo "Cleaning up e2e job..."
 kubectl delete job e2e-inventory-http-tests --ignore-not-found=true
-echo "Waiting for WAL e2e job pod to be fully removed..."
-kubectl wait --for=delete pod --selector=job-name=e2e-inventory-http-tests --timeout=60s
-
-# --- Swap to table-mode and run e2e tests ---
-# Remove this block when the outbox table is deprecated.
-echo "=== Switching to outbox-mode=table for second e2e run ==="
-
-# Patch inventory config to use table mode
-kubectl get secret inventory-api-config -o jsonpath='{.data.inventory-api-config\.yaml}' | base64 -d | sed 's/outbox-mode: wal/outbox-mode: table/' > /tmp/inventory-api-config-table.yaml
-kubectl create secret generic inventory-api-config \
-  --from-file=inventory-api-config.yaml=/tmp/inventory-api-config-table.yaml \
-  --from-literal=db_password=yPsw5e6ab4bvAGe5H \
-  --dry-run=client -o yaml | kubectl apply -f -
-rm -f /tmp/inventory-api-config-table.yaml
-
-# Swap connector from WAL to table mode — drop old slot and recreate
-kubectl delete kafkaconnector kessel-inventory-source-connector
-sleep 10
-
-# Drop the WAL replication slot so the table connector starts fresh.
-# The WAL connector's slot captures logical decoding messages, not table changes.
-# Reusing it would cause the table connector to miss outbox_events inserts.
-POSTGRES_POD=$(kubectl get pods -l app=invdatabase -o jsonpath='{.items[0].metadata.name}')
-kubectl exec "$POSTGRES_POD" -- psql -U postgres -d spicedb -c \
-  "SELECT pg_drop_replication_slot('inventory_api_debezium');" 2>/dev/null || true
-
-kubectl apply -f deploy/kind/inventory/strimzi-table-connector.yaml
-
-# Wait for the table-mode connector to reach RUNNING before proceeding
-check_connector_readiness "kessel-inventory-source-connector"
-
-# Restart inventory pod to pick up new config
-kubectl rollout restart deployment kessel-inventory
-kubectl rollout status deployment kessel-inventory --timeout=300s
-
-# Submit table-mode e2e tests
-kubectl apply -f deploy/kind/e2e/e2e-batch-outbox-table.yaml
 
 echo "Setup complete."
 rm -rf $TMP_DIR

@@ -7,8 +7,8 @@ import (
 
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
 	"github.com/google/uuid"
-	"github.com/project-kessel/inventory-api/internal/biz/model_legacy"
 	"github.com/project-kessel/inventory-api/internal/metricscollector"
+	"github.com/project-kessel/inventory-api/internal/storage"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/otel"
@@ -122,7 +122,7 @@ func (t *TestCase) TestSetup(testingT *testing.T) []error {
 	}
 
 	// Replace the repository with one using a no-op outbox publisher for SQLite compatibility
-	noopPublisher := data.OutboxPublisher(func(_ *gorm.DB, _ *model_legacy.OutboxEvent) error { return nil })
+	noopPublisher := data.SetOutboxPublisher(storage.OutboxModeNone)
 	t.inv.ResourceRepository = data.NewResourceRepository(db, data.NewGormTransactionManager(t.inv.MetricsCollector, 3), noopPublisher)
 
 	t.inv.SchemaService = model.NewSchemaService(schemaRepository, t.logger)

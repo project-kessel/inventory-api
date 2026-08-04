@@ -104,21 +104,21 @@ log_info "Database pod: $DB_POD"
 # Step 3: Connect to DB and verify all tables are empty
 log_info "Verifying database tables are empty..."
 
-TABLES=("resource" "reporter_resources" "reporter_representations" "common_representations" "outbox_events")
+TABLES=("resource" "reporter_resources" "reporter_representations" "common_representations")
 
 for table in "${TABLES[@]}"; do
     log_info "Checking table: $table"
-    COUNT=$(oc exec -n $NAMESPACE $DB_POD -- bash -c "psql -U postgres -d kessel-inventory -t -c \"SELECT COUNT(*) FROM $table;\"" 2>&1)
+    COUNT=$(oc exec -n "$NAMESPACE" "$DB_POD" -- bash -c "psql -U postgres -d kessel-inventory -t -c \"SELECT COUNT(*) FROM $table;\"" 2>&1)
     EXIT_CODE=$?
-    
+
     if [ $EXIT_CODE -ne 0 ] || [[ "$COUNT" == *"error"* ]] || [[ "$COUNT" == *"ERROR"* ]] || [[ "$COUNT" == *"does not exist"* ]]; then
         log_warning "Could not query table '$table'"
         log_info "Skipping database verification - will verify via API behavior instead"
         break
     fi
-    
-    COUNT=$(echo $COUNT | xargs) # trim whitespace
-    
+
+    COUNT=$(printf '%s\n' "$COUNT" | xargs) # trim whitespace
+
     if [ "$COUNT" -eq 0 ]; then
         log_info "✓ Table '$table' is empty (count: 0)"
     else
@@ -127,6 +127,21 @@ for table in "${TABLES[@]}"; do
 done
 
 log_info "Database verification complete"
+
+# Verify outbox_events table was dropped by the migration
+log_info "Verifying outbox_events table was dropped..."
+OUTBOX_CHECK=$(oc exec -n "$NAMESPACE" "$DB_POD" -- bash -c "psql -U postgres -d kessel-inventory -t -c \"SELECT to_regclass('public.outbox_events');\"" 2>&1)
+OUTBOX_EXIT=$?
+if [ "$OUTBOX_EXIT" -ne 0 ]; then
+    log_error "Failed to query outbox_events table status: $OUTBOX_CHECK"
+    exit 1
+fi
+OUTBOX_CHECK=$(printf '%s' "$OUTBOX_CHECK" | xargs)
+if [ -n "$OUTBOX_CHECK" ]; then
+    log_error "outbox_events table still exists — drop migration may not have run"
+    exit 1
+fi
+log_info "✓ outbox_events table has been dropped"
 
 # Step 4: Set up port-forward to inventory-api
 log_info "Setting up port-forward to kessel-inventory-api service..."

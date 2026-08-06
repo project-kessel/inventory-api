@@ -31,7 +31,8 @@ TITLE:="Kessel Asset Inventory API"
 ifeq ($(VERSION),)
 VERSION:=$(shell git describe --tags --always)
 endif
-INVENTORY_SCHEMA_VERSION=0.11.0
+SCHEMA_REPO ?= project-kessel/starlark-unified-schema
+SCHEMA_VERSION=unset
 
 # Postgres configuration
 DB_PORT ?= 5435
@@ -83,6 +84,25 @@ api_breaking:
 # 	@$(DOCKER) build -t custom-protoc ./api
 # 	@$(DOCKER) run -t --rm -v $(PWD)/api:/api:rw -v $(PWD)/openapi.yaml:/openapi.yaml:rw \
 # 	-w=/api/ custom-protoc sh -c "buf generate && buf lint"
+
+.PHONY: update-schemas
+# download starlark jsonschema release and rebuild inventory schema artifacts
+update-schemas:
+	@test -n "${SCHEMA_VERSION}" || { echo "SCHEMA_VERSION is required"; exit 1; }
+	gh release download "${SCHEMA_VERSION}" \
+		--repo "${SCHEMA_REPO}" \
+		--pattern 'jsonschema.tar.gz' \
+		--clobber
+	tmpdir=$$(mktemp -d) && \
+	tar xzf jsonschema.tar.gz -C "$$tmpdir" && \
+	mkdir -p ${SCHEMA_PATH} && \
+	(cd "$$tmpdir" && find . -type f -path '*/reporters/features/*.json' -print) | while read -r f; do \
+		mkdir -p ${SCHEMA_PATH}$$(dirname "$$f") && \
+		cp "$$tmpdir/$$f" ${SCHEMA_PATH}$$f; \
+	done && \
+	rm -rf "$$tmpdir" jsonschema.tar.gz
+	$(MAKE) build-schemas SCHEMA_PATH=${SCHEMA_PATH}
+	go run main.go preload-schema
 
 .PHONY: build-schemas
 # build schema tarball

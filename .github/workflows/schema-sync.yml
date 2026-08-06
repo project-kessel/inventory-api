@@ -25,7 +25,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
-      SCHEMA_REPO: project-kessel/starlark-unified-schema
+      SCHEMA_REPO: lennysgarage/starlark-unified-schema
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - name: Checkout

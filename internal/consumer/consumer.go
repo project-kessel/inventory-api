@@ -58,6 +58,10 @@ type InventoryConsumer struct {
 	Config           CompletedConfig
 	DB               *gorm.DB
 	Relations        model.RelationsRepository
+	// RelationsEnabled gates the tuple-replication path: it is true when the
+	// configured relations backend actually persists tuples (kessel/spicedb) and
+	// false for the allow-all no-op backend. Derived from config at wiring time.
+	RelationsEnabled bool
 	Errors           chan error
 	MetricsCollector *metricscollector.MetricsCollector
 	Logger           *log.Helper
@@ -78,7 +82,7 @@ type InventoryConsumer struct {
 }
 
 // New instantiates a new InventoryConsumer
-func New(config CompletedConfig, db *gorm.DB, schemaRepository model.SchemaRepository, relations model.RelationsRepository, notifier pubsub.Notifier, logger *log.Helper, consumer Consumer) (InventoryConsumer, error) {
+func New(config CompletedConfig, db *gorm.DB, schemaRepository model.SchemaRepository, relations model.RelationsRepository, relationsEnabled bool, notifier pubsub.Notifier, logger *log.Helper, consumer Consumer) (InventoryConsumer, error) {
 	if consumer == nil {
 		logger.Info("Setting up kafka consumer")
 		logger.Debugf("completed kafka config: %+v", config.KafkaConfig)
@@ -130,6 +134,7 @@ func New(config CompletedConfig, db *gorm.DB, schemaRepository model.SchemaRepos
 		DB:                 db,
 		ResourceRepository: resourceRepository,
 		Relations:          relations,
+		RelationsEnabled:   relationsEnabled,
 		Errors:             errChan,
 		MetricsCollector:   &mc,
 		Logger:             logger,
@@ -168,18 +173,7 @@ func (i *InventoryConsumer) Consume() error {
 	sigchan := make(chan os.Signal, 1)
 	signal.Notify(sigchan, syscall.SIGINT, syscall.SIGTERM)
 
-	// Both gRPC (relations-api) and SpiceDB (direct) backends write tuples;
-	// only allow-all is a no-op. The type switch gates the consumer's tuple
-	// write path so new RelationsRepository implementations must opt-in here.
-	var relationsEnabled bool
-	switch i.Relations.(type) {
-	case *data.GRPCRelationsRepository:
-		relationsEnabled = true
-	case *data.SpiceDBRelationsRepository:
-		relationsEnabled = true
-	case *data.AllowAllRelationsRepository:
-		relationsEnabled = false
-	}
+	relationsEnabled := i.RelationsEnabled
 	// Process messages
 	run := true
 	i.Logger.Info("Consumer ready: waiting for messages...")

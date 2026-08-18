@@ -85,6 +85,10 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
           git fetch origin main
+          # Fetch the existing sync branch (if any) so --force-with-lease can
+          # compare against the current remote tip instead of rejecting.
+          git fetch origin "${BRANCH}" || true
+
           git checkout -B "${BRANCH}" origin/main
 
           # Pin SCHEMA_VERSION to the target release

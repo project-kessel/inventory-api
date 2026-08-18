@@ -108,7 +108,7 @@ jobs:
           Automated schema sync from [\`${SCHEMA_REPO}\`](https://github.com/${SCHEMA_REPO}) release \`${TARGET}\`.
 
           - Bumps \`SCHEMA_VERSION\` to \`${TARGET}\`
-          - Runs \`make update-schemas\` (downloads \`jsonschema.tar.gz\`, extracts feature JSON schemas, rebuilds \`resources.tar.gz\` / \`schema_cache.json\` / ephemeral ConfigMap)
+          - Runs \`make update-schemas\` (downloads \`jsonschema.tar.gz\`, extracts feature JSON schemas and common representations, rebuilds \`resources.tar.gz\` / \`schema_cache.json\` / ephemeral ConfigMap)
 
           ## Test plan
 

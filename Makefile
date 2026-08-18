@@ -96,7 +96,7 @@ update-schemas:
 	tmpdir=$$(mktemp -d) && \
 	tar xzf jsonschema.tar.gz -C "$$tmpdir" && \
 	mkdir -p ${SCHEMA_PATH} && \
-	(cd "$$tmpdir" && find . -type f -path '*/reporters/features/*.json' -print) | while read -r f; do \
+	(cd "$$tmpdir" && find . -type f \( -path '*/reporters/features/*.json' -o -name 'common_representation.json' \) -print) | while read -r f; do \
 		mkdir -p ${SCHEMA_PATH}$$(dirname "$$f") && \
 		cp "$$tmpdir/$$f" ${SCHEMA_PATH}$$f; \
 	done && \

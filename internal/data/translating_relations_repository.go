@@ -109,7 +109,11 @@ func (t *TranslatingRelationsRepository) CreateTuples(ctx context.Context, tuple
 }
 
 func (t *TranslatingRelationsRepository) DeleteTuples(ctx context.Context, filter model.TupleFilter, fencing *model.FencingCheck) (model.TuplesResult, error) {
-	return t.inner.DeleteTuples(ctx, t.schema.TranslateTupleFilter(filter), fencing)
+	translated, err := t.schema.TranslateTupleFilter(filter)
+	if err != nil {
+		return model.TuplesResult{}, err
+	}
+	return t.inner.DeleteTuples(ctx, translated, fencing)
 }
 
 // ReadTuples is the deprecated, RBAC-only raw SpiceDB bypass (see

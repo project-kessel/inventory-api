@@ -19,6 +19,7 @@ type recordingRelationsRepository struct {
 	gotCheck        model.Relationship
 	gotCreateTuples []model.RelationsTuple
 	gotDeleteFilter model.TupleFilter
+	deleteCalled    bool
 	gotReadFilter   model.TupleFilter
 
 	gotLookupObjectsType     model.RepresentationType
@@ -74,6 +75,7 @@ func (r *recordingRelationsRepository) CreateTuples(_ context.Context, tuples []
 }
 
 func (r *recordingRelationsRepository) DeleteTuples(_ context.Context, filter model.TupleFilter, _ *model.FencingCheck) (model.TuplesResult, error) {
+	r.deleteCalled = true
 	r.gotDeleteFilter = filter
 	return model.TuplesResult{}, nil
 }
@@ -177,6 +179,22 @@ func TestDecorator_DeleteTuplesTranslatesFilter(t *testing.T) {
 	assert.Equal(t, "rbac", inner.gotDeleteFilter.ReporterType().Serialize())
 	assert.Equal(t, "workspace", inner.gotDeleteFilter.ObjectType().Serialize())
 	assert.Equal(t, "features_workspace_enabled_services", inner.gotDeleteFilter.Relation().Serialize())
+}
+
+func TestDecorator_DeleteTuplesRejectsUnscopedDerivedFilter(t *testing.T) {
+	// A derived-type delete without a relation would fold to the parent type
+	// (rbac/workspace) unscoped and wipe unrelated parent tuples. It must error
+	// and never reach the backend.
+	inner := &recordingRelationsRepository{}
+	repo := newTranslator(inner)
+
+	filter := model.NewTupleFilter().
+		WithReporterType(model.DeserializeReporterType("features")).
+		WithObjectType(model.DeserializeResourceType("workspace"))
+
+	_, err := repo.DeleteTuples(context.Background(), filter, nil)
+	require.ErrorIs(t, err, model.ErrUnscopedDerivedFilter)
+	assert.False(t, inner.deleteCalled, "backend DeleteTuples must not be called for an unsafe filter")
 }
 
 func TestDecorator_ReadTuplesForwardsFilterUntranslated(t *testing.T) {

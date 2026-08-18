@@ -1,5 +1,7 @@
 package model
 
+import "fmt"
+
 // Derived-type rewrites for SpiceDB
 //
 // The logical schema (the unified schema language exposed by the front-facing
@@ -123,19 +125,27 @@ func (sc *SchemaService) TranslateSubjectRepresentationType(rt RepresentationTyp
 	return rewriteRepresentationType(rw)
 }
 
-// TranslateTupleFilter rewrites both sides of a tuple filter (used by delete and
-// read). Type and reporter type are always specified together on each side.
-func (sc *SchemaService) TranslateTupleFilter(f TupleFilter) TupleFilter {
+// TranslateTupleFilter rewrites both sides of a tuple filter (used by delete).
+// Type and reporter type are always specified together on each side.
+//
+// A derived object type is folded into its parent type in SpiceDB and its
+// relations are prefixed, so the parent type holds tuples from several logical
+// types. A filter that omits the relation would therefore match the parent's own
+// tuples and those of sibling derived types — deleting far more than intended.
+// Such a filter cannot be translated safely and is rejected with
+// ErrUnscopedDerivedFilter.
+func (sc *SchemaService) TranslateTupleFilter(f TupleFilter) (TupleFilter, error) {
 	out := f
 
 	if f.ReporterType() != nil && f.ObjectType() != nil {
 		if rw, ok := lookupSubclassRewrite(f.ReporterType().Serialize(), f.ObjectType().Serialize()); ok {
+			if f.Relation() == nil {
+				return TupleFilter{}, fmt.Errorf("%w: %s/%s", ErrUnscopedDerivedFilter, rw.reporter, rw.resourceType)
+			}
 			out = out.
 				WithReporterType(DeserializeReporterType(rw.parentNamespace)).
-				WithObjectType(DeserializeResourceType(rw.parentType))
-			if f.Relation() != nil {
-				out = out.WithRelation(DeserializeRelation(rw.relationPrefix() + f.Relation().Serialize()))
-			}
+				WithObjectType(DeserializeResourceType(rw.parentType)).
+				WithRelation(DeserializeRelation(rw.relationPrefix() + f.Relation().Serialize()))
 		}
 	}
 
@@ -148,7 +158,7 @@ func (sc *SchemaService) TranslateTupleFilter(f TupleFilter) TupleFilter {
 		}
 	}
 
-	return out
+	return out, nil
 }
 
 // translateResourceSide rewrites the type of a resource reference to its parent

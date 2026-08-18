@@ -94,6 +94,10 @@ jobs:
           # Pin SCHEMA_VERSION to the target release
           sed -i "s/^SCHEMA_VERSION=.*/SCHEMA_VERSION=${TARGET}/" Makefile
 
+          # Overlay copy is additive so non-starlark resource types stay in
+          # tree. When every type is onboarded to starlark-unified-schema,
+          # update `make update-schemas` to replace managed paths (delete then
+          # copy) so files removed upstream do not remain in the local cache.
           make update-schemas SCHEMA_VERSION="${TARGET}" SCHEMA_REPO="${SCHEMA_REPO}"
 
           git add Makefile data/schema/resources resources.tar.gz schema_cache.json deploy/kessel-inventory-ephem.yaml

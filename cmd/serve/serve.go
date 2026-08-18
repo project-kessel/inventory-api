@@ -233,14 +233,14 @@ func NewCommand(
 				return err
 			}
 
-			// construct relations repository
-			relationsRepo, err := data.NewRelationsRepository(ctx, authzConfig, log.With(logger, "subsystem", "relations"))
+			// constructs schema repository
+			schemaRepository, err := newSchemaRepository(ctx, schemaConfig, log.NewHelper(log.With(logger, "subsystem", "schemaRepository")))
 			if err != nil {
 				return err
 			}
 
-			// constructs schema repository
-			schemaRepository, err := newSchemaRepository(ctx, schemaConfig, log.NewHelper(log.With(logger, "subsystem", "schemaRepository")))
+			// construct relations repository (the backend selected by config)
+			internalRelationsRepo, err := data.NewRelationsRepository(ctx, authzConfig, log.With(logger, "subsystem", "relations"))
 			if err != nil {
 				return err
 			}
@@ -248,9 +248,10 @@ func NewCommand(
 			// Translate derived/subclassed resource types into their SpiceDB
 			// relational form for every relations request. This wraps whichever
 			// backend was selected above, so checks, lookups, and tuple writes are
-			// all translated at a single chokepoint. See RHCLOUD-49793 / KSL-067.
-			relationsRepo = data.NewTranslatingRelationsRepository(
-				relationsRepo,
+			// all translated at a single chokepoint. Everything downstream uses
+			// this translating repository. See RHCLOUD-49793 / KSL-067.
+			relationsRepo := data.NewTranslatingRelationsRepository(
+				internalRelationsRepo,
 				bizmodel.NewSchemaService(schemaRepository, log.NewHelper(log.With(logger, "subsystem", "relations-translation"))),
 			)
 

@@ -245,6 +245,15 @@ func NewCommand(
 				return err
 			}
 
+			// Translate derived/subclassed resource types into their SpiceDB
+			// relational form for every relations request. This wraps whichever
+			// backend was selected above, so checks, lookups, and tuple writes are
+			// all translated at a single chokepoint. See RHCLOUD-49793 / KSL-067.
+			relationsRepo = data.NewTranslatingRelationsRepository(
+				relationsRepo,
+				bizmodel.NewSchemaService(schemaRepository, log.NewHelper(log.With(logger, "subsystem", "relations-translation"))),
+			)
+
 			// construct servers
 			server, err := server.New(serverConfig, middleware.Authentication(authenticator), authnConfig, authenticator, logger)
 			if err != nil {

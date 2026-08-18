@@ -53,11 +53,11 @@ type Consumer interface {
 
 // InventoryConsumer defines a Consumer with required clients and configs to call Relations API and update the Inventory DB with consistency tokens
 type InventoryConsumer struct {
-	Consumer         Consumer
-	OffsetStorage    []kafka.TopicPartition
-	Config           CompletedConfig
-	DB               *gorm.DB
-	Relations        model.RelationsRepository
+	Consumer      Consumer
+	OffsetStorage []kafka.TopicPartition
+	Config        CompletedConfig
+	DB            *gorm.DB
+	Relations     model.RelationsRepository
 	// RelationsEnabled gates the tuple-replication path: it is true when the
 	// configured relations backend actually persists tuples (kessel/spicedb) and
 	// false for the allow-all no-op backend. Derived from config at wiring time.

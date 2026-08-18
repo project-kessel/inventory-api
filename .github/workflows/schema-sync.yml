@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Release tag to sync (default: latest)'
+        description: 'Release tag to sync (default: latest). Format: vYYYYMMDD.N (e.g. v20260804.3)'
         required: false
         type: string
 
@@ -60,6 +60,13 @@ jobs:
             fi
           fi
 
+          TAG_RE='^v[0-9]{8}\.[0-9]+$'
+          if [[ ! "${TARGET}" =~ $TAG_RE ]]; then
+            echo "Invalid schema release tag: ${TARGET}"
+            echo "Expected format: vYYYYMMDD.N (e.g. v20260804.3)"
+            exit 1
+          fi
+
           echo "target=${TARGET}" >> "${GITHUB_OUTPUT}"
           echo "Target release tag: ${TARGET}"
 
@@ -88,7 +95,10 @@ jobs:
           git checkout -B "${BRANCH}" origin/main
 
           # Pin SCHEMA_VERSION to the target release
-          sed -i "s/^SCHEMA_VERSION=.*/SCHEMA_VERSION=${TARGET}/" Makefile
+          awk -v ver="${TARGET}" '
+            /^SCHEMA_VERSION=/ { print "SCHEMA_VERSION=" ver; next }
+            { print }
+          ' Makefile > Makefile.tmp && mv Makefile.tmp Makefile
 
           # Overlay copy is additive so non-starlark resource types stay in
           # tree. When every type is onboarded to starlark-unified-schema,

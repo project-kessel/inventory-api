@@ -105,9 +105,9 @@ func (s *sliceStream[T]) Recv() (T, error) {
 	return item, nil
 }
 
-func newTranslator(inner model.RelationsRepository) *data.TranslatingRelationsRepository {
+func newDecorator(inner model.RelationsRepository) *data.RelationsRepositoryDecorator {
 	schema := model.NewSchemaService(nil, log.NewHelper(log.DefaultLogger))
-	return data.NewTranslatingRelationsRepository(inner, schema)
+	return data.NewRelationsRepositoryDecorator(inner, schema)
 }
 
 func resourceRef(reporter, resourceType, id string) model.ResourceReference {
@@ -128,7 +128,7 @@ func spicedbType(ref model.ResourceReference) string {
 
 func TestDecorator_CheckTranslatesResourceSide(t *testing.T) {
 	inner := &recordingRelationsRepository{}
-	repo := newTranslator(inner)
+	repo := newDecorator(inner)
 
 	rel := model.NewRelationship(
 		resourceRef("features", "workspace", "uuid-1"),
@@ -146,7 +146,7 @@ func TestDecorator_CheckTranslatesResourceSide(t *testing.T) {
 
 func TestDecorator_CreateTuplesTranslatesEach(t *testing.T) {
 	inner := &recordingRelationsRepository{}
-	repo := newTranslator(inner)
+	repo := newDecorator(inner)
 
 	tuples := []model.RelationsTuple{
 		model.NewRelationsTuple(
@@ -166,7 +166,7 @@ func TestDecorator_CreateTuplesTranslatesEach(t *testing.T) {
 
 func TestDecorator_DeleteTuplesTranslatesFilter(t *testing.T) {
 	inner := &recordingRelationsRepository{}
-	repo := newTranslator(inner)
+	repo := newDecorator(inner)
 
 	filter := model.NewTupleFilter().
 		WithReporterType(model.DeserializeReporterType("features")).
@@ -186,7 +186,7 @@ func TestDecorator_DeleteTuplesRejectsUnscopedDerivedFilter(t *testing.T) {
 	// (rbac/workspace) unscoped and wipe unrelated parent tuples. It must error
 	// and never reach the backend.
 	inner := &recordingRelationsRepository{}
-	repo := newTranslator(inner)
+	repo := newDecorator(inner)
 
 	filter := model.NewTupleFilter().
 		WithReporterType(model.DeserializeReporterType("features")).
@@ -201,7 +201,7 @@ func TestDecorator_ReadTuplesForwardsFilterUntranslated(t *testing.T) {
 	// ReadTuples is the deprecated RBAC-only raw SpiceDB bypass: the filter must
 	// reach the backend unchanged (no type folding, no relation prefix).
 	inner := &recordingRelationsRepository{}
-	repo := newTranslator(inner)
+	repo := newDecorator(inner)
 
 	filter := model.NewTupleFilter().
 		WithReporterType(model.DeserializeReporterType("features")).
@@ -223,7 +223,7 @@ func TestDecorator_LookupObjectsNonDerivedForwardsUnchanged(t *testing.T) {
 		model.NewLookupObjectsItem(resourceRef("rbac", "workspace", "uuid-a"), model.ContinuationToken("")),
 	}}
 	inner := &recordingRelationsRepository{lookupObjectsStream: backendStream}
-	repo := newTranslator(inner)
+	repo := newDecorator(inner)
 
 	reporter := model.DeserializeReporterType("rbac")
 	objectType := model.NewRepresentationType(model.DeserializeResourceType("workspace"), &reporter)
@@ -255,7 +255,7 @@ func TestDecorator_LookupSubjectsTranslatesRequestAndRestoresResults(t *testing.
 			model.NewLookupSubjectsItem(model.NewSubjectReferenceWithoutRelation(resourceRef("rbac", "workspace", "uuid-b")), model.ContinuationToken("")),
 		}},
 	}
-	repo := newTranslator(inner)
+	repo := newDecorator(inner)
 
 	reporter := model.DeserializeReporterType("features")
 	subjectType := model.NewRepresentationType(model.DeserializeResourceType("workspace"), &reporter)
@@ -302,7 +302,7 @@ func TestDecorator_LookupObjectsTranslatesRequestAndRestoresResults(t *testing.T
 			model.NewLookupObjectsItem(resourceRef("rbac", "workspace", "uuid-b"), model.ContinuationToken("")),
 		}},
 	}
-	repo := newTranslator(inner)
+	repo := newDecorator(inner)
 
 	reporter := model.DeserializeReporterType("features")
 	objectType := model.NewRepresentationType(model.DeserializeResourceType("workspace"), &reporter)

@@ -250,7 +250,7 @@ func NewCommand(
 			// backend was selected above, so checks, lookups, and tuple writes are
 			// all translated at a single chokepoint. Everything downstream uses
 			// this translating repository. See RHCLOUD-49793 / KSL-067.
-			relationsRepo := data.NewTranslatingRelationsRepository(
+			relationsRepo := data.NewRelationsRepositoryDecorator(
 				internalRelationsRepo,
 				bizmodel.NewSchemaService(schemaRepository, log.NewHelper(log.With(logger, "subsystem", "relations-translation"))),
 			)

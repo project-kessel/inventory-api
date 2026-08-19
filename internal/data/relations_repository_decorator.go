@@ -6,7 +6,7 @@ import (
 	"github.com/project-kessel/inventory-api/internal/biz/model"
 )
 
-// TranslatingRelationsRepository decorates a RelationsRepository, rewriting
+// RelationsRepositoryDecorator decorates a RelationsRepository, rewriting
 // derived/subclassed resource types into their SpiceDB relational form before
 // every request reaches the backend. Because the logical schema exposed by the
 // API differs from the relational schema stored in SpiceDB, this decorator is
@@ -23,38 +23,38 @@ import (
 //
 // The translation itself is owned by the SchemaService; this type only decides
 // where to apply it. See RHCLOUD-49793 / KSL-067.
-type TranslatingRelationsRepository struct {
+type RelationsRepositoryDecorator struct {
 	inner  model.RelationsRepository
 	schema *model.SchemaService
 }
 
-// NewTranslatingRelationsRepository wraps inner so that all requests are
+// NewRelationsRepositoryDecorator wraps inner so that all requests are
 // translated by schema before being forwarded.
-func NewTranslatingRelationsRepository(inner model.RelationsRepository, schema *model.SchemaService) *TranslatingRelationsRepository {
-	return &TranslatingRelationsRepository{inner: inner, schema: schema}
+func NewRelationsRepositoryDecorator(inner model.RelationsRepository, schema *model.SchemaService) *RelationsRepositoryDecorator {
+	return &RelationsRepositoryDecorator{inner: inner, schema: schema}
 }
 
-func (t *TranslatingRelationsRepository) Health(ctx context.Context) (model.HealthResult, error) {
+func (t *RelationsRepositoryDecorator) Health(ctx context.Context) (model.HealthResult, error) {
 	return t.inner.Health(ctx)
 }
 
-func (t *TranslatingRelationsRepository) Check(ctx context.Context, rel model.Relationship, consistency model.Consistency) (model.CheckResult, error) {
+func (t *RelationsRepositoryDecorator) Check(ctx context.Context, rel model.Relationship, consistency model.Consistency) (model.CheckResult, error) {
 	return t.inner.Check(ctx, t.schema.TranslateRelationship(rel), consistency)
 }
 
-func (t *TranslatingRelationsRepository) CheckForUpdate(ctx context.Context, rel model.Relationship) (model.CheckResult, error) {
+func (t *RelationsRepositoryDecorator) CheckForUpdate(ctx context.Context, rel model.Relationship) (model.CheckResult, error) {
 	return t.inner.CheckForUpdate(ctx, t.schema.TranslateRelationship(rel))
 }
 
-func (t *TranslatingRelationsRepository) CheckBulk(ctx context.Context, rels []model.Relationship, consistency model.Consistency) (model.CheckBulkResult, error) {
+func (t *RelationsRepositoryDecorator) CheckBulk(ctx context.Context, rels []model.Relationship, consistency model.Consistency) (model.CheckBulkResult, error) {
 	return t.inner.CheckBulk(ctx, t.translateRelationships(rels), consistency)
 }
 
-func (t *TranslatingRelationsRepository) CheckForUpdateBulk(ctx context.Context, rels []model.Relationship) (model.CheckBulkResult, error) {
+func (t *RelationsRepositoryDecorator) CheckForUpdateBulk(ctx context.Context, rels []model.Relationship) (model.CheckBulkResult, error) {
 	return t.inner.CheckForUpdateBulk(ctx, t.translateRelationships(rels))
 }
 
-func (t *TranslatingRelationsRepository) LookupObjects(
+func (t *RelationsRepositoryDecorator) LookupObjects(
 	ctx context.Context,
 	objectType model.RepresentationType,
 	relation model.Relation,
@@ -77,7 +77,7 @@ func (t *TranslatingRelationsRepository) LookupObjects(
 	return &restoringLookupObjectsStream{inner: stream, logicalType: objectType}, nil
 }
 
-func (t *TranslatingRelationsRepository) LookupSubjects(
+func (t *RelationsRepositoryDecorator) LookupSubjects(
 	ctx context.Context,
 	object model.ResourceReference,
 	relation model.Relation,
@@ -100,7 +100,7 @@ func (t *TranslatingRelationsRepository) LookupSubjects(
 	return &restoringLookupSubjectsStream{inner: stream, logicalType: subjectType}, nil
 }
 
-func (t *TranslatingRelationsRepository) CreateTuples(ctx context.Context, tuples []model.RelationsTuple, upsert bool, fencing *model.FencingCheck) (model.TuplesResult, error) {
+func (t *RelationsRepositoryDecorator) CreateTuples(ctx context.Context, tuples []model.RelationsTuple, upsert bool, fencing *model.FencingCheck) (model.TuplesResult, error) {
 	translated := make([]model.RelationsTuple, len(tuples))
 	for i, tuple := range tuples {
 		translated[i] = t.schema.TranslateRelationsTuple(tuple)
@@ -108,7 +108,7 @@ func (t *TranslatingRelationsRepository) CreateTuples(ctx context.Context, tuple
 	return t.inner.CreateTuples(ctx, translated, upsert, fencing)
 }
 
-func (t *TranslatingRelationsRepository) DeleteTuples(ctx context.Context, filter model.TupleFilter, fencing *model.FencingCheck) (model.TuplesResult, error) {
+func (t *RelationsRepositoryDecorator) DeleteTuples(ctx context.Context, filter model.TupleFilter, fencing *model.FencingCheck) (model.TuplesResult, error) {
 	translated, err := t.schema.TranslateTupleFilter(filter)
 	if err != nil {
 		return model.TuplesResult{}, err
@@ -123,15 +123,15 @@ func (t *TranslatingRelationsRepository) DeleteTuples(ctx context.Context, filte
 // directions: the filter is forwarded as-is and results are returned as-is,
 // exposing SpiceDB's relational schema directly. Callers of this bypass are
 // expected to know they operate against the relational schema.
-func (t *TranslatingRelationsRepository) ReadTuples(ctx context.Context, filter model.TupleFilter, pagination *model.Pagination, consistency model.Consistency) (model.ResultStream[model.ReadTuplesItem], error) {
+func (t *RelationsRepositoryDecorator) ReadTuples(ctx context.Context, filter model.TupleFilter, pagination *model.Pagination, consistency model.Consistency) (model.ResultStream[model.ReadTuplesItem], error) {
 	return t.inner.ReadTuples(ctx, filter, pagination, consistency)
 }
 
-func (t *TranslatingRelationsRepository) AcquireLock(ctx context.Context, lockId model.LockId) (model.AcquireLockResult, error) {
+func (t *RelationsRepositoryDecorator) AcquireLock(ctx context.Context, lockId model.LockId) (model.AcquireLockResult, error) {
 	return t.inner.AcquireLock(ctx, lockId)
 }
 
-func (t *TranslatingRelationsRepository) translateRelationships(rels []model.Relationship) []model.Relationship {
+func (t *RelationsRepositoryDecorator) translateRelationships(rels []model.Relationship) []model.Relationship {
 	translated := make([]model.Relationship, len(rels))
 	for i, rel := range rels {
 		translated[i] = t.schema.TranslateRelationship(rel)

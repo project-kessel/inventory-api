@@ -332,7 +332,7 @@ func TestDecorator_CreateTuplesTranslatesEach(t *testing.T) {
 	tuples := []model.RelationsTuple{
 		model.NewRelationsTuple(
 			resourceRef("features", "workspace", "uuid-2"),
-			model.DeserializeRelation("direct_billing_account"),
+			model.DeserializeRelation("direct_billing_accounts"),
 			model.NewSubjectReferenceWithoutRelation(resourceRef("features", "billing_account", "acct-1")),
 		),
 	}
@@ -342,7 +342,52 @@ func TestDecorator_CreateTuplesTranslatesEach(t *testing.T) {
 
 	require.Len(t, inner.gotCreateTuples, 1)
 	assert.Equal(t, "rbac/workspace", spicedbType(inner.gotCreateTuples[0].Object()))
-	assert.Equal(t, "features_workspace_direct_billing_account", inner.gotCreateTuples[0].Relation().Serialize())
+	assert.Equal(t, "features_workspace_direct_billing_accounts", inner.gotCreateTuples[0].Relation().Serialize())
+}
+
+func TestDecorator_CreateTuplesLeavesCommonRelationUnprefixed(t *testing.T) {
+	// report-resource emits common/parent-owned relations (e.g. the "workspace"
+	// membership field) on a derived type. The type is folded to the parent but
+	// the relation must NOT be prefixed, or the tuple lands under a relation that
+	// does not exist on rbac/workspace.
+	inner := &recordingRelationsRepository{}
+	repo := newDecorator(inner)
+
+	tuples := []model.RelationsTuple{
+		model.NewRelationsTuple(
+			resourceRef("features", "workspace", "uuid-3"),
+			model.DeserializeRelation("workspace"),
+			model.NewSubjectReferenceWithoutRelation(resourceRef("rbac", "workspace", "ws-1")),
+		),
+	}
+
+	_, err := repo.CreateTuples(context.Background(), tuples, true, nil)
+	require.NoError(t, err)
+
+	require.Len(t, inner.gotCreateTuples, 1)
+	assert.Equal(t, "rbac/workspace", spicedbType(inner.gotCreateTuples[0].Object()))
+	assert.Equal(t, "workspace", inner.gotCreateTuples[0].Relation().Serialize())
+}
+
+func TestDecorator_DeleteTuplesLeavesCommonRelationUnprefixed(t *testing.T) {
+	// Symmetric with create: a delete filtering on a common relation folds the
+	// type to the parent and forwards the relation unprefixed (not rejected).
+	inner := &recordingRelationsRepository{}
+	repo := newDecorator(inner)
+
+	filter := model.NewTupleFilter().
+		WithReporterType(model.DeserializeReporterType("features")).
+		WithObjectType(model.DeserializeResourceType("workspace")).
+		WithRelation(model.DeserializeRelation("parent"))
+
+	_, err := repo.DeleteTuples(context.Background(), filter, nil)
+	require.NoError(t, err)
+
+	assert.True(t, inner.deleteCalled)
+	assert.Equal(t, "rbac", inner.gotDeleteFilter.ReporterType().Serialize())
+	assert.Equal(t, "workspace", inner.gotDeleteFilter.ObjectType().Serialize())
+	require.NotNil(t, inner.gotDeleteFilter.Relation())
+	assert.Equal(t, "parent", inner.gotDeleteFilter.Relation().Serialize())
 }
 
 func TestDecorator_DeleteTuplesTranslatesFilter(t *testing.T) {

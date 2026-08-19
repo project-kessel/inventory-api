@@ -86,16 +86,67 @@ func TestTranslateRelationsTuple_FeaturesWorkspace(t *testing.T) {
 
 	object := resourceRef("features", "workspace", "uuid-4")
 	subject := model.NewSubjectReferenceWithoutRelation(resourceRef("features", "billing_account", "acct-1"))
-	tuple := model.NewRelationsTuple(object, model.DeserializeRelation("direct_billing_account"), subject)
+	tuple := model.NewRelationsTuple(object, model.DeserializeRelation("direct_billing_accounts"), subject)
 
 	got := sc.TranslateRelationsTuple(tuple)
 
 	want := model.NewRelationsTuple(
 		resourceRef("rbac", "workspace", "uuid-4"),
-		model.DeserializeRelation("features_workspace_direct_billing_account"),
+		model.DeserializeRelation("features_workspace_direct_billing_accounts"),
 		model.NewSubjectReferenceWithoutRelation(resourceRef("features", "billing_account", "acct-1")),
 	)
 	assert.Equal(t, want, got)
+}
+
+// TestTranslateRelationsTuple_CommonRelationNotPrefixed covers the report-resource
+// case: common/parent-owned relations (e.g. the "workspace" membership field and
+// "parent" hierarchy) are folded onto the parent type but must NOT be prefixed --
+// prefixing would name a relation that does not exist on rbac/workspace.
+func TestTranslateRelationsTuple_CommonRelationNotPrefixed(t *testing.T) {
+	sc := translationService()
+
+	for _, commonRelation := range []string{"workspace", "parent"} {
+		t.Run(commonRelation, func(t *testing.T) {
+			object := resourceRef("features", "workspace", "uuid-5")
+			subject := model.NewSubjectReferenceWithoutRelation(resourceRef("rbac", "workspace", "ws-1"))
+			tuple := model.NewRelationsTuple(object, model.DeserializeRelation(commonRelation), subject)
+
+			got := sc.TranslateRelationsTuple(tuple)
+
+			want := model.NewRelationsTuple(
+				resourceRef("rbac", "workspace", "uuid-5"),
+				model.DeserializeRelation(commonRelation),
+				model.NewSubjectReferenceWithoutRelation(resourceRef("rbac", "workspace", "ws-1")),
+			)
+			assert.Equal(t, want, got, "type folded to parent, common relation left unprefixed")
+		})
+	}
+}
+
+// TestTranslateRelationsTuple_AllOwnedRelationsPrefixed pins the full owned set so
+// adding/removing an owned relation is a deliberate, tested change.
+func TestTranslateRelationsTuple_AllOwnedRelationsPrefixed(t *testing.T) {
+	sc := translationService()
+
+	owned := []string{
+		"desired_services",
+		"enabled_services",
+		"paid_services",
+		"direct_billing_accounts",
+		"direct_service_preference",
+	}
+	for _, relation := range owned {
+		t.Run(relation, func(t *testing.T) {
+			object := resourceRef("features", "workspace", "uuid-6")
+			subject := model.NewSubjectReferenceWithoutRelation(resourceRef("features", "service", "svc-1"))
+			tuple := model.NewRelationsTuple(object, model.DeserializeRelation(relation), subject)
+
+			got := sc.TranslateRelationsTuple(tuple)
+
+			assert.Equal(t, "rbac/workspace", got.Object().Reporter().ReporterType().Serialize()+"/"+got.Object().ResourceType().Serialize())
+			assert.Equal(t, "features_workspace_"+relation, got.Relation().Serialize())
+		})
+	}
 }
 
 func TestTranslateResourceRepresentationType_ForLookupResources(t *testing.T) {

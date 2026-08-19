@@ -17,7 +17,11 @@ import "fmt"
 // Every request sent to SpiceDB — checks, lookups, and tuple writes/deletes —
 // must therefore translate derived types before they reach the store. The rules
 // are:
-//   - Resource side: rewrite the type to the parent type AND prefix the relation.
+//   - Resource side: rewrite the type to the parent type AND prefix the relation,
+//     but only when the derived type owns that relation. Relations inherited from
+//     the parent (e.g. workspace hierarchy, role bindings, and common fields set
+//     by report-resource) are folded onto the parent unchanged -- prefixing them
+//     would name a relation that does not exist on the parent type.
 //   - Subject side:  rewrite the type to the parent type only (relation unchanged).
 //
 // For now the rewrites are hardcoded. Once the unified/serialized schema model
@@ -35,12 +39,28 @@ type subclassRewrite struct {
 	resourceType    string
 	parentNamespace string
 	parentType      string
+	// ownedRelations are the relations the derived type declares itself. Only
+	// these are prefixed on the resource side; every other relation belongs to
+	// the parent type (e.g. workspace hierarchy, role bindings) and is folded
+	// onto the parent unchanged. Prefixing a parent-owned relation would produce
+	// a relation that does not exist on the parent type.
+	ownedRelations map[string]struct{}
 }
 
 // relationPrefix is the prefix applied to resource-side relations of a derived
 // type: reporter name + subclass type + "_" (e.g. "features_workspace_").
 func (r subclassRewrite) relationPrefix() string {
 	return r.reporter + "_" + r.resourceType + "_"
+}
+
+// rewriteRelation prefixes a resource-side relation only when the derived type
+// owns it. Parent-owned relations are returned unchanged so they fold onto the
+// parent type as-is.
+func (r subclassRewrite) rewriteRelation(relation Relation) Relation {
+	if _, owned := r.ownedRelations[relation.Serialize()]; !owned {
+		return relation
+	}
+	return DeserializeRelation(r.relationPrefix() + relation.Serialize())
 }
 
 // hardcodedSubclassRewrites lists the temporary, hardcoded derived-type rewrites.
@@ -51,6 +71,13 @@ var hardcodedSubclassRewrites = []subclassRewrite{
 		resourceType:    workspaceResourceType,
 		parentNamespace: RbacNamespace,
 		parentType:      workspaceResourceType,
+		ownedRelations: map[string]struct{}{
+			"desired_services":          {},
+			"enabled_services":          {},
+			"paid_services":             {},
+			"direct_billing_accounts":   {},
+			"direct_service_preference": {},
+		},
 	},
 }
 
@@ -112,7 +139,7 @@ func (sc *SchemaService) TranslateResourceRepresentationType(rt RepresentationTy
 	if !ok {
 		return rt, relation
 	}
-	return rewriteRepresentationType(rw), DeserializeRelation(rw.relationPrefix() + relation.Serialize())
+	return rewriteRepresentationType(rw), rw.rewriteRelation(relation)
 }
 
 // TranslateSubjectRepresentationType rewrites the subject-side type pattern
@@ -145,7 +172,7 @@ func (sc *SchemaService) TranslateTupleFilter(f TupleFilter) (TupleFilter, error
 			out = out.
 				WithReporterType(DeserializeReporterType(rw.parentNamespace)).
 				WithObjectType(DeserializeResourceType(rw.parentType)).
-				WithRelation(DeserializeRelation(rw.relationPrefix() + f.Relation().Serialize()))
+				WithRelation(rw.rewriteRelation(*f.Relation()))
 		}
 	}
 
@@ -172,7 +199,7 @@ func (sc *SchemaService) translateResourceSide(ref ResourceReference, relation R
 	if !ok {
 		return ref, relation
 	}
-	return rewriteReference(ref, rw), DeserializeRelation(rw.relationPrefix() + relation.Serialize())
+	return rewriteReference(ref, rw), rw.rewriteRelation(relation)
 }
 
 // rewriteReference builds a resource reference against the parent type. The

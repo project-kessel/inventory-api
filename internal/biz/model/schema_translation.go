@@ -2,21 +2,22 @@ package model
 
 import "fmt"
 
-// Derived-type rewrites for SpiceDB
+// Kessel-to-serialized schema rewrites
 //
-// The logical schema (the unified schema language exposed by the front-facing
-// API) differs from the relational schema stored in SpiceDB. In particular, a
-// "subclassed"/derived resource type does not exist as its own type in SpiceDB:
-// it is folded into its parent type, and its relations/permissions are prefixed
-// to avoid colliding with the parent's own relations.
+// The kessel schema (the unified schema language exposed by the front-facing
+// API) differs from the serialized schema stored in the relations backend. In
+// particular, a "subclassed"/derived resource type does not exist as its own
+// type in the serialized schema: it is folded into its parent type, and its
+// relations/permissions are prefixed to avoid colliding with the parent's own
+// relations.
 //
 // For example, the Features workspace (reporter "features", resource type
 // "workspace") is stored as the RBAC workspace ("rbac/workspace"), and a
 // permission like "enabled_services" is stored as "features_workspace_enabled_services".
 //
-// Every request sent to SpiceDB — checks, lookups, and tuple writes/deletes —
-// must therefore translate derived types before they reach the store. The rules
-// are:
+// Every request sent to the backend — checks, lookups, and tuple writes/deletes —
+// must therefore translate derived types from the kessel schema into the
+// serialized schema before they reach the store. The rules are:
 //   - Resource side: rewrite the type to the parent type AND prefix the relation,
 //     but only when the derived type owns that relation. Relations inherited from
 //     the parent (e.g. workspace hierarchy, role bindings, and common fields set
@@ -24,7 +25,7 @@ import "fmt"
 //     would name a relation that does not exist on the parent type.
 //   - Subject side:  rewrite the type to the parent type only (relation unchanged).
 //
-// For now the rewrites are hardcoded. Once the unified/serialized schema model
+// For now the rewrites are hardcoded. Once the unified kessel schema model
 // lands, these will be derived from the schema instead. See RHCLOUD-49793 / KSL-067.
 
 const (
@@ -33,7 +34,7 @@ const (
 )
 
 // subclassRewrite describes a single derived-type rewrite: how a (reporter,
-// resource type) pair maps onto its parent type stored in SpiceDB.
+// resource type) pair maps onto its parent type in the serialized schema.
 type subclassRewrite struct {
 	reporter        string
 	resourceType    string
@@ -97,16 +98,16 @@ func lookupSubclassRewrite(reporter, resourceType string) (subclassRewrite, bool
 }
 
 // TranslateRelationship rewrites both sides of a query relationship so a derived
-// type is expressed against its parent type in SpiceDB. The resource side also
-// gets its relation prefixed.
+// type is expressed against its parent type in the serialized schema. The
+// resource side also gets its relation prefixed.
 func (sc *SchemaService) TranslateRelationship(rel Relationship) Relationship {
 	object, relation := sc.translateResourceSide(rel.Object(), rel.Relation())
 	subject := sc.TranslateSubjectReference(rel.Subject())
 	return NewRelationship(object, relation, subject)
 }
 
-// TranslateRelationsTuple rewrites a tuple for storage in SpiceDB, applying the
-// same derived-type rewrites as queries.
+// TranslateRelationsTuple rewrites a tuple into the serialized schema for
+// storage, applying the same derived-type rewrites as queries.
 func (sc *SchemaService) TranslateRelationsTuple(t RelationsTuple) RelationsTuple {
 	object, relation := sc.translateResourceSide(t.Object(), t.Relation())
 	subject := sc.TranslateSubjectReference(t.Subject())
@@ -155,9 +156,9 @@ func (sc *SchemaService) TranslateSubjectRepresentationType(rt RepresentationTyp
 // TranslateTupleFilter rewrites both sides of a tuple filter (used by delete).
 // Type and reporter type are always specified together on each side.
 //
-// A derived object type is folded into its parent type in SpiceDB and its
-// relations are prefixed, so the parent type holds tuples from several logical
-// types. A filter that omits the relation would therefore match the parent's own
+// A derived object type is folded into its parent type in the serialized schema
+// and its relations are prefixed, so the parent type holds tuples from several
+// kessel types. A filter that omits the relation would therefore match the parent's own
 // tuples and those of sibling derived types — deleting far more than intended.
 // Such a filter cannot be translated safely and is rejected with
 // ErrUnscopedDerivedFilter.
@@ -204,7 +205,7 @@ func (sc *SchemaService) translateResourceSide(ref ResourceReference, relation R
 
 // rewriteReference builds a resource reference against the parent type. The
 // reporter instance id is dropped: the parent type is owned by a different
-// reporter and only its type is meaningful in SpiceDB.
+// reporter and only its type is meaningful in the serialized schema.
 func rewriteReference(ref ResourceReference, rw subclassRewrite) ResourceReference {
 	reporter := NewReporterReference(DeserializeReporterType(rw.parentNamespace), nil)
 	return NewResourceReference(DeserializeResourceType(rw.parentType), ref.ResourceId(), &reporter)

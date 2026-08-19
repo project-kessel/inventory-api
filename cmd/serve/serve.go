@@ -245,11 +245,11 @@ func NewCommand(
 				return err
 			}
 
-			// Translate derived/subclassed resource types into their SpiceDB
-			// relational form for every relations request. This wraps whichever
-			// backend was selected above, so checks, lookups, and tuple writes are
-			// all translated at a single chokepoint. Everything downstream uses
-			// this translating repository. See RHCLOUD-49793 / KSL-067.
+			// Translate derived/subclassed resource types from the kessel schema
+			// into the serialized schema for every relations request. This wraps
+			// whichever backend was selected above, so checks, lookups, and tuple
+			// writes are all translated at a single chokepoint. Everything
+			// downstream uses this translating repository. See RHCLOUD-49793 / KSL-067.
 			relationsRepo := data.NewRelationsRepositoryDecorator(
 				internalRelationsRepo,
 				bizmodel.NewSchemaService(schemaRepository, log.NewHelper(log.With(logger, "subsystem", "relations-translation"))),

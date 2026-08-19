@@ -75,7 +75,7 @@ func (r *recordingRelationsRepository) CheckForUpdateBulk(_ context.Context, rel
 
 // echoBulkResult mimics the real backends, which build each result pair from the
 // request they received. The decorator hands them translated relationships, so
-// without restoration these pairs would carry the relational form back to the caller.
+// without restoration these pairs would carry the serialized form back to the caller.
 func (r *recordingRelationsRepository) echoBulkResult(rels []model.Relationship) model.CheckBulkResult {
 	pairs := make([]model.CheckBulkResultPair, len(rels))
 	for i, rel := range rels {
@@ -221,8 +221,8 @@ func TestDecorator_CheckBulkTranslatesQueryAndRestoresResult(t *testing.T) {
 	require.NotNil(t, gotToken)
 	assert.Equal(t, token, *gotToken)
 
-	// (b)/(c-return) Result side: pairs restored to the logical type and
-	// un-prefixed relation the caller supplied -- the relational form never leaks back.
+	// (b)/(c-return) Result side: pairs restored to the kessel type and
+	// un-prefixed relation the caller supplied -- the serialized form never leaks back.
 	require.Len(t, res.Pairs(), 2)
 	for i, p := range res.Pairs() {
 		assert.Equal(t, "features/workspace", spicedbType(p.Request().Object()), "pair %d object", i)
@@ -251,7 +251,7 @@ func TestDecorator_CheckBulkRestoresOnlyDerivedInMixedInput(t *testing.T) {
 	assert.Equal(t, "rbac/role_binding", spicedbType(inner.gotCheckBulkRels[1].Object()))
 	assert.Equal(t, "subject", inner.gotCheckBulkRels[1].Relation().Serialize())
 
-	// Result side: derived restored to logical, non-derived unchanged.
+	// Result side: derived restored to kessel, non-derived unchanged.
 	require.Len(t, res.Pairs(), 2)
 	assert.Equal(t, "features/workspace", spicedbType(res.Pairs()[0].Request().Object()))
 	assert.Equal(t, "enabled_services", res.Pairs()[0].Request().Relation().Serialize())
@@ -292,7 +292,7 @@ func TestDecorator_CheckBulkLeavesResultUnchangedOnCountMismatch(t *testing.T) {
 	res, err := repo.CheckBulk(context.Background(), rels, model.NewConsistencyMinimizeLatency())
 	require.NoError(t, err)
 
-	// One pair returned for two requests: passed through untouched, still relational.
+	// One pair returned for two requests: passed through untouched, still serialized.
 	require.Len(t, res.Pairs(), 1)
 	assert.Equal(t, "rbac/workspace", spicedbType(res.Pairs()[0].Request().Object()))
 	assert.Equal(t, "features_workspace_enabled_services", res.Pairs()[0].Request().Relation().Serialize())
@@ -316,7 +316,7 @@ func TestDecorator_CheckForUpdateBulkTranslatesQueryAndRestoresResult(t *testing
 	assert.Equal(t, "rbac/role_binding", spicedbType(inner.gotCheckForUpdateBulkRels[1].Object()))
 	assert.Equal(t, "subject", inner.gotCheckForUpdateBulkRels[1].Relation().Serialize())
 
-	// Result side: pairs restored to the logical form the caller supplied.
+	// Result side: pairs restored to the kessel form the caller supplied.
 	require.Len(t, res.Pairs(), 2)
 	assert.Equal(t, "features/workspace", spicedbType(res.Pairs()[0].Request().Object()))
 	assert.Equal(t, "enabled_services", res.Pairs()[0].Request().Relation().Serialize())
@@ -474,7 +474,7 @@ func TestDecorator_LookupObjectsNonDerivedForwardsUnchanged(t *testing.T) {
 
 func TestDecorator_LookupSubjectsTranslatesRequestAndRestoresResults(t *testing.T) {
 	// The backend returns subjects labeled with the translated (parent) type;
-	// the decorator must restore them to the logical type the caller queried.
+	// the decorator must restore them to the kessel type the caller queried.
 	inner := &recordingRelationsRepository{
 		lookupSubjectsStream: &sliceStream[model.LookupSubjectsItem]{items: []model.LookupSubjectsItem{
 			model.NewLookupSubjectsItem(model.NewSubjectReferenceWithoutRelation(resourceRef("rbac", "workspace", "uuid-a")), model.ContinuationToken("")),
@@ -504,7 +504,7 @@ func TestDecorator_LookupSubjectsTranslatesRequestAndRestoresResults(t *testing.
 	assert.Equal(t, "workspace", inner.gotLookupSubjectsSubjectType.ResourceType().Serialize())
 	assert.Equal(t, "rbac", inner.gotLookupSubjectsSubjectType.ReporterType().Serialize())
 
-	// Results are restored to the logical subject type the caller queried.
+	// Results are restored to the kessel subject type the caller queried.
 	first, err := stream.Recv()
 	require.NoError(t, err)
 	assert.Equal(t, "features/workspace", spicedbType(first.Subject().Resource()))
@@ -548,7 +548,7 @@ func TestDecorator_LookupObjectsTranslatesRequestAndRestoresResults(t *testing.T
 	assert.Equal(t, "rbac", inner.gotLookupObjectsType.ReporterType().Serialize())
 	assert.Equal(t, "features_workspace_enabled_services", inner.gotLookupObjectsRelation.Serialize())
 
-	// Results are restored to the logical type the caller queried.
+	// Results are restored to the kessel type the caller queried.
 	first, err := stream.Recv()
 	require.NoError(t, err)
 	assert.Equal(t, "features/workspace", spicedbType(first.Object()))

@@ -73,11 +73,11 @@ var hardcodedSubclassRewrites = []subclassRewrite{
 		parentNamespace: RbacNamespace,
 		parentType:      workspaceResourceType,
 		ownedRelations: map[string]struct{}{
-			"desired_services":          {},
-			"enabled_services":          {},
-			"paid_services":             {},
-			"direct_billing_accounts":   {},
-			"direct_service_preference": {},
+			"direct_billing_account":     {},
+			"direct_service_preferences": {},
+			"_paid_services":             {},
+			"_desired_services":          {},
+			"enabled_services":           {},
 		},
 	},
 }

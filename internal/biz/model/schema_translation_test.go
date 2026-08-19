@@ -86,13 +86,13 @@ func TestTranslateRelationsTuple_FeaturesWorkspace(t *testing.T) {
 
 	object := resourceRef("features", "workspace", "uuid-4")
 	subject := model.NewSubjectReferenceWithoutRelation(resourceRef("features", "billing_account", "acct-1"))
-	tuple := model.NewRelationsTuple(object, model.DeserializeRelation("direct_billing_accounts"), subject)
+	tuple := model.NewRelationsTuple(object, model.DeserializeRelation("direct_billing_account"), subject)
 
 	got := sc.TranslateRelationsTuple(tuple)
 
 	want := model.NewRelationsTuple(
 		resourceRef("rbac", "workspace", "uuid-4"),
-		model.DeserializeRelation("features_workspace_direct_billing_accounts"),
+		model.DeserializeRelation("features_workspace_direct_billing_account"),
 		model.NewSubjectReferenceWithoutRelation(resourceRef("features", "billing_account", "acct-1")),
 	)
 	assert.Equal(t, want, got)
@@ -129,11 +129,11 @@ func TestTranslateRelationsTuple_AllOwnedRelationsPrefixed(t *testing.T) {
 	sc := translationService()
 
 	owned := []string{
-		"desired_services",
+		"direct_billing_account",
+		"direct_service_preferences",
+		"_paid_services",
+		"_desired_services",
 		"enabled_services",
-		"paid_services",
-		"direct_billing_accounts",
-		"direct_service_preference",
 	}
 	for _, relation := range owned {
 		t.Run(relation, func(t *testing.T) {

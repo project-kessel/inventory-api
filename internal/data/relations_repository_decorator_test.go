@@ -332,7 +332,7 @@ func TestDecorator_CreateTuplesTranslatesEach(t *testing.T) {
 	tuples := []model.RelationsTuple{
 		model.NewRelationsTuple(
 			resourceRef("features", "workspace", "uuid-2"),
-			model.DeserializeRelation("direct_billing_accounts"),
+			model.DeserializeRelation("direct_billing_account"),
 			model.NewSubjectReferenceWithoutRelation(resourceRef("features", "billing_account", "acct-1")),
 		),
 	}
@@ -342,7 +342,7 @@ func TestDecorator_CreateTuplesTranslatesEach(t *testing.T) {
 
 	require.Len(t, inner.gotCreateTuples, 1)
 	assert.Equal(t, "rbac/workspace", spicedbType(inner.gotCreateTuples[0].Object()))
-	assert.Equal(t, "features_workspace_direct_billing_accounts", inner.gotCreateTuples[0].Relation().Serialize())
+	assert.Equal(t, "features_workspace_direct_billing_account", inner.gotCreateTuples[0].Relation().Serialize())
 }
 
 func TestDecorator_CreateTuplesLeavesCommonRelationUnprefixed(t *testing.T) {

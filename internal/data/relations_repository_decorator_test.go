@@ -22,6 +22,19 @@ type recordingRelationsRepository struct {
 	deleteCalled    bool
 	gotReadFilter   model.TupleFilter
 
+	gotCheckBulkRels          []model.Relationship
+	gotCheckBulkConsistency   model.Consistency
+	checkBulkCalled           bool
+	gotCheckForUpdateBulkRels []model.Relationship
+	checkForUpdateBulkCalled  bool
+	// checkBulkToken is the consistency token the fake backend returns. Result
+	// pairs are synthesized by echoing the (translated) relationships it receives,
+	// mirroring the real backends (see the NewCheckBulkResultPair call sites).
+	checkBulkToken model.ConsistencyToken
+	// omitLastBulkPair drops one pair from the response to exercise the decorator's
+	// count-mismatch fallback.
+	omitLastBulkPair bool
+
 	gotLookupObjectsType     model.RepresentationType
 	gotLookupObjectsRelation model.Relation
 	gotLookupObjectsSubject  model.SubjectReference
@@ -47,12 +60,31 @@ func (r *recordingRelationsRepository) CheckForUpdate(_ context.Context, rel mod
 	return model.CheckResult{}, nil
 }
 
-func (r *recordingRelationsRepository) CheckBulk(context.Context, []model.Relationship, model.Consistency) (model.CheckBulkResult, error) {
-	return model.CheckBulkResult{}, nil
+func (r *recordingRelationsRepository) CheckBulk(_ context.Context, rels []model.Relationship, consistency model.Consistency) (model.CheckBulkResult, error) {
+	r.checkBulkCalled = true
+	r.gotCheckBulkRels = rels
+	r.gotCheckBulkConsistency = consistency
+	return r.echoBulkResult(rels), nil
 }
 
-func (r *recordingRelationsRepository) CheckForUpdateBulk(context.Context, []model.Relationship) (model.CheckBulkResult, error) {
-	return model.CheckBulkResult{}, nil
+func (r *recordingRelationsRepository) CheckForUpdateBulk(_ context.Context, rels []model.Relationship) (model.CheckBulkResult, error) {
+	r.checkForUpdateBulkCalled = true
+	r.gotCheckForUpdateBulkRels = rels
+	return r.echoBulkResult(rels), nil
+}
+
+// echoBulkResult mimics the real backends, which build each result pair from the
+// request they received. The decorator hands them translated relationships, so
+// without restoration these pairs would carry the relational form back to the caller.
+func (r *recordingRelationsRepository) echoBulkResult(rels []model.Relationship) model.CheckBulkResult {
+	pairs := make([]model.CheckBulkResultPair, len(rels))
+	for i, rel := range rels {
+		pairs[i] = model.NewCheckBulkResultPair(rel, model.NewCheckBulkResultItem(true, nil, 0))
+	}
+	if r.omitLastBulkPair && len(pairs) > 0 {
+		pairs = pairs[:len(pairs)-1]
+	}
+	return model.NewCheckBulkResult(pairs, r.checkBulkToken)
 }
 
 func (r *recordingRelationsRepository) LookupObjects(_ context.Context, objectType model.RepresentationType, relation model.Relation, subject model.SubjectReference, _ *model.Pagination, _ model.Consistency) (model.ResultStream[model.LookupObjectsItem], error) {
@@ -126,6 +158,26 @@ func spicedbType(ref model.ResourceReference) string {
 	return ref.Reporter().ReporterType().Serialize() + "/" + ref.ResourceType().Serialize()
 }
 
+// derivedRel builds a relationship on the derived features/workspace type, whose
+// object side must be folded to rbac/workspace and its relation prefixed.
+func derivedRel(id string) model.Relationship {
+	return model.NewRelationship(
+		resourceRef("features", "workspace", id),
+		model.DeserializeRelation("enabled_services"),
+		model.NewSubjectReferenceWithoutRelation(resourceRef("features", "service", "svc-"+id)),
+	)
+}
+
+// nonDerivedRel builds a relationship on a plain (non-derived) type that must be
+// forwarded to the backend untouched.
+func nonDerivedRel(id string) model.Relationship {
+	return model.NewRelationship(
+		resourceRef("rbac", "role_binding", id),
+		model.DeserializeRelation("subject"),
+		model.NewSubjectReferenceWithoutRelation(resourceRef("rbac", "principal", "alice")),
+	)
+}
+
 func TestDecorator_CheckTranslatesResourceSide(t *testing.T) {
 	inner := &recordingRelationsRepository{}
 	repo := newDecorator(inner)
@@ -142,6 +194,135 @@ func TestDecorator_CheckTranslatesResourceSide(t *testing.T) {
 	assert.Equal(t, "rbac/workspace", spicedbType(inner.gotCheck.Object()))
 	assert.Equal(t, "features_workspace_enabled_services", inner.gotCheck.Relation().Serialize())
 	assert.Equal(t, "features/service", spicedbType(inner.gotCheck.Subject().Resource()))
+}
+
+func TestDecorator_CheckBulkTranslatesQueryAndRestoresResult(t *testing.T) {
+	token, err := model.NewConsistencyToken("tok-123")
+	require.NoError(t, err)
+	inner := &recordingRelationsRepository{checkBulkToken: token}
+	repo := newDecorator(inner)
+
+	rels := []model.Relationship{derivedRel("uuid-1"), derivedRel("uuid-2")}
+
+	res, err := repo.CheckBulk(context.Background(), rels, model.NewConsistencyAtLeastAsFresh(token))
+	require.NoError(t, err)
+
+	// (a)/(c-in) Query side: each relationship folded to the parent type and its
+	// relation prefixed, with input order preserved.
+	require.Len(t, inner.gotCheckBulkRels, 2)
+	for i, got := range inner.gotCheckBulkRels {
+		assert.Equal(t, "rbac/workspace", spicedbType(got.Object()), "rel %d object", i)
+		assert.Equal(t, "features_workspace_enabled_services", got.Relation().Serialize(), "rel %d relation", i)
+	}
+
+	// Consistency is forwarded unchanged.
+	assert.Equal(t, model.ConsistencyAtLeastAsFresh, model.ConsistencyTypeOf(inner.gotCheckBulkConsistency))
+	gotToken := model.ConsistencyAtLeastAsFreshToken(inner.gotCheckBulkConsistency)
+	require.NotNil(t, gotToken)
+	assert.Equal(t, token, *gotToken)
+
+	// (b)/(c-return) Result side: pairs restored to the logical type and
+	// un-prefixed relation the caller supplied -- the relational form never leaks back.
+	require.Len(t, res.Pairs(), 2)
+	for i, p := range res.Pairs() {
+		assert.Equal(t, "features/workspace", spicedbType(p.Request().Object()), "pair %d object", i)
+		assert.Equal(t, "enabled_services", p.Request().Relation().Serialize(), "pair %d relation", i)
+		assert.True(t, p.Result().Allowed(), "pair %d result", i)
+	}
+	assert.Equal(t, "uuid-1", res.Pairs()[0].Request().Object().ResourceId().Serialize())
+	assert.Equal(t, "uuid-2", res.Pairs()[1].Request().Object().ResourceId().Serialize())
+	// Consistency token preserved.
+	assert.Equal(t, token, res.ConsistencyToken())
+}
+
+func TestDecorator_CheckBulkRestoresOnlyDerivedInMixedInput(t *testing.T) {
+	inner := &recordingRelationsRepository{}
+	repo := newDecorator(inner)
+
+	rels := []model.Relationship{derivedRel("uuid-1"), nonDerivedRel("uuid-2")}
+
+	res, err := repo.CheckBulk(context.Background(), rels, model.NewConsistencyMinimizeLatency())
+	require.NoError(t, err)
+
+	// Query side: derived folded + prefixed, non-derived untouched.
+	require.Len(t, inner.gotCheckBulkRels, 2)
+	assert.Equal(t, "rbac/workspace", spicedbType(inner.gotCheckBulkRels[0].Object()))
+	assert.Equal(t, "features_workspace_enabled_services", inner.gotCheckBulkRels[0].Relation().Serialize())
+	assert.Equal(t, "rbac/role_binding", spicedbType(inner.gotCheckBulkRels[1].Object()))
+	assert.Equal(t, "subject", inner.gotCheckBulkRels[1].Relation().Serialize())
+
+	// Result side: derived restored to logical, non-derived unchanged.
+	require.Len(t, res.Pairs(), 2)
+	assert.Equal(t, "features/workspace", spicedbType(res.Pairs()[0].Request().Object()))
+	assert.Equal(t, "enabled_services", res.Pairs()[0].Request().Relation().Serialize())
+	assert.Equal(t, "rbac/role_binding", spicedbType(res.Pairs()[1].Request().Object()))
+	assert.Equal(t, "subject", res.Pairs()[1].Request().Relation().Serialize())
+}
+
+func TestDecorator_CheckBulkForwardsEmptyInput(t *testing.T) {
+	cases := map[string][]model.Relationship{
+		"empty": {},
+		"nil":   nil,
+	}
+	for name, input := range cases {
+		t.Run(name, func(t *testing.T) {
+			inner := &recordingRelationsRepository{}
+			repo := newDecorator(inner)
+
+			res, err := repo.CheckBulk(context.Background(), input, model.NewConsistencyMinimizeLatency())
+			require.NoError(t, err)
+
+			assert.True(t, inner.checkBulkCalled, "backend CheckBulk must still be called")
+			assert.NotNil(t, inner.gotCheckBulkRels, "decorator should forward a non-nil slice")
+			assert.Empty(t, inner.gotCheckBulkRels)
+			assert.Empty(t, res.Pairs())
+		})
+	}
+}
+
+func TestDecorator_CheckBulkLeavesResultUnchangedOnCountMismatch(t *testing.T) {
+	// Defensive: if the backend returns a different number of pairs than were
+	// requested, the decorator cannot positionally restore, so it forwards the
+	// result unchanged and lets the usecase's length check surface the error.
+	inner := &recordingRelationsRepository{omitLastBulkPair: true}
+	repo := newDecorator(inner)
+
+	rels := []model.Relationship{derivedRel("uuid-1"), derivedRel("uuid-2")}
+
+	res, err := repo.CheckBulk(context.Background(), rels, model.NewConsistencyMinimizeLatency())
+	require.NoError(t, err)
+
+	// One pair returned for two requests: passed through untouched, still relational.
+	require.Len(t, res.Pairs(), 1)
+	assert.Equal(t, "rbac/workspace", spicedbType(res.Pairs()[0].Request().Object()))
+	assert.Equal(t, "features_workspace_enabled_services", res.Pairs()[0].Request().Relation().Serialize())
+}
+
+func TestDecorator_CheckForUpdateBulkTranslatesQueryAndRestoresResult(t *testing.T) {
+	token, err := model.NewConsistencyToken("tok-9")
+	require.NoError(t, err)
+	inner := &recordingRelationsRepository{checkBulkToken: token}
+	repo := newDecorator(inner)
+
+	rels := []model.Relationship{derivedRel("uuid-1"), nonDerivedRel("uuid-2")}
+
+	res, err := repo.CheckForUpdateBulk(context.Background(), rels)
+	require.NoError(t, err)
+
+	// Query side: derived translated, non-derived untouched.
+	require.Len(t, inner.gotCheckForUpdateBulkRels, 2)
+	assert.Equal(t, "rbac/workspace", spicedbType(inner.gotCheckForUpdateBulkRels[0].Object()))
+	assert.Equal(t, "features_workspace_enabled_services", inner.gotCheckForUpdateBulkRels[0].Relation().Serialize())
+	assert.Equal(t, "rbac/role_binding", spicedbType(inner.gotCheckForUpdateBulkRels[1].Object()))
+	assert.Equal(t, "subject", inner.gotCheckForUpdateBulkRels[1].Relation().Serialize())
+
+	// Result side: pairs restored to the logical form the caller supplied.
+	require.Len(t, res.Pairs(), 2)
+	assert.Equal(t, "features/workspace", spicedbType(res.Pairs()[0].Request().Object()))
+	assert.Equal(t, "enabled_services", res.Pairs()[0].Request().Relation().Serialize())
+	assert.Equal(t, "rbac/role_binding", spicedbType(res.Pairs()[1].Request().Object()))
+	assert.Equal(t, "subject", res.Pairs()[1].Request().Relation().Serialize())
+	assert.Equal(t, token, res.ConsistencyToken())
 }
 
 func TestDecorator_CreateTuplesTranslatesEach(t *testing.T) {

@@ -13,10 +13,12 @@ import (
 // the single chokepoint where "logical" is translated to "relational" for
 // SpiceDB calls (checks, lookups, and tuple writes/deletes).
 //
-// Lookup results are restored to the logical type the caller queried: a lookup
-// against features/workspace is sent to SpiceDB as rbac/workspace, but the
-// returned objects are relabeled features/workspace so the API stays consistent
-// with the logical schema.
+// Results are restored to the logical type the caller queried: a lookup against
+// features/workspace is sent to SpiceDB as rbac/workspace, but the returned
+// objects are relabeled features/workspace so the API stays consistent with the
+// logical schema. Bulk checks are restored the same way -- each result pair
+// echoes back the original logical relationship, not the translated one sent to
+// SpiceDB.
 //
 // ReadTuples is deliberately exempt from translation in both directions -- see
 // the note on that method.
@@ -47,11 +49,19 @@ func (t *RelationsRepositoryDecorator) CheckForUpdate(ctx context.Context, rel m
 }
 
 func (t *RelationsRepositoryDecorator) CheckBulk(ctx context.Context, rels []model.Relationship, consistency model.Consistency) (model.CheckBulkResult, error) {
-	return t.inner.CheckBulk(ctx, t.translateRelationships(rels), consistency)
+	result, err := t.inner.CheckBulk(ctx, t.translateRelationships(rels), consistency)
+	if err != nil {
+		return result, err
+	}
+	return restoreBulkResult(rels, result), nil
 }
 
 func (t *RelationsRepositoryDecorator) CheckForUpdateBulk(ctx context.Context, rels []model.Relationship) (model.CheckBulkResult, error) {
-	return t.inner.CheckForUpdateBulk(ctx, t.translateRelationships(rels))
+	result, err := t.inner.CheckForUpdateBulk(ctx, t.translateRelationships(rels))
+	if err != nil {
+		return result, err
+	}
+	return restoreBulkResult(rels, result), nil
 }
 
 func (t *RelationsRepositoryDecorator) LookupObjects(
@@ -137,6 +147,25 @@ func (t *RelationsRepositoryDecorator) translateRelationships(rels []model.Relat
 		translated[i] = t.schema.TranslateRelationship(rel)
 	}
 	return translated
+}
+
+// restoreBulkResult relabels each result pair with the original logical
+// relationship the caller supplied. The backend builds its pairs from the
+// translated relationships it received, so without this step the relational form
+// (e.g. rbac/workspace and the prefixed relation) would leak back through the
+// logical API. Pairs are matched to inputs positionally -- backends preserve
+// request order. If the counts disagree the result is returned unchanged so the
+// mismatch is surfaced upstream rather than mispaired here.
+func restoreBulkResult(original []model.Relationship, result model.CheckBulkResult) model.CheckBulkResult {
+	pairs := result.Pairs()
+	if len(pairs) != len(original) {
+		return result
+	}
+	restored := make([]model.CheckBulkResultPair, len(pairs))
+	for i, pair := range pairs {
+		restored[i] = model.NewCheckBulkResultPair(original[i], pair.Result())
+	}
+	return model.NewCheckBulkResult(restored, result.ConsistencyToken())
 }
 
 // representationTypeChanged reports whether translation altered the type pattern,

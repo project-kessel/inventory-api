@@ -115,7 +115,7 @@ func (t *TestCase) TestSetup(testingT *testing.T) []error {
 	schemaRepository := data.NewInMemorySchemaRepository()
 
 	// Create consumer with real database first
-	t.inv, err = New(cfg, db, schemaRepository, relationsRepo, notifier, t.logger, consumer)
+	t.inv, err = New(cfg, db, schemaRepository, relationsRepo, true, notifier, t.logger, consumer)
 	if err != nil {
 		errs = append(errs, err)
 		return errs

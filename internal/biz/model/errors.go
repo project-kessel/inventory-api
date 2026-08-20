@@ -28,6 +28,10 @@ var (
 	ErrInvalidData              = errors.New("invalid data structure")
 	ErrEmptyReporterList        = errors.New("must have at least one reporter resource")
 	ErrNoRepresentationProvided = errors.New("at least one of reporterRepresentation or commonRepresentation must be provided")
+	// ErrUnscopedDerivedFilter indicates a tuple filter targets a derived type
+	// (folded into a parent type in SpiceDB) without a relation, which cannot be
+	// translated without risking deletion of unrelated parent-type tuples.
+	ErrUnscopedDerivedFilter = errors.New("derived-type tuple filter must specify a relation")
 )
 
 // Error reasons used in kratos errors across layers

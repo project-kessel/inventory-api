@@ -233,17 +233,27 @@ func NewCommand(
 				return err
 			}
 
-			// construct relations repository
-			relationsRepo, err := data.NewRelationsRepository(ctx, authzConfig, log.With(logger, "subsystem", "relations"))
-			if err != nil {
-				return err
-			}
-
 			// constructs schema repository
 			schemaRepository, err := newSchemaRepository(ctx, schemaConfig, log.NewHelper(log.With(logger, "subsystem", "schemaRepository")))
 			if err != nil {
 				return err
 			}
+
+			// construct relations repository (the backend selected by config)
+			internalRelationsRepo, err := data.NewRelationsRepository(ctx, authzConfig, log.With(logger, "subsystem", "relations"))
+			if err != nil {
+				return err
+			}
+
+			// Translate derived/subclassed resource types from the kessel schema
+			// into the serialized schema for every relations request. This wraps
+			// whichever backend was selected above, so checks, lookups, and tuple
+			// writes are all translated at a single chokepoint. Everything
+			// downstream uses this translating repository. See RHCLOUD-49793 / KSL-067.
+			relationsRepo := data.NewRelationsRepositoryDecorator(
+				internalRelationsRepo,
+				bizmodel.NewSchemaService(schemaRepository, log.NewHelper(log.With(logger, "subsystem", "relations-translation"))),
+			)
 
 			// construct servers
 			server, err := server.New(serverConfig, middleware.Authentication(authenticator), authnConfig, authenticator, logger)
@@ -353,7 +363,7 @@ func NewCommand(
 						// If the consumer cannot process a message, the consumer loop is restarted
 						// This is to ensure we re-read the message and prevent it being dropped and moving to next message.
 						// To re-read the current message, we have to recreate the consumer connection so that the earliest offset is used
-						inventoryConsumer, err = consumer.New(consumerConfig, db, schemaRepository, relationsRepo, notifier, log.NewHelper(log.With(logger, "subsystem", "inventoryConsumer")), nil)
+						inventoryConsumer, err = consumer.New(consumerConfig, db, schemaRepository, relationsRepo, authzConfig.ReplicatesTuples(), notifier, log.NewHelper(log.With(logger, "subsystem", "inventoryConsumer")), nil)
 						if err != nil {
 							shutdown(err)
 						}

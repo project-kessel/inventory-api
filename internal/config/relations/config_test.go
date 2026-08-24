@@ -135,3 +135,26 @@ func TestCheckRelationsImpl_AllCases(t *testing.T) {
 		})
 	}
 }
+
+func TestReplicatesTuples(t *testing.T) {
+	// The consumer gates tuple replication on this: only allow-all is a no-op,
+	// so a misclassification here silently stops (or wrongly runs) replication.
+	tests := []struct {
+		name  string
+		authz string
+		want  bool
+	}{
+		{"allow-all is a no-op", AllowAll, false},
+		{"kessel writes tuples", Kessel, true},
+		{"spicedb writes tuples", SpiceDB, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			config := CompletedConfig{
+				completedConfig: &completedConfig{Authz: tt.authz},
+			}
+			assert.Equal(t, tt.want, config.ReplicatesTuples())
+		})
+	}
+}

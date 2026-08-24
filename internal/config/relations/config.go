@@ -75,3 +75,10 @@ func CheckRelationsImpl(config CompletedConfig) string {
 		return "unknown"
 	}
 }
+
+// ReplicatesTuples reports whether the selected backend actually persists tuples,
+// and thus whether the consumer should run its tuple-replication path. Only the
+// allow-all backend is a no-op; the kessel and spicedb backends write.
+func (c CompletedConfig) ReplicatesTuples() bool {
+	return c.Authz != AllowAll
+}

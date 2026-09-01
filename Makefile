@@ -87,6 +87,10 @@ api_breaking:
 
 .PHONY: update-schemas
 # download starlark jsonschema release and rebuild inventory schema artifacts
+# Additive overlay: do not delete first. Non-starlark types (k8s_*, host, …)
+# are not in the release tarball and must stay. After all types are
+# onboarded, replace managed paths (features JSON + common_representation.json)
+# so removed upstream files leave the tree.
 update-schemas:
 	@test -n "${SCHEMA_VERSION}" || { echo "SCHEMA_VERSION is required"; exit 1; }
 	gh release download "${SCHEMA_VERSION}" \
@@ -96,10 +100,6 @@ update-schemas:
 	tmpdir=$$(mktemp -d) && \
 	tar xzf jsonschema.tar.gz -C "$$tmpdir" && \
 	mkdir -p ${SCHEMA_PATH} && \
-	# Additive overlay: do not delete first. Non-starlark types (k8s_*, host, …)
-	# are not in the release tarball and must stay. After all types are
-	# onboarded, replace managed paths (features JSON + common_representation.json)
-	# so removed upstream files leave the tree.
 	(cd "$$tmpdir" && find . -type f \( -path '*/reporters/features/*.json' -o -name 'common_representation.json' \) -print) | while read -r f; do \
 		mkdir -p ${SCHEMA_PATH}$$(dirname "$$f") && \
 		cp "$$tmpdir/$$f" ${SCHEMA_PATH}$$f; \

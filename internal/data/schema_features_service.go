@@ -14,20 +14,19 @@ func mustRelationDef(fieldName, relationName, subjectNamespace, subjectResourceT
 	return rd
 }
 
-var serviceRelations = []model.RelationDef{
-	mustRelationDef("allowed_workspaces", "allowed_workspaces", model.RbacNamespace, "workspace", true),
-	mustRelationDef("billing_account", "billing_account", featureNamespace, "billing_account", true),
-	mustRelationDef("parent", "parent", featureNamespace, "service", false),
-}
-
-func NewFeaturesServiceSchemaFromString(jsonSchema string) model.Schema {
-	return NewJsonSchemaWithRelations(jsonSchema, serviceRelations)
-}
-
 var billingAccountRelations = []model.RelationDef{
-	mustRelationDef("workspaces", "workspace", model.RbacNamespace, "workspace", true),
+	mustRelationDef("services", "services", featureNamespace, "service", true),
 }
 
 func NewFeaturesBillingAccountSchemaFromString(jsonSchema string) model.Schema {
 	return NewJsonSchemaWithRelations(jsonSchema, billingAccountRelations)
+}
+
+var workspaceRelations = []model.RelationDef{
+	mustRelationDef("direct_billing_account", "direct_billing_account", featureNamespace, "billing_account", false),
+	mustRelationDef("direct_service_preferences", "direct_service_preferences", featureNamespace, "service", true),
+}
+
+func NewFeaturesWorkspaceSchemaFromString(jsonSchema string) model.Schema {
+	return NewJsonSchemaWithRelations(jsonSchema, workspaceRelations)
 }

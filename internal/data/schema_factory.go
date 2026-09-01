@@ -12,7 +12,7 @@ func DefaultSchemaFactory(_ model.ResourceType, jsonSchema string) model.Schema 
 }
 
 var (
-	serviceType        = model.DeserializeResourceType("service")
+	workspaceType        = model.DeserializeResourceType("workspace")
 	billingAccountType = model.DeserializeResourceType("billing_account")
 )
 
@@ -21,8 +21,8 @@ var (
 // JsonSchemaWithWorkspaces for everything else.
 func FeaturesAwareSchemaFactory(resourceType model.ResourceType, jsonSchema string) model.Schema {
 	switch resourceType {
-	case serviceType:
-		return NewFeaturesServiceSchemaFromString(jsonSchema)
+	case workspaceType:
+		return NewFeaturesWorkspaceSchemaFromString(jsonSchema)
 	case billingAccountType:
 		return NewFeaturesBillingAccountSchemaFromString(jsonSchema)
 	default:

@@ -12,7 +12,7 @@ func DefaultSchemaFactory(_ model.ResourceType, jsonSchema string) model.Schema 
 }
 
 var (
-	workspaceType        = model.DeserializeResourceType("workspace")
+	workspaceType      = model.DeserializeResourceType("workspace")
 	billingAccountType = model.DeserializeResourceType("billing_account")
 )
 

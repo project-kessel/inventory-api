@@ -1,0 +1,41 @@
+apiVersion: template.openshift.io/v1
+kind: Template
+metadata:
+  name: kessel-inventory-clowdappref
+objects:
+  - apiVersion: cloud.redhat.com/v1alpha1
+    kind: ClowdAppRef
+    metadata:
+      name: kessel-inventory
+    spec:
+      envName: ${ENV_NAME}
+      remoteEnvironment:
+        name: ${REMOTE_ENV_NAME}
+        port: 443
+        tls:
+          port: 443
+      deployments:
+        - name: api
+          hostname: ${GATEWAY_HOSTNAME}
+          webServices:
+            public:
+              enabled: true
+              tls: true
+              apiPaths:
+                - "/inventory"
+              authenticated: true
+      # Consumers opt in here, gradually -- unlisted ClowdApps keep resolving kessel-inventory
+      # against their own cluster's local ClowdApp (see Clowder's processAppAndAppRefEndpoints).
+      # Add a new consumer's ClowdApp name below as part of RHCLOUD-48029 migration for that service.
+      serves:
+        - insights-host-inventory
+parameters:
+  - description: ClowdEnvironment name of the *consumer* (stage, prod) -- must match the consuming ClowdApp's own envName for Clowder to resolve this ClowdAppRef (see getAppRefsInEnv, matched cluster-wide by spec.envName, not by namespace).
+    name: ENV_NAME
+    required: true
+  - description: ClowdEnvironment name Clowder reports for the remote (HCC) side. Same convention as ENV_NAME (stage/prod) -- confirmed via data/products/hcc/environments/*.yml in app-interface, not a cluster-specific name.
+    name: REMOTE_ENV_NAME
+    required: true
+  - description: East/west gateway hostname for this environment (RHCLOUD-43992), e.g. ewgw.apps.rosa.hccs01ue1.t2w6.p3.openshiftapps.com for stage.
+    name: GATEWAY_HOSTNAME
+    required: true

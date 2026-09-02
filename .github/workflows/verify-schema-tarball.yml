@@ -17,7 +17,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v7
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           fetch-depth: 0  # Fetch all history for accurate diff
 
@@ -76,22 +76,3 @@ jobs:
             echo "status=success" >> $GITHUB_OUTPUT
           fi
 
-          if [ -z "${ERRORS}" ]; then
-            echo "✅ Schema, tarball, and cache changes are in sync."
-            echo "status=success" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Save PR context for comment workflow
-        if: failure()
-        run: |
-          mkdir -p ./pr-context
-          echo "${{ github.event.number }}" > ./pr-context/pr-number.txt
-          echo "failed" > ./pr-context/status.txt
-
-      - name: Upload PR context
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: pr-context
-          path: pr-context/
-          retention-days: 1

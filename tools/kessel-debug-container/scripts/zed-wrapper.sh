@@ -4,8 +4,8 @@
 # This provides a security policy layer for debug/read-only containers
 
 # Check if the any arguments provided are for write operations
-if [[ "$@" =~ "write" ]] || [[ "$@" =~ "delete" ]]; then
-echo "ERROR: write and delete operations are disabled in this container for security reasons." >&2
+if [[ "$@" =~ "write" ]]  || [[ "$@" =~ "create" ]] || [[ "$@" =~ "delete" ]]; then
+echo "ERROR: write (create) and delete operations are disabled in this container for security reasons." >&2
 echo "This container is configured for read-only operations only." >&2
 exit 1
 fi

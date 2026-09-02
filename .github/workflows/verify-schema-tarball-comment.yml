@@ -1,0 +1,58 @@
+name: Comment on Schema Tarball Verification
+
+on:
+  workflow_run:
+    workflows: ["Verify Schema Tarball"]
+    types:
+      - completed
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  comment:
+    name: Post verification result comment
+    runs-on: ubuntu-latest
+    if: >
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.conclusion == 'failure'
+    steps:
+      - name: Download PR context artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: pr-context
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ github.event.workflow_run.id }}
+
+      - name: Read PR number
+        id: pr
+        run: |
+          PR_NUMBER=$(cat pr-number.txt)
+          echo "number=${PR_NUMBER}" >> $GITHUB_OUTPUT
+
+      - name: Comment on PR
+        uses: actions/github-script@v9
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            github.rest.issues.createComment({
+              issue_number: ${{ steps.pr.outputs.number }},
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: '## ⚠️ Schema Files Not Updated\n\n' +
+                    'Changes were detected in `data/schema/` but the generated files were not updated.\n\n' +
+                    '### How to fix:\n' +
+                    '1. Run `make build-schemas` to regenerate the tarball\n' +
+                    '2. Run `go run main.go preload-schema` to regenerate the schema cache\n' +
+                    '3. Commit the updated files:\n' +
+                    '   - `resources.tar.gz`\n' +
+                    '   - `schema_cache.json`\n' +
+                    '   - `deploy/kessel-inventory-ephem.yaml`\n' +
+                    '4. Push the changes to your PR\n\n' +
+                    '### Why this is required:\n' +
+                    'These generated files must be rebuilt whenever schema configs change to ensure:\n' +
+                    '- The tarball contains the latest schemas for deployments\n' +
+                    '- The cache file has up-to-date schema data for runtime\n' +
+                    '- Changes are properly captured and consumable in production'
+            })

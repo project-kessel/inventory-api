@@ -6,7 +6,7 @@
   "common:k8s_policy": "{\n  \"$schema\": \"http://json-schema.org/draft-07/schema#\",\n  \"type\": \"object\",\n  \"properties\": {\n    \"workspace_id\": { \"type\": \"string\" }\n  },\n  \"required\": [\n    \"workspace_id\"\n  ]\n}\n\n",
   "common:notifications_integration": "{\n  \"$schema\": \"http://json-schema.org/draft-07/schema#\",\n  \"type\": \"object\",\n  \"properties\": {\n    \"workspace_id\": { \"type\": \"string\" }\n  },\n  \"required\": [\n    \"workspace_id\"\n  ]\n}\n\n",
   "common:service": "{\n  \"$schema\": \"http://json-schema.org/draft-07/schema#\",\n  \"type\": \"object\",\n  \"properties\": {\n  },\n  \"required\": []\n}\n",
-  "common:workspace": "{\n  \"$schema\": \"http://json-schema.org/draft-07/schema#\",\n  \"properties\": {\n    \"id\": {\n      \"type\": \"string\",\n      \"format\": \"uuid\"\n    }\n  },\n  \"required\": [],\n  \"type\": \"object\"\n}\n",
+  "common:workspace": "{\n  \"$schema\": \"http://json-schema.org/draft-07/schema#\",\n  \"properties\": {\n  },\n  \"required\": [],\n  \"type\": \"object\"\n}\n",
   "config:billing_account": "cmVzb3VyY2VfcmVwb3J0ZXJzOgogICAgLSBmZWF0dXJlcwpyZXNvdXJjZV90eXBlOiBiaWxsaW5nX2FjY291bnQK",
   "config:billing_account:features": "bmFtZXNwYWNlOiBmZWF0dXJlcwpyZXBvcnRlcl9uYW1lOiBmZWF0dXJlcwpyZXNvdXJjZV90eXBlOiBiaWxsaW5nX2FjY291bnQK",
   "config:host": "cmVzb3VyY2VfcmVwb3J0ZXJzOgogICAgLSBoYmkKcmVzb3VyY2VfdHlwZTogaG9zdAo=",

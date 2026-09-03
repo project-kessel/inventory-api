@@ -422,14 +422,14 @@ func TestSchemaService_CalculateTuplesForResource_FeaturesWorkspace(t *testing.T
 	require.NoError(t, err)
 	err = repo.CreateReporterSchema(ctx, reporterSchemaRepr)
 	require.NoError(t, err)
-	
+
 	// Create schema service
 	logger := log.NewHelper(log.DefaultLogger)
 	schemaService := model.NewSchemaService(repo, logger)
-	
+
 	// Create resource key
 	key := featuresWorkspaceKey(t)
-	
+
 	// Create representations with data in REPORTER representation (not common)
 	ver := model.NewVersion(1)
 	current, err := model.NewRepresentations(
@@ -441,16 +441,16 @@ func TestSchemaService_CalculateTuplesForResource_FeaturesWorkspace(t *testing.T
 		&ver, // Reporter representation
 	)
 	require.NoError(t, err)
-	
+
 	// Calculate tuples using SchemaService
 	result, err := schemaService.CalculateTuplesForResource(ctx, current, nil, key)
 	require.NoError(t, err)
-	
+
 	// Verify tuples were created from reporter data
 	assert.True(t, result.HasTuplesToCreate())
 	creates := *result.TuplesToCreate()
 	assert.Len(t, creates, 3) // 1 billing_account + 2 service_preferences
-	
+
 	expected := []model.RelationsTuple{
 		model.NewRelationTupleForSubject(key, "direct_billing_account", "features", "billing_account", "ba-100"),
 		model.NewRelationTupleForSubject(key, "direct_service_preferences", "features", "service", "svc-1"),
@@ -463,17 +463,17 @@ func TestSchemaService_CalculateTuplesForResource_FeaturesWorkspace(t *testing.T
 // and verifies tuple calculation works with real schema files.
 func TestFeaturesSchemas_FromDirectory(t *testing.T) {
 	ctx := context.Background()
-	
+
 	// Load schemas from actual directory
 	repo, err := NewInMemorySchemaRepositoryFromDir(ctx, "../../data/schema/resources", FeaturesAwareSchemaFactory)
 	require.NoError(t, err)
-	
+
 	logger := log.NewHelper(log.DefaultLogger)
 	schemaService := model.NewSchemaService(repo, logger)
-	
+
 	t.Run("workspace with reporter data", func(t *testing.T) {
 		key := featuresWorkspaceKey(t)
-		
+
 		ver := model.NewVersion(1)
 		current, err := model.NewRepresentations(
 			nil, nil,
@@ -484,14 +484,14 @@ func TestFeaturesSchemas_FromDirectory(t *testing.T) {
 			&ver,
 		)
 		require.NoError(t, err)
-		
+
 		result, err := schemaService.CalculateTuplesForResource(ctx, current, nil, key)
 		require.NoError(t, err)
-		
+
 		assert.True(t, result.HasTuplesToCreate())
 		creates := *result.TuplesToCreate()
 		assert.Len(t, creates, 3)
-		
+
 		expected := []model.RelationsTuple{
 			model.NewRelationTupleForSubject(key, "direct_billing_account", "features", "billing_account", "ba-100"),
 			model.NewRelationTupleForSubject(key, "direct_service_preferences", "features", "service", "svc-1"),
@@ -499,10 +499,10 @@ func TestFeaturesSchemas_FromDirectory(t *testing.T) {
 		}
 		assert.ElementsMatch(t, expected, creates)
 	})
-	
+
 	t.Run("billing_account with reporter data", func(t *testing.T) {
 		key := featuresBillingAccountKey(t)
-		
+
 		ver := model.NewVersion(1)
 		current, err := model.NewRepresentations(
 			nil, nil,
@@ -512,14 +512,14 @@ func TestFeaturesSchemas_FromDirectory(t *testing.T) {
 			&ver,
 		)
 		require.NoError(t, err)
-		
+
 		result, err := schemaService.CalculateTuplesForResource(ctx, current, nil, key)
 		require.NoError(t, err)
-		
+
 		assert.True(t, result.HasTuplesToCreate())
 		creates := *result.TuplesToCreate()
 		assert.Len(t, creates, 2)
-		
+
 		expected := []model.RelationsTuple{
 			model.NewRelationTupleForSubject(key, "services", "features", "service", "svc-1"),
 			model.NewRelationTupleForSubject(key, "services", "features", "service", "svc-2"),
@@ -697,7 +697,7 @@ func TestSchemaService_MergesReporterAndCommonSchemas(t *testing.T) {
 		}),
 		&ver,
 		model.Representation(map[string]interface{}{
-			"direct_billing_account":     "ba-100",              // Reporter schema field
+			"direct_billing_account":     "ba-100",               // Reporter schema field
 			"direct_service_preferences": []interface{}{"svc-1"}, // Reporter schema field
 		}),
 		&ver,

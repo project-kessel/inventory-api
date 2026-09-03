@@ -1,0 +1,49 @@
+name: Comment on Schema Tarball Verification
+
+on:
+  workflow_run:
+    workflows: ["Verify Schema Tarball"]
+    types:
+      - completed
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  comment:
+    name: Post verification result comment
+    runs-on: ubuntu-latest
+    if: >
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.conclusion == 'failure'
+    steps:
+      - name: Comment on PR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.workflow_run.pull_requests[0].number }}
+          REPO: ${{ github.repository }}
+        run: |
+          if [ -z "$PR_NUMBER" ] || [ "$PR_NUMBER" -lt 1 ] 2>/dev/null; then
+            echo "Invalid PR number from workflow_run event: $PR_NUMBER"
+            exit 1
+          fi
+
+          gh pr comment "$PR_NUMBER" -R "$REPO" --body "## ⚠️ Schema Files Not Updated
+
+          Changes were detected in \`data/schema/\` but the generated files were not updated.
+
+          ### How to fix:
+          1. Run \`make build-schemas\` to regenerate the tarball
+          2. Run \`go run main.go preload-schema\` to regenerate the schema cache
+          3. Commit the updated files:
+             - \`resources.tar.gz\`
+             - \`schema_cache.json\`
+             - \`deploy/kessel-inventory-ephem.yaml\`
+          4. Push the changes to your PR
+
+          ### Why this is required:
+          These generated files must be rebuilt whenever schema configs change to ensure:
+          - The tarball contains the latest schemas for deployments
+          - The cache file has up-to-date schema data for runtime
+          - Changes are properly captured and consumable in production"

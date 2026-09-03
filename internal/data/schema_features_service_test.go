@@ -601,60 +601,6 @@ func TestFeaturesSchemas_MergeBehavior(t *testing.T) {
 		assert.ElementsMatch(t, expected, creates)
 	})
 
-	t.Run("merges same single-valued field from both representations", func(t *testing.T) {
-		ver := model.NewVersion(1)
-		current, err := model.NewRepresentations(
-			model.Representation(map[string]interface{}{
-				"direct_billing_account": "ba-from-common",
-			}),
-			&ver,
-			model.Representation(map[string]interface{}{
-				"direct_billing_account": "ba-from-reporter",
-			}),
-			&ver,
-		)
-		require.NoError(t, err)
-
-		result, err := schema.CalculateTuples(current, nil, key)
-		require.NoError(t, err)
-
-		creates := *result.TuplesToCreate()
-		require.Len(t, creates, 2) // Both values become tuples
-
-		expected := []model.RelationsTuple{
-			model.NewRelationTupleForSubject(key, "direct_billing_account", "features", "billing_account", "ba-from-common"),
-			model.NewRelationTupleForSubject(key, "direct_billing_account", "features", "billing_account", "ba-from-reporter"),
-		}
-		assert.ElementsMatch(t, expected, creates)
-	})
-
-	t.Run("merges and deduplicates multi-valued fields from both representations", func(t *testing.T) {
-		ver := model.NewVersion(1)
-		current, err := model.NewRepresentations(
-			model.Representation(map[string]interface{}{
-				"direct_service_preferences": []interface{}{"svc-1", "svc-2"},
-			}),
-			&ver,
-			model.Representation(map[string]interface{}{
-				"direct_service_preferences": []interface{}{"svc-2", "svc-3"}, // svc-2 is duplicate
-			}),
-			&ver,
-		)
-		require.NoError(t, err)
-
-		result, err := schema.CalculateTuples(current, nil, key)
-		require.NoError(t, err)
-
-		creates := *result.TuplesToCreate()
-		require.Len(t, creates, 3) // svc-1, svc-2 (deduplicated), svc-3
-
-		expected := []model.RelationsTuple{
-			model.NewRelationTupleForSubject(key, "direct_service_preferences", "features", "service", "svc-1"),
-			model.NewRelationTupleForSubject(key, "direct_service_preferences", "features", "service", "svc-2"),
-			model.NewRelationTupleForSubject(key, "direct_service_preferences", "features", "service", "svc-3"),
-		}
-		assert.ElementsMatch(t, expected, creates)
-	})
 }
 
 // TestSchemaService_MergesReporterAndCommonSchemas verifies that

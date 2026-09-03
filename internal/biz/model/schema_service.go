@@ -37,7 +37,12 @@ func (sc *SchemaService) CalculateTuplesForResource(ctx context.Context, current
 
 	// Get tuples from reporter schema (if exists)
 	reporterSchema, err := sc.schemaRepository.GetReporterSchema(ctx, resourceType, reporterType)
-	if err == nil && reporterSchema.Schema() != nil {
+	if err != nil {
+		// Only continue if schema not found; propagate unexpected errors
+		if !errors.Is(err, ErrResourceSchemaNotFound) && !errors.Is(err, ErrReporterSchemaNotFound) {
+			return TuplesToReplicate{}, err
+		}
+	} else if reporterSchema.Schema() != nil {
 		foundReporterSchema = true
 		reporterTuples, err := reporterSchema.Schema().CalculateTuples(current, previous, key)
 		if err != nil {
@@ -53,7 +58,12 @@ func (sc *SchemaService) CalculateTuplesForResource(ctx context.Context, current
 
 	// Get tuples from resource/common schema (if exists)
 	resourceSchema, err := sc.schemaRepository.GetResourceSchema(ctx, resourceType)
-	if err == nil && resourceSchema.Schema() != nil {
+	if err != nil {
+		// Only continue if schema not found; propagate unexpected errors
+		if !errors.Is(err, ErrResourceSchemaNotFound) {
+			return TuplesToReplicate{}, err
+		}
+	} else if resourceSchema.Schema() != nil {
 		foundResourceSchema = true
 		commonTuples, err := resourceSchema.Schema().CalculateTuples(current, previous, key)
 		if err != nil {

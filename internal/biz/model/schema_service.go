@@ -24,24 +24,55 @@ func NewSchemaService(schemaRepository SchemaRepository, logger *log.Helper) *Sc
 }
 
 // CalculateTuplesForResource computes the relation tuples to replicate for a given resource.
-// It retrieves the appropriate schema for the resource type and delegates tuple calculation to it.
-// If no schema is registered for the resource type, it uses a default schema implementation.
-//
-// Note: this currently only uses the ResourceSchema (common), so tuple calculation
-// can only reference attributes from the common representation. Any tuple logic
-// that depends on reporter-specific attributes would require changes here.
+// It calculates tuples from both reporter-specific schema (if exists) and resource/common schema (if exists),
+// then merges the results. This allows reporter schemas to define reporter-specific relations
+// while common schemas define common relations (e.g., workspace_id).
 func (sc *SchemaService) CalculateTuplesForResource(ctx context.Context, current, previous *Representations, key ReporterResourceKey) (TuplesToReplicate, error) {
 	resourceType := key.ResourceType()
+	reporterType := key.ReporterType()
 
-	resource, err := sc.schemaRepository.GetResourceSchema(ctx, resourceType)
-	if err != nil {
-		if errors.Is(err, ErrResourceSchemaNotFound) {
-			return NewDefaultSchema().CalculateTuples(current, previous, key)
+	var allCreates, allDeletes []RelationsTuple
+	foundReporterSchema := false
+	foundResourceSchema := false
+
+	// Get tuples from reporter schema (if exists)
+	reporterSchema, err := sc.schemaRepository.GetReporterSchema(ctx, resourceType, reporterType)
+	if err == nil && reporterSchema.Schema() != nil {
+		foundReporterSchema = true
+		reporterTuples, err := reporterSchema.Schema().CalculateTuples(current, previous, key)
+		if err != nil {
+			return TuplesToReplicate{}, err
 		}
-		return TuplesToReplicate{}, err
+		if reporterTuples.HasTuplesToCreate() {
+			allCreates = append(allCreates, *reporterTuples.TuplesToCreate()...)
+		}
+		if reporterTuples.HasTuplesToDelete() {
+			allDeletes = append(allDeletes, *reporterTuples.TuplesToDelete()...)
+		}
 	}
 
-	return resource.Schema().CalculateTuples(current, previous, key)
+	// Get tuples from resource/common schema (if exists)
+	resourceSchema, err := sc.schemaRepository.GetResourceSchema(ctx, resourceType)
+	if err == nil && resourceSchema.Schema() != nil {
+		foundResourceSchema = true
+		commonTuples, err := resourceSchema.Schema().CalculateTuples(current, previous, key)
+		if err != nil {
+			return TuplesToReplicate{}, err
+		}
+		if commonTuples.HasTuplesToCreate() {
+			allCreates = append(allCreates, *commonTuples.TuplesToCreate()...)
+		}
+		if commonTuples.HasTuplesToDelete() {
+			allDeletes = append(allDeletes, *commonTuples.TuplesToDelete()...)
+		}
+	}
+
+	// If no schemas found at all, use default
+	if !foundReporterSchema && !foundResourceSchema {
+		return NewDefaultSchema().CalculateTuples(current, previous, key)
+	}
+
+	return NewTuplesToReplicate(allCreates, allDeletes)
 }
 
 // ValidateReportAgainstSchema validates that a resource report conforms to the configured schemas.

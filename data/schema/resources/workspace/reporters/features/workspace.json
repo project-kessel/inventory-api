@@ -1,7 +1,11 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "properties": {
-    "services": {
+    "direct_billing_account": {
+      "format": "uuid",
+      "type": "string"
+    },
+    "direct_service_preferences": {
       "items": {
         "format": "uuid",
         "type": "string"

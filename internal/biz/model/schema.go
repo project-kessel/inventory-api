@@ -54,7 +54,7 @@ func (d DefaultSchema) CalculateTuples(currentRepresentation, previousRepresenta
 
 // ResourceTypeSchemaFactory is a factory function that creates a Schema
 // with awareness of the resource type.
-type ResourceTypeSchemaFactory func(resourceType ResourceType, jsonSchema string) Schema
+type ResourceTypeSchemaFactory func(resourceType ResourceType, isReporter bool, jsonSchema string) Schema
 
 // ResourceSchemaRepresentation holds a resource schema with its validation and tuple logic.
 type ResourceSchemaRepresentation struct {
@@ -144,6 +144,7 @@ func (r RelationDef) MultiValued() bool           { return r.multiValued }
 // CalculateTuplesFromRelationDefs computes create/delete tuple sets by
 // diffing current vs previous representation values for each relation
 // definition.
+// For each field, checks both common and reporter representations and merges the results.
 func CalculateTuplesFromRelationDefs(
 	relations []RelationDef,
 	current, previous *Representations,
@@ -153,15 +154,30 @@ func CalculateTuplesFromRelationDefs(
 
 	for _, rel := range relations {
 		var currentValues, previousValues []string
+
 		if rel.multiValued {
-			currentValues = current.StringSliceField(rel.fieldName)
-			previousValues = previous.StringSliceField(rel.fieldName)
+			// Merge values from both common and reporter representations
+			currentCommon := current.StringSliceField(rel.fieldName)
+			currentReporter := current.ReporterStringSliceField(rel.fieldName)
+			currentValues = mergeStringSlices(currentCommon, currentReporter)
+
+			previousCommon := previous.StringSliceField(rel.fieldName)
+			previousReporter := previous.ReporterStringSliceField(rel.fieldName)
+			previousValues = mergeStringSlices(previousCommon, previousReporter)
 		} else {
+			// For single-valued fields, check both representations
 			if v := current.StringField(rel.fieldName); v != "" {
-				currentValues = []string{v}
+				currentValues = append(currentValues, v)
 			}
+			if v := current.ReporterStringField(rel.fieldName); v != "" {
+				currentValues = append(currentValues, v)
+			}
+
 			if v := previous.StringField(rel.fieldName); v != "" {
-				previousValues = []string{v}
+				previousValues = append(previousValues, v)
+			}
+			if v := previous.ReporterStringField(rel.fieldName); v != "" {
+				previousValues = append(previousValues, v)
 			}
 		}
 
@@ -174,4 +190,34 @@ func CalculateTuplesFromRelationDefs(
 	}
 
 	return NewTuplesToReplicate(allCreates, allDeletes)
+}
+
+// mergeStringSlices combines two string slices, filtering out duplicates and nils.
+func mergeStringSlices(slice1, slice2 []string) []string {
+	if slice1 == nil && slice2 == nil {
+		return nil
+	}
+
+	seen := make(map[string]bool)
+	var result []string
+
+	for _, s := range slice1 {
+		if s != "" && !seen[s] {
+			result = append(result, s)
+			seen[s] = true
+		}
+	}
+
+	for _, s := range slice2 {
+		if s != "" && !seen[s] {
+			result = append(result, s)
+			seen[s] = true
+		}
+	}
+
+	if len(result) == 0 {
+		return nil
+	}
+
+	return result
 }

@@ -23,10 +23,36 @@ func NewSchemaService(schemaRepository SchemaRepository, logger *log.Helper) *Sc
 	}
 }
 
+// filterRepresentationsToCommonOnly returns a new Representations object containing only
+// the common representation data, with reporter data cleared. If common data is not present,
+// returns nil. This prevents schemas from accidentally reading values from both representations.
+func filterRepresentationsToCommonOnly(rep *Representations) (*Representations, error) {
+	if rep == nil || !rep.HasCommon() {
+		return nil, nil
+	}
+	// Return a new Representations with only common data, no reporter data
+	return NewRepresentations(rep.CommonData(), rep.CommonVersion(), nil, nil)
+}
+
+// filterRepresentationsToReporterOnly returns a new Representations object containing only
+// the reporter representation data, with common data cleared. If reporter data is not present,
+// returns nil. This prevents schemas from accidentally reading values from both representations.
+func filterRepresentationsToReporterOnly(rep *Representations) (*Representations, error) {
+	if rep == nil || !rep.HasReporter() {
+		return nil, nil
+	}
+	// Return a new Representations with only reporter data, no common data
+	return NewRepresentations(nil, nil, rep.ReporterData(), rep.ReporterVersion())
+}
+
 // CalculateTuplesForResource computes the relation tuples to replicate for a given resource.
 // It calculates tuples from both reporter-specific schema (if exists) and resource/common schema (if exists),
 // then merges the results. This allows reporter schemas to define reporter-specific relations
 // while common schemas define common relations (e.g., workspace_id).
+//
+// To prevent duplicate tuples from the same field being read by both schemas, the method filters
+// the representations before passing to each schema: reporter schema receives only reporter data,
+// and common schema receives only common data.
 func (sc *SchemaService) CalculateTuplesForResource(ctx context.Context, current, previous *Representations, key ReporterResourceKey) (TuplesToReplicate, error) {
 	resourceType := key.ResourceType()
 	reporterType := key.ReporterType()
@@ -44,7 +70,16 @@ func (sc *SchemaService) CalculateTuplesForResource(ctx context.Context, current
 		}
 	} else if reporterSchema.Schema() != nil {
 		foundReporterSchema = true
-		reporterTuples, err := reporterSchema.Schema().CalculateTuples(current, previous, key)
+		// Filter representations to reporter-only data to prevent reading common data
+		currentReporterOnly, err := filterRepresentationsToReporterOnly(current)
+		if err != nil {
+			return TuplesToReplicate{}, err
+		}
+		previousReporterOnly, err := filterRepresentationsToReporterOnly(previous)
+		if err != nil {
+			return TuplesToReplicate{}, err
+		}
+		reporterTuples, err := reporterSchema.Schema().CalculateTuples(currentReporterOnly, previousReporterOnly, key)
 		if err != nil {
 			return TuplesToReplicate{}, err
 		}
@@ -65,7 +100,16 @@ func (sc *SchemaService) CalculateTuplesForResource(ctx context.Context, current
 		}
 	} else if resourceSchema.Schema() != nil {
 		foundResourceSchema = true
-		commonTuples, err := resourceSchema.Schema().CalculateTuples(current, previous, key)
+		// Filter representations to common-only data to prevent reading reporter data
+		currentCommonOnly, err := filterRepresentationsToCommonOnly(current)
+		if err != nil {
+			return TuplesToReplicate{}, err
+		}
+		previousCommonOnly, err := filterRepresentationsToCommonOnly(previous)
+		if err != nil {
+			return TuplesToReplicate{}, err
+		}
+		commonTuples, err := resourceSchema.Schema().CalculateTuples(currentCommonOnly, previousCommonOnly, key)
 		if err != nil {
 			return TuplesToReplicate{}, err
 		}

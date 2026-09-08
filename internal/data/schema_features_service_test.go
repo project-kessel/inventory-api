@@ -601,6 +601,36 @@ func TestFeaturesSchemas_MergeBehavior(t *testing.T) {
 		assert.ElementsMatch(t, expected, creates)
 	})
 
+	t.Run("merges same single-valued field from both representations", func(t *testing.T) {
+		ver := model.NewVersion(1)
+		current, err := model.NewRepresentations(
+			model.Representation(map[string]interface{}{
+				"direct_billing_account": "ba-from-common",
+			}),
+			&ver,
+			model.Representation(map[string]interface{}{
+				"direct_billing_account": "ba-from-reporter",
+				"direct_service_preferences": []interface{}{"svc-1"},
+			}),
+			&ver,
+		)
+		require.NoError(t, err)
+
+		result, err := schema.CalculateTuples(current, nil, key)
+		require.NoError(t, err)
+
+		creates := *result.TuplesToCreate()
+		// Should emit only one subject for direct_billing_account (reporter takes precedence)
+		// and one for direct_service_preferences
+		require.Len(t, creates, 2)
+
+		expected := []model.RelationsTuple{
+			model.NewRelationTupleForSubject(key, "direct_billing_account", "features", "billing_account", "ba-from-reporter"),
+			model.NewRelationTupleForSubject(key, "direct_service_preferences", "features", "service", "svc-1"),
+		}
+		assert.ElementsMatch(t, expected, creates)
+	})
+
 }
 
 // TestSchemaService_MergesReporterAndCommonSchemas verifies that

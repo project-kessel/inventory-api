@@ -31,7 +31,11 @@ func filterRepresentationsToCommonOnly(rep *Representations) (*Representations, 
 		return nil, nil
 	}
 	// Return a new Representations with only common data, no reporter data
-	return NewRepresentations(rep.CommonData(), rep.CommonVersion(), nil, nil)
+	commonOnly, err := NewRepresentations(rep.CommonData(), rep.CommonVersion(), nil, nil)
+	if err != nil {
+		return nil, err
+	}
+	return commonOnly, nil
 }
 
 // filterRepresentationsToReporterOnly returns a new Representations object containing only
@@ -42,7 +46,11 @@ func filterRepresentationsToReporterOnly(rep *Representations) (*Representations
 		return nil, nil
 	}
 	// Return a new Representations with only reporter data, no common data
-	return NewRepresentations(nil, nil, rep.ReporterData(), rep.ReporterVersion())
+	repOnly, err := NewRepresentations(nil, nil, rep.ReporterData(), rep.ReporterVersion())
+	if err != nil {
+		return nil, err
+	}
+	return repOnly, nil
 }
 
 // CalculateTuplesForResource computes the relation tuples to replicate for a given resource.

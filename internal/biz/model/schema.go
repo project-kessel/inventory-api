@@ -165,18 +165,16 @@ func CalculateTuplesFromRelationDefs(
 			previousReporter := previous.ReporterStringSliceField(rel.fieldName)
 			previousValues = mergeStringSlices(previousCommon, previousReporter)
 		} else {
-			// For single-valued fields, check both representations
-			if v := current.StringField(rel.fieldName); v != "" {
-				currentValues = append(currentValues, v)
-			}
+			// For single-valued fields, reporter takes precedence over common
 			if v := current.ReporterStringField(rel.fieldName); v != "" {
+				currentValues = append(currentValues, v)
+			} else if v := current.StringField(rel.fieldName); v != "" {
 				currentValues = append(currentValues, v)
 			}
 
-			if v := previous.StringField(rel.fieldName); v != "" {
-				previousValues = append(previousValues, v)
-			}
 			if v := previous.ReporterStringField(rel.fieldName); v != "" {
+				previousValues = append(previousValues, v)
+			} else if v := previous.StringField(rel.fieldName); v != "" {
 				previousValues = append(previousValues, v)
 			}
 		}

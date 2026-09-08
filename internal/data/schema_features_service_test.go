@@ -609,7 +609,7 @@ func TestFeaturesSchemas_MergeBehavior(t *testing.T) {
 			}),
 			&ver,
 			model.Representation(map[string]interface{}{
-				"direct_billing_account": "ba-from-reporter",
+				"direct_billing_account":     "ba-from-reporter",
 				"direct_service_preferences": []interface{}{"svc-1"},
 			}),
 			&ver,
@@ -694,6 +694,139 @@ func TestSchemaService_MergesReporterAndCommonSchemas(t *testing.T) {
 		// From reporter schema
 		model.NewRelationTupleForSubject(key, "direct_billing_account", "features", "billing_account", "ba-100"),
 		model.NewRelationTupleForSubject(key, "direct_service_preferences", "features", "service", "svc-1"),
+	}
+	assert.ElementsMatch(t, expected, creates)
+}
+
+// TestSchemaService_FeaturesWorkspaceTupleCalculation verifies end-to-end tuple calculation
+// for a features workspace report with both common and reporter representations.
+// This test reproduces the issue from RHCLOUD-49504 where features workspace tuples
+// were not being created.
+func TestSchemaService_FeaturesWorkspaceTupleCalculation(t *testing.T) {
+	ctx := context.Background()
+	repo := NewInMemorySchemaRepository()
+
+	resourceType, _ := model.NewResourceType("workspace")
+	reporterType, _ := model.NewReporterType("features")
+
+	// Create common/resource schema with workspace_id relation
+	workspaceIdRelations := []model.RelationDef{
+		mustRelationDef("workspace_id", "workspace", "rbac", "workspace", false),
+	}
+	commonSchema := NewJsonSchemaWithRelations(`{"type": "object"}`, workspaceIdRelations)
+	resourceSchemaRepr, err := model.NewResourceSchemaRepresentation(resourceType, commonSchema)
+	require.NoError(t, err)
+	err = repo.CreateResourceSchema(ctx, resourceSchemaRepr)
+	require.NoError(t, err)
+
+	// Create reporter schema for features workspace
+	reporterSchema := NewFeaturesWorkspaceSchemaFromString(workspaceJsonSchema)
+	reporterSchemaRepr, err := model.NewReporterSchemaRepresentation(resourceType, reporterType, reporterSchema)
+	require.NoError(t, err)
+	err = repo.CreateReporterSchema(ctx, reporterSchemaRepr)
+	require.NoError(t, err)
+
+	// Create schema service
+	logger := log.NewHelper(log.DefaultLogger)
+	schemaService := model.NewSchemaService(repo, logger)
+
+	key := featuresWorkspaceKey(t)
+
+	// Simulate a features workspace report with both representations
+	// This mimics what the consumer receives from a CDC event
+	ver := model.NewVersion(1)
+	current, err := model.NewRepresentations(
+		model.Representation(map[string]interface{}{
+			"workspace_id": "workspace-uuid-123",
+		}),
+		&ver,
+		model.Representation(map[string]interface{}{
+			"direct_billing_account":     "billing-account-uuid-456",
+			"direct_service_preferences": []interface{}{"service-uuid-789"},
+		}),
+		&ver,
+	)
+	require.NoError(t, err)
+
+	// Calculate tuples - should NOT error and should produce tuples
+	result, err := schemaService.CalculateTuplesForResource(ctx, current, nil, key)
+	require.NoError(t, err, "CalculateTuplesForResource should not error")
+
+	// Verify we have tuples to create
+	require.True(t, result.HasTuplesToCreate(), "should have tuples to create")
+
+	creates := *result.TuplesToCreate()
+	require.Len(t, creates, 3, "should create 3 tuples: 1 from common schema + 2 from reporter schema")
+
+	// Verify the tuples are correct
+	expected := []model.RelationsTuple{
+		// From common schema (workspace_id)
+		model.NewRelationTupleForSubject(key, "workspace", "rbac", "workspace", "workspace-uuid-123"),
+		// From reporter schema (direct_billing_account and direct_service_preferences)
+		model.NewRelationTupleForSubject(key, "direct_billing_account", "features", "billing_account", "billing-account-uuid-456"),
+		model.NewRelationTupleForSubject(key, "direct_service_preferences", "features", "service", "service-uuid-789"),
+	}
+	assert.ElementsMatch(t, expected, creates)
+}
+
+// TestSchemaService_FeaturesWorkspaceWithoutCommonRepresentation verifies that
+// features workspace tuples are calculated even when common representation is missing.
+func TestSchemaService_FeaturesWorkspaceWithoutCommonRepresentation(t *testing.T) {
+	ctx := context.Background()
+	repo := NewInMemorySchemaRepository()
+
+	resourceType, _ := model.NewResourceType("workspace")
+	reporterType, _ := model.NewReporterType("features")
+
+	// Create common/resource schema with workspace_id relation
+	workspaceIdRelations := []model.RelationDef{
+		mustRelationDef("workspace_id", "workspace", "rbac", "workspace", false),
+	}
+	commonSchema := NewJsonSchemaWithRelations(`{"type": "object"}`, workspaceIdRelations)
+	resourceSchemaRepr, err := model.NewResourceSchemaRepresentation(resourceType, commonSchema)
+	require.NoError(t, err)
+	err = repo.CreateResourceSchema(ctx, resourceSchemaRepr)
+	require.NoError(t, err)
+
+	// Create reporter schema for features workspace
+	reporterSchema := NewFeaturesWorkspaceSchemaFromString(workspaceJsonSchema)
+	reporterSchemaRepr, err := model.NewReporterSchemaRepresentation(resourceType, reporterType, reporterSchema)
+	require.NoError(t, err)
+	err = repo.CreateReporterSchema(ctx, reporterSchemaRepr)
+	require.NoError(t, err)
+
+	// Create schema service
+	logger := log.NewHelper(log.DefaultLogger)
+	schemaService := model.NewSchemaService(repo, logger)
+
+	key := featuresWorkspaceKey(t)
+
+	// Report with ONLY reporter representation (no common data)
+	ver := model.NewVersion(1)
+	current, err := model.NewRepresentations(
+		nil, nil, // No common representation
+		model.Representation(map[string]interface{}{
+			"direct_billing_account":     "billing-account-uuid-456",
+			"direct_service_preferences": []interface{}{"service-uuid-789"},
+		}),
+		&ver,
+	)
+	require.NoError(t, err)
+
+	// Calculate tuples - should produce tuples from reporter schema
+	result, err := schemaService.CalculateTuplesForResource(ctx, current, nil, key)
+	require.NoError(t, err, "CalculateTuplesForResource should not error")
+
+	// Verify we have tuples to create (only from reporter schema)
+	require.True(t, result.HasTuplesToCreate(), "should have tuples to create")
+
+	creates := *result.TuplesToCreate()
+	require.Len(t, creates, 2, "should create 2 tuples from reporter schema only")
+
+	// Verify the tuples are correct
+	expected := []model.RelationsTuple{
+		model.NewRelationTupleForSubject(key, "direct_billing_account", "features", "billing_account", "billing-account-uuid-456"),
+		model.NewRelationTupleForSubject(key, "direct_service_preferences", "features", "service", "service-uuid-789"),
 	}
 	assert.ElementsMatch(t, expected, creates)
 }

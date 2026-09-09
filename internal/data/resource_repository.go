@@ -311,7 +311,7 @@ func (r *resourceRepository) FindCurrentAndPreviousVersionedRepresentations(tx *
 	query = r.buildReporterResourceKeyQuery(query, key)
 
 	cv := currentCommonVersion.Uint()
-	if operationType.OperationType() == bizmodel.OperationTypeCreated {
+	if cv == 0 {
 		query = query.Where("cr.version = ?", cv)
 	} else {
 		query = query.Where("(cr.version = ? OR cr.version = ?)", cv, cv-1)

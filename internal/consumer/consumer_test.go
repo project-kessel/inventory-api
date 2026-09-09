@@ -978,3 +978,47 @@ func TestInventoryConsumer_UpdateWithSameWorkspace_NoOp(t *testing.T) {
 	// Verify no relations operations occurred - version should still be 1 (initial)
 	assert.Equal(t, int64(1), relationsRepo.Version(), "No relations operations should occur when workspace doesn't change")
 }
+
+// TestInventoryConsumer_FeaturesWorkspaceTupleCalculation documents RHCLOUD-49504:
+// Features workspace tuples were not being replicated to SpiceDB because
+// FindCurrentAndPreviousVersionedRepresentations was only fetching common representations
+// and ignoring reporter representations.
+//
+// This test verifies the Representations type correctly handles both common and reporter data.
+// The actual bug (missing LEFT JOIN in the repository query) has been fixed.
+func TestInventoryConsumer_FeaturesWorkspaceTupleCalculation(t *testing.T) {
+	// Create a representation object with both common and reporter data
+	commonRep := map[string]interface{}{
+		"workspace_id": "workspace-uuid-123",
+	}
+	reporterRep := map[string]interface{}{
+		"direct_billing_account":     "billing-account-uuid-456",
+		"direct_service_preferences": []interface{}{"service-uuid-789"},
+	}
+
+	commonVersion := model.NewVersion(1)
+	fullReps, err := model.NewRepresentations(
+		model.Representation(commonRep),
+		&commonVersion,
+		model.Representation(reporterRep),
+		&commonVersion,
+	)
+	require.NoError(t, err)
+
+	// Verify the representations object has both common and reporter data
+	require.True(t, fullReps.HasCommon(), "representations should have common data")
+	require.True(t, fullReps.HasReporter(), "representations should have reporter data")
+
+	// Verify that creating a Representations object with only common data (no reporter data)
+	// correctly reflects the absence of reporter data
+	commonOnlyReps, err := model.NewRepresentations(
+		model.Representation(commonRep),
+		&commonVersion,
+		nil, // No reporter data
+		nil,
+	)
+	require.NoError(t, err)
+
+	require.True(t, commonOnlyReps.HasCommon(), "should have common data")
+	require.False(t, commonOnlyReps.HasReporter(), "should not have reporter data when none provided")
+}

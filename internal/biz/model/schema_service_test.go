@@ -713,3 +713,158 @@ func TestValidateReportAgainstSchema(t *testing.T) {
 		assert.NoError(t, err)
 	})
 }
+
+func TestCalculateTuplesForResource_NoWorkspaceDuplication(t *testing.T) {
+	ctx := context.Background()
+
+	resourceType, err := model.NewResourceType("host")
+	require.NoError(t, err)
+	reporterType, err := model.NewReporterType("HBI")
+	require.NoError(t, err)
+	reporterInstanceId, err := model.NewReporterInstanceId("hbi-instance-01")
+	require.NoError(t, err)
+	key, err := model.NewReporterResourceKey(
+		model.LocalResourceId("pr1450-duplicate-host-001"),
+		resourceType, reporterType, reporterInstanceId,
+	)
+	require.NoError(t, err)
+
+	t.Run("HBI reporter with workspace_id in common should not duplicate tuples", func(t *testing.T) {
+		repo := data.NewInMemorySchemaRepository()
+
+		// Common schema that defines workspace_id as a relation
+		commonSchema := data.NewJsonSchemaWithWorkspacesFromString(`{
+			"$schema": "http://json-schema.org/draft-07/schema#",
+			"type": "object",
+			"properties": { "workspace_id": { "type": "string" } },
+			"required": ["workspace_id"]
+		}`)
+		commonRepresentation, err := model.NewResourceSchemaRepresentation(resourceType, commonSchema)
+		require.NoError(t, err)
+		require.NoError(t, repo.CreateResourceSchema(ctx, commonRepresentation))
+
+		// HBI reporter schema that does NOT define workspace_id
+		reporterSchema := data.NewJsonSchemaWithWorkspacesFromString(`{
+			"$schema": "http://json-schema.org/draft-07/schema#",
+			"type": "object",
+			"properties": {
+				"fqdn": { "type": "string" }
+			},
+			"required": []
+		}`)
+		reporterRepresentation, err := model.NewReporterSchemaRepresentation(resourceType, reporterType, reporterSchema)
+		require.NoError(t, err)
+		require.NoError(t, repo.CreateReporterSchema(ctx, reporterRepresentation))
+
+		sc := model.NewSchemaService(repo, log.NewHelper(log.DefaultLogger))
+
+		// Build representations with workspace_id in common data and reporter data in reporter representation
+		ver := model.NewVersion(1)
+		workspaceID := "c29e9c7f-36e5-463c-8ac4-8dc58ae19c83"
+		currentRep, err := model.NewRepresentations(
+			model.Representation(map[string]interface{}{
+				"workspace_id": workspaceID,
+			}),
+			&ver,
+			model.Representation(map[string]interface{}{
+				"fqdn": "pr1450-duplicate.example.com",
+			}),
+			&ver,
+		)
+		require.NoError(t, err)
+
+		result, err := sc.CalculateTuplesForResource(ctx, currentRep, nil, key)
+		require.NoError(t, err)
+
+		// Should create tuples since workspace_id changed from empty to set
+		require.True(t, result.HasTuplesToCreate(), "should have tuples to create for new workspace")
+		creates := *result.TuplesToCreate()
+
+		// Verify that we have exactly 1 tuple (not 2 duplicates)
+		assert.Len(t, creates, 1, "should create exactly 1 workspace tuple, not duplicates")
+
+		// Verify the tuple is correct
+		tuple := creates[0]
+		assert.Equal(t, "host", tuple.Object().ResourceType().Serialize())
+		assert.Equal(t, "pr1450-duplicate-host-001", tuple.Object().ResourceId().Serialize())
+		assert.Equal(t, workspaceID, tuple.Subject().Resource().ResourceId().Serialize())
+		assert.Equal(t, "workspace", tuple.Subject().Resource().ResourceType().Serialize())
+	})
+
+	t.Run("workspace_id change should not create duplicate create/delete tuples", func(t *testing.T) {
+		repo := data.NewInMemorySchemaRepository()
+
+		// Common schema with workspace_id relation
+		commonSchema := data.NewJsonSchemaWithWorkspacesFromString(`{
+			"$schema": "http://json-schema.org/draft-07/schema#",
+			"type": "object",
+			"properties": { "workspace_id": { "type": "string" } },
+			"required": ["workspace_id"]
+		}`)
+		commonRepresentation, err := model.NewResourceSchemaRepresentation(resourceType, commonSchema)
+		require.NoError(t, err)
+		require.NoError(t, repo.CreateResourceSchema(ctx, commonRepresentation))
+
+		// HBI reporter schema without workspace_id
+		reporterSchema := data.NewJsonSchemaWithWorkspacesFromString(`{
+			"$schema": "http://json-schema.org/draft-07/schema#",
+			"type": "object",
+			"properties": { "fqdn": { "type": "string" } },
+			"required": []
+		}`)
+		reporterRepresentation, err := model.NewReporterSchemaRepresentation(resourceType, reporterType, reporterSchema)
+		require.NoError(t, err)
+		require.NoError(t, repo.CreateReporterSchema(ctx, reporterRepresentation))
+
+		sc := model.NewSchemaService(repo, log.NewHelper(log.DefaultLogger))
+
+		// Previous state: workspace A
+		prevVer := model.NewVersion(0)
+		prevRep, err := model.NewRepresentations(
+			model.Representation(map[string]interface{}{
+				"workspace_id": "workspace-old-id",
+			}),
+			&prevVer,
+			model.Representation(map[string]interface{}{
+				"fqdn": "old.example.com",
+			}),
+			&prevVer,
+		)
+		require.NoError(t, err)
+
+		// Current state: workspace B
+		curVer := model.NewVersion(1)
+		curRep, err := model.NewRepresentations(
+			model.Representation(map[string]interface{}{
+				"workspace_id": "workspace-new-id",
+			}),
+			&curVer,
+			model.Representation(map[string]interface{}{
+				"fqdn": "new.example.com",
+			}),
+			&curVer,
+		)
+		require.NoError(t, err)
+
+		result, err := sc.CalculateTuplesForResource(ctx, curRep, prevRep, key)
+		require.NoError(t, err)
+
+		require.True(t, result.HasTuplesToCreate(), "should have tuples to create")
+		require.True(t, result.HasTuplesToDelete(), "should have tuples to delete")
+
+		creates := *result.TuplesToCreate()
+		deletes := *result.TuplesToDelete()
+
+		// Should have exactly 1 create and 1 delete (not 2 each due to duplication)
+		assert.Len(t, creates, 1, "should have exactly 1 create tuple")
+		assert.Len(t, deletes, 1, "should have exactly 1 delete tuple")
+
+		// Verify the new tuple is created
+		createTuple := creates[0]
+		assert.Equal(t, "workspace-new-id", createTuple.Subject().Resource().ResourceId().Serialize())
+
+		// Verify the old tuple is deleted
+		deleteTuple := deletes[0]
+		assert.Equal(t, "workspace-old-id", deleteTuple.Subject().Resource().ResourceId().Serialize())
+	})
+}

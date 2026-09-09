@@ -16,11 +16,30 @@ objects:
           authenticator:
             type: first_match
             chain:
+              - type: oidc
+                enable: true
+                transport:
+                  http: false
+                  grpc: true
+                config:
+                  authn-server-url: >-
+                    ${SSO_SERVER_URL}/auth/realms/redhat-external
+                  # Ephemeral callers use dynamically-created SSO clients.
+                  skip-client-id-check: true
+                  principal-user-domain: redhat.com
+                  grpc-endpoints:
+                    - "/kessel.inventory.v1beta2.KesselTupleService/CreateTuples"
+                    - "/kessel.inventory.v1beta2.KesselTupleService/DeleteTuples"
+                    - "/kessel.inventory.v1beta2.KesselTupleService/ReadTuples"
+                    - "/kessel.inventory.v1beta2.KesselTupleService/AcquireLock"
               - type: x-rh-identity
                 transport:
                   http: true
                   grpc: false
               - type: allow-unauthenticated
+        metaauthorizer:
+          tuple-crud-allowlist:
+            - "${TUPLE_CRUD_CLIENT_ID}"
         authz:
           kessel:
             insecure-client: true
@@ -33,7 +52,7 @@ objects:
           redhatRbacSelfSubjectStrategy:
             enabled: true
             issuerDomain: redhat
-            # oidcIssuerDomains is unused in ephemeral (no OIDC in the authn chain) but required by validation
+            # Retained for validation; tuple CRUD authn is endpoint-scoped.
             oidcIssuerDomains:
               - iss: https://not-used.example.com
                 domain: redhat
@@ -312,6 +331,12 @@ parameters:
   - name: AUTHZ_IMPL
     description: Authz implementation (allow-all, kessel, spicedb)
     value: "spicedb"
+  - name: SSO_SERVER_URL
+    description: Base URL for the ephemeral Keycloak endpoint
+    value: http://keycloak:8080
+  - name: TUPLE_CRUD_CLIENT_ID
+    description: OIDC client ID or '*' for tuple CRUD endpoints
+    value: "*"
   - name: SCHEMA_INIT_IMAGE
     description: Image for the schema init container
     value: registry.access.redhat.com/ubi9/ubi-minimal:latest

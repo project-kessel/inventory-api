@@ -286,68 +286,108 @@ func (r *resourceRepository) GetTransactionManager() bizmodel.TransactionManager
 	return r.transactionManager
 }
 
-func (r *resourceRepository) FindCurrentAndPreviousVersionedRepresentations(tx *gorm.DB, key bizmodel.ReporterResourceKey, currentCommonVersion *bizmodel.Version, operationType bizmodel.EventOperationType) (*bizmodel.Representations, *bizmodel.Representations, error) {
-	if currentCommonVersion == nil {
-		return nil, nil, nil
+func (r *resourceRepository) FindCurrentAndPreviousVersionedRepresentations(
+	tx *gorm.DB,
+	key bizmodel.ReporterResourceKey,
+	currentCommonVersion *bizmodel.Version,
+	currentReporterVersion *bizmodel.Version,
+	operationType bizmodel.EventOperationType,
+) (*bizmodel.Representations, *bizmodel.Representations, error) {
+	// Guard against both versions being nil (should not happen per TupleEvent invariant)
+	if currentCommonVersion == nil && currentReporterVersion == nil {
+		return nil, nil, fmt.Errorf("at least one version must be provided")
 	}
-
-	type commonRepresentationRow struct {
-		Data                       internal.JsonObject
-		Version                    uint
-		ResourceId                 uuid.UUID
-		ReportedByReporterType     string
-		ReportedByReporterInstance string
-		TransactionId              string
-	}
-
-	var results []commonRepresentationRow
 
 	db := r.getDBSession(tx)
 
-	query := db.Table("reporter_resources rr").
-		Select("cr.data, cr.version, cr.resource_id, cr.reported_by_reporter_type, cr.reported_by_reporter_instance, cr.transaction_id").
-		Joins("JOIN common_representations cr ON rr.resource_id = cr.resource_id")
+	// Determine which streams advanced and fetch current/previous for each
+	var currentCommon, previousCommon bizmodel.Representation
+	var currentCommonVer, previousCommonVer *bizmodel.Version
 
-	query = r.buildReporterResourceKeyQuery(query, key)
+	var currentReporter, previousReporter bizmodel.Representation
+	var currentReporterVer, previousReporterVer *bizmodel.Version
 
-	cv := currentCommonVersion.Uint()
-	if operationType.OperationType() == bizmodel.OperationTypeCreated {
-		query = query.Where("cr.version = ?", cv)
-	} else {
-		query = query.Where("(cr.version = ? OR cr.version = ?)", cv, cv-1)
-	}
-
-	err := query.Find(&results).Error
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to find common representations by version: %w", err)
-	}
-
-	var current, previous *bizmodel.Representations
-	for _, row := range results {
-		v := bizmodel.NewVersion(row.Version)
-		rep, err := bizmodel.NewRepresentations(bizmodel.Representation(row.Data), &v, nil, nil)
-		if err != nil {
-			return nil, nil, fmt.Errorf("failed to create representation: %w", err)
+	// Fetch common stream
+	if currentCommonVersion != nil {
+		// Common stream advanced
+		cv := currentCommonVersion.Uint()
+		currentCommon, currentCommonVer = r.fetchCommonRepresentation(db, key, cv)
+		if operationType.OperationType() != bizmodel.OperationTypeCreated && cv > 0 {
+			previousCommon, previousCommonVer = r.fetchCommonRepresentation(db, key, cv-1)
 		}
+	} else {
+		// Common stream didn't advance - use latest for both current and previous
+		currentCommon, currentCommonVer = r.fetchLatestCommonRepresentation(db, key)
+		previousCommon, previousCommonVer = currentCommon, currentCommonVer
+	}
 
-		if row.Version == cv {
-			current = rep
-		} else if cv > 0 && row.Version == cv-1 {
-			previous = rep
+	// Fetch reporter stream
+	if currentReporterVersion != nil {
+		// Reporter stream advanced
+		rv := currentReporterVersion.Uint()
+		currentReporter, currentReporterVer = r.fetchReporterRepresentation(db, key, rv)
+		if operationType.OperationType() != bizmodel.OperationTypeCreated && rv > 0 {
+			// Fetch immediately preceding reporter row (by version DESC, generation DESC)
+			previousReporter, previousReporterVer = r.fetchPreviousReporterRepresentation(db, key, rv)
+		}
+	} else {
+		// Reporter stream didn't advance - use latest for both current and previous
+		currentReporter, currentReporterVer = r.fetchLatestReporterRepresentation(db, key)
+		previousReporter, previousReporterVer = currentReporter, currentReporterVer
+	}
+
+	// Build current and previous Representations
+	var current, previous *bizmodel.Representations
+	var err error
+
+	current, err = bizmodel.NewRepresentations(currentCommon, currentCommonVer, currentReporter, currentReporterVer)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to create current representation: %w", err)
+	}
+
+	// Only build previous if at least one stream has data
+	if len(previousCommon) > 0 || len(previousReporter) > 0 {
+		previous, err = bizmodel.NewRepresentations(previousCommon, previousCommonVer, previousReporter, previousReporterVer)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to create previous representation: %w", err)
 		}
 	}
 
 	return current, previous, nil
 }
 
-func (r *resourceRepository) FindLatestRepresentations(tx *gorm.DB, key bizmodel.ReporterResourceKey) (*bizmodel.Representations, error) {
-	var result struct {
+// fetchCommonRepresentation fetches a common representation at a specific version
+func (r *resourceRepository) fetchCommonRepresentation(db *gorm.DB, key bizmodel.ReporterResourceKey, version uint) (bizmodel.Representation, *bizmodel.Version) {
+	type commonRepresentationRow struct {
 		Data    internal.JsonObject
 		Version uint
 	}
 
-	db := r.getDBSession(tx)
+	var result commonRepresentationRow
+	query := db.Table("reporter_resources rr").
+		Select("cr.data, cr.version").
+		Joins("JOIN common_representations cr ON rr.resource_id = cr.resource_id")
 
+	query = r.buildReporterResourceKeyQuery(query, key)
+	query = query.Where("cr.version = ?", version)
+
+	err := query.Limit(1).Scan(&result).Error
+	if err != nil || len(result.Data) == 0 {
+		return nil, nil
+	}
+
+	v := bizmodel.NewVersion(result.Version)
+	return bizmodel.Representation(result.Data), &v
+}
+
+// fetchLatestCommonRepresentation fetches the latest common representation
+func (r *resourceRepository) fetchLatestCommonRepresentation(db *gorm.DB, key bizmodel.ReporterResourceKey) (bizmodel.Representation, *bizmodel.Version) {
+	type commonRepresentationRow struct {
+		Data    internal.JsonObject
+		Version uint
+	}
+
+	var result commonRepresentationRow
 	query := db.Table("reporter_resources rr").
 		Select("cr.data, cr.version").
 		Joins("JOIN common_representations cr ON rr.resource_id = cr.resource_id")
@@ -355,17 +395,94 @@ func (r *resourceRepository) FindLatestRepresentations(tx *gorm.DB, key bizmodel
 	query = r.buildReporterResourceKeyQuery(query, key)
 
 	err := query.Order("cr.version DESC").Limit(1).Scan(&result).Error
-	if err != nil {
-		return nil, fmt.Errorf("failed to find latest representations: %w", err)
+	if err != nil || len(result.Data) == 0 {
+		return nil, nil
 	}
 
 	v := bizmodel.NewVersion(result.Version)
-	rep, err := bizmodel.NewRepresentations(
-		bizmodel.Representation(result.Data),
-		&v,
-		nil,
-		nil,
-	)
+	return bizmodel.Representation(result.Data), &v
+}
+
+// fetchReporterRepresentation fetches a reporter representation at a specific version
+func (r *resourceRepository) fetchReporterRepresentation(db *gorm.DB, key bizmodel.ReporterResourceKey, version uint) (bizmodel.Representation, *bizmodel.Version) {
+	type reporterRepresentationRow struct {
+		Data    internal.JsonObject
+		Version uint
+	}
+
+	var result reporterRepresentationRow
+	query := db.Table("reporter_resources rr").
+		Select("rrep.data, rrep.version").
+		Joins("JOIN reporter_representations rrep ON rr.id = rrep.reporter_resource_id")
+
+	query = r.buildReporterResourceKeyQuery(query, key)
+	query = query.Where("rrep.version = ?", version)
+
+	err := query.Order("rrep.generation DESC").Limit(1).Scan(&result).Error
+	if err != nil || len(result.Data) == 0 {
+		return nil, nil
+	}
+
+	v := bizmodel.NewVersion(result.Version)
+	return bizmodel.Representation(result.Data), &v
+}
+
+// fetchPreviousReporterRepresentation fetches the reporter representation immediately before the given version
+func (r *resourceRepository) fetchPreviousReporterRepresentation(db *gorm.DB, key bizmodel.ReporterResourceKey, currentVersion uint) (bizmodel.Representation, *bizmodel.Version) {
+	type reporterRepresentationRow struct {
+		Data    internal.JsonObject
+		Version uint
+	}
+
+	var result reporterRepresentationRow
+	query := db.Table("reporter_resources rr").
+		Select("rrep.data, rrep.version").
+		Joins("JOIN reporter_representations rrep ON rr.id = rrep.reporter_resource_id")
+
+	query = r.buildReporterResourceKeyQuery(query, key)
+	query = query.Where("rrep.version < ?", currentVersion)
+
+	err := query.Order("rrep.version DESC, rrep.generation DESC").Limit(1).Scan(&result).Error
+	if err != nil || len(result.Data) == 0 {
+		return nil, nil
+	}
+
+	v := bizmodel.NewVersion(result.Version)
+	return bizmodel.Representation(result.Data), &v
+}
+
+// fetchLatestReporterRepresentation fetches the latest reporter representation
+func (r *resourceRepository) fetchLatestReporterRepresentation(db *gorm.DB, key bizmodel.ReporterResourceKey) (bizmodel.Representation, *bizmodel.Version) {
+	type reporterRepresentationRow struct {
+		Data    internal.JsonObject
+		Version uint
+	}
+
+	var result reporterRepresentationRow
+	query := db.Table("reporter_resources rr").
+		Select("rrep.data, rrep.version").
+		Joins("JOIN reporter_representations rrep ON rr.id = rrep.reporter_resource_id")
+
+	query = r.buildReporterResourceKeyQuery(query, key)
+
+	err := query.Order("rrep.version DESC, rrep.generation DESC").Limit(1).Scan(&result).Error
+	if err != nil || len(result.Data) == 0 {
+		return nil, nil
+	}
+
+	v := bizmodel.NewVersion(result.Version)
+	return bizmodel.Representation(result.Data), &v
+}
+
+func (r *resourceRepository) FindLatestRepresentations(tx *gorm.DB, key bizmodel.ReporterResourceKey) (*bizmodel.Representations, error) {
+	db := r.getDBSession(tx)
+
+	// Fetch latest from both streams
+	commonData, commonVersion := r.fetchLatestCommonRepresentation(db, key)
+	reporterData, reporterVersion := r.fetchLatestReporterRepresentation(db, key)
+
+	// Build representation from whatever streams exist
+	rep, err := bizmodel.NewRepresentations(commonData, commonVersion, reporterData, reporterVersion)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create representation: %w", err)
 	}

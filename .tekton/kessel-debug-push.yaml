@@ -2,6 +2,7 @@ apiVersion: tekton.dev/v1
 kind: PipelineRun
 metadata:
   annotations:
+    test.appstudio.openshift.io/ignore-supersession: "true"
     build.appstudio.openshift.io/repo: https://github.com/project-kessel/inventory-api?rev={{revision}}
     build.appstudio.redhat.com/commit_sha: '{{revision}}'
     build.appstudio.redhat.com/target_branch: '{{target_branch}}'

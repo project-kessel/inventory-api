@@ -253,9 +253,16 @@ func (f *fakeResourceRepository) FindResourceByKeys(tx *gorm.DB, key bizmodel.Re
 	return nil, gorm.ErrRecordNotFound
 }
 
-func (f *fakeResourceRepository) FindCurrentAndPreviousVersionedRepresentations(tx *gorm.DB, key bizmodel.ReporterResourceKey, currentVersion *bizmodel.Version, operationType bizmodel.EventOperationType) (*bizmodel.Representations, *bizmodel.Representations, error) {
-	if currentVersion == nil {
-		return nil, nil, nil
+func (f *fakeResourceRepository) FindCurrentAndPreviousVersionedRepresentations(
+	tx *gorm.DB,
+	key bizmodel.ReporterResourceKey,
+	currentCommonVersion *bizmodel.Version,
+	currentReporterVersion *bizmodel.Version,
+	operationType bizmodel.EventOperationType,
+) (*bizmodel.Representations, *bizmodel.Representations, error) {
+	// Guard against both versions being nil
+	if currentCommonVersion == nil && currentReporterVersion == nil {
+		return nil, nil, fmt.Errorf("at least one version must be provided")
 	}
 
 	historyKey := f.makeHistoryKey(
@@ -273,7 +280,12 @@ func (f *fakeResourceRepository) FindCurrentAndPreviousVersionedRepresentations(
 		return nil, nil, fmt.Errorf("no representations found for key")
 	}
 
-	cv := currentVersion.Uint()
+	// Fake repo only tracks common data currently - reporter stream support TBD
+	if currentCommonVersion == nil {
+		return nil, nil, nil
+	}
+
+	cv := currentCommonVersion.Uint()
 	var current *bizmodel.Representations
 	var previous *bizmodel.Representations
 

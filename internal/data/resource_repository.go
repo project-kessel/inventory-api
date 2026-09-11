@@ -1,6 +1,7 @@
 package data
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
@@ -8,7 +9,7 @@ import (
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
-	"github.com/go-kratos/kratos/v2/errors"
+	kratosErrors "github.com/go-kratos/kratos/v2/errors"
 	"github.com/project-kessel/inventory-api/internal"
 	bizmodel "github.com/project-kessel/inventory-api/internal/biz/model"
 	"github.com/project-kessel/inventory-api/internal/biz/model_legacy"
@@ -151,7 +152,7 @@ func (r *resourceRepository) Save(tx *gorm.DB, resource bizmodel.Resource, opera
 		dataReporterRepresentation := datamodel.DeserializeReporterRepresentationFromSnapshot(*reporterRepresentationSnapshot)
 		if err := tx.Create(&dataReporterRepresentation).Error; err != nil {
 			if errors.Is(err, gorm.ErrDuplicatedKey) {
-				return errors.BadRequest(bizmodel.ReasonNonUniqueTransactionID, err.Error()).WithCause(err)
+				return kratosErrors.BadRequest(bizmodel.ReasonNonUniqueTransactionID, err.Error()).WithCause(err)
 			}
 			return fmt.Errorf("failed to save reporter representation: %w", err)
 		}
@@ -161,7 +162,7 @@ func (r *resourceRepository) Save(tx *gorm.DB, resource bizmodel.Resource, opera
 		dataCommonRepresentation := datamodel.DeserializeCommonRepresentationFromSnapshot(*commonRepresentationSnapshot)
 		if err := tx.Create(&dataCommonRepresentation).Error; err != nil {
 			if errors.Is(err, gorm.ErrDuplicatedKey) {
-				return errors.BadRequest(bizmodel.ReasonNonUniqueTransactionID, err.Error()).WithCause(err)
+				return kratosErrors.BadRequest(bizmodel.ReasonNonUniqueTransactionID, err.Error()).WithCause(err)
 			}
 			return fmt.Errorf("failed to save common representation: %w", err)
 		}
@@ -293,15 +294,15 @@ type sqlRepresentationFetcher struct {
 	repo *resourceRepository
 }
 
-func (s *sqlRepresentationFetcher) fetchCommon(version uint) (bizmodel.Representation, *bizmodel.Version) {
+func (s *sqlRepresentationFetcher) fetchCommon(version uint) (bizmodel.Representation, *bizmodel.Version, error) {
 	return s.repo.fetchCommonRepresentation(s.db, s.key, version)
 }
 
-func (s *sqlRepresentationFetcher) fetchReporter(version uint) (bizmodel.Representation, *bizmodel.Version) {
+func (s *sqlRepresentationFetcher) fetchReporter(version uint) (bizmodel.Representation, *bizmodel.Version, error) {
 	return s.repo.fetchReporterRepresentation(s.db, s.key, version)
 }
 
-func (s *sqlRepresentationFetcher) fetchPreviousReporter(currentVersion uint) (bizmodel.Representation, *bizmodel.Version) {
+func (s *sqlRepresentationFetcher) fetchPreviousReporter(currentVersion uint) (bizmodel.Representation, *bizmodel.Version, error) {
 	return s.repo.fetchPreviousReporterRepresentation(s.db, s.key, currentVersion)
 }
 
@@ -318,7 +319,7 @@ func (r *resourceRepository) FindCurrentAndPreviousVersionedRepresentations(
 }
 
 // fetchCommonRepresentation fetches a common representation at a specific version
-func (r *resourceRepository) fetchCommonRepresentation(db *gorm.DB, key bizmodel.ReporterResourceKey, version uint) (bizmodel.Representation, *bizmodel.Version) {
+func (r *resourceRepository) fetchCommonRepresentation(db *gorm.DB, key bizmodel.ReporterResourceKey, version uint) (bizmodel.Representation, *bizmodel.Version, error) {
 	type commonRepresentationRow struct {
 		Data    internal.JsonObject
 		Version uint
@@ -333,16 +334,24 @@ func (r *resourceRepository) fetchCommonRepresentation(db *gorm.DB, key bizmodel
 	query = query.Where("cr.version = ?", version)
 
 	err := query.Limit(1).Scan(&result).Error
-	if err != nil || len(result.Data) == 0 {
-		return nil, nil
+	if err != nil {
+		// ErrRecordNotFound is expected when the representation doesn't exist
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil, nil
+		}
+		return nil, nil, fmt.Errorf("database error fetching common representation: %w", err)
+	}
+	// Empty data also means "not found"
+	if len(result.Data) == 0 {
+		return nil, nil, nil
 	}
 
 	v := bizmodel.NewVersion(result.Version)
-	return bizmodel.Representation(result.Data), &v
+	return bizmodel.Representation(result.Data), &v, nil
 }
 
 // fetchLatestCommonRepresentation fetches the latest common representation
-func (r *resourceRepository) fetchLatestCommonRepresentation(db *gorm.DB, key bizmodel.ReporterResourceKey) (bizmodel.Representation, *bizmodel.Version) {
+func (r *resourceRepository) fetchLatestCommonRepresentation(db *gorm.DB, key bizmodel.ReporterResourceKey) (bizmodel.Representation, *bizmodel.Version, error) {
 	type commonRepresentationRow struct {
 		Data    internal.JsonObject
 		Version uint
@@ -356,16 +365,24 @@ func (r *resourceRepository) fetchLatestCommonRepresentation(db *gorm.DB, key bi
 	query = r.buildReporterResourceKeyQuery(query, key)
 
 	err := query.Order("cr.version DESC").Limit(1).Scan(&result).Error
-	if err != nil || len(result.Data) == 0 {
-		return nil, nil
+	if err != nil {
+		// ErrRecordNotFound is expected when the representation doesn't exist
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil, nil
+		}
+		return nil, nil, fmt.Errorf("database error fetching latest common representation: %w", err)
+	}
+	// Empty data also means "not found"
+	if len(result.Data) == 0 {
+		return nil, nil, nil
 	}
 
 	v := bizmodel.NewVersion(result.Version)
-	return bizmodel.Representation(result.Data), &v
+	return bizmodel.Representation(result.Data), &v, nil
 }
 
 // fetchReporterRepresentation fetches a reporter representation at a specific version
-func (r *resourceRepository) fetchReporterRepresentation(db *gorm.DB, key bizmodel.ReporterResourceKey, version uint) (bizmodel.Representation, *bizmodel.Version) {
+func (r *resourceRepository) fetchReporterRepresentation(db *gorm.DB, key bizmodel.ReporterResourceKey, version uint) (bizmodel.Representation, *bizmodel.Version, error) {
 	type reporterRepresentationRow struct {
 		Data    internal.JsonObject
 		Version uint
@@ -380,17 +397,25 @@ func (r *resourceRepository) fetchReporterRepresentation(db *gorm.DB, key bizmod
 	query = query.Where("rrep.version = ?", version)
 
 	err := query.Order("rrep.generation DESC").Limit(1).Scan(&result).Error
-	if err != nil || len(result.Data) == 0 {
-		return nil, nil
+	if err != nil {
+		// ErrRecordNotFound is expected when the representation doesn't exist
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil, nil
+		}
+		return nil, nil, fmt.Errorf("database error fetching reporter representation: %w", err)
+	}
+	// Empty data also means "not found"
+	if len(result.Data) == 0 {
+		return nil, nil, nil
 	}
 
 	v := bizmodel.NewVersion(result.Version)
-	return bizmodel.Representation(result.Data), &v
+	return bizmodel.Representation(result.Data), &v, nil
 }
 
 // fetchPreviousReporterRepresentation fetches the reporter representation immediately before the given version.
 // This handles both normal updates (previous version in same generation) and revivals (tombstone in previous generation).
-func (r *resourceRepository) fetchPreviousReporterRepresentation(db *gorm.DB, key bizmodel.ReporterResourceKey, currentVersion uint) (bizmodel.Representation, *bizmodel.Version) {
+func (r *resourceRepository) fetchPreviousReporterRepresentation(db *gorm.DB, key bizmodel.ReporterResourceKey, currentVersion uint) (bizmodel.Representation, *bizmodel.Version, error) {
 	type reporterRepresentationRow struct {
 		Data    internal.JsonObject
 		Version uint
@@ -412,16 +437,24 @@ func (r *resourceRepository) fetchPreviousReporterRepresentation(db *gorm.DB, ke
 
 	// Order by generation first, then version, to properly handle generation boundaries
 	err := query.Order("rrep.generation DESC, rrep.version DESC").Limit(1).Scan(&result).Error
-	if err != nil || len(result.Data) == 0 {
-		return nil, nil
+	if err != nil {
+		// ErrRecordNotFound is expected when the representation doesn't exist
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil, nil
+		}
+		return nil, nil, fmt.Errorf("database error fetching previous reporter representation: %w", err)
+	}
+	// Empty data also means "not found"
+	if len(result.Data) == 0 {
+		return nil, nil, nil
 	}
 
 	v := bizmodel.NewVersion(result.Version)
-	return bizmodel.Representation(result.Data), &v
+	return bizmodel.Representation(result.Data), &v, nil
 }
 
 // fetchLatestReporterRepresentation fetches the latest reporter representation
-func (r *resourceRepository) fetchLatestReporterRepresentation(db *gorm.DB, key bizmodel.ReporterResourceKey) (bizmodel.Representation, *bizmodel.Version) {
+func (r *resourceRepository) fetchLatestReporterRepresentation(db *gorm.DB, key bizmodel.ReporterResourceKey) (bizmodel.Representation, *bizmodel.Version, error) {
 	type reporterRepresentationRow struct {
 		Data    internal.JsonObject
 		Version uint
@@ -435,20 +468,35 @@ func (r *resourceRepository) fetchLatestReporterRepresentation(db *gorm.DB, key 
 	query = r.buildReporterResourceKeyQuery(query, key)
 
 	err := query.Order("rrep.version DESC, rrep.generation DESC").Limit(1).Scan(&result).Error
-	if err != nil || len(result.Data) == 0 {
-		return nil, nil
+	if err != nil {
+		// ErrRecordNotFound is expected when the representation doesn't exist
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil, nil
+		}
+		return nil, nil, fmt.Errorf("database error fetching latest reporter representation: %w", err)
+	}
+	// Empty data also means "not found"
+	if len(result.Data) == 0 {
+		return nil, nil, nil
 	}
 
 	v := bizmodel.NewVersion(result.Version)
-	return bizmodel.Representation(result.Data), &v
+	return bizmodel.Representation(result.Data), &v, nil
 }
 
 func (r *resourceRepository) FindLatestRepresentations(tx *gorm.DB, key bizmodel.ReporterResourceKey) (*bizmodel.Representations, error) {
 	db := r.getDBSession(tx)
 
 	// Fetch latest from both streams
-	commonData, commonVersion := r.fetchLatestCommonRepresentation(db, key)
-	reporterData, reporterVersion := r.fetchLatestReporterRepresentation(db, key)
+	commonData, commonVersion, err := r.fetchLatestCommonRepresentation(db, key)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch latest common representation: %w", err)
+	}
+
+	reporterData, reporterVersion, err := r.fetchLatestReporterRepresentation(db, key)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch latest reporter representation: %w", err)
+	}
 
 	// Build representation from whatever streams exist
 	rep, err := bizmodel.NewRepresentations(commonData, commonVersion, reporterData, reporterVersion)

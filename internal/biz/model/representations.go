@@ -65,6 +65,11 @@ func (r *Representations) HasCommon() bool {
 	return len(r.commonData) > 0 && r.commonVersion != nil
 }
 
+// ReporterData returns the reporter representation data, or nil if not present.
+func (r *Representations) ReporterData() Representation {
+	return r.reporterData
+}
+
 // ReporterRepresentationVersion returns a pointer to the reporter representation version, or nil if not present.
 func (r *Representations) ReporterRepresentationVersion() *Version {
 	return r.reporterRepresentationVersion

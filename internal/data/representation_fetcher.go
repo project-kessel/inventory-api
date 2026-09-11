@@ -10,9 +10,9 @@ import (
 // This abstraction allows both the real repository (SQL) and fake repository (in-memory)
 // to share the same control flow logic while using different storage backends.
 type representationFetcher interface {
-	fetchCommon(version uint) (bizmodel.Representation, *bizmodel.Version)
-	fetchReporter(version uint) (bizmodel.Representation, *bizmodel.Version)
-	fetchPreviousReporter(currentVersion uint) (bizmodel.Representation, *bizmodel.Version)
+	fetchCommon(version uint) (bizmodel.Representation, *bizmodel.Version, error)
+	fetchReporter(version uint) (bizmodel.Representation, *bizmodel.Version, error)
+	fetchPreviousReporter(currentVersion uint) (bizmodel.Representation, *bizmodel.Version, error)
 }
 
 // fetchCurrentAndPreviousRepresentations implements the common control flow for fetching
@@ -39,12 +39,20 @@ func fetchCurrentAndPreviousRepresentations(
 	var currentReporter, previousReporter bizmodel.Representation
 	var currentReporterVer, previousReporterVer *bizmodel.Version
 
+	var err error
+
 	// Fetch common stream - only if version is provided (stream advanced)
 	if currentCommonVersion != nil {
 		cv := currentCommonVersion.Uint()
-		currentCommon, currentCommonVer = fetcher.fetchCommon(cv)
+		currentCommon, currentCommonVer, err = fetcher.fetchCommon(cv)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to fetch current common representation: %w", err)
+		}
 		if operationType.OperationType() != bizmodel.OperationTypeCreated && cv > 0 {
-			previousCommon, previousCommonVer = fetcher.fetchCommon(cv - 1)
+			previousCommon, previousCommonVer, err = fetcher.fetchCommon(cv - 1)
+			if err != nil {
+				return nil, nil, fmt.Errorf("failed to fetch previous common representation: %w", err)
+			}
 		}
 	}
 	// else: common stream didn't advance - leave nil (don't fetch)
@@ -52,19 +60,24 @@ func fetchCurrentAndPreviousRepresentations(
 	// Fetch reporter stream - only if version is provided (stream advanced)
 	if currentReporterVersion != nil {
 		rv := currentReporterVersion.Uint()
-		currentReporter, currentReporterVer = fetcher.fetchReporter(rv)
+		currentReporter, currentReporterVer, err = fetcher.fetchReporter(rv)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to fetch current reporter representation: %w", err)
+		}
 		if operationType.OperationType() != bizmodel.OperationTypeCreated {
 			// Fetch immediately preceding reporter row (by generation DESC, version DESC)
 			// This handles both normal updates (previous version in same generation)
 			// and revivals (tombstone in previous generation, even when current version is 0)
-			previousReporter, previousReporterVer = fetcher.fetchPreviousReporter(rv)
+			previousReporter, previousReporterVer, err = fetcher.fetchPreviousReporter(rv)
+			if err != nil {
+				return nil, nil, fmt.Errorf("failed to fetch previous reporter representation: %w", err)
+			}
 		}
 	}
 	// else: reporter stream didn't advance - leave nil (don't fetch)
 
 	// Build current and previous Representations
 	var current, previous *bizmodel.Representations
-	var err error
 
 	current, err = bizmodel.NewRepresentations(currentCommon, currentCommonVer, currentReporter, currentReporterVer)
 	if err != nil {

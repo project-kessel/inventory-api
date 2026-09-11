@@ -286,6 +286,25 @@ func (r *resourceRepository) GetTransactionManager() bizmodel.TransactionManager
 	return r.transactionManager
 }
 
+// sqlRepresentationFetcher implements the representationFetcher interface using SQL queries.
+type sqlRepresentationFetcher struct {
+	db   *gorm.DB
+	key  bizmodel.ReporterResourceKey
+	repo *resourceRepository
+}
+
+func (s *sqlRepresentationFetcher) fetchCommon(version uint) (bizmodel.Representation, *bizmodel.Version) {
+	return s.repo.fetchCommonRepresentation(s.db, s.key, version)
+}
+
+func (s *sqlRepresentationFetcher) fetchReporter(version uint) (bizmodel.Representation, *bizmodel.Version) {
+	return s.repo.fetchReporterRepresentation(s.db, s.key, version)
+}
+
+func (s *sqlRepresentationFetcher) fetchPreviousReporter(currentVersion uint) (bizmodel.Representation, *bizmodel.Version) {
+	return s.repo.fetchPreviousReporterRepresentation(s.db, s.key, currentVersion)
+}
+
 func (r *resourceRepository) FindCurrentAndPreviousVersionedRepresentations(
 	tx *gorm.DB,
 	key bizmodel.ReporterResourceKey,
@@ -293,59 +312,9 @@ func (r *resourceRepository) FindCurrentAndPreviousVersionedRepresentations(
 	currentReporterVersion *bizmodel.Version,
 	operationType bizmodel.EventOperationType,
 ) (*bizmodel.Representations, *bizmodel.Representations, error) {
-	// Guard against both versions being nil (should not happen per TupleEvent invariant)
-	if currentCommonVersion == nil && currentReporterVersion == nil {
-		return nil, nil, fmt.Errorf("at least one version must be provided")
-	}
-
 	db := r.getDBSession(tx)
-
-	// Determine which streams advanced and fetch current/previous for each
-	var currentCommon, previousCommon bizmodel.Representation
-	var currentCommonVer, previousCommonVer *bizmodel.Version
-
-	var currentReporter, previousReporter bizmodel.Representation
-	var currentReporterVer, previousReporterVer *bizmodel.Version
-
-	// Fetch common stream - only if version is provided (stream advanced)
-	if currentCommonVersion != nil {
-		cv := currentCommonVersion.Uint()
-		currentCommon, currentCommonVer = r.fetchCommonRepresentation(db, key, cv)
-		if operationType.OperationType() != bizmodel.OperationTypeCreated && cv > 0 {
-			previousCommon, previousCommonVer = r.fetchCommonRepresentation(db, key, cv-1)
-		}
-	}
-	// else: common stream didn't advance - leave nil (don't fetch)
-
-	// Fetch reporter stream - only if version is provided (stream advanced)
-	if currentReporterVersion != nil {
-		rv := currentReporterVersion.Uint()
-		currentReporter, currentReporterVer = r.fetchReporterRepresentation(db, key, rv)
-		if operationType.OperationType() != bizmodel.OperationTypeCreated && rv > 0 {
-			// Fetch immediately preceding reporter row (by version DESC, generation DESC)
-			previousReporter, previousReporterVer = r.fetchPreviousReporterRepresentation(db, key, rv)
-		}
-	}
-	// else: reporter stream didn't advance - leave nil (don't fetch)
-
-	// Build current and previous Representations
-	var current, previous *bizmodel.Representations
-	var err error
-
-	current, err = bizmodel.NewRepresentations(currentCommon, currentCommonVer, currentReporter, currentReporterVer)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to create current representation: %w", err)
-	}
-
-	// Only build previous if at least one stream has data
-	if len(previousCommon) > 0 || len(previousReporter) > 0 {
-		previous, err = bizmodel.NewRepresentations(previousCommon, previousCommonVer, previousReporter, previousReporterVer)
-		if err != nil {
-			return nil, nil, fmt.Errorf("failed to create previous representation: %w", err)
-		}
-	}
-
-	return current, previous, nil
+	fetcher := &sqlRepresentationFetcher{db: db, key: key, repo: r}
+	return fetchCurrentAndPreviousRepresentations(fetcher, currentCommonVersion, currentReporterVersion, operationType)
 }
 
 // fetchCommonRepresentation fetches a common representation at a specific version

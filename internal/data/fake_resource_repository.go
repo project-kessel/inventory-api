@@ -276,6 +276,96 @@ func (f *fakeResourceRepository) FindResourceByKeys(tx *gorm.DB, key bizmodel.Re
 	return nil, gorm.ErrRecordNotFound
 }
 
+// inMemoryRepresentationFetcher implements the representationFetcher interface using in-memory maps.
+// findResourceIDs locates the resource_id and reporter_resource_id for a given ReporterResourceKey.
+// This mimics the JOIN on reporter_resources table in the real SQL implementation.
+func (f *fakeResourceRepository) findResourceIDs(key bizmodel.ReporterResourceKey) (resourceID, reporterResourceID uuid.UUID, found bool) {
+	for _, stored := range f.resourcesByPrimaryKey {
+		if strings.EqualFold(stored.localResourceID, key.LocalResourceId().Serialize()) &&
+			strings.EqualFold(stored.resourceType, key.ResourceType().Serialize()) &&
+			strings.EqualFold(stored.reporterType, key.ReporterType().Serialize()) {
+			searchReporterInstanceId := key.ReporterInstanceId().Serialize()
+			if searchReporterInstanceId == "" || strings.EqualFold(stored.reporterInstanceID, searchReporterInstanceId) {
+				return stored.resourceID, stored.reporterResourceID, true
+			}
+		}
+	}
+	return uuid.UUID{}, uuid.UUID{}, false
+}
+
+type inMemoryRepresentationFetcher struct {
+	resourceID         uuid.UUID
+	reporterResourceID uuid.UUID
+	commonReps         map[uint]*storedCommonRepresentation
+	reporterReps       map[uint]map[uint]*storedReporterRepresentation
+}
+
+func (m *inMemoryRepresentationFetcher) fetchCommon(version uint) (bizmodel.Representation, *bizmodel.Version) {
+	if m.commonReps == nil {
+		return nil, nil
+	}
+	if entry, ok := m.commonReps[version]; ok {
+		v := bizmodel.NewVersion(entry.version)
+		return bizmodel.Representation(cloneJsonObject(entry.data)), &v
+	}
+	return nil, nil
+}
+
+func (m *inMemoryRepresentationFetcher) fetchReporter(version uint) (bizmodel.Representation, *bizmodel.Version) {
+	if m.reporterReps == nil {
+		return nil, nil
+	}
+	// Find current reporter representation (highest generation at this version)
+	if generations, ok := m.reporterReps[version]; ok {
+		var maxGen uint
+		var maxEntry *storedReporterRepresentation
+		for gen, entry := range generations {
+			if maxEntry == nil || gen > maxGen {
+				maxGen = gen
+				maxEntry = entry
+			}
+		}
+		if maxEntry != nil {
+			v := bizmodel.NewVersion(maxEntry.version)
+			return bizmodel.Representation(cloneJsonObject(maxEntry.data)), &v
+		}
+	}
+	return nil, nil
+}
+
+func (m *inMemoryRepresentationFetcher) fetchPreviousReporter(currentVersion uint) (bizmodel.Representation, *bizmodel.Version) {
+	if m.reporterReps == nil {
+		return nil, nil
+	}
+	// Find previous reporter representation (immediately before current version/generation)
+	type versionGen struct {
+		version    uint
+		generation uint
+		entry      *storedReporterRepresentation
+	}
+	var allReps []versionGen
+	for v, generations := range m.reporterReps {
+		for g, entry := range generations {
+			allReps = append(allReps, versionGen{v, g, entry})
+		}
+	}
+	// Find max version/generation that is less than currentVersion
+	var maxRep *versionGen
+	for i := range allReps {
+		rep := &allReps[i]
+		if rep.version < currentVersion {
+			if maxRep == nil || rep.version > maxRep.version || (rep.version == maxRep.version && rep.generation > maxRep.generation) {
+				maxRep = rep
+			}
+		}
+	}
+	if maxRep != nil {
+		v := bizmodel.NewVersion(maxRep.entry.version)
+		return bizmodel.Representation(cloneJsonObject(maxRep.entry.data)), &v
+	}
+	return nil, nil
+}
+
 func (f *fakeResourceRepository) FindCurrentAndPreviousVersionedRepresentations(
 	tx *gorm.DB,
 	key bizmodel.ReporterResourceKey,
@@ -283,157 +373,29 @@ func (f *fakeResourceRepository) FindCurrentAndPreviousVersionedRepresentations(
 	currentReporterVersion *bizmodel.Version,
 	operationType bizmodel.EventOperationType,
 ) (*bizmodel.Representations, *bizmodel.Representations, error) {
-	// Guard against both versions being nil (should not happen per TupleEvent invariant)
-	if currentCommonVersion == nil && currentReporterVersion == nil {
-		return nil, nil, fmt.Errorf("at least one version must be provided")
-	}
-
 	f.mu.RLock()
 	defer f.mu.RUnlock()
 
-	// First find the reporter_resource_id and resource_id for this key
-	var reporterResourceID, resourceID uuid.UUID
-	var found bool
-	for _, stored := range f.resourcesByPrimaryKey {
-		if strings.EqualFold(stored.localResourceID, key.LocalResourceId().Serialize()) &&
-			strings.EqualFold(stored.resourceType, key.ResourceType().Serialize()) &&
-			strings.EqualFold(stored.reporterType, key.ReporterType().Serialize()) {
-			searchReporterInstanceId := key.ReporterInstanceId().Serialize()
-			if searchReporterInstanceId == "" || strings.EqualFold(stored.reporterInstanceID, searchReporterInstanceId) {
-				reporterResourceID = stored.reporterResourceID
-				resourceID = stored.resourceID
-				found = true
-				break
-			}
-		}
-	}
-
+	resourceID, reporterResourceID, found := f.findResourceIDs(key)
 	if !found {
 		return nil, nil, fmt.Errorf("resource not found for key")
 	}
 
-	// Fetch common stream - only if version is provided (stream advanced)
-	var currentCommon, previousCommon bizmodel.Representation
-	var currentCommonVer, previousCommonVer *bizmodel.Version
-
-	if currentCommonVersion != nil {
-		cv := currentCommonVersion.Uint()
-		if commonVersions, ok := f.commonRepresentationsByResource[resourceID]; ok {
-			if entry, ok := commonVersions[cv]; ok {
-				v := bizmodel.NewVersion(entry.version)
-				currentCommon = bizmodel.Representation(cloneJsonObject(entry.data))
-				currentCommonVer = &v
-			}
-
-			if operationType.OperationType() != bizmodel.OperationTypeCreated && cv > 0 {
-				if entry, ok := commonVersions[cv-1]; ok {
-					v := bizmodel.NewVersion(entry.version)
-					previousCommon = bizmodel.Representation(cloneJsonObject(entry.data))
-					previousCommonVer = &v
-				}
-			}
-		}
-	}
-	// else: common stream didn't advance - leave nil (don't fetch)
-
-	// Fetch reporter stream - only if version is provided (stream advanced)
-	var currentReporter, previousReporter bizmodel.Representation
-	var currentReporterVer, previousReporterVer *bizmodel.Version
-
-	if currentReporterVersion != nil {
-		rv := currentReporterVersion.Uint()
-		if reporterVersions, ok := f.reporterRepsByReporterResource[reporterResourceID]; ok {
-			// Find current reporter representation (highest generation at this version)
-			if generations, ok := reporterVersions[rv]; ok {
-				var maxGen uint
-				var maxEntry *storedReporterRepresentation
-				for gen, entry := range generations {
-					if maxEntry == nil || gen > maxGen {
-						maxGen = gen
-						maxEntry = entry
-					}
-				}
-				if maxEntry != nil {
-					v := bizmodel.NewVersion(maxEntry.version)
-					currentReporter = bizmodel.Representation(cloneJsonObject(maxEntry.data))
-					currentReporterVer = &v
-				}
-			}
-
-			// Find previous reporter representation (immediately before current version/generation)
-			if operationType.OperationType() != bizmodel.OperationTypeCreated && rv > 0 {
-				type versionGen struct {
-					version    uint
-					generation uint
-					entry      *storedReporterRepresentation
-				}
-				var allReps []versionGen
-				for v, generations := range reporterVersions {
-					for g, entry := range generations {
-						allReps = append(allReps, versionGen{v, g, entry})
-					}
-				}
-				// Sort descending by version, then generation
-				var maxRep *versionGen
-				for i := range allReps {
-					rep := &allReps[i]
-					if rep.version < rv || (rep.version == rv && rep.generation < allReps[len(allReps)-1].generation) {
-						if maxRep == nil || rep.version > maxRep.version || (rep.version == maxRep.version && rep.generation > maxRep.generation) {
-							maxRep = rep
-						}
-					}
-				}
-				if maxRep != nil {
-					v := bizmodel.NewVersion(maxRep.entry.version)
-					previousReporter = bizmodel.Representation(cloneJsonObject(maxRep.entry.data))
-					previousReporterVer = &v
-				}
-			}
-		}
-	}
-	// else: reporter stream didn't advance - leave nil (don't fetch)
-
-	// Build current and previous Representations
-	var current, previous *bizmodel.Representations
-	var err error
-
-	current, err = bizmodel.NewRepresentations(currentCommon, currentCommonVer, currentReporter, currentReporterVer)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to create current representation: %w", err)
+	fetcher := &inMemoryRepresentationFetcher{
+		resourceID:         resourceID,
+		reporterResourceID: reporterResourceID,
+		commonReps:         f.commonRepresentationsByResource[resourceID],
+		reporterReps:       f.reporterRepsByReporterResource[reporterResourceID],
 	}
 
-	// Only build previous if at least one stream has data
-	if len(previousCommon) > 0 || len(previousReporter) > 0 {
-		previous, err = bizmodel.NewRepresentations(previousCommon, previousCommonVer, previousReporter, previousReporterVer)
-		if err != nil {
-			return nil, nil, fmt.Errorf("failed to create previous representation: %w", err)
-		}
-	}
-
-	return current, previous, nil
+	return fetchCurrentAndPreviousRepresentations(fetcher, currentCommonVersion, currentReporterVersion, operationType)
 }
 
 func (f *fakeResourceRepository) FindLatestRepresentations(tx *gorm.DB, key bizmodel.ReporterResourceKey) (*bizmodel.Representations, error) {
 	f.mu.RLock()
 	defer f.mu.RUnlock()
 
-	// First find the reporter_resource_id and resource_id for this key
-	var reporterResourceID, resourceID uuid.UUID
-	var found bool
-	for _, stored := range f.resourcesByPrimaryKey {
-		if strings.EqualFold(stored.localResourceID, key.LocalResourceId().Serialize()) &&
-			strings.EqualFold(stored.resourceType, key.ResourceType().Serialize()) &&
-			strings.EqualFold(stored.reporterType, key.ReporterType().Serialize()) {
-			searchReporterInstanceId := key.ReporterInstanceId().Serialize()
-			if searchReporterInstanceId == "" || strings.EqualFold(stored.reporterInstanceID, searchReporterInstanceId) {
-				reporterResourceID = stored.reporterResourceID
-				resourceID = stored.resourceID
-				found = true
-				break
-			}
-		}
-	}
-
+	resourceID, reporterResourceID, found := f.findResourceIDs(key)
 	if !found {
 		return nil, fmt.Errorf("resource not found for key")
 	}

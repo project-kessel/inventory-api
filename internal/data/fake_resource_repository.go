@@ -300,20 +300,20 @@ type inMemoryRepresentationFetcher struct {
 	reporterReps       map[uint]map[uint]*storedReporterRepresentation
 }
 
-func (m *inMemoryRepresentationFetcher) fetchCommon(version uint) (bizmodel.Representation, *bizmodel.Version) {
+func (m *inMemoryRepresentationFetcher) fetchCommon(version uint) (bizmodel.Representation, *bizmodel.Version, error) {
 	if m.commonReps == nil {
-		return nil, nil
+		return nil, nil, nil
 	}
 	if entry, ok := m.commonReps[version]; ok {
 		v := bizmodel.NewVersion(entry.version)
-		return bizmodel.Representation(cloneJsonObject(entry.data)), &v
+		return bizmodel.Representation(cloneJsonObject(entry.data)), &v, nil
 	}
-	return nil, nil
+	return nil, nil, nil
 }
 
-func (m *inMemoryRepresentationFetcher) fetchReporter(version uint) (bizmodel.Representation, *bizmodel.Version) {
+func (m *inMemoryRepresentationFetcher) fetchReporter(version uint) (bizmodel.Representation, *bizmodel.Version, error) {
 	if m.reporterReps == nil {
-		return nil, nil
+		return nil, nil, nil
 	}
 	// Find current reporter representation (highest generation at this version)
 	if generations, ok := m.reporterReps[version]; ok {
@@ -327,15 +327,15 @@ func (m *inMemoryRepresentationFetcher) fetchReporter(version uint) (bizmodel.Re
 		}
 		if maxEntry != nil {
 			v := bizmodel.NewVersion(maxEntry.version)
-			return bizmodel.Representation(cloneJsonObject(maxEntry.data)), &v
+			return bizmodel.Representation(cloneJsonObject(maxEntry.data)), &v, nil
 		}
 	}
-	return nil, nil
+	return nil, nil, nil
 }
 
-func (m *inMemoryRepresentationFetcher) fetchPreviousReporter(currentVersion uint) (bizmodel.Representation, *bizmodel.Version) {
+func (m *inMemoryRepresentationFetcher) fetchPreviousReporter(currentVersion uint) (bizmodel.Representation, *bizmodel.Version, error) {
 	if m.reporterReps == nil {
-		return nil, nil
+		return nil, nil, nil
 	}
 	// Find previous reporter representation (immediately before current version/generation)
 	type versionGen struct {
@@ -361,9 +361,9 @@ func (m *inMemoryRepresentationFetcher) fetchPreviousReporter(currentVersion uin
 	}
 	if maxRep != nil {
 		v := bizmodel.NewVersion(maxRep.entry.version)
-		return bizmodel.Representation(cloneJsonObject(maxRep.entry.data)), &v
+		return bizmodel.Representation(cloneJsonObject(maxRep.entry.data)), &v, nil
 	}
-	return nil, nil
+	return nil, nil, nil
 }
 
 func (f *fakeResourceRepository) FindCurrentAndPreviousVersionedRepresentations(

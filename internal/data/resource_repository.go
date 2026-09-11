@@ -388,7 +388,8 @@ func (r *resourceRepository) fetchReporterRepresentation(db *gorm.DB, key bizmod
 	return bizmodel.Representation(result.Data), &v
 }
 
-// fetchPreviousReporterRepresentation fetches the reporter representation immediately before the given version
+// fetchPreviousReporterRepresentation fetches the reporter representation immediately before the given version.
+// This handles both normal updates (previous version in same generation) and revivals (tombstone in previous generation).
 func (r *resourceRepository) fetchPreviousReporterRepresentation(db *gorm.DB, key bizmodel.ReporterResourceKey, currentVersion uint) (bizmodel.Representation, *bizmodel.Version) {
 	type reporterRepresentationRow struct {
 		Data    internal.JsonObject
@@ -401,9 +402,16 @@ func (r *resourceRepository) fetchPreviousReporterRepresentation(db *gorm.DB, ke
 		Joins("JOIN reporter_representations rrep ON rr.id = rrep.reporter_resource_id")
 
 	query = r.buildReporterResourceKeyQuery(query, key)
-	query = query.Where("rrep.version < ?", currentVersion)
+	// Find either:
+	// 1. Previous version in the same generation (normal update)
+	// 2. Any version in a previous generation (revival after tombstone)
+	query = query.Where(`
+		(rrep.generation = rr.generation AND rrep.version < ?)
+		OR rrep.generation < rr.generation
+	`, currentVersion)
 
-	err := query.Order("rrep.version DESC, rrep.generation DESC").Limit(1).Scan(&result).Error
+	// Order by generation first, then version, to properly handle generation boundaries
+	err := query.Order("rrep.generation DESC, rrep.version DESC").Limit(1).Scan(&result).Error
 	if err != nil || len(result.Data) == 0 {
 		return nil, nil
 	}

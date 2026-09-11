@@ -69,8 +69,8 @@ func fetchCurrentAndPreviousRepresentations(
 		return nil, nil, fmt.Errorf("failed to create current representation: %w", err)
 	}
 
-	// Only build previous if at least one stream has data
-	if len(previousCommon) > 0 || len(previousReporter) > 0 {
+	// Only build previous if at least one stream advanced to a previous version
+	if previousCommonVer != nil || previousReporterVer != nil {
 		previous, err = bizmodel.NewRepresentations(previousCommon, previousCommonVer, previousReporter, previousReporterVer)
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to create previous representation: %w", err)

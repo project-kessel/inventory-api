@@ -15,13 +15,13 @@ import (
 
 type fakeResourceRepository struct {
 	mu                              sync.RWMutex
-	resourcesByPrimaryKey           map[uuid.UUID]*storedResource                                  // keyed by primary key (ResourceID) - simulates database primary storage
-	resourcesByCompositeKey         map[string]uuid.UUID                                           // composite key -> primary key mapping for unique constraint
-	resources                       map[string]*storedResource                                     // legacy field for backward compatibility
-	commonRepresentationsByResource map[uuid.UUID]map[uint]*storedCommonRepresentation             // keyed by resource_id -> version (simulates common_representations table)
+	resourcesByPrimaryKey           map[uuid.UUID]*storedResource                                 // keyed by primary key (ResourceID) - simulates database primary storage
+	resourcesByCompositeKey         map[string]uuid.UUID                                          // composite key -> primary key mapping for unique constraint
+	resources                       map[string]*storedResource                                    // legacy field for backward compatibility
+	commonRepresentationsByResource map[uuid.UUID]map[uint]*storedCommonRepresentation            // keyed by resource_id -> version (simulates common_representations table)
 	reporterRepsByReporterResource  map[uuid.UUID]map[uint]map[uint]*storedReporterRepresentation // keyed by reporter_resource_id -> version -> generation (simulates reporter_representations table)
-	processedTransactionIds         map[string]bool                                                // track processed transaction IDs for idempotency testing
-	maxCommonVersionByResourceID    map[uuid.UUID]*uint                                            // mirrors MAX(version) FROM common_representations WHERE resource_id = ?
+	processedTransactionIds         map[string]bool                                               // track processed transaction IDs for idempotency testing
+	maxCommonVersionByResourceID    map[uuid.UUID]*uint                                           // mirrors MAX(version) FROM common_representations WHERE resource_id = ?
 }
 
 type storedResource struct {

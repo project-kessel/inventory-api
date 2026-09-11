@@ -8,11 +8,26 @@ import (
 )
 
 func TestTupleEvent_NewTupleEvent_RequiresAtLeastOneVersion(t *testing.T) {
-	localResourceId, _ := NewLocalResourceId("test-resource")
-	resourceType, _ := NewResourceType("test-type")
-	reporterType, _ := NewReporterType("test-reporter")
-	reporterInstanceId, _ := NewReporterInstanceId("test-instance")
-	key, _ := NewReporterResourceKey(localResourceId, resourceType, reporterType, reporterInstanceId)
+	localResourceId, err := NewLocalResourceId("test-resource")
+	if err != nil {
+		t.Fatalf("failed to create local resource id: %v", err)
+	}
+	resourceType, err := NewResourceType("test-type")
+	if err != nil {
+		t.Fatalf("failed to create resource type: %v", err)
+	}
+	reporterType, err := NewReporterType("test-reporter")
+	if err != nil {
+		t.Fatalf("failed to create reporter type: %v", err)
+	}
+	reporterInstanceId, err := NewReporterInstanceId("test-instance")
+	if err != nil {
+		t.Fatalf("failed to create reporter instance id: %v", err)
+	}
+	key, err := NewReporterResourceKey(localResourceId, resourceType, reporterType, reporterInstanceId)
+	if err != nil {
+		t.Fatalf("failed to create reporter resource key: %v", err)
+	}
 
 	t.Run("valid with both versions", func(t *testing.T) {
 		commonVer := NewVersion(1)
@@ -52,11 +67,26 @@ func TestTupleEvent_NewTupleEvent_RequiresAtLeastOneVersion(t *testing.T) {
 }
 
 func TestTupleEvent_UnmarshalJSON_ValidatesInvariant(t *testing.T) {
-	localResourceId, _ := NewLocalResourceId("test-resource")
-	resourceType, _ := NewResourceType("test-type")
-	reporterType, _ := NewReporterType("test-reporter")
-	reporterInstanceId, _ := NewReporterInstanceId("test-instance")
-	key, _ := NewReporterResourceKey(localResourceId, resourceType, reporterType, reporterInstanceId)
+	localResourceId, err := NewLocalResourceId("test-resource")
+	if err != nil {
+		t.Fatalf("failed to create local resource id: %v", err)
+	}
+	resourceType, err := NewResourceType("test-type")
+	if err != nil {
+		t.Fatalf("failed to create resource type: %v", err)
+	}
+	reporterType, err := NewReporterType("test-reporter")
+	if err != nil {
+		t.Fatalf("failed to create reporter type: %v", err)
+	}
+	reporterInstanceId, err := NewReporterInstanceId("test-instance")
+	if err != nil {
+		t.Fatalf("failed to create reporter instance id: %v", err)
+	}
+	key, err := NewReporterResourceKey(localResourceId, resourceType, reporterType, reporterInstanceId)
+	if err != nil {
+		t.Fatalf("failed to create reporter resource key: %v", err)
+	}
 
 	t.Run("valid JSON with both versions", func(t *testing.T) {
 		commonVer := NewVersion(1)
@@ -166,11 +196,26 @@ func TestTupleEvent_UnmarshalJSON_ValidatesInvariant(t *testing.T) {
 }
 
 func TestTupleEvent_RoundTrip(t *testing.T) {
-	localResourceId, _ := NewLocalResourceId("test-resource")
-	resourceType, _ := NewResourceType("test-type")
-	reporterType, _ := NewReporterType("test-reporter")
-	reporterInstanceId, _ := NewReporterInstanceId(uuid.New().String())
-	key, _ := NewReporterResourceKey(localResourceId, resourceType, reporterType, reporterInstanceId)
+	localResourceId, err := NewLocalResourceId("test-resource")
+	if err != nil {
+		t.Fatalf("failed to create local resource id: %v", err)
+	}
+	resourceType, err := NewResourceType("test-type")
+	if err != nil {
+		t.Fatalf("failed to create resource type: %v", err)
+	}
+	reporterType, err := NewReporterType("test-reporter")
+	if err != nil {
+		t.Fatalf("failed to create reporter type: %v", err)
+	}
+	reporterInstanceId, err := NewReporterInstanceId(uuid.New().String())
+	if err != nil {
+		t.Fatalf("failed to create reporter instance id: %v", err)
+	}
+	key, err := NewReporterResourceKey(localResourceId, resourceType, reporterType, reporterInstanceId)
+	if err != nil {
+		t.Fatalf("failed to create reporter resource key: %v", err)
+	}
 	commonVer := NewVersion(5)
 	reporterVer := NewVersion(10)
 

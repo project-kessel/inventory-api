@@ -53,8 +53,10 @@ func fetchCurrentAndPreviousRepresentations(
 	if currentReporterVersion != nil {
 		rv := currentReporterVersion.Uint()
 		currentReporter, currentReporterVer = fetcher.fetchReporter(rv)
-		if operationType.OperationType() != bizmodel.OperationTypeCreated && rv > 0 {
-			// Fetch immediately preceding reporter row (by version DESC, generation DESC)
+		if operationType.OperationType() != bizmodel.OperationTypeCreated {
+			// Fetch immediately preceding reporter row (by generation DESC, version DESC)
+			// This handles both normal updates (previous version in same generation)
+			// and revivals (tombstone in previous generation, even when current version is 0)
 			previousReporter, previousReporterVer = fetcher.fetchPreviousReporter(rv)
 		}
 	}

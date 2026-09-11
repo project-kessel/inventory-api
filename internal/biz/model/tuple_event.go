@@ -73,6 +73,17 @@ func (te *TupleEvent) UnmarshalJSON(data []byte) error {
 		return err
 	}
 
+	// Validate required fields
+	if temp.ReporterResourceKey == (ReporterResourceKey{}) {
+		return fmt.Errorf("%w: reporterResourceKey", ErrEmpty)
+	}
+
+	// Enforce invariant: at least one version must be present
+	// This prevents poison messages (both versions nil) from blocking the Kafka partition
+	if temp.CommonVersion == nil && temp.ReporterRepresentationVersion == nil {
+		return fmt.Errorf("at least one version (commonVersion or reporterRepresentationVersion) must be present")
+	}
+
 	te.reporterResourceKey = temp.ReporterResourceKey
 	te.commonVersion = temp.CommonVersion
 	te.reporterRepresentationVersion = temp.ReporterRepresentationVersion

@@ -1,9 +1,10 @@
 package schema
 
 import (
-	"gorm.io/gorm"
+	"fmt"
 
 	"github.com/go-gormigrate/gormigrate/v2"
+	"gorm.io/gorm"
 )
 
 // ReporterRepCommonVersionNullable makes the common_version column nullable in reporter_representations
@@ -16,9 +17,7 @@ func ReporterRepCommonVersionNullable() *gormigrate.Migration {
 			return tx.Exec("ALTER TABLE reporter_representations ALTER COLUMN common_version DROP NOT NULL").Error
 		},
 		Rollback: func(tx *gorm.DB) error {
-			// Rollback: make common_version NOT NULL again
-			// This will fail if there are any NULL values in the column
-			return tx.Exec("ALTER TABLE reporter_representations ALTER COLUMN common_version SET NOT NULL").Error
+			return fmt.Errorf("irreversible migration: common_version has been made nullable to support reporter-only resources, and the database may contain legitimate NULL values that cannot be safely converted back to NOT NULL")
 		},
 	}
 }

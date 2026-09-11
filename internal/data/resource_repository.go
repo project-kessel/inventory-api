@@ -307,34 +307,26 @@ func (r *resourceRepository) FindCurrentAndPreviousVersionedRepresentations(
 	var currentReporter, previousReporter bizmodel.Representation
 	var currentReporterVer, previousReporterVer *bizmodel.Version
 
-	// Fetch common stream
+	// Fetch common stream - only if version is provided (stream advanced)
 	if currentCommonVersion != nil {
-		// Common stream advanced
 		cv := currentCommonVersion.Uint()
 		currentCommon, currentCommonVer = r.fetchCommonRepresentation(db, key, cv)
 		if operationType.OperationType() != bizmodel.OperationTypeCreated && cv > 0 {
 			previousCommon, previousCommonVer = r.fetchCommonRepresentation(db, key, cv-1)
 		}
-	} else {
-		// Common stream didn't advance - use latest for both current and previous
-		currentCommon, currentCommonVer = r.fetchLatestCommonRepresentation(db, key)
-		previousCommon, previousCommonVer = currentCommon, currentCommonVer
 	}
+	// else: common stream didn't advance - leave nil (don't fetch)
 
-	// Fetch reporter stream
+	// Fetch reporter stream - only if version is provided (stream advanced)
 	if currentReporterVersion != nil {
-		// Reporter stream advanced
 		rv := currentReporterVersion.Uint()
 		currentReporter, currentReporterVer = r.fetchReporterRepresentation(db, key, rv)
 		if operationType.OperationType() != bizmodel.OperationTypeCreated && rv > 0 {
 			// Fetch immediately preceding reporter row (by version DESC, generation DESC)
 			previousReporter, previousReporterVer = r.fetchPreviousReporterRepresentation(db, key, rv)
 		}
-	} else {
-		// Reporter stream didn't advance - use latest for both current and previous
-		currentReporter, currentReporterVer = r.fetchLatestReporterRepresentation(db, key)
-		previousReporter, previousReporterVer = currentReporter, currentReporterVer
 	}
+	// else: reporter stream didn't advance - leave nil (don't fetch)
 
 	// Build current and previous Representations
 	var current, previous *bizmodel.Representations

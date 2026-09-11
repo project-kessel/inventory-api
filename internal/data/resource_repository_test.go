@@ -2599,6 +2599,85 @@ func TestFindCurrentAndPreviousVersionedRepresentations_TwoStreamScenarios(t *te
 	})
 }
 
+// TestFindCurrentAndPreviousVersionedRepresentations_TombstoneRevival tests that
+// fetching previous reporter representation works correctly when a resource is
+// deleted and then revived (tombstone → new generation with version reset to 0).
+func TestFindCurrentAndPreviousVersionedRepresentations_TombstoneRevival(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping test requiring SpiceDB Docker container")
+	}
+
+	db := setupInMemoryDB(t)
+	mc := metricscollector.NewFakeMetricsCollector()
+	tm := NewGormTransactionManager(mc, 3)
+	repo := NewResourceRepository(db, tm, noopOutboxPublisher())
+
+	// Create reporter-only resource (no common representation)
+	resource, key := createResourceNoCommon(t, "revival-test")
+	require.NoError(t, repo.Save(db, resource, bizmodel.OperationTypeCreated, emptyTxId))
+
+	// Update a few times to advance version (gen 0, v0 → v1 → v2)
+	for i := 1; i <= 2; i++ {
+		found, err := repo.FindResourceByKeys(db, key)
+		require.NoError(t, err)
+
+		updatedReporter := bizmodel.Representation(internal.JsonObject{"iteration": i})
+		api, err := bizmodel.NewApiHref(fmt.Sprintf("https://api.example.com/update-%d", i))
+		require.NoError(t, err)
+		con, err := bizmodel.NewConsoleHref(fmt.Sprintf("https://console.example.com/update-%d", i))
+		require.NoError(t, err)
+		require.NoError(t, found.Update(key, api, &con, nil, &updatedReporter, nil, newUniqueTxID(fmt.Sprintf("update-%d", i))))
+		require.NoError(t, repo.Save(db, *found, bizmodel.OperationTypeUpdated, emptyTxId))
+	}
+
+	// Delete the resource (creates tombstone at gen 0, v3)
+	found, err := repo.FindResourceByKeys(db, key)
+	require.NoError(t, err)
+	require.NoError(t, found.Delete(key))
+	require.NoError(t, repo.Save(db, *found, bizmodel.OperationTypeDeleted, emptyTxId))
+
+	// Verify tombstone was created
+	var tombstoneCount int64
+	db.Table("reporter_representations").
+		Where("tombstone = true AND reporter_resource_id = (SELECT id FROM reporter_resources WHERE local_resource_id = ?)", "revival-test").
+		Count(&tombstoneCount)
+	require.Equal(t, int64(1), tombstoneCount, "should have one tombstone")
+
+	// Revive the resource (starts new generation: gen 1, v0)
+	// ReporterResource.Update calls startNewGeneration when tombstoned, which resets version to 0
+	found, err = repo.FindResourceByKeys(db, key)
+	require.NoError(t, err)
+
+	revivalReporter := bizmodel.Representation(internal.JsonObject{"revived": true})
+	api, err := bizmodel.NewApiHref("https://api.example.com/revival")
+	require.NoError(t, err)
+	con, err := bizmodel.NewConsoleHref("https://console.example.com/revival")
+	require.NoError(t, err)
+	require.NoError(t, found.Update(key, api, &con, nil, &revivalReporter, nil, newUniqueTxID("revival")))
+	require.NoError(t, repo.Save(db, *found, bizmodel.OperationTypeUpdated, emptyTxId))
+
+	// Fetch current and previous for the revival (gen 1, v0)
+	// This is the critical test: previous should be the tombstone (gen 0, v3), not nil
+	reporterVersion := ptrVersion(0) // Version reset to 0 on revival
+	current, previous, err := repo.FindCurrentAndPreviousVersionedRepresentations(
+		db, key, nil, reporterVersion, bizmodel.OperationTypeUpdated)
+
+	require.NoError(t, err)
+	require.NotNil(t, current, "current should exist")
+	require.NotNil(t, previous, "previous should exist (the tombstone from previous generation)")
+
+	// Current should be the revival (gen 1, v0)
+	assert.Equal(t, bizmodel.NewVersion(0), *current.ReporterRepresentationVersion(), "revival should be at version 0")
+	revivalData := current.ReporterData()
+	assert.Equal(t, true, revivalData["revived"], "current should be the revival data")
+
+	// Previous should be the tombstone (gen 0, v3)
+	assert.Equal(t, bizmodel.NewVersion(3), *previous.ReporterRepresentationVersion(), "previous should be the tombstone at version 3")
+	// The tombstone has empty data (nil representation in the model)
+	previousData := previous.ReporterData()
+	assert.Nil(t, previousData, "tombstone representation should be nil")
+}
+
 // TestFindLatestRepresentations_ReporterOnly tests that FindLatestRepresentations does not
 // error on reporter-only resources (regression test for delete-path bug).
 func TestFindLatestRepresentations_ReporterOnly(t *testing.T) {

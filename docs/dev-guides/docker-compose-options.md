@@ -85,19 +85,19 @@ SCHEMA_ZED_URL=https://example.com/your-schema.zed
 
 ### RBAC Compose Override
 
-`make kessel-up` downloads the RBAC integration override automatically. To use a pinned revision for reproducible runs, set `RBAC_OVERRIDE_URL` in `development/full-kessel/.env`:
+`make kessel-up` downloads the RBAC integration override automatically. Set `RBAC_OVERRIDE` to a pinned revision for reproducible runs:
 
 ```env
-RBAC_OVERRIDE_URL=https://raw.githubusercontent.com/project-kessel/insights-rbac/<commit>/scripts/local_stack/full-kessel.rbac-override.yml
+RBAC_OVERRIDE=https://raw.githubusercontent.com/project-kessel/insights-rbac/<commit>/scripts/local_stack/full-kessel.rbac-override.yml
 ```
 
-For local RBAC development, use a checked-out override instead:
+For local RBAC development, set the same variable to a checked-out override instead:
 
 ```env
-RBAC_OVERRIDE_FILE=/path/to/insights-rbac/scripts/local_stack/full-kessel.rbac-override.yml
+RBAC_OVERRIDE=/path/to/insights-rbac/scripts/local_stack/full-kessel.rbac-override.yml
 ```
 
-The startup script generates the temporary Inventory configuration referenced by the override and removes it when startup exits. If the RBAC image or Compose configuration changes, recreate the stack with `make kessel-down && make kessel-up` before running the integration test.
+The startup script generates the Inventory configuration referenced by the override under the system temporary directory and retains it for container restarts. It is regenerated on each `make kessel-up`. If the RBAC image or Compose configuration changes, recreate the stack with `make kessel-down && make kessel-up` before running the integration test.
 
 The full-Kessel Compose configuration supplies the RBAC system-role UUIDs and scope permissions, waits for the RBAC Debezium connector before seeding, and force-creates the platform-role relations needed by the integration tests.
 

@@ -5,11 +5,12 @@ source ./scripts/check_docker_podman.sh
 
 COMPOSE_DIR="development/full-kessel"
 ENV_FILE="${COMPOSE_DIR}/.env"
-DEFAULT_RBAC_OVERRIDE_URL="https://raw.githubusercontent.com/project-kessel/insights-rbac/master/scripts/local_stack/full-kessel.rbac-override.yml"
+DEFAULT_RBAC_OVERRIDE="https://raw.githubusercontent.com/project-kessel/insights-rbac/master/scripts/local_stack/full-kessel.rbac-override.yml"
 
 TEMP_DIR=""
 RBAC_CONFIG_SRC=""
 RBAC_OVERRIDE_PATH=""
+RBAC_INVENTORY_API_CONFIG_DIR="${TMPDIR:-/tmp}/inventory-api-full-kessel"
 
 cleanup() {
   if [[ -n "${TEMP_DIR}" ]]; then
@@ -25,30 +26,27 @@ if [ -f "${ENV_FILE}" ]; then
   saved_schema_zed_file="${SCHEMA_ZED_FILE:-}"
   saved_rbac_config_file_set="${RBAC_CONFIG_FILE+x}"
   saved_rbac_config_file="${RBAC_CONFIG_FILE:-}"
-  saved_rbac_override_url_set="${RBAC_OVERRIDE_URL+x}"
-  saved_rbac_override_url="${RBAC_OVERRIDE_URL:-}"
-  saved_rbac_override_file_set="${RBAC_OVERRIDE_FILE+x}"
-  saved_rbac_override_file="${RBAC_OVERRIDE_FILE:-}"
+  saved_rbac_override_set="${RBAC_OVERRIDE+x}"
+  saved_rbac_override="${RBAC_OVERRIDE:-}"
   set -a
   source "${ENV_FILE}"
   set +a
   [ -n "${saved_schema_zed_file_set}" ] && SCHEMA_ZED_FILE="${saved_schema_zed_file}"
   [ -n "${saved_rbac_config_file_set}" ] && RBAC_CONFIG_FILE="${saved_rbac_config_file}"
-  [ -n "${saved_rbac_override_url_set}" ] && RBAC_OVERRIDE_URL="${saved_rbac_override_url}"
-  [ -n "${saved_rbac_override_file_set}" ] && RBAC_OVERRIDE_FILE="${saved_rbac_override_file}"
+  [ -n "${saved_rbac_override_set}" ] && RBAC_OVERRIDE="${saved_rbac_override}"
   unset saved_schema_zed_file saved_rbac_config_file saved_schema_zed_file_set saved_rbac_config_file_set \
-    saved_rbac_override_url saved_rbac_override_url_set saved_rbac_override_file saved_rbac_override_file_set
+    saved_rbac_override saved_rbac_override_set
 fi
 
-RBAC_OVERRIDE_URL="${RBAC_OVERRIDE_URL:-${DEFAULT_RBAC_OVERRIDE_URL}}"
-RBAC_OVERRIDE_FILE="${RBAC_OVERRIDE_FILE:-}"
+RBAC_OVERRIDE="${RBAC_OVERRIDE:-${DEFAULT_RBAC_OVERRIDE}}"
 
 TEMP_DIR="$(mktemp -d "${TMPDIR:-/tmp}/inventory-api-full-kessel.XXXXXX")"
+mkdir -p "${RBAC_INVENTORY_API_CONFIG_DIR}"
 
-# The RBAC compose override enables local Inventory compatibility settings. Keep
-# this generated file out of the repository and expose its path for Compose
-# interpolation in the downloaded override.
-RBAC_INVENTORY_API_CONFIG="${TEMP_DIR}/inventory-api.yaml"
+# The RBAC compose override enables local Inventory compatibility settings.
+# Keep this generated file out of the repository, but retain it after startup
+# because the containers may restart and need the bind-mount source to exist.
+RBAC_INVENTORY_API_CONFIG="${RBAC_INVENTORY_API_CONFIG_DIR}/inventory-api.yaml"
 awk '
   /^authn:$/ {
     print
@@ -59,17 +57,17 @@ awk '
 ' "${COMPOSE_DIR}/configs/inventory-api.yaml" > "${RBAC_INVENTORY_API_CONFIG}"
 export RBAC_INVENTORY_API_CONFIG
 
-if [[ -n "${RBAC_OVERRIDE_FILE}" ]]; then
-  if [[ ! -f "${RBAC_OVERRIDE_FILE}" ]]; then
-    echo "Error: RBAC_OVERRIDE_FILE does not exist: ${RBAC_OVERRIDE_FILE}"
+if [[ "${RBAC_OVERRIDE}" == http://* || "${RBAC_OVERRIDE}" == https://* ]]; then
+  RBAC_OVERRIDE_PATH="${TEMP_DIR}/rbac-override.yml"
+  echo "Downloading RBAC compose override from ${RBAC_OVERRIDE}"
+  curl -fsSL --retry 3 --retry-all-errors -o "${RBAC_OVERRIDE_PATH}" "${RBAC_OVERRIDE}"
+else
+  if [[ ! -f "${RBAC_OVERRIDE}" ]]; then
+    echo "Error: RBAC_OVERRIDE does not exist: ${RBAC_OVERRIDE}"
     exit 1
   fi
-  RBAC_OVERRIDE_PATH="${RBAC_OVERRIDE_FILE}"
+  RBAC_OVERRIDE_PATH="${RBAC_OVERRIDE}"
   echo "Using local RBAC compose override: ${RBAC_OVERRIDE_PATH}"
-else
-  RBAC_OVERRIDE_PATH="${TEMP_DIR}/rbac-override.yml"
-  echo "Downloading RBAC compose override from ${RBAC_OVERRIDE_URL}"
-  curl -fsSL --retry 3 --retry-all-errors -o "${RBAC_OVERRIDE_PATH}" "${RBAC_OVERRIDE_URL}"
 fi
 
 # Check yq is installed (needed to extract RBAC role definitions from configmap YAML)

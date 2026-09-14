@@ -2697,6 +2697,28 @@ func TestFindLatestRepresentations_ReporterOnly(t *testing.T) {
 	assert.NotNil(t, latest.ReporterVersion(), "reporter version should be present")
 }
 
+func TestFindLatestRepresentations_ReporterOnlyAfterDelete(t *testing.T) {
+	db := setupInMemoryDB(t)
+	mc := metricscollector.NewFakeMetricsCollector()
+	tm := NewGormTransactionManager(mc, 3)
+	repo := NewResourceRepository(db, tm, noopOutboxPublisher())
+
+	resource, key := createResourceNoCommon(t, "reporter-only-delete")
+	require.NoError(t, repo.Save(db, resource, bizmodel.OperationTypeCreated, emptyTxId))
+
+	found, err := repo.FindResourceByKeys(db, key)
+	require.NoError(t, err)
+	require.NoError(t, found.Delete(key))
+	require.NoError(t, repo.Save(db, *found, bizmodel.OperationTypeDeleted, emptyTxId))
+
+	latest, err := repo.FindLatestRepresentations(db, key)
+	require.NoError(t, err)
+	require.NotNil(t, latest)
+	require.NotNil(t, latest.ReporterVersion())
+	assert.Equal(t, bizmodel.NewVersion(0), *latest.ReporterVersion())
+	assert.Equal(t, "reporter-only-delete", latest.ReporterData()["cluster_id"])
+}
+
 func TestHasTransactionIdBeenProcessed(t *testing.T) {
 	implementations := []struct {
 		name string

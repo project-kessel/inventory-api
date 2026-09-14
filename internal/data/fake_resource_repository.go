@@ -50,6 +50,7 @@ type storedReporterRepresentation struct {
 	data       internal.JsonObject
 	version    uint
 	generation uint
+	tombstone  bool
 }
 
 func NewFakeResourceRepository() bizmodel.ResourceRepository {
@@ -178,6 +179,7 @@ func (f *fakeResourceRepository) Save(tx *gorm.DB, resource bizmodel.Resource, o
 			data:       cloneJsonObject(reporterRepresentationSnapshot.Representation.Data),
 			version:    reporterVersion,
 			generation: reporterResourceSnapshot.Generation,
+			tombstone:  reporterRepresentationSnapshot.Tombstone,
 		}
 	}
 
@@ -429,6 +431,10 @@ func (f *fakeResourceRepository) FindLatestRepresentations(tx *gorm.DB, key bizm
 		var maxEntry *storedReporterRepresentation
 		for version, generations := range reporterVersions {
 			for gen, entry := range generations {
+				// Skip tombstones - we want the latest live representation
+				if entry.tombstone {
+					continue
+				}
 				if maxEntry == nil || version > maxVersion || (version == maxVersion && gen > maxGen) {
 					maxVersion = version
 					maxGen = gen

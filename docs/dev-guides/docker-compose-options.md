@@ -30,7 +30,7 @@ Deploy the entire Kessel suite locally with a single command: Inventory API, Rel
 make kessel-up
 ```
 
-This starts all services using the compose file at `development/full-kessel/docker-compose.yaml`. The SpiceDB schema is automatically downloaded from the [stage rbac-config repo](https://raw.githubusercontent.com/project-kessel/rbac-config/refs/heads/master/configs/stage/schemas/schema.zed) at startup.
+This starts all services using the compose file at `development/full-kessel/docker-compose.yaml`. The SpiceDB schema is automatically downloaded from the [stage rbac-config repo](https://raw.githubusercontent.com/project-kessel/rbac-config/refs/heads/master/configs/stage/schemas/schema.zed) at startup. The RBAC-specific Compose override is downloaded from the [insights-rbac repository](https://raw.githubusercontent.com/project-kessel/insights-rbac/master/scripts/local_stack/full-kessel.rbac-override.yml), so the RBAC repository does not need to be cloned.
 
 ### Ports
 
@@ -83,6 +83,24 @@ Or change the download URL:
 SCHEMA_ZED_URL=https://example.com/your-schema.zed
 ```
 
+### RBAC Compose Override
+
+`make kessel-up` downloads the RBAC integration override automatically. To use a pinned revision for reproducible runs, set `RBAC_OVERRIDE_URL` in `development/full-kessel/.env`:
+
+```env
+RBAC_OVERRIDE_URL=https://raw.githubusercontent.com/project-kessel/insights-rbac/<commit>/scripts/local_stack/full-kessel.rbac-override.yml
+```
+
+For local RBAC development, use a checked-out override instead:
+
+```env
+RBAC_OVERRIDE_FILE=/path/to/insights-rbac/scripts/local_stack/full-kessel.rbac-override.yml
+```
+
+The startup script generates the temporary Inventory configuration referenced by the override and removes it when startup exits. If the RBAC image or Compose configuration changes, recreate the stack with `make kessel-down && make kessel-up` before running the integration test.
+
+The full-Kessel Compose configuration supplies the RBAC system-role UUIDs and scope permissions, waits for the RBAC Debezium connector before seeding, and force-creates the platform-role relations needed by the integration tests.
+
 ### With Monitoring Stack
 
 To include Prometheus, Grafana, and Alertmanager:
@@ -97,7 +115,7 @@ See [Monitoring Info](#monitoring-info) for URLs and login details.
 
 ### RBAC Integration
 
-The full Kessel stack includes [insights-rbac](https://github.com/RedHatInsights/insights-rbac) for role-based access control testing. RBAC connects to both Relations API (gRPC) and Inventory API (gRPC) automatically. The V2 APIs are enabled by default.
+The full Kessel stack includes [insights-rbac](https://github.com/project-kessel/insights-rbac) for role-based access control testing. RBAC connects to both Relations API (gRPC) and Inventory API (gRPC) automatically. The V2 APIs are enabled by default.
 
 RBAC is available at `http://localhost:9080/api/rbac/v2/`. Metrics are served at `http://localhost:9080/metrics`.
 
@@ -125,6 +143,8 @@ The test flow:
 ```shell
 make kessel-down
 ```
+
+This stops the stack and removes its project-scoped volumes, including the ephemeral PostgreSQL, Kafka, and Redis data. Run `make kessel-up` afterward to start from clean local state.
 
 ---
 

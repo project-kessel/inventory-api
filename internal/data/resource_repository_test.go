@@ -2420,9 +2420,6 @@ func TestFindCurrentAndPreviousVersionedRepresentations_NoCommonInconsistency(t 
 // TestFindCurrentAndPreviousVersionedRepresentations_TwoStreamScenarios tests the two-stream
 // model (common + reporter) where each stream can advance independently or together.
 func TestFindCurrentAndPreviousVersionedRepresentations_TwoStreamScenarios(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping test requiring SpiceDB Docker container")
-	}
 
 	t.Run("reporter-only create", func(t *testing.T) {
 		db := setupInMemoryDB(t)
@@ -2524,11 +2521,9 @@ func TestFindCurrentAndPreviousVersionedRepresentations_TwoStreamScenarios(t *te
 		assert.Equal(t, bizmodel.NewVersion(1), *current.CommonVersion())
 		assert.Equal(t, bizmodel.NewVersion(0), *previous.CommonVersion())
 
-		// Reporter should be identical in both (latest unchanged)
-		require.NotNil(t, current.ReporterRepresentationVersion())
-		require.NotNil(t, previous.ReporterRepresentationVersion())
-		assert.Equal(t, *current.ReporterRepresentationVersion(), *previous.ReporterRepresentationVersion(),
-			"reporter should be identical in both when it didn't advance")
+		// Reporter should be nil in both (stream didn't advance, so not fetched)
+		assert.Nil(t, current.ReporterRepresentationVersion(), "reporter should be nil when stream didn't advance")
+		assert.Nil(t, previous.ReporterRepresentationVersion(), "reporter should be nil when stream didn't advance")
 	})
 
 	t.Run("both streams advance", func(t *testing.T) {

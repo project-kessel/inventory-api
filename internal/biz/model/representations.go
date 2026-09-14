@@ -70,8 +70,8 @@ func (r *Representations) ReporterData() Representation {
 	return r.reporterData
 }
 
-// ReporterRepresentationVersion returns a pointer to the reporter representation version, or nil if not present.
-func (r *Representations) ReporterRepresentationVersion() *Version {
+// ReporterVersion returns a pointer to the reporter representation version, or nil if not present.
+func (r *Representations) ReporterVersion() *Version {
 	return r.reporterRepresentationVersion
 }
 

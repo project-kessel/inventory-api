@@ -2403,14 +2403,14 @@ func TestFindCurrentAndPreviousVersionedRepresentations_NoCommonInconsistency(t 
 		// Previous has: common nil (no v-1), reporter v0 (previous version)
 		require.NotNil(t, cur, "current should be resolvable")
 		assert.Equal(t, "test-workspace", cur.WorkspaceID(), "current has common v0 data")
-		require.NotNil(t, cur.ReporterRepresentationVersion(), "current has reporter v1")
-		assert.Equal(t, bizmodel.NewVersion(1), *cur.ReporterRepresentationVersion())
+		require.NotNil(t, cur.ReporterVersion(), "current has reporter v1")
+		assert.Equal(t, bizmodel.NewVersion(1), *cur.ReporterVersion())
 
 		// Previous now correctly has the previous reporter representation (v0)
 		require.NotNil(t, prev, "previous should have reporter v0 data")
 		assert.Nil(t, prev.CommonVersion(), "previous has no common (no v-1 from v0)")
-		require.NotNil(t, prev.ReporterRepresentationVersion(), "previous has reporter v0")
-		assert.Equal(t, bizmodel.NewVersion(0), *prev.ReporterRepresentationVersion())
+		require.NotNil(t, prev.ReporterVersion(), "previous has reporter v0")
+		assert.Equal(t, bizmodel.NewVersion(0), *prev.ReporterVersion())
 
 		// The fix: both streams are now available in the same snapshot, so tuple calculation
 		// can correctly compute creates/deletes based on BOTH common and reporter data.
@@ -2441,8 +2441,8 @@ func TestFindCurrentAndPreviousVersionedRepresentations_TwoStreamScenarios(t *te
 
 		// Current should have reporter data but no common data
 		assert.Nil(t, current.CommonVersion(), "no common version for reporter-only resource")
-		assert.NotNil(t, current.ReporterRepresentationVersion(), "reporter version should be present")
-		assert.Equal(t, bizmodel.NewVersion(0), *current.ReporterRepresentationVersion())
+		assert.NotNil(t, current.ReporterVersion(), "reporter version should be present")
+		assert.Equal(t, bizmodel.NewVersion(0), *current.ReporterVersion())
 	})
 
 	t.Run("reporter-only update", func(t *testing.T) {
@@ -2478,9 +2478,9 @@ func TestFindCurrentAndPreviousVersionedRepresentations_TwoStreamScenarios(t *te
 
 		// Current = reporter v1, previous = reporter v0, no common in either
 		assert.Nil(t, current.CommonVersion())
-		assert.Equal(t, bizmodel.NewVersion(1), *current.ReporterRepresentationVersion())
+		assert.Equal(t, bizmodel.NewVersion(1), *current.ReporterVersion())
 		assert.Nil(t, previous.CommonVersion())
-		assert.Equal(t, bizmodel.NewVersion(0), *previous.ReporterRepresentationVersion())
+		assert.Equal(t, bizmodel.NewVersion(0), *previous.ReporterVersion())
 	})
 
 	t.Run("common-only update while reporter unchanged", func(t *testing.T) {
@@ -2522,8 +2522,8 @@ func TestFindCurrentAndPreviousVersionedRepresentations_TwoStreamScenarios(t *te
 		assert.Equal(t, bizmodel.NewVersion(0), *previous.CommonVersion())
 
 		// Reporter should be nil in both (stream didn't advance, so not fetched)
-		assert.Nil(t, current.ReporterRepresentationVersion(), "reporter should be nil when stream didn't advance")
-		assert.Nil(t, previous.ReporterRepresentationVersion(), "reporter should be nil when stream didn't advance")
+		assert.Nil(t, current.ReporterVersion(), "reporter should be nil when stream didn't advance")
+		assert.Nil(t, previous.ReporterVersion(), "reporter should be nil when stream didn't advance")
 	})
 
 	t.Run("both streams advance", func(t *testing.T) {
@@ -2565,8 +2565,8 @@ func TestFindCurrentAndPreviousVersionedRepresentations_TwoStreamScenarios(t *te
 		// Both streams should have current/previous populated
 		assert.Equal(t, bizmodel.NewVersion(1), *current.CommonVersion())
 		assert.Equal(t, bizmodel.NewVersion(0), *previous.CommonVersion())
-		assert.Equal(t, bizmodel.NewVersion(1), *current.ReporterRepresentationVersion())
-		assert.Equal(t, bizmodel.NewVersion(0), *previous.ReporterRepresentationVersion())
+		assert.Equal(t, bizmodel.NewVersion(1), *current.ReporterVersion())
+		assert.Equal(t, bizmodel.NewVersion(0), *previous.ReporterVersion())
 	})
 
 	t.Run("cv == 0 underflow guard", func(t *testing.T) {
@@ -2662,12 +2662,12 @@ func TestFindCurrentAndPreviousVersionedRepresentations_TombstoneRevival(t *test
 	require.NotNil(t, previous, "previous should exist (the tombstone from previous generation)")
 
 	// Current should be the revival (gen 1, v0)
-	assert.Equal(t, bizmodel.NewVersion(0), *current.ReporterRepresentationVersion(), "revival should be at version 0")
+	assert.Equal(t, bizmodel.NewVersion(0), *current.ReporterVersion(), "revival should be at version 0")
 	revivalData := current.ReporterData()
 	assert.Equal(t, true, revivalData["revived"], "current should be the revival data")
 
 	// Previous should be the tombstone (gen 0, v3)
-	assert.Equal(t, bizmodel.NewVersion(3), *previous.ReporterRepresentationVersion(), "previous should be the tombstone at version 3")
+	assert.Equal(t, bizmodel.NewVersion(3), *previous.ReporterVersion(), "previous should be the tombstone at version 3")
 	// The tombstone has empty data (nil representation in the model)
 	previousData := previous.ReporterData()
 	assert.Nil(t, previousData, "tombstone representation should be nil")
@@ -2694,7 +2694,7 @@ func TestFindLatestRepresentations_ReporterOnly(t *testing.T) {
 
 	// Should have reporter data but no common data
 	assert.Nil(t, latest.CommonVersion(), "no common version")
-	assert.NotNil(t, latest.ReporterRepresentationVersion(), "reporter version should be present")
+	assert.NotNil(t, latest.ReporterVersion(), "reporter version should be present")
 }
 
 func TestHasTransactionIdBeenProcessed(t *testing.T) {

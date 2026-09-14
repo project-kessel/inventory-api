@@ -467,6 +467,9 @@ func (r *resourceRepository) fetchLatestReporterRepresentation(db *gorm.DB, key 
 
 	query = r.buildReporterResourceKeyQuery(query, key)
 
+	// Skip tombstones - we want the latest live representation
+	query = query.Where("rrep.tombstone = ?", false)
+
 	err := query.Order("rrep.version DESC, rrep.generation DESC").Limit(1).Scan(&result).Error
 	if err != nil {
 		// ErrRecordNotFound is expected when the representation doesn't exist

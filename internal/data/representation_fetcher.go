@@ -11,8 +11,8 @@ import (
 // to share the same control flow logic while using different storage backends.
 type representationFetcher interface {
 	fetchCommon(version uint) (bizmodel.Representation, *bizmodel.Version, error)
-	fetchReporter(version uint) (bizmodel.Representation, *bizmodel.Version, error)
-	fetchPreviousReporter(currentVersion uint) (bizmodel.Representation, *bizmodel.Version, error)
+	fetchReporter(version uint, generation uint) (bizmodel.Representation, *bizmodel.Version, error)
+	fetchPreviousReporter(currentVersion uint, currentGeneration uint) (bizmodel.Representation, *bizmodel.Version, error)
 }
 
 // fetchCurrentAndPreviousRepresentations implements the common control flow for fetching
@@ -23,10 +23,13 @@ type representationFetcher interface {
 // - If a version is nil, that stream didn't advance - leave it nil (don't fetch)
 func fetchCurrentAndPreviousRepresentations(
 	fetcher representationFetcher,
-	currentCommonVersion *bizmodel.Version,
-	currentReporterVersion *bizmodel.Version,
+	versions bizmodel.RepresentationVersions,
 	operationType bizmodel.EventOperationType,
 ) (*bizmodel.Representations, *bizmodel.Representations, error) {
+	currentCommonVersion := versions.CommonVersion()
+	currentReporterVersion := versions.ReporterVersion()
+	currentReporterGeneration := versions.ReporterGeneration()
+
 	// Guard against both versions being nil (should not happen per TupleEvent invariant)
 	if currentCommonVersion == nil && currentReporterVersion == nil {
 		return nil, nil, fmt.Errorf("at least one version must be provided")
@@ -60,7 +63,11 @@ func fetchCurrentAndPreviousRepresentations(
 	// Fetch reporter stream - only if version is provided (stream advanced)
 	if currentReporterVersion != nil {
 		rv := currentReporterVersion.Uint()
-		currentReporter, currentReporterVer, err = fetcher.fetchReporter(rv)
+		rg := uint(0)
+		if currentReporterGeneration != nil {
+			rg = currentReporterGeneration.Uint()
+		}
+		currentReporter, currentReporterVer, err = fetcher.fetchReporter(rv, rg)
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to fetch current reporter representation: %w", err)
 		}
@@ -68,7 +75,7 @@ func fetchCurrentAndPreviousRepresentations(
 			// Fetch immediately preceding reporter row (by generation DESC, version DESC)
 			// This handles both normal updates (previous version in same generation)
 			// and revivals (tombstone in previous generation, even when current version is 0)
-			previousReporter, previousReporterVer, err = fetcher.fetchPreviousReporter(rv)
+			previousReporter, previousReporterVer, err = fetcher.fetchPreviousReporter(rv, rg)
 			if err != nil {
 				return nil, nil, fmt.Errorf("failed to fetch previous reporter representation: %w", err)
 			}

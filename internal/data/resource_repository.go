@@ -298,24 +298,23 @@ func (s *sqlRepresentationFetcher) fetchCommon(version uint) (bizmodel.Represent
 	return s.repo.fetchCommonRepresentation(s.db, s.key, version)
 }
 
-func (s *sqlRepresentationFetcher) fetchReporter(version uint) (bizmodel.Representation, *bizmodel.Version, error) {
-	return s.repo.fetchReporterRepresentation(s.db, s.key, version)
+func (s *sqlRepresentationFetcher) fetchReporter(version uint, generation uint) (bizmodel.Representation, *bizmodel.Version, error) {
+	return s.repo.fetchReporterRepresentation(s.db, s.key, version, generation)
 }
 
-func (s *sqlRepresentationFetcher) fetchPreviousReporter(currentVersion uint) (bizmodel.Representation, *bizmodel.Version, error) {
-	return s.repo.fetchPreviousReporterRepresentation(s.db, s.key, currentVersion)
+func (s *sqlRepresentationFetcher) fetchPreviousReporter(currentVersion uint, currentGeneration uint) (bizmodel.Representation, *bizmodel.Version, error) {
+	return s.repo.fetchPreviousReporterRepresentation(s.db, s.key, currentVersion, currentGeneration)
 }
 
 func (r *resourceRepository) FindCurrentAndPreviousVersionedRepresentations(
 	tx *gorm.DB,
 	key bizmodel.ReporterResourceKey,
-	currentCommonVersion *bizmodel.Version,
-	currentReporterVersion *bizmodel.Version,
+	versions bizmodel.RepresentationVersions,
 	operationType bizmodel.EventOperationType,
 ) (*bizmodel.Representations, *bizmodel.Representations, error) {
 	db := r.getDBSession(tx)
 	fetcher := &sqlRepresentationFetcher{db: db, key: key, repo: r}
-	return fetchCurrentAndPreviousRepresentations(fetcher, currentCommonVersion, currentReporterVersion, operationType)
+	return fetchCurrentAndPreviousRepresentations(fetcher, versions, operationType)
 }
 
 // fetchCommonRepresentation fetches a common representation at a specific version
@@ -381,8 +380,8 @@ func (r *resourceRepository) fetchLatestCommonRepresentation(db *gorm.DB, key bi
 	return bizmodel.Representation(result.Data), &v, nil
 }
 
-// fetchReporterRepresentation fetches a reporter representation at a specific version
-func (r *resourceRepository) fetchReporterRepresentation(db *gorm.DB, key bizmodel.ReporterResourceKey, version uint) (bizmodel.Representation, *bizmodel.Version, error) {
+// fetchReporterRepresentation fetches a reporter representation at a specific version and generation
+func (r *resourceRepository) fetchReporterRepresentation(db *gorm.DB, key bizmodel.ReporterResourceKey, version uint, generation uint) (bizmodel.Representation, *bizmodel.Version, error) {
 	type reporterRepresentationRow struct {
 		Data    internal.JsonObject
 		Version uint
@@ -394,9 +393,9 @@ func (r *resourceRepository) fetchReporterRepresentation(db *gorm.DB, key bizmod
 		Joins("JOIN reporter_representations rrep ON rr.id = rrep.reporter_resource_id")
 
 	query = r.buildReporterResourceKeyQuery(query, key)
-	query = query.Where("rrep.version = ?", version)
+	query = query.Where("rrep.version = ? AND rrep.generation = ?", version, generation)
 
-	err := query.Order("rrep.generation DESC").Limit(1).Scan(&result).Error
+	err := query.Limit(1).Scan(&result).Error
 	if err != nil {
 		// ErrRecordNotFound is expected when the representation doesn't exist
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -413,9 +412,9 @@ func (r *resourceRepository) fetchReporterRepresentation(db *gorm.DB, key bizmod
 	return bizmodel.Representation(result.Data), &v, nil
 }
 
-// fetchPreviousReporterRepresentation fetches the reporter representation immediately before the given version.
+// fetchPreviousReporterRepresentation fetches the reporter representation immediately before the given version and generation.
 // This handles both normal updates (previous version in same generation) and revivals (tombstone in previous generation).
-func (r *resourceRepository) fetchPreviousReporterRepresentation(db *gorm.DB, key bizmodel.ReporterResourceKey, currentVersion uint) (bizmodel.Representation, *bizmodel.Version, error) {
+func (r *resourceRepository) fetchPreviousReporterRepresentation(db *gorm.DB, key bizmodel.ReporterResourceKey, currentVersion uint, currentGeneration uint) (bizmodel.Representation, *bizmodel.Version, error) {
 	type reporterRepresentationRow struct {
 		Data    internal.JsonObject
 		Version uint
@@ -431,9 +430,9 @@ func (r *resourceRepository) fetchPreviousReporterRepresentation(db *gorm.DB, ke
 	// 1. Previous version in the same generation (normal update)
 	// 2. Any version in a previous generation (revival after tombstone)
 	query = query.Where(`
-		(rrep.generation = rr.generation AND rrep.version < ?)
-		OR rrep.generation < rr.generation
-	`, currentVersion)
+		(rrep.generation = ? AND rrep.version < ?)
+		OR rrep.generation < ?
+	`, currentGeneration, currentVersion, currentGeneration)
 
 	// Order by generation first, then version, to properly handle generation boundaries
 	err := query.Order("rrep.generation DESC, rrep.version DESC").Limit(1).Scan(&result).Error

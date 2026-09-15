@@ -24,6 +24,11 @@ func ptrVersion(v uint) *bizmodel.Version {
 	return &ver
 }
 
+func ptrGeneration(g uint) *bizmodel.Generation {
+	gen := bizmodel.NewGeneration(g)
+	return &gen
+}
+
 var emptyTxId = bizmodel.NewTransactionId("")
 
 func TestResourceRepositoryContract(t *testing.T) {
@@ -2222,7 +2227,7 @@ func TestFindCurrentAndPreviousVersionedRepresentations(t *testing.T) {
 
 				// Get current and previous versions
 				version := bizmodel.NewVersion(1)
-				cur, prev, err := repo.FindCurrentAndPreviousVersionedRepresentations(db, key, &version, nil, bizmodel.OperationTypeUpdated)
+				cur, prev, err := repo.FindCurrentAndPreviousVersionedRepresentations(db, key, bizmodel.NewRepresentationVersions(&version, nil, nil), bizmodel.OperationTypeUpdated)
 				require.NoError(t, err)
 
 				currentWS, previousWS := GetCurrentAndPreviousWorkspaceID(cur, prev)
@@ -2243,7 +2248,7 @@ func TestFindCurrentAndPreviousVersionedRepresentations(t *testing.T) {
 
 				// Get version 0 representations
 				version := bizmodel.NewVersion(0)
-				cur, prev, err := repo.FindCurrentAndPreviousVersionedRepresentations(db, key, &version, nil, bizmodel.OperationTypeCreated)
+				cur, prev, err := repo.FindCurrentAndPreviousVersionedRepresentations(db, key, bizmodel.NewRepresentationVersions(&version, nil, nil), bizmodel.OperationTypeCreated)
 				require.NoError(t, err)
 
 				currentWS, previousWS := GetCurrentAndPreviousWorkspaceID(cur, prev)
@@ -2340,7 +2345,7 @@ func TestFindCurrentAndPreviousVersionedRepresentations_NoCommonInconsistency(t 
 
 		// For reporter-only resource: common version is nil, reporter version is 0
 		reporterVersion := ptrVersion(0)
-		cur, prev, err := repo.FindCurrentAndPreviousVersionedRepresentations(db, key, nil, reporterVersion, bizmodel.OperationTypeCreated)
+		cur, prev, err := repo.FindCurrentAndPreviousVersionedRepresentations(db, key, bizmodel.NewRepresentationVersions(nil, reporterVersion, nil), bizmodel.OperationTypeCreated)
 		require.NoError(t, err)
 		assert.Nil(t, prev, "no previous version on create")
 
@@ -2395,7 +2400,7 @@ func TestFindCurrentAndPreviousVersionedRepresentations_NoCommonInconsistency(t 
 
 		lastKnownCommonVersion := latest.CommonVersion()
 		reporterVersion := ptrVersion(1)
-		cur, prev, err := repo.FindCurrentAndPreviousVersionedRepresentations(db, key, lastKnownCommonVersion, reporterVersion, bizmodel.OperationTypeUpdated)
+		cur, prev, err := repo.FindCurrentAndPreviousVersionedRepresentations(db, key, bizmodel.NewRepresentationVersions(lastKnownCommonVersion, reporterVersion, nil), bizmodel.OperationTypeUpdated)
 		require.NoError(t, err)
 
 		// NEW BEHAVIOR (after fix): Both streams are now properly tracked.
@@ -2433,7 +2438,7 @@ func TestFindCurrentAndPreviousVersionedRepresentations_TwoStreamScenarios(t *te
 		// Reporter version is v0, common version is nil (no common data)
 		reporterVersion := ptrVersion(0)
 		current, previous, err := repo.FindCurrentAndPreviousVersionedRepresentations(
-			db, key, nil, reporterVersion, bizmodel.OperationTypeCreated)
+			db, key, bizmodel.NewRepresentationVersions(nil, reporterVersion, nil), bizmodel.OperationTypeCreated)
 
 		require.NoError(t, err)
 		require.NotNil(t, current, "current representation should exist")
@@ -2470,7 +2475,7 @@ func TestFindCurrentAndPreviousVersionedRepresentations_TwoStreamScenarios(t *te
 		// Fetch with reporter version v1, common version still nil
 		reporterVersion := ptrVersion(1)
 		current, previous, err := repo.FindCurrentAndPreviousVersionedRepresentations(
-			db, key, nil, reporterVersion, bizmodel.OperationTypeUpdated)
+			db, key, bizmodel.NewRepresentationVersions(nil, reporterVersion, nil), bizmodel.OperationTypeUpdated)
 
 		require.NoError(t, err)
 		require.NotNil(t, current, "current should exist")
@@ -2511,7 +2516,7 @@ func TestFindCurrentAndPreviousVersionedRepresentations_TwoStreamScenarios(t *te
 		// Common advanced to v1, reporter version nil (not advanced)
 		commonVersion := ptrVersion(1)
 		current, previous, err := repo.FindCurrentAndPreviousVersionedRepresentations(
-			db, key, commonVersion, nil, bizmodel.OperationTypeUpdated)
+			db, key, bizmodel.NewRepresentationVersions(commonVersion, nil, nil), bizmodel.OperationTypeUpdated)
 
 		require.NoError(t, err)
 		require.NotNil(t, current)
@@ -2556,7 +2561,7 @@ func TestFindCurrentAndPreviousVersionedRepresentations_TwoStreamScenarios(t *te
 		commonVersion := ptrVersion(1)
 		reporterVersion := ptrVersion(1)
 		current, previous, err := repo.FindCurrentAndPreviousVersionedRepresentations(
-			db, key, commonVersion, reporterVersion, bizmodel.OperationTypeUpdated)
+			db, key, bizmodel.NewRepresentationVersions(commonVersion, reporterVersion, nil), bizmodel.OperationTypeUpdated)
 
 		require.NoError(t, err)
 		require.NotNil(t, current)
@@ -2585,7 +2590,7 @@ func TestFindCurrentAndPreviousVersionedRepresentations_TwoStreamScenarios(t *te
 		// Query with common version 0 - should not attempt cv-1 query
 		commonVersion := ptrVersion(0)
 		current, previous, err := repo.FindCurrentAndPreviousVersionedRepresentations(
-			db, key, commonVersion, nil, bizmodel.OperationTypeCreated)
+			db, key, bizmodel.NewRepresentationVersions(commonVersion, nil, nil), bizmodel.OperationTypeCreated)
 
 		require.NoError(t, err)
 		require.NotNil(t, current, "current should exist at v0")
@@ -2653,9 +2658,10 @@ func TestFindCurrentAndPreviousVersionedRepresentations_TombstoneRevival(t *test
 
 	// Fetch current and previous for the revival (gen 1, v0)
 	// This is the critical test: previous should be the tombstone (gen 0, v3), not nil
-	reporterVersion := ptrVersion(0) // Version reset to 0 on revival
+	reporterVersion := ptrVersion(0)       // Version reset to 0 on revival
+	reporterGeneration := ptrGeneration(1) // Generation incremented on revival
 	current, previous, err := repo.FindCurrentAndPreviousVersionedRepresentations(
-		db, key, nil, reporterVersion, bizmodel.OperationTypeUpdated)
+		db, key, bizmodel.NewRepresentationVersions(nil, reporterVersion, reporterGeneration), bizmodel.OperationTypeUpdated)
 
 	require.NoError(t, err)
 	require.NotNil(t, current, "current should exist")
@@ -2671,6 +2677,92 @@ func TestFindCurrentAndPreviousVersionedRepresentations_TombstoneRevival(t *test
 	// The tombstone has empty data (nil representation in the model)
 	previousData := previous.ReporterData()
 	assert.Nil(t, previousData, "tombstone representation should be nil")
+}
+
+// TestFindCurrentAndPreviousVersionedRepresentations_EventReplayRaceCondition tests the scenario
+// from PR #1465 review: when a resource is deleted and re-reported, an old event replayed after
+// the re-report must fetch the correct historical representation (not the new generation's data).
+//
+// Scenario:
+// 1. Resource reported at gen=0, ver=0
+// 2. Resource deleted (tombstone at gen=0, ver=1)
+// 3. Resource re-reported (new generation: gen=1, ver=0)
+// 4. Old event from step 1 is replayed (consumer restart/reprocessing)
+//   - WITHOUT generation tracking: would incorrectly fetch gen=1, ver=0 (wrong!)
+//   - WITH generation tracking: correctly fetches gen=0, ver=0 (correct!)
+func TestFindCurrentAndPreviousVersionedRepresentations_EventReplayRaceCondition(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping test requiring SpiceDB Docker container")
+	}
+
+	db := setupInMemoryDB(t)
+	mc := metricscollector.NewFakeMetricsCollector()
+	tm := NewGormTransactionManager(mc, 3)
+	repo := NewResourceRepository(db, tm, noopOutboxPublisher())
+
+	// Step 1: Create resource at gen=0, ver=0
+	resource, key := createResourceNoCommon(t, "replay-race-test")
+	require.NoError(t, repo.Save(db, resource, bizmodel.OperationTypeCreated, emptyTxId))
+
+	// The initial creation creates gen=0, ver=0 with data: {"cluster_id": "replay-race-test"}
+	found, err := repo.FindResourceByKeys(db, key)
+	require.NoError(t, err)
+
+	// Step 2: Delete the resource (creates tombstone at gen=0, ver=1)
+	require.NoError(t, found.Delete(key))
+	require.NoError(t, repo.Save(db, *found, bizmodel.OperationTypeDeleted, emptyTxId))
+
+	// Step 3: Re-report the resource (starts new generation: gen=1, ver=0)
+	found, err = repo.FindResourceByKeys(db, key)
+	require.NoError(t, err)
+
+	revivalReporter := bizmodel.Representation(internal.JsonObject{"revived": "generation-1"})
+	api, err := bizmodel.NewApiHref("https://api.example.com/revival")
+	require.NoError(t, err)
+	con, err := bizmodel.NewConsoleHref("https://console.example.com/revival")
+	require.NoError(t, err)
+	require.NoError(t, found.Update(key, api, &con, nil, &revivalReporter, nil, newUniqueTxID("revival")))
+	require.NoError(t, repo.Save(db, *found, bizmodel.OperationTypeUpdated, emptyTxId))
+
+	// At this point, we have TWO representations at version=0:
+	// - gen=0, ver=0: original data ({"cluster_id": "replay-race-test"})
+	// - gen=1, ver=0: revival data ({"revived": "generation-1"})
+
+	// Step 4: Simulate replaying the old event (gen=0, ver=0)
+	// This is what happens when a consumer restarts and reprocesses an uncommitted event
+	// The event says: "fetch representation at version=0, generation=0"
+	oldEventVersion := ptrVersion(0)
+	oldEventGeneration := ptrGeneration(0)
+
+	// THE CRITICAL TEST: When we fetch (gen=0, ver=0), we MUST get the original data,
+	// NOT the new generation's data
+	current, previous, err := repo.FindCurrentAndPreviousVersionedRepresentations(
+		db, key, bizmodel.NewRepresentationVersions(nil, oldEventVersion, oldEventGeneration), bizmodel.OperationTypeCreated)
+
+	require.NoError(t, err)
+	require.NotNil(t, current, "current should exist")
+	assert.Nil(t, previous, "no previous for gen=0, ver=0 create event")
+
+	// Verify we got the ORIGINAL gen=0 data, not the gen=1 data
+	currentData := current.ReporterData()
+	assert.NotNil(t, currentData, "should have data")
+	assert.Equal(t, "replay-race-test", currentData["cluster_id"], "MUST fetch gen=0 data when event specifies gen=0")
+	assert.Nil(t, currentData["revived"], "MUST NOT fetch gen=1 data when event specifies gen=0")
+
+	// Also verify that fetching the NEW event (gen=1, ver=0) still works correctly
+	newEventVersion := ptrVersion(0)
+	newEventGeneration := ptrGeneration(1)
+
+	current, previous, err = repo.FindCurrentAndPreviousVersionedRepresentations(
+		db, key, bizmodel.NewRepresentationVersions(nil, newEventVersion, newEventGeneration), bizmodel.OperationTypeUpdated)
+
+	require.NoError(t, err)
+	require.NotNil(t, current, "current should exist")
+	require.NotNil(t, previous, "previous should be the tombstone")
+
+	currentData = current.ReporterData()
+	assert.Equal(t, "generation-1", currentData["revived"], "gen=1 event should fetch gen=1 data")
+	assert.Nil(t, currentData["cluster_id"], "gen=1 event should NOT fetch gen=0 data")
 }
 
 // TestFindLatestRepresentations_ReporterOnly tests that FindLatestRepresentations does not

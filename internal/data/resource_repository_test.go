@@ -1689,6 +1689,57 @@ func TestSerializableUpdateFails(t *testing.T) {
 	}
 }
 
+func TestMigrationsCreateRequiredTables(t *testing.T) {
+	db := testutil.NewSQLiteTestDB(t, &gorm.Config{TranslateError: true})
+
+	// Run migrations
+	err := Migrate(db, nil)
+	require.NoError(t, err)
+
+	// Verify that all required tables exist
+	requiredTables := []string{
+		"resource",
+		"reporter_resources",
+		"reporter_representations",
+		"common_representations",
+	}
+
+	for _, tableName := range requiredTables {
+		t.Run("Table_"+tableName, func(t *testing.T) {
+			// Try to query the table - this will fail if the table doesn't exist
+			var tableExists bool
+			result := db.Raw("SELECT EXISTS (SELECT 1 FROM sqlite_master WHERE type='table' AND name=?)", tableName).
+				Scan(&tableExists)
+			require.NoError(t, result.Error, "failed to check if table %s exists", tableName)
+			assert.True(t, tableExists, "table %s should exist after migration", tableName)
+		})
+	}
+}
+
+func TestReportResourceWithTransactionIdIdempotencyCheck(t *testing.T) {
+	db := setupInMemoryDB(t)
+	mc := metricscollector.NewFakeMetricsCollector()
+	tm := NewGormTransactionManager(mc, 3)
+	repo := NewResourceRepository(db, tm, noopOutboxPublisher())
+
+	// Create a resource with a transaction ID
+	txId := newUniqueTxID("test-report-idempotency")
+
+	// Simulate what ReportResource does: first call HasTransactionIdBeenProcessed
+	// This was failing with "relation reporter_representations does not exist"
+	processed, err := repo.HasTransactionIdBeenProcessed(db, txId)
+	require.NoError(t, err, "HasTransactionIdBeenProcessed should not fail with missing table error")
+	assert.False(t, processed, "Transaction ID should not be processed initially")
+
+	// Verify tables exist by querying them directly
+	var count int64
+	result := db.Table("reporter_representations").Count(&count)
+	require.NoError(t, result.Error, "reporter_representations table should exist and be queryable")
+
+	result = db.Table("common_representations").Count(&count)
+	require.NoError(t, result.Error, "common_representations table should exist and be queryable")
+}
+
 func setupInMemoryDB(t *testing.T) *gorm.DB {
 	db := testutil.NewSQLiteTestDB(t, &gorm.Config{TranslateError: true})
 

@@ -14,6 +14,7 @@ type JsonSchemaWithRelations struct {
 
 // NewJsonSchemaWithRelations creates a Schema that validates against jsonSchema
 // and computes tuples from the given relation definitions.
+// Tuple calculation merges values from both common and reporter representations.
 func NewJsonSchemaWithRelations(jsonSchema string, relations []model.RelationDef) model.Schema {
 	return JsonSchemaWithRelations{jsonSchema: jsonSchema, relations: relations}
 }

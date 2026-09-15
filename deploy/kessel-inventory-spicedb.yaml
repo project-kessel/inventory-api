@@ -1,0 +1,396 @@
+apiVersion: template.openshift.io/v1
+kind: Template
+metadata:
+  name: inventory
+objects:
+  - apiVersion: cloud.redhat.com/v1alpha1
+    kind: ClowdApp
+    metadata:
+      name: kessel-inventory
+    spec:
+      envName: ${ENV_NAME}
+      database:
+        name: kessel-inventory
+      kafkaTopics:
+      - topicName: outbox.event.kessel.tuples
+        partitions: 1
+        replicas: 3
+      - topicName: outbox.event.kessel.resources
+        partitions: 1
+        replicas: 3
+      optionalDependencies:
+        - kessel-relations
+      deployments:
+        - name: api
+          replicas: ${{REPLICAS}}
+          podSpec:
+            initContainers:
+            - name: copy-resources
+              image: registry.access.redhat.com/ubi9
+              imagePullPolicy: Always
+              command:
+                - /bin/sh
+                - "-c"
+                - |
+                  echo "Extracting resources from tarball..."
+                  tar -xzf /mnt/resources/resources.tar.gz -C /data/schema/resources
+                  echo "Extraction complete!"
+              volumeMounts:
+                - name: resources-tarball
+                  mountPath: "/mnt/resources"
+                - name: resource-volume
+                  mountPath: "/data/schema/resources"
+            - name: migration
+              image: ${INVENTORY_IMAGE}:${IMAGE_TAG}
+              command: ["inventory-api"]
+              args: ["migrate"]
+              inheritEnv: true
+            image: ${INVENTORY_IMAGE}:${IMAGE_TAG}
+            command: ["inventory-api"]
+            args: ["serve"]
+            livenessProbe:
+              httpGet:
+                path: /api/kessel/v1/livez
+                port: 8000
+              timeoutSeconds: 5
+              periodSeconds: 15
+              failureThreshold: 3
+            readinessProbe:
+              httpGet:
+                path: /api/kessel/v1/readyz
+                port: 8000
+              timeoutSeconds: 5
+              periodSeconds: 10
+              failureThreshold: 3
+            resources:
+              requests:
+                memory: ${INVENTORY_REQUESTS_MEMORY}
+                cpu: ${INVENTORY_REQUESTS_CPU}
+              limits:
+                memory: ${INVENTORY_LIMITS_MEMORY}
+                cpu: ${INVENTORY_LIMITS_CPU}
+            env:
+            - name: CLOWDER_ENABLED
+              value: "true"
+            - name: INVENTORY_API_CONFIG
+              value: "/inventory/inventory-api-config.yaml"
+            - name: PGDATA
+              value: /temp/data
+            volumeMounts:
+                - name: config-volume
+                  mountPath: "/inventory"
+                - name: kafka-ca-certs
+                  mountPath: "/kafka-ca-certs"
+                - name: resource-volume
+                  mountPath: "/data/schema/resources"
+                - name: resources-tarball
+                  mountPath: "/mnt/resources"
+                - name: spicedb-schema
+                  mountPath: "/etc/spicedb-schema"
+                - name: spicedb-secret
+                  mountPath: "/etc/spicedb-secret"
+                  readOnly: true
+            volumes:
+              - name: config-volume
+                secret:
+                  secretName: ${INVENTORY_API_CONFIG_SECRET}
+              - name: kafka-ca-certs
+                secret:
+                  secretName: ${CA_CERT_SECRET}
+                  optional: true
+              - name: resource-volume
+                emptyDir: { }
+              - name: resources-tarball
+                configMap:
+                  name: resources-tarball
+              - name: spicedb-schema
+                configMap:
+                  name: ${SPICEDB_SCHEMA_CONFIGMAP}
+                  optional: true
+              - name: spicedb-secret
+                secret:
+                  secretName: ${SPICEDB_SECRET_NAME}
+                  optional: true
+                  items:
+                    - key: preshared_key
+                      path: preshared_key
+          webServices:
+            public:
+              enabled: true
+              h2cEnabled: true
+              h2cTargetPort: 9000
+              apiPath: inventory
+      testing:
+        iqePlugin: kessel-inventory
+
+  - apiVersion: batch/v1
+    kind: CronJob
+    metadata:
+      name: business-metrics-collect
+      labels:
+        app: kessel-inventory-jobs
+        job-type: metrics-collect
+    spec:
+      suspend: ${{METRICS_CRONJOB_SUSPEND}}
+      schedule: "@daily"
+      concurrencyPolicy: Forbid
+      successfulJobsHistoryLimit: 3
+      failedJobsHistoryLimit: 3
+      jobTemplate:
+        metadata:
+          labels:
+            app: kessel-inventory-jobs
+            job-type: metrics-collect
+        spec:
+          backoffLimit: 3
+          template:
+            metadata:
+              labels:
+                app: kessel-inventory-jobs
+                job-type: metrics-collect
+            spec:
+              restartPolicy: OnFailure
+              containers:
+                - name: metrics-collect
+                  image: ${INVENTORY_IMAGE}:${IMAGE_TAG}
+                  imagePullPolicy: Always
+                  command:
+                    - inventory-api
+                    - run-job
+                    - metrics-collect-job
+                    - --retention-days=${RETENTION_DAYS}
+                  env:
+                    - name: CLOWDER_ENABLED
+                      value: "true"
+                    - name: INVENTORY_API_CONFIG
+                      value: "/inventory/inventory-api-config.yaml"
+                    - name: PGDATA
+                      value: /temp/data
+                    - name: INVENTORY_API_STORAGE_POSTGRES_HOST
+                      valueFrom:
+                        secretKeyRef:
+                          name: kessel-inventory-db
+                          key: db.host
+                          optional: true
+                    - name: INVENTORY_API_STORAGE_POSTGRES_PORT
+                      valueFrom:
+                        secretKeyRef:
+                          name: kessel-inventory-db
+                          key: db.port
+                          optional: true
+                    - name: INVENTORY_API_STORAGE_POSTGRES_DBNAME
+                      valueFrom:
+                        secretKeyRef:
+                          name: kessel-inventory-db
+                          key: db.name
+                          optional: true
+                    - name: INVENTORY_API_STORAGE_POSTGRES_USER
+                      valueFrom:
+                        secretKeyRef:
+                          name: kessel-inventory-db
+                          key: db.user
+                          optional: true
+                    - name: INVENTORY_API_STORAGE_POSTGRES_PASSWORD
+                      valueFrom:
+                        secretKeyRef:
+                          name: kessel-inventory-db
+                          key: db.password
+                          optional: true
+                    - name: INVENTORY_API_STORAGE_DATABASE
+                      value: postgres
+                  volumeMounts:
+                    - name: config-volume
+                      mountPath: "/inventory"
+                  resources:
+                    requests:
+                      memory: ${JOB_REQUESTS_MEMORY}
+                      cpu: ${JOB_REQUESTS_CPU}
+                    limits:
+                      memory: ${JOB_LIMITS_MEMORY}
+                      cpu: ${JOB_LIMITS_CPU}
+              volumes:
+                - name: config-volume
+                  secret:
+                    secretName: ${INVENTORY_API_CONFIG_SECRET}
+
+  - kind: PodDisruptionBudget
+    apiVersion: policy/v1
+    metadata:
+      name: kessel-inventory-api-pdb
+    spec:
+      minAvailable: 1
+      selector:
+        matchLabels:
+          app: kessel-inventory
+
+  - apiVersion: authzed.com/v1alpha1
+    kind: SpiceDBCluster
+    metadata:
+      name: kessel-relations-spicedb
+    spec:
+      config:
+        logLevel: ${SPICEDB_LOG_LEVEL}
+        logFormat: json
+        grpcLogRequestsEnabled: "true"
+        replicas: ${{SPICEDB_REPLICAS}}
+        datastoreEngine: postgres
+        image: ${SPICEDB_IMAGE}
+      secretName: spicedb-config
+      patches:
+      - kind: Job
+        patch:
+          spec:
+            template:
+              spec:
+                containers:
+                  - name: migrate
+                    volumeMounts:
+                      - mountPath: /etc/tls/rds.pem
+                        name: rds-tls
+                        subPath: db.ca_cert
+                volumes:
+                  - name: rds-tls
+                    secret:
+                      secretName: kessel-relations-spicedb
+      - kind: Deployment
+        patch:
+          spec:
+            template:
+              spec:
+                affinity:
+                  podAntiAffinity:
+                    preferredDuringSchedulingIgnoredDuringExecution:
+                    - weight: 100
+                      podAffinityTerm:
+                        labelSelector:
+                          matchExpressions:
+                          - key: app.kubernetes.io/instance
+                            operator: In
+                            values:
+                            - kessel-relations-spicedb-spicedb
+                        topologyKey: kubernetes.io/hostname
+                containers:
+                - name: spicedb
+                  resources:
+                    requests:
+                      memory: ${SPICEDB_REQUESTS_MEMORY}
+                      cpu: ${SPICEDB_REQUESTS_CPU}
+                    limits:
+                      memory: ${SPICEDB_LIMITS_MEMORY}
+                      cpu: ${SPICEDB_LIMITS_CPU}
+                  env:
+                    - name: SPICEDB_DATASTORE_REVISION_QUANTIZATION_INTERVAL
+                      value: ${SPICEDB_QUANTIZATION_INTERVAL}
+                    - name: SPICEDB_DATASTORE_REVISION_QUANTIZATION_MAX_STALENESS_PERCENT
+                      value: ${SPICEDB_QUANTIZATION_STALENESS_PERCENT}
+                    - name: SPICEDB_DATASTORE_CONN_POOL_READ_MAX_OPEN
+                      value: ${SPICEDB_DATASTORE_MAX_CONN_OPEN}
+                    - name: SPICEDB_DATASTORE_CONN_POOL_READ_MIN_OPEN
+                      value: ${SPICEDB_DATASTORE_MIN_CONN_OPEN}
+                    - name: SPICEDB_ENABLE_EXPERIMENTAL_WATCHABLE_SCHEMA_CACHE
+                      value: ${SPICEDB_ENABLE_WATCHABLE_SCHEMA_CACHE}
+                    - name: SPICEDB_WRITE_RELATIONSHIPS_MAX_UPDATES_PER_CALL
+                      value: ${SPICEDB_WRITE_RELATIONSHIPS_MAX_UPDATES_PER_CALL}
+                  volumeMounts:
+                    - name: rds-tls
+                      mountPath: /etc/tls/rds.pem
+                      subPath: db.ca_cert
+                volumes:
+                  - name: rds-tls
+                    secret:
+                      secretName: kessel-relations-spicedb
+parameters:
+  - description: ClowdEnvironment name (ephemeral, stage, prod)
+    name: ENV_NAME
+    required: true
+  - description: App Image
+    name: INVENTORY_IMAGE
+    value: quay.io/redhat-services-prod/project-kessel-tenant/kessel-inventory/inventory-api
+  - description: Image Tag
+    name: IMAGE_TAG
+    required: true
+    value: latest
+  - description: Number of replicas
+    name: REPLICAS
+    value: "1"
+  - description: Name of the Inventory API Config K8s secret
+    name: INVENTORY_API_CONFIG_SECRET
+    value: inventory-api-config
+  - description: Name of Secret that contains the Kafka clusters' CA Cert (if required)
+    name: CA_CERT_SECRET
+    value: kessel-kafka-connect-config
+  - description: Memory request for Inventory service
+    name: INVENTORY_REQUESTS_MEMORY
+    value: '512Mi'
+  - description: CPU request for Inventory service
+    name: INVENTORY_REQUESTS_CPU
+    value: '250m'
+  - description: Memory limit for Inventory service
+    name: INVENTORY_LIMITS_MEMORY
+    value: '1Gi'
+  - description: CPU limit for Inventory service
+    name: INVENTORY_LIMITS_CPU
+    value: '500m'
+  - description: Memory request for job
+    name: JOB_REQUESTS_MEMORY
+    value: '256Mi'
+  - description: CPU request for job
+    name: JOB_REQUESTS_CPU
+    value: '100m'
+  - description: Memory limit for job
+    name: JOB_LIMITS_MEMORY
+    value: '384Mi'
+  - description: CPU limit for job
+    name: JOB_LIMITS_CPU
+    value: '200m'
+  - description: Number of days to retain metrics summary data
+    name: RETENTION_DAYS
+    value: "30"
+  - description: Suspend the metrics collection CronJob (set to true to disable)
+    name: METRICS_CRONJOB_SUSPEND
+    value: "false"
+  - description: K8s secret containing SpiceDB preshared key (mounted as token-file)
+    name: SPICEDB_SECRET_NAME
+    value: "spicedb-config"
+  - description: ConfigMap containing SpiceDB schema.zed
+    name: SPICEDB_SCHEMA_CONFIGMAP
+    value: "spicedb-schema"
+  - description: SpiceDB Image
+    name: SPICEDB_IMAGE
+    value: quay.io/redhat-services-prod/project-kessel-tenant/kessel-relations/spicedb:latest
+  - description: Number of SpiceDB pods
+    name: SPICEDB_REPLICAS
+    value: '1'
+  - description: Memory request for SpiceDB
+    name: SPICEDB_REQUESTS_MEMORY
+    value: '128Mi'
+  - description: CPU request for SpiceDB
+    name: SPICEDB_REQUESTS_CPU
+    value: '25m'
+  - description: Memory limit for SpiceDB
+    name: SPICEDB_LIMITS_MEMORY
+    value: '256Mi'
+  - description: CPU limit for SpiceDB
+    name: SPICEDB_LIMITS_CPU
+    value: '100m'
+  - description: SpiceDB quantization interval
+    name: SPICEDB_QUANTIZATION_INTERVAL
+    value: '5s'
+  - description: SpiceDB quantization max staleness percent
+    name: SPICEDB_QUANTIZATION_STALENESS_PERCENT
+    value: '0.1'
+  - description: Maximum number of open read connections to datastore
+    name: SPICEDB_DATASTORE_MAX_CONN_OPEN
+    value: '20'
+  - description: Minimum number of open read connections to datastore
+    name: SPICEDB_DATASTORE_MIN_CONN_OPEN
+    value: '20'
+  - description: Enable the experimental watchable schema cache
+    name: SPICEDB_ENABLE_WATCHABLE_SCHEMA_CACHE
+    value: 'false'
+  - description: Maximum number of updates per WriteRelationships call
+    name: SPICEDB_WRITE_RELATIONSHIPS_MAX_UPDATES_PER_CALL
+    value: '1000'
+  - description: SpiceDB log level (trace, debug, info, warn, error)
+    name: SPICEDB_LOG_LEVEL
+    value: info

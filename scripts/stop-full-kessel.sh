@@ -9,4 +9,4 @@ ENV_FILE="${COMPOSE_DIR}/.env"
 ${DOCKER} compose --env-file "${ENV_FILE}" \
   --profile relations --profile consumer --profile rbac --profile monitoring \
   -f "${COMPOSE_DIR}/docker-compose.yaml" \
-  down
+  down --volumes --remove-orphans

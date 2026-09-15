@@ -1,0 +1,14 @@
+{
+  "publicPort": 8080,
+  "database": {
+    "name": "postgres",
+    "username": "postgres",
+    "password": "postgres",
+    "hostname": "rbac-database",
+    "port": 5432
+  },
+  "inMemoryDb": {
+    "hostname": "redis",
+    "port": 6379
+  }
+}

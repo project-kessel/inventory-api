@@ -314,9 +314,8 @@ services:
   rbac-migrate:
     image: "${RBAC_IMAGE}"
     profiles: ["rbac"]
-    entrypoint: ["bash", "/opt/rbac/deploy/init-container-setup.sh"]
+    entrypoint: ["bash", "/rbac-init-container-setup.sh"]
     environment:
-      - MIGRATE_AND_SEED_ON_INIT=True
       - DATABASE_NAME=postgres
       - DATABASE_USER=postgres
       - DATABASE_PASSWORD=postgres
@@ -324,11 +323,26 @@ services:
       - DATABASE_PORT=5432
       - PGSSLMODE=disable
       - ACCESS_CACHE_CONNECT_SIGNALS=False
+      - REPLICATION_TO_RELATION_ENABLED=True
+      - KAFKA_CONNECT_URL=http://kafka-connect:8083
+      - KAFKA_CONNECTOR_NAME=rbac-outbox-connector
+      - SYSTEM_DEFAULT_ROOT_WORKSPACE_ROLE_UUID=23592f00-71f7-482d-be2c-e82eeb704406
+      - SYSTEM_DEFAULT_TENANT_ROLE_UUID=d8e9d8c6-1edf-41b8-951d-805e9e701f49
+      - SYSTEM_ADMIN_ROOT_WORKSPACE_ROLE_UUID=411ef1a0-75a8-4765-8e9f-377297e8ee28
+      - SYSTEM_ADMIN_TENANT_ROLE_UUID=a62b9113-593d-471b-96aa-971d6e748a9b
+      # These settings must match rbac-server so seeded roles can be attached
+      # to the appropriate platform-role scopes during forced relation seeding.
+      - ROOT_SCOPE_PERMISSIONS=advisor:*:*,patch:*:*,staleness:*:*
+      - TENANT_SCOPE_PERMISSIONS=rbac:*:*,subscriptions:*:*
+      - DEFAULT_SCOPE_PERMISSIONS=rbac:role_binding:*,subscriptions:reports:*,subscriptions:manifests:*,subscriptions:cloud_access:*
     volumes:
       - ./configs/rbac-role-definitions:/opt/rbac/rbac/management/role/definitions:ro,z
+      - ./configs/rbac-init-container-setup.sh:/rbac-init-container-setup.sh:ro,z
     restart: "on-failure"
     depends_on:
       rbac-database:
+        condition: service_healthy
+      kafka-connect:
         condition: service_healthy
     networks:
       - kessel
@@ -401,7 +415,15 @@ services:
       - DATABASE_PORT=5432
       - PGSSLMODE=disable
       - REDIS_HOST=redis
-      - DEVELOPMENT=True
+      # Preserve the x-rh-identity header supplied by integration tests and
+      # local clients; DEVELOPMENT=True replaces it with RBAC's hard-coded
+      # user_dev identity.
+      - DEVELOPMENT=False
+      # The local Inventory gRPC endpoint is plaintext. CLOWDER_ENABLED makes
+      # RBAC use its insecure local gRPC channel without enabling the
+      # development identity middleware above.
+      - CLOWDER_ENABLED=True
+      - ACG_CONFIG=/rbac-server-acg.json
       - DJANGO_DEBUG=True
       - DJANGO_LOG_HANDLERS=console
       - API_PATH_PREFIX=/api/rbac
@@ -427,6 +449,7 @@ services:
       - ROLE_CREATE_ALLOW_LIST=catalog,catalog_local_test,cost-management,remediations,inventory,drift,policies,advisor,approval,vulnerability,compliance,automation-analytics,notifications,patch,integrations,ros,staleness
     volumes:
       - ./configs/rbac-role-definitions:/opt/rbac/rbac/management/role/definitions:ro,z
+      - ./configs/rbac-server-acg.json:/rbac-server-acg.json:ro,z
     depends_on:
       rbac-migrate:
         condition: service_completed_successfully
@@ -460,8 +483,11 @@ services:
       - DEVELOPMENT=True
       - KAFKA_ENABLED=True
       - RBAC_KAFKA_CONSUMER_TOPIC=outbox.event.relations-replication-event
+      - RBAC_KAFKA_CONSUMER_GROUP_ID=rbac-consumer-group
       - RBAC_KAFKA_CUSTOM_CONSUMER_BROKER=kafka:9093
       - RELATION_API_SERVER=relations-api:9000
+      - INVENTORY_API_SERVER=inventory-api:9081
+      - INVENTORY_API_LOCAL=True
       - REPLICATION_TO_RELATION_ENABLED=True
       - ACG_CONFIG=/acg-config.json
     volumes:
@@ -470,6 +496,10 @@ services:
       kafka:
         condition: service_healthy
       rbac-server:
+        condition: service_healthy
+      inventory-api:
+        condition: service_healthy
+      relations-api:
         condition: service_healthy
     restart: "always"
     networks:

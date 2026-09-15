@@ -313,33 +313,28 @@ func (m *inMemoryRepresentationFetcher) fetchCommon(version uint) (bizmodel.Repr
 	return nil, nil, nil
 }
 
-func (m *inMemoryRepresentationFetcher) fetchReporter(version uint) (bizmodel.Representation, *bizmodel.Version, error) {
+func (m *inMemoryRepresentationFetcher) fetchReporter(version uint, generation uint) (bizmodel.Representation, *bizmodel.Version, error) {
 	if m.reporterReps == nil {
 		return nil, nil, nil
 	}
-	// Find current reporter representation (highest generation at this version)
+	// Find reporter representation at exact version and generation
 	if generations, ok := m.reporterReps[version]; ok {
-		var maxGen uint
-		var maxEntry *storedReporterRepresentation
-		for gen, entry := range generations {
-			if maxEntry == nil || gen > maxGen {
-				maxGen = gen
-				maxEntry = entry
-			}
-		}
-		if maxEntry != nil {
-			v := bizmodel.NewVersion(maxEntry.version)
-			return bizmodel.Representation(cloneJsonObject(maxEntry.data)), &v, nil
+		if entry, ok := generations[generation]; ok {
+			v := bizmodel.NewVersion(entry.version)
+			return bizmodel.Representation(cloneJsonObject(entry.data)), &v, nil
 		}
 	}
 	return nil, nil, nil
 }
 
-func (m *inMemoryRepresentationFetcher) fetchPreviousReporter(currentVersion uint) (bizmodel.Representation, *bizmodel.Version, error) {
+func (m *inMemoryRepresentationFetcher) fetchPreviousReporter(currentVersion uint, currentGeneration uint) (bizmodel.Representation, *bizmodel.Version, error) {
 	if m.reporterReps == nil {
 		return nil, nil, nil
 	}
 	// Find previous reporter representation (immediately before current version/generation)
+	// This handles both:
+	// 1. Previous version in same generation (normal update)
+	// 2. Any version in previous generation (revival after tombstone)
 	type versionGen struct {
 		version    uint
 		generation uint
@@ -351,12 +346,13 @@ func (m *inMemoryRepresentationFetcher) fetchPreviousReporter(currentVersion uin
 			allReps = append(allReps, versionGen{v, g, entry})
 		}
 	}
-	// Find max version/generation that is less than currentVersion
+	// Find max version/generation that is before current (version, generation)
 	var maxRep *versionGen
 	for i := range allReps {
 		rep := &allReps[i]
-		if rep.version < currentVersion {
-			if maxRep == nil || rep.version > maxRep.version || (rep.version == maxRep.version && rep.generation > maxRep.generation) {
+		// Match the SQL logic: (generation = currentGeneration AND version < currentVersion) OR generation < currentGeneration
+		if (rep.generation == currentGeneration && rep.version < currentVersion) || rep.generation < currentGeneration {
+			if maxRep == nil || rep.generation > maxRep.generation || (rep.generation == maxRep.generation && rep.version > maxRep.version) {
 				maxRep = rep
 			}
 		}
@@ -371,8 +367,7 @@ func (m *inMemoryRepresentationFetcher) fetchPreviousReporter(currentVersion uin
 func (f *fakeResourceRepository) FindCurrentAndPreviousVersionedRepresentations(
 	tx *gorm.DB,
 	key bizmodel.ReporterResourceKey,
-	currentCommonVersion *bizmodel.Version,
-	currentReporterVersion *bizmodel.Version,
+	versions bizmodel.RepresentationVersions,
 	operationType bizmodel.EventOperationType,
 ) (*bizmodel.Representations, *bizmodel.Representations, error) {
 	f.mu.RLock()
@@ -390,7 +385,7 @@ func (f *fakeResourceRepository) FindCurrentAndPreviousVersionedRepresentations(
 		reporterReps:       f.reporterRepsByReporterResource[reporterResourceID],
 	}
 
-	return fetchCurrentAndPreviousRepresentations(fetcher, currentCommonVersion, currentReporterVersion, operationType)
+	return fetchCurrentAndPreviousRepresentations(fetcher, versions, operationType)
 }
 
 func (f *fakeResourceRepository) FindLatestRepresentations(tx *gorm.DB, key bizmodel.ReporterResourceKey) (*bizmodel.Representations, error) {

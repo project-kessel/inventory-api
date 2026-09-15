@@ -307,8 +307,13 @@ func (m *inMemoryRepresentationFetcher) fetchCommon(version uint) (bizmodel.Repr
 		return nil, nil, nil
 	}
 	if entry, ok := m.commonReps[version]; ok {
+		data := bizmodel.Representation(cloneJsonObject(entry.data))
+		// Empty data means "not found" - match real repository behavior
+		if len(data) == 0 {
+			return nil, nil, nil
+		}
 		v := bizmodel.NewVersion(entry.version)
-		return bizmodel.Representation(cloneJsonObject(entry.data)), &v, nil
+		return data, &v, nil
 	}
 	return nil, nil, nil
 }
@@ -320,8 +325,14 @@ func (m *inMemoryRepresentationFetcher) fetchReporter(version uint, generation u
 	// Find reporter representation at exact version and generation
 	if generations, ok := m.reporterReps[version]; ok {
 		if entry, ok := generations[generation]; ok {
+			data := bizmodel.Representation(cloneJsonObject(entry.data))
+			// Empty data means "not found" (e.g., tombstone with nil data)
+			// Match real repository behavior: return (nil, nil, nil)
+			if len(data) == 0 {
+				return nil, nil, nil
+			}
 			v := bizmodel.NewVersion(entry.version)
-			return bizmodel.Representation(cloneJsonObject(entry.data)), &v, nil
+			return data, &v, nil
 		}
 	}
 	return nil, nil, nil

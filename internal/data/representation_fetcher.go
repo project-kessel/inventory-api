@@ -86,9 +86,14 @@ func fetchCurrentAndPreviousRepresentations(
 	// Build current and previous Representations
 	var current, previous *bizmodel.Representations
 
-	current, err = bizmodel.NewRepresentations(currentCommon, currentCommonVer, currentReporter, currentReporterVer)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to create current representation: %w", err)
+	// Only build current if at least one stream returned a version.
+	// For tombstones (delete operations), the fetch returns (nil, nil, nil),
+	// so both versions will be nil and we skip building current.
+	if currentCommonVer != nil || currentReporterVer != nil {
+		current, err = bizmodel.NewRepresentations(currentCommon, currentCommonVer, currentReporter, currentReporterVer)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to create current representation: %w", err)
+		}
 	}
 
 	// Only build previous if at least one stream advanced to a previous version

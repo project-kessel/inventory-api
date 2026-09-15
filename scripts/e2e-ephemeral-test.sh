@@ -62,7 +62,7 @@ if [ $DEPLOY_EXIT_CODE -ne 0 ]; then
 fi
 
 # Extract namespace from bonfire output - look for "successfully deployed to namespace"
-NAMESPACE=$(echo "$BONFIRE_OUTPUT" | grep -oE "successfully deployed to namespace [a-z0-9-]+" | awk '{print $NF}')
+NAMESPACE=$(oc project -q)
 
 if [ -z "$NAMESPACE" ]; then
     # Try alternate method - look for "namespace:" line
@@ -381,4 +381,3 @@ log_info "To release the namespace, run: bonfire namespace release $NAMESPACE"
 log_info "Or the script will auto-release it on next run"
 
 exit 0
-

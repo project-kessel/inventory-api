@@ -320,7 +320,7 @@ func (i *InventoryConsumer) ProcessMessage(headers map[string]string, relationsE
 		if relationsEnabled {
 			return i.processRelationsOperation(operation, txid, msg, operationConfig{
 				fetchRepresentations: func(i *InventoryConsumer, key model.ReporterResourceKey, versions model.RepresentationVersions) (*model.Representations, *model.Representations, error) {
-					previous, err := i.ResourceRepository.FindLatestRepresentations(nil, key)
+					_, previous, err := i.ResourceRepository.FindCurrentAndPreviousVersionedRepresentations(nil, key, versions, model.OperationTypeDeleted)
 					return nil, previous, err
 				},
 				executeSpiceDB: func(i *InventoryConsumer, tuples model.TuplesToReplicate) (string, error) {

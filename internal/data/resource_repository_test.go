@@ -2811,6 +2811,81 @@ func TestFindLatestRepresentations_ReporterOnlyAfterDelete(t *testing.T) {
 	assert.Equal(t, "reporter-only-delete", latest.ReporterData()["cluster_id"])
 }
 
+// TestFindCurrentAndPreviousVersionedRepresentations_ReporterOnlyDelete tests that
+// delete operations on reporter-only resources (no common representation) work correctly.
+// Regression test for the tombstone fetch bug where fetching a deleted reporter-only
+// resource would fail with "at least one of common or reporter representation must be present".
+func TestFindCurrentAndPreviousVersionedRepresentations_ReporterOnlyDelete(t *testing.T) {
+	implementations := []struct {
+		name string
+		repo func() bizmodel.ResourceRepository
+		db   func() *gorm.DB
+	}{
+		{
+			name: "Real Repository",
+			repo: func() bizmodel.ResourceRepository {
+				db := setupInMemoryDB(t)
+				mc := metricscollector.NewFakeMetricsCollector()
+				tm := NewGormTransactionManager(mc, 3)
+				return NewResourceRepository(db, tm, noopOutboxPublisher())
+			},
+			db: func() *gorm.DB {
+				return setupInMemoryDB(t)
+			},
+		},
+		{
+			name: "Fake Repository",
+			repo: func() bizmodel.ResourceRepository {
+				return NewFakeResourceRepository()
+			},
+			db: func() *gorm.DB {
+				return nil
+			},
+		},
+	}
+
+	for _, impl := range implementations {
+		t.Run(impl.name, func(t *testing.T) {
+			if testing.Short() && impl.name == "Real Repository" {
+				t.Skip("skipping real repository test in short mode")
+			}
+
+			repo := impl.repo()
+			db := impl.db()
+
+			// Create a reporter-only resource (no common representation)
+			resource, key := createResourceNoCommon(t, "reporter-only-delete-versioned")
+			require.NoError(t, repo.Save(db, resource, bizmodel.OperationTypeCreated, emptyTxId))
+
+			// Delete the resource
+			found, err := repo.FindResourceByKeys(db, key)
+			require.NoError(t, err)
+			require.NoError(t, found.Delete(key))
+			require.NoError(t, repo.Save(db, *found, bizmodel.OperationTypeDeleted, emptyTxId))
+
+			// Fetch using versioned method with the delete event's versions
+			// The delete event has reporter version=1 (the tombstone)
+			reporterVersion := bizmodel.NewVersion(1)
+			reporterGeneration := bizmodel.NewGeneration(0)
+			versions := bizmodel.NewRepresentationVersions(nil, &reporterVersion, &reporterGeneration)
+
+			current, previous, err := repo.FindCurrentAndPreviousVersionedRepresentations(db, key, versions, bizmodel.OperationTypeDeleted)
+			require.NoError(t, err, "must not error when fetching delete of reporter-only resource")
+
+			// For delete operations, current may be nil (tombstone), but previous should have the data
+			// The consumer only uses previous for deletes anyway
+			require.NotNil(t, previous, "previous should contain the pre-delete representation")
+			assert.Equal(t, bizmodel.NewVersion(0), *previous.ReporterVersion(), "previous should be version 0 (pre-delete)")
+			assert.Equal(t, "reporter-only-delete-versioned", previous.ReporterData()["cluster_id"])
+
+			// Current may be nil (tombstone has no data), which is expected and fine for delete operations
+			if current != nil {
+				t.Logf("current is non-nil (unexpected but allowed): %+v", current)
+			}
+		})
+	}
+}
+
 func TestHasTransactionIdBeenProcessed(t *testing.T) {
 	implementations := []struct {
 		name string

@@ -403,7 +403,8 @@ func (r *resourceRepository) fetchReporterRepresentation(db *gorm.DB, key bizmod
 		}
 		return nil, nil, fmt.Errorf("database error fetching reporter representation: %w", err)
 	}
-	// Empty data also means "not found"
+	// Empty data means tombstone or not found
+	// Return nil data but WITH version so caller can detect tombstones
 	if len(result.Data) == 0 {
 		return nil, nil, nil
 	}

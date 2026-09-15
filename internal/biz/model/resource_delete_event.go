@@ -82,6 +82,12 @@ func (re ResourceDeleteEvent) CurrentReporterRepresentationVersion() *Version {
 	return &re.reporterRepresentation.version
 }
 
+// CurrentReporterGeneration returns the generation from the ReporterRepresentation
+func (re ResourceDeleteEvent) CurrentReporterGeneration() *Generation {
+	gen := re.reporterRepresentation.Generation()
+	return &gen
+}
+
 // ReporterResourceKey constructs and returns the ReporterResourceKey from the event fields
 func (re ResourceDeleteEvent) ReporterResourceKey() ReporterResourceKey {
 	return ReporterResourceKey{

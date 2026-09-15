@@ -294,8 +294,8 @@ func (i *InventoryConsumer) ProcessMessage(headers map[string]string, relationsE
 	case string(model.OperationTypeCreated):
 		if relationsEnabled {
 			return i.processRelationsOperation(operation, txid, msg, operationConfig{
-				fetchRepresentations: func(i *InventoryConsumer, key model.ReporterResourceKey, version *model.Version) (*model.Representations, *model.Representations, error) {
-					return i.ResourceRepository.FindCurrentAndPreviousVersionedRepresentations(nil, key, version, model.OperationTypeCreated)
+				fetchRepresentations: func(i *InventoryConsumer, key model.ReporterResourceKey, versions model.RepresentationVersions) (*model.Representations, *model.Representations, error) {
+					return i.ResourceRepository.FindCurrentAndPreviousVersionedRepresentations(nil, key, versions, model.OperationTypeCreated)
 				},
 				executeSpiceDB: func(i *InventoryConsumer, tuples model.TuplesToReplicate) (string, error) {
 					return i.CreateTuple(context.Background(), tuples.TuplesToCreate())
@@ -307,8 +307,8 @@ func (i *InventoryConsumer) ProcessMessage(headers map[string]string, relationsE
 	case string(model.OperationTypeUpdated):
 		if relationsEnabled {
 			return i.processRelationsOperation(operation, txid, msg, operationConfig{
-				fetchRepresentations: func(i *InventoryConsumer, key model.ReporterResourceKey, version *model.Version) (*model.Representations, *model.Representations, error) {
-					return i.ResourceRepository.FindCurrentAndPreviousVersionedRepresentations(nil, key, version, model.OperationTypeUpdated)
+				fetchRepresentations: func(i *InventoryConsumer, key model.ReporterResourceKey, versions model.RepresentationVersions) (*model.Representations, *model.Representations, error) {
+					return i.ResourceRepository.FindCurrentAndPreviousVersionedRepresentations(nil, key, versions, model.OperationTypeUpdated)
 				},
 				executeSpiceDB: func(i *InventoryConsumer, tuples model.TuplesToReplicate) (string, error) {
 					return i.UpdateTuple(context.Background(), tuples.TuplesToCreate(), tuples.TuplesToDelete())
@@ -319,8 +319,8 @@ func (i *InventoryConsumer) ProcessMessage(headers map[string]string, relationsE
 	case string(model.OperationTypeDeleted):
 		if relationsEnabled {
 			return i.processRelationsOperation(operation, txid, msg, operationConfig{
-				fetchRepresentations: func(i *InventoryConsumer, key model.ReporterResourceKey, version *model.Version) (*model.Representations, *model.Representations, error) {
-					previous, err := i.ResourceRepository.FindLatestRepresentations(nil, key)
+				fetchRepresentations: func(i *InventoryConsumer, key model.ReporterResourceKey, versions model.RepresentationVersions) (*model.Representations, *model.Representations, error) {
+					_, previous, err := i.ResourceRepository.FindCurrentAndPreviousVersionedRepresentations(nil, key, versions, model.OperationTypeDeleted)
 					return nil, previous, err
 				},
 				executeSpiceDB: func(i *InventoryConsumer, tuples model.TuplesToReplicate) (string, error) {
@@ -339,7 +339,7 @@ func (i *InventoryConsumer) ProcessMessage(headers map[string]string, relationsE
 }
 
 type operationConfig struct {
-	fetchRepresentations func(i *InventoryConsumer, key model.ReporterResourceKey, version *model.Version) (*model.Representations, *model.Representations, error)
+	fetchRepresentations func(i *InventoryConsumer, key model.ReporterResourceKey, versions model.RepresentationVersions) (*model.Representations, *model.Representations, error)
 	executeSpiceDB       func(i *InventoryConsumer, tuples model.TuplesToReplicate) (string, error)
 	metricName           string
 }
@@ -361,8 +361,9 @@ func (i *InventoryConsumer) processRelationsOperation(
 	}
 
 	key := tupleEvent.ReporterResourceKey()
+	versions := model.NewRepresentationVersionsFromTupleEvent(*tupleEvent)
 
-	current, previous, err := config.fetchRepresentations(i, key, tupleEvent.CommonVersion())
+	current, previous, err := config.fetchRepresentations(i, key, versions)
 	if err != nil {
 		metricscollector.Incr(i.MetricsCollector.MsgProcessFailures, "FindRepresentations")
 		i.Logger.Errorf("failed to find representations: %v", err)

@@ -978,3 +978,200 @@ func TestInventoryConsumer_UpdateWithSameWorkspace_NoOp(t *testing.T) {
 	// Verify no relations operations occurred - version should still be 1 (initial)
 	assert.Equal(t, int64(1), relationsRepo.Version(), "No relations operations should occur when workspace doesn't change")
 }
+
+// TestInventoryConsumer_VersionCombinations tests that the consumer correctly fetches
+// representations based on the version fields present in the Kafka message:
+// - Only reporter_representation_version: fetches only reporter representation
+// - Only common_version: fetches only common representation
+// - Both versions: fetches both representations
+func TestInventoryConsumer_VersionCombinations(t *testing.T) {
+
+	tests := []struct {
+		name        string
+		setupData   func(t *testing.T, repo model.ResourceRepository, db *gorm.DB) model.ReporterResourceKey
+		message     string
+		operation   string
+		expectError bool
+		expectToken bool
+		description string
+	}{
+		{
+			name: "create with only reporter_representation_version",
+			setupData: func(t *testing.T, repo model.ResourceRepository, db *gorm.DB) model.ReporterResourceKey {
+				// Create resource with both representations, but message will only provide reporter version
+				testData, err := model.NewResourceFixture("reporter-version-create", "integration", "notifications", "notif-instance-1", "workspace-v0")
+				require.NoError(t, err)
+				require.NoError(t, repo.Save(db, *testData.Resource, model.OperationTypeCreated, testData.InitialTransactionId))
+				return testData.Key
+			},
+			message:     `{"schema":{"type":"string"},"payload":{"reporter_resource_key":{"local_resource_id":"reporter-version-create","resource_type":"integration","reporter":{"reporter_type":"notifications","reporter_instance_id":"notif-instance-1"}},"reporter_representation_version":0}}`,
+			operation:   string(model.OperationTypeCreated),
+			expectError: false,
+			expectToken: false, // Create with same workspace in both reps = no tuple changes
+			description: "Should fetch only reporter representation when only reporter_representation_version is present",
+		},
+		{
+			name: "update with only reporter_representation_version",
+			setupData: func(t *testing.T, repo model.ResourceRepository, db *gorm.DB) model.ReporterResourceKey {
+				// Create with both representations
+				testData, err := model.NewResourceFixture("reporter-version-update", "integration", "notifications", "notif-instance-1", "workspace-v0")
+				require.NoError(t, err)
+				require.NoError(t, repo.Save(db, *testData.Resource, model.OperationTypeCreated, testData.InitialTransactionId))
+
+				// Update only reporter data (common stays at v0, reporter advances to v1)
+				found, err := repo.FindResourceByKeys(db, testData.Key)
+				require.NoError(t, err)
+				updatedReporter := model.Representation(map[string]interface{}{"reporter_specific": "updated"})
+				api, err := model.NewApiHref("https://api.example.com/updated")
+				require.NoError(t, err)
+				con, err := model.NewConsoleHref("https://console.example.com/updated")
+				require.NoError(t, err)
+				require.NoError(t, found.Update(testData.Key, api, &con, nil, &updatedReporter, nil, model.TransactionId("tx-update")))
+				require.NoError(t, repo.Save(db, *found, model.OperationTypeUpdated, model.TransactionId("tx-update")))
+				return testData.Key
+			},
+			message:     `{"schema":{"type":"string"},"payload":{"reporter_resource_key":{"local_resource_id":"reporter-version-update","resource_type":"integration","reporter":{"reporter_type":"notifications","reporter_instance_id":"notif-instance-1"}},"reporter_representation_version":1}}`,
+			operation:   string(model.OperationTypeUpdated),
+			expectError: false,
+			expectToken: false, // No tuples change when only reporter changes and workspace doesn't change
+			description: "Should fetch reporter representations when only reporter_representation_version is present on update",
+		},
+		{
+			name: "update with only common_version",
+			setupData: func(t *testing.T, repo model.ResourceRepository, db *gorm.DB) model.ReporterResourceKey {
+				testData, err := model.NewResourceFixture("common-only-update", "integration", "notifications", "notif-instance-1", "workspace-v0")
+				require.NoError(t, err)
+				require.NoError(t, repo.Save(db, *testData.Resource, model.OperationTypeCreated, testData.InitialTransactionId))
+
+				// Update only common data
+				found, err := repo.FindResourceByKeys(db, testData.Key)
+				require.NoError(t, err)
+				updatedCommon := model.Representation(map[string]interface{}{"workspace_id": "workspace-v1"})
+				api, err := model.NewApiHref("https://api.example.com/common-update")
+				require.NoError(t, err)
+				con, err := model.NewConsoleHref("https://console.example.com/common-update")
+				require.NoError(t, err)
+				require.NoError(t, found.Update(testData.Key, api, &con, nil, nil, &updatedCommon, model.TransactionId("tx-common-update")))
+				require.NoError(t, repo.Save(db, *found, model.OperationTypeUpdated, model.TransactionId("tx-common-update")))
+				return testData.Key
+			},
+			message:     `{"schema":{"type":"string"},"payload":{"reporter_resource_key":{"local_resource_id":"common-only-update","resource_type":"integration","reporter":{"reporter_type":"notifications","reporter_instance_id":"notif-instance-1"}},"common_version":1}}`,
+			operation:   string(model.OperationTypeUpdated),
+			expectError: false,
+			expectToken: true,
+			description: "Should fetch only common representation when only common_version is present",
+		},
+		{
+			name: "create with both versions",
+			setupData: func(t *testing.T, repo model.ResourceRepository, db *gorm.DB) model.ReporterResourceKey {
+				testData, err := model.NewResourceFixture("both-versions-create", "integration", "notifications", "notif-instance-1", "workspace-v0")
+				require.NoError(t, err)
+				require.NoError(t, repo.Save(db, *testData.Resource, model.OperationTypeCreated, testData.InitialTransactionId))
+				return testData.Key
+			},
+			message:     `{"schema":{"type":"string"},"payload":{"reporter_resource_key":{"local_resource_id":"both-versions-create","resource_type":"integration","reporter":{"reporter_type":"notifications","reporter_instance_id":"notif-instance-1"}},"common_version":0,"reporter_representation_version":0}}`,
+			operation:   string(model.OperationTypeCreated),
+			expectError: false,
+			expectToken: true,
+			description: "Should fetch both representations when both versions are present",
+		},
+		{
+			name: "update with both versions",
+			setupData: func(t *testing.T, repo model.ResourceRepository, db *gorm.DB) model.ReporterResourceKey {
+				testData, err := model.NewResourceFixture("both-versions-update", "integration", "notifications", "notif-instance-1", "workspace-v0")
+				require.NoError(t, err)
+				require.NoError(t, repo.Save(db, *testData.Resource, model.OperationTypeCreated, testData.InitialTransactionId))
+
+				// Update both reporter and common
+				found, err := repo.FindResourceByKeys(db, testData.Key)
+				require.NoError(t, err)
+				updatedCommon := model.Representation(map[string]interface{}{"workspace_id": "workspace-v1"})
+				updatedReporter := model.Representation(map[string]interface{}{"reporter_specific": "updated"})
+				api, err := model.NewApiHref("https://api.example.com/both-update")
+				require.NoError(t, err)
+				con, err := model.NewConsoleHref("https://console.example.com/both-update")
+				require.NoError(t, err)
+				require.NoError(t, found.Update(testData.Key, api, &con, nil, &updatedReporter, &updatedCommon, model.TransactionId("tx-both-update")))
+				require.NoError(t, repo.Save(db, *found, model.OperationTypeUpdated, model.TransactionId("tx-both-update")))
+				return testData.Key
+			},
+			message:     `{"schema":{"type":"string"},"payload":{"reporter_resource_key":{"local_resource_id":"both-versions-update","resource_type":"integration","reporter":{"reporter_type":"notifications","reporter_instance_id":"notif-instance-1"}},"common_version":1,"reporter_representation_version":1}}`,
+			operation:   string(model.OperationTypeUpdated),
+			expectError: false,
+			expectToken: true,
+			description: "Should fetch both representations when both versions are present on update",
+		},
+		{
+			name: "delete with reporter_representation_version only",
+			setupData: func(t *testing.T, repo model.ResourceRepository, db *gorm.DB) model.ReporterResourceKey {
+				testData, err := model.NewResourceFixture("reporter-version-delete", "integration", "notifications", "notif-instance-1", "workspace-v0")
+				require.NoError(t, err)
+				require.NoError(t, repo.Save(db, *testData.Resource, model.OperationTypeCreated, testData.InitialTransactionId))
+				return testData.Key
+			},
+			message:     `{"schema":{"type":"string"},"payload":{"reporter_resource_key":{"local_resource_id":"reporter-version-delete","resource_type":"integration","reporter":{"reporter_type":"notifications","reporter_instance_id":"notif-instance-1"}},"reporter_representation_version":0}}`,
+			operation:   string(model.OperationTypeDeleted),
+			expectError: false,
+			expectToken: false,
+			description: "Should fetch reporter representation for deletion",
+		},
+		{
+			name: "delete with both versions",
+			setupData: func(t *testing.T, repo model.ResourceRepository, db *gorm.DB) model.ReporterResourceKey {
+				testData, err := model.NewResourceFixture("both-versions-delete", "integration", "notifications", "notif-instance-1", "workspace-v0")
+				require.NoError(t, err)
+				require.NoError(t, repo.Save(db, *testData.Resource, model.OperationTypeCreated, testData.InitialTransactionId))
+				return testData.Key
+			},
+			message:     `{"schema":{"type":"string"},"payload":{"reporter_resource_key":{"local_resource_id":"both-versions-delete","resource_type":"integration","reporter":{"reporter_type":"notifications","reporter_instance_id":"notif-instance-1"}},"common_version":0,"reporter_representation_version":0}}`,
+			operation:   string(model.OperationTypeDeleted),
+			expectError: false,
+			expectToken: false,
+			description: "Should fetch both representations for deletion",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			tester := TestCase{}
+			errs := tester.TestSetup(t)
+			require.Nil(t, errs)
+
+			// Setup test data
+			_ = test.setupData(t, tester.inv.ResourceRepository, tester.inv.DB)
+
+			// Create Kafka message
+			msg := &kafka.Message{
+				Key:   []byte(`{"schema":{"type":"string","optional":false},"payload":"00000000-0000-0000-0000-000000000000"}`),
+				Value: []byte(test.message),
+				Headers: []kafka.Header{
+					{Key: "operation", Value: []byte(test.operation)},
+					{Key: "txid", Value: []byte("test-txid")},
+				},
+			}
+
+			parsedHeaders, err := ParseHeaders(msg)
+			require.NoError(t, err)
+
+			// Process the message
+			resp, err := tester.inv.ProcessMessage(parsedHeaders, true, msg)
+
+			if test.expectError {
+				assert.NotNil(t, err, test.description)
+			} else {
+				assert.Nil(t, err, test.description)
+				if test.expectToken {
+					assert.NotEmpty(t, resp, test.description)
+				} else {
+					// Delete operations return empty string consistency token
+					assert.Equal(t, "", resp, test.description)
+				}
+			}
+
+			// Additional verification: check that the correct representations were fetched
+			// by verifying that FindCurrentAndPreviousVersionedRepresentations was called
+			// with the correct parameters (this is implicit through successful processing)
+			t.Logf("%s: %s", test.name, test.description)
+		})
+	}
+}

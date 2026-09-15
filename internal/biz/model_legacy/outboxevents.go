@@ -169,10 +169,10 @@ func convertResourceToResourceEvent(resourceReportEvent bizmodel.ResourceReportE
 	return payload, nil
 }
 
-func convertResourceToTupleEvent(reporterResourceKey bizmodel.ReporterResourceKey, operationType bizmodel.EventOperationType, currentCommonVersion *bizmodel.Version, currentReporterRepresentationVersion *bizmodel.Version) (internal.JsonObject, error) {
+func convertResourceToTupleEvent(reporterResourceKey bizmodel.ReporterResourceKey, operationType bizmodel.EventOperationType, currentCommonVersion *bizmodel.Version, currentReporterRepresentationVersion *bizmodel.Version, currentReporterGeneration *bizmodel.Generation) (internal.JsonObject, error) {
 	payload := internal.JsonObject{}
 
-	tuple, err := bizmodel.NewTupleEvent(reporterResourceKey, currentCommonVersion, currentReporterRepresentationVersion)
+	tuple, err := bizmodel.NewTupleEvent(reporterResourceKey, currentCommonVersion, currentReporterRepresentationVersion, currentReporterGeneration)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Tuple Event: %w", err)
 	}
@@ -193,7 +193,7 @@ func NewOutboxEventsFromResourceEvent(domainResourceEvent bizmodel.ResourceEvent
 	var tuplePayload internal.JsonObject
 	var err error
 
-	tuplePayload, err = convertResourceToTupleEvent(domainResourceEvent.ReporterResourceKey(), operationType, domainResourceEvent.CurrentCommonVersion(), domainResourceEvent.CurrentReporterRepresentationVersion())
+	tuplePayload, err = convertResourceToTupleEvent(domainResourceEvent.ReporterResourceKey(), operationType, domainResourceEvent.CurrentCommonVersion(), domainResourceEvent.CurrentReporterRepresentationVersion(), domainResourceEvent.CurrentReporterGeneration())
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to convert resource to tuple event: %w", err)
 	}

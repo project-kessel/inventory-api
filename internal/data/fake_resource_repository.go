@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"gorm.io/gorm"
 
 	"github.com/project-kessel/inventory-api/internal"
 	bizmodel "github.com/project-kessel/inventory-api/internal/biz/model"
@@ -15,12 +14,11 @@ import (
 
 type fakeResourceRepository struct {
 	mu                           sync.RWMutex
-	resourcesByPrimaryKey        map[uuid.UUID]*storedResource // keyed by primary key (ResourceID) - simulates database primary storage
-	resourcesByCompositeKey      map[string]uuid.UUID          // composite key -> primary key mapping for unique constraint
-	resources                    map[string]*storedResource    // legacy field for backward compatibility
+	resourcesByPrimaryKey        map[uuid.UUID]*storedResource
+	resourcesByCompositeKey      map[string]uuid.UUID
 	representationsByVersion     map[string]map[uint]*storedRepresentation
-	processedTransactionIds      map[string]bool     // track processed transaction IDs for idempotency testing
-	maxCommonVersionByResourceID map[uuid.UUID]*uint // mirrors MAX(version) FROM common_representations WHERE resource_id = ?
+	processedTransactionIds      map[string]bool
+	maxCommonVersionByResourceID map[uuid.UUID]*uint
 }
 
 type storedResource struct {
@@ -49,41 +47,101 @@ func NewFakeResourceRepository() bizmodel.ResourceRepository {
 	return &fakeResourceRepository{
 		resourcesByPrimaryKey:        make(map[uuid.UUID]*storedResource),
 		resourcesByCompositeKey:      make(map[string]uuid.UUID),
-		resources:                    make(map[string]*storedResource),
 		representationsByVersion:     make(map[string]map[uint]*storedRepresentation),
 		processedTransactionIds:      make(map[string]bool),
 		maxCommonVersionByResourceID: make(map[uuid.UUID]*uint),
 	}
 }
 
-func (f *fakeResourceRepository) NextResourceId() (bizmodel.ResourceId, error) {
+var _ bizmodel.ResourceRepository = (*fakeResourceRepository)(nil)
+
+func (f *fakeResourceRepository) Begin(_ string) (bizmodel.ResourceTx, error) {
+	f.mu.RLock()
+	tx := &fakeResourceTx{
+		repo:                         f,
+		resourcesByPrimaryKey:        cloneResourcesByPrimaryKey(f.resourcesByPrimaryKey),
+		resourcesByCompositeKey:      cloneStringUUIDMap(f.resourcesByCompositeKey),
+		representationsByVersion:     cloneRepresentationsByVersion(f.representationsByVersion),
+		processedTransactionIds:      cloneBoolMap(f.processedTransactionIds),
+		maxCommonVersionByResourceID: cloneUintPtrMap(f.maxCommonVersionByResourceID),
+	}
+	f.mu.RUnlock()
+	return tx, nil
+}
+
+func (f *fakeResourceRepository) Transact(_ string, fn func(bizmodel.ResourceTx) error) error {
+	tx, err := f.Begin("")
+	if err != nil {
+		return err
+	}
+	if err := fn(tx); err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+	return tx.Commit()
+}
+
+// --- fakeResourceTx implements model.ResourceTx ---
+//
+// Each transaction operates on a snapshot of the repository state taken at
+// Begin time. Writes mutate only the snapshot. Commit atomically replaces
+// the live repository state; Rollback discards the snapshot.
+
+type fakeResourceTx struct {
+	repo                         *fakeResourceRepository
+	resourcesByPrimaryKey        map[uuid.UUID]*storedResource
+	resourcesByCompositeKey      map[string]uuid.UUID
+	representationsByVersion     map[string]map[uint]*storedRepresentation
+	processedTransactionIds      map[string]bool
+	maxCommonVersionByResourceID map[uuid.UUID]*uint
+	done                         bool
+}
+
+var _ bizmodel.ResourceTx = (*fakeResourceTx)(nil)
+
+func (tx *fakeResourceTx) Commit() error {
+	if tx.done {
+		return nil
+	}
+	tx.repo.mu.Lock()
+	tx.repo.resourcesByPrimaryKey = tx.resourcesByPrimaryKey
+	tx.repo.resourcesByCompositeKey = tx.resourcesByCompositeKey
+	tx.repo.representationsByVersion = tx.representationsByVersion
+	tx.repo.processedTransactionIds = tx.processedTransactionIds
+	tx.repo.maxCommonVersionByResourceID = tx.maxCommonVersionByResourceID
+	tx.repo.mu.Unlock()
+	tx.done = true
+	return nil
+}
+
+func (tx *fakeResourceTx) Rollback() error {
+	tx.done = true
+	return nil
+}
+
+func (tx *fakeResourceTx) NextResourceId() (bizmodel.ResourceId, error) {
 	uuidV7, err := uuid.NewV7()
 	if err != nil {
 		return bizmodel.ResourceId{}, err
 	}
-
 	return bizmodel.NewResourceId(uuidV7)
 }
 
-func (f *fakeResourceRepository) NextReporterResourceId() (bizmodel.ReporterResourceId, error) {
+func (tx *fakeResourceTx) NextReporterResourceId() (bizmodel.ReporterResourceId, error) {
 	uuidV7, err := uuid.NewV7()
 	if err != nil {
 		return bizmodel.ReporterResourceId{}, err
 	}
-
 	return bizmodel.NewReporterResourceId(uuidV7)
 }
 
-func (f *fakeResourceRepository) Save(tx *gorm.DB, resource bizmodel.Resource, operationType bizmodel.EventOperationType, txid bizmodel.TransactionId) error {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-
+func (tx *fakeResourceTx) Save(resource bizmodel.Resource, operationType bizmodel.EventOperationType, txid bizmodel.TransactionId) error {
 	resourceSnapshot, reporterResourceSnapshot, reporterRepresentationSnapshot, commonRepresentationSnapshot, err := resource.Serialize()
 	if err != nil {
 		return fmt.Errorf("failed to serialize resource: %w", err)
 	}
 
-	compositeKey := f.makeCompositeKey(
+	compositeKey := tx.repo.makeCompositeKey(
 		reporterResourceSnapshot.ReporterResourceKey.LocalResourceID,
 		reporterResourceSnapshot.ReporterResourceKey.ReporterType,
 		reporterResourceSnapshot.ReporterResourceKey.ResourceType,
@@ -94,8 +152,8 @@ func (f *fakeResourceRepository) Save(tx *gorm.DB, resource bizmodel.Resource, o
 
 	reporterResourcePrimaryKey := reporterResourceSnapshot.ID
 
-	if existingResource, exists := f.resourcesByPrimaryKey[reporterResourcePrimaryKey]; exists {
-		oldCompositeKey := f.makeCompositeKey(
+	if existingResource, exists := tx.resourcesByPrimaryKey[reporterResourcePrimaryKey]; exists {
+		oldCompositeKey := tx.repo.makeCompositeKey(
 			existingResource.localResourceID,
 			existingResource.reporterType,
 			existingResource.resourceType,
@@ -103,9 +161,9 @@ func (f *fakeResourceRepository) Save(tx *gorm.DB, resource bizmodel.Resource, o
 			existingResource.representationVersion,
 			existingResource.generation,
 		)
-		delete(f.resourcesByCompositeKey, oldCompositeKey)
+		delete(tx.resourcesByCompositeKey, oldCompositeKey)
 	} else {
-		if existingPrimaryKey, exists := f.resourcesByCompositeKey[compositeKey]; exists {
+		if existingPrimaryKey, exists := tx.resourcesByCompositeKey[compositeKey]; exists {
 			return fmt.Errorf("duplicate key violation: reporter_resource_key_idx unique constraint failed for key: %s (conflicts with existing resource: %s)", compositeKey, existingPrimaryKey)
 		}
 	}
@@ -118,9 +176,9 @@ func (f *fakeResourceRepository) Save(tx *gorm.DB, resource bizmodel.Resource, o
 
 		// Track the max common version seen for this resource (mirrors the MAX subquery in the real repo).
 		resourceID := resourceSnapshot.ID
-		if prev := f.maxCommonVersionByResourceID[resourceID]; prev == nil || commonVersion > *prev {
+		if prev := tx.maxCommonVersionByResourceID[resourceID]; prev == nil || commonVersion > *prev {
 			v := commonVersion
-			f.maxCommonVersionByResourceID[resourceID] = &v
+			tx.maxCommonVersionByResourceID[resourceID] = &v
 		}
 	}
 
@@ -141,52 +199,38 @@ func (f *fakeResourceRepository) Save(tx *gorm.DB, resource bizmodel.Resource, o
 		tombstone:             reporterResourceSnapshot.Tombstone,
 	}
 
-	f.resourcesByPrimaryKey[reporterResourcePrimaryKey] = stored
-	f.resourcesByCompositeKey[compositeKey] = reporterResourcePrimaryKey
+	tx.resourcesByPrimaryKey[reporterResourcePrimaryKey] = stored
+	tx.resourcesByCompositeKey[compositeKey] = reporterResourcePrimaryKey
 
-	historyKey := f.makeHistoryKey(
+	historyKey := tx.repo.makeHistoryKey(
 		stored.localResourceID,
 		stored.reporterType,
 		stored.resourceType,
 		stored.reporterInstanceID,
 	)
-	if _, ok := f.representationsByVersion[historyKey]; !ok {
-		f.representationsByVersion[historyKey] = make(map[uint]*storedRepresentation)
+	if _, ok := tx.representationsByVersion[historyKey]; !ok {
+		tx.representationsByVersion[historyKey] = make(map[uint]*storedRepresentation)
 	}
-	f.representationsByVersion[historyKey][stored.representationVersion] = &storedRepresentation{
+	tx.representationsByVersion[historyKey][stored.representationVersion] = &storedRepresentation{
 		commonData:    cloneJsonObject(stored.commonData),
 		commonVersion: commonVersion,
 	}
 
 	if reporterRepresentationSnapshot != nil && reporterRepresentationSnapshot.TransactionId != "" {
-		f.markTransactionIdAsProcessed(reporterRepresentationSnapshot.TransactionId)
+		tx.processedTransactionIds[reporterRepresentationSnapshot.TransactionId] = true
 	}
 	if commonRepresentationSnapshot != nil && commonRepresentationSnapshot.TransactionId != "" {
-		f.markTransactionIdAsProcessed(commonRepresentationSnapshot.TransactionId)
+		tx.processedTransactionIds[commonRepresentationSnapshot.TransactionId] = true
 	}
 
 	return nil
 }
 
-func (f *fakeResourceRepository) FindResourceByKeys(tx *gorm.DB, key bizmodel.ReporterResourceKey) (*bizmodel.Resource, error) {
-	f.mu.RLock()
-	defer f.mu.RUnlock()
-
-	// Note: This fake implementation doesn't use the transaction parameter,
-	// but we acknowledge it for consistency with the real implementation.
-	// In a real scenario, tx would be used for database operations.
-	_ = tx // Explicitly acknowledge the transaction parameter
-
-	// Match the real repository's behavior: if reporterInstanceId is empty,
-	// find any resource that matches the other key components
+func (tx *fakeResourceTx) FindResourceByKeys(key bizmodel.ReporterResourceKey) (*bizmodel.Resource, error) {
 	searchReporterInstanceId := key.ReporterInstanceId().Serialize()
 
-	// Find the latest version for the given natural key.
-	// Prefer non-tombstoned resources (a live resource from a newer lifecycle always
-	// beats a tombstoned one from an older lifecycle), then break ties by highest
-	// representation version + generation — matching the real repository's behaviour.
 	var latestResource *storedResource
-	for _, stored := range f.resourcesByPrimaryKey {
+	for _, stored := range tx.resourcesByPrimaryKey {
 		if strings.EqualFold(stored.localResourceID, key.LocalResourceId().Serialize()) &&
 			strings.EqualFold(stored.resourceType, key.ResourceType().Serialize()) &&
 			strings.EqualFold(stored.reporterType, key.ReporterType().Serialize()) {
@@ -196,7 +240,6 @@ func (f *fakeResourceRepository) FindResourceByKeys(tx *gorm.DB, key bizmodel.Re
 					latestResource = stored
 					continue
 				}
-				// A live resource always wins over a tombstoned one.
 				if !stored.tombstone && latestResource.tombstone {
 					latestResource = stored
 					continue
@@ -204,7 +247,6 @@ func (f *fakeResourceRepository) FindResourceByKeys(tx *gorm.DB, key bizmodel.Re
 				if stored.tombstone && !latestResource.tombstone {
 					continue
 				}
-				// Both have the same tombstone state — pick highest version/generation.
 				if stored.representationVersion > latestResource.representationVersion ||
 					(stored.representationVersion == latestResource.representationVersion && stored.generation > latestResource.generation) {
 					latestResource = stored
@@ -218,7 +260,7 @@ func (f *fakeResourceRepository) FindResourceByKeys(tx *gorm.DB, key bizmodel.Re
 			ID:                latestResource.resourceID,
 			Type:              latestResource.resourceType,
 			CommonVersion:     latestResource.commonVersion,
-			LastCommonVersion: f.maxCommonVersionByResourceID[latestResource.resourceID],
+			LastCommonVersion: tx.maxCommonVersionByResourceID[latestResource.resourceID],
 			ConsistencyToken:  latestResource.consistencyToken,
 			CreatedAt:         latestResource.createdAt,
 			UpdatedAt:         latestResource.updatedAt,
@@ -234,7 +276,7 @@ func (f *fakeResourceRepository) FindResourceByKeys(tx *gorm.DB, key bizmodel.Re
 			},
 			ResourceID:            latestResource.resourceID,
 			APIHref:               "",
-			ConsoleHref:           nil, // optional
+			ConsoleHref:           nil,
 			RepresentationVersion: latestResource.representationVersion,
 			Generation:            latestResource.generation,
 			Tombstone:             latestResource.tombstone,
@@ -242,7 +284,6 @@ func (f *fakeResourceRepository) FindResourceByKeys(tx *gorm.DB, key bizmodel.Re
 			UpdatedAt:             latestResource.updatedAt,
 		}
 
-		// Use DeserializeResource to create a Resource that reflects the actual stored state
 		resource := bizmodel.DeserializeResource(&resourceSnapshot, []bizmodel.ReporterResourceSnapshot{reporterResourceSnapshot}, nil, nil)
 		if resource == nil {
 			return nil, fmt.Errorf("failed to deserialize resource")
@@ -250,25 +291,22 @@ func (f *fakeResourceRepository) FindResourceByKeys(tx *gorm.DB, key bizmodel.Re
 		return resource, nil
 	}
 
-	return nil, gorm.ErrRecordNotFound
+	return nil, bizmodel.ErrResourceNotFound
 }
 
-func (f *fakeResourceRepository) FindCurrentAndPreviousVersionedRepresentations(tx *gorm.DB, key bizmodel.ReporterResourceKey, currentVersion *bizmodel.Version, operationType bizmodel.EventOperationType) (*bizmodel.Representations, *bizmodel.Representations, error) {
+func (tx *fakeResourceTx) FindCurrentAndPreviousVersionedRepresentations(key bizmodel.ReporterResourceKey, currentVersion *bizmodel.Version, operationType bizmodel.EventOperationType) (*bizmodel.Representations, *bizmodel.Representations, error) {
 	if currentVersion == nil {
 		return nil, nil, nil
 	}
 
-	historyKey := f.makeHistoryKey(
+	historyKey := tx.repo.makeHistoryKey(
 		key.LocalResourceId().Serialize(),
 		key.ReporterType().Serialize(),
 		key.ResourceType().Serialize(),
 		key.ReporterInstanceId().Serialize(),
 	)
 
-	f.mu.RLock()
-	defer f.mu.RUnlock()
-
-	versionMap := f.representationsByVersion[historyKey]
+	versionMap := tx.representationsByVersion[historyKey]
 	if versionMap == nil {
 		return nil, nil, fmt.Errorf("no representations found for key")
 	}
@@ -291,7 +329,9 @@ func (f *fakeResourceRepository) FindCurrentAndPreviousVersionedRepresentations(
 		}
 	}
 
-	if cv > 0 {
+	// Skip previous-version lookup for create operations, matching the real
+	// repository's WHERE clause which only fetches cv-1 for non-create ops.
+	if operationType.OperationType() != bizmodel.OperationTypeCreated && cv > 0 {
 		if entry, ok := versionMap[cv-1]; ok {
 			v := bizmodel.NewVersion(entry.commonVersion)
 			var err error
@@ -310,18 +350,15 @@ func (f *fakeResourceRepository) FindCurrentAndPreviousVersionedRepresentations(
 	return current, previous, nil
 }
 
-func (f *fakeResourceRepository) FindLatestRepresentations(tx *gorm.DB, key bizmodel.ReporterResourceKey) (*bizmodel.Representations, error) {
-	historyKey := f.makeHistoryKey(
+func (tx *fakeResourceTx) FindLatestRepresentations(key bizmodel.ReporterResourceKey) (*bizmodel.Representations, error) {
+	historyKey := tx.repo.makeHistoryKey(
 		key.LocalResourceId().Serialize(),
 		key.ReporterType().Serialize(),
 		key.ResourceType().Serialize(),
 		key.ReporterInstanceId().Serialize(),
 	)
 
-	f.mu.RLock()
-	defer f.mu.RUnlock()
-
-	versionMap := f.representationsByVersion[historyKey]
+	versionMap := tx.representationsByVersion[historyKey]
 	if len(versionMap) == 0 {
 		return nil, fmt.Errorf("no representations found for key")
 	}
@@ -344,15 +381,12 @@ func (f *fakeResourceRepository) FindLatestRepresentations(tx *gorm.DB, key bizm
 	)
 }
 
-func (f *fakeResourceRepository) GetDB() *gorm.DB {
-	// Fake repository doesn't use a real database
-	return nil
+func (tx *fakeResourceTx) HasTransactionIdBeenProcessed(transactionId bizmodel.TransactionId) (bool, error) {
+	_, exists := tx.processedTransactionIds[transactionId.String()]
+	return exists, nil
 }
 
-func (f *fakeResourceRepository) GetTransactionManager() bizmodel.TransactionManager {
-	// Return a fake transaction manager for testing
-	return NewFakeTransactionManager(3) // Default retry count
-}
+// --- helpers ---
 
 func (f *fakeResourceRepository) makeCompositeKey(localResourceID, reporterType, resourceType, reporterInstanceID string, representationVersion, generation uint) string {
 	return fmt.Sprintf("%s|%s|%s|%s|%d|%d", localResourceID, reporterType, resourceType, reporterInstanceID, representationVersion, generation)
@@ -362,14 +396,13 @@ func (f *fakeResourceRepository) makeHistoryKey(localResourceID, reporterType, r
 	return strings.ToLower(fmt.Sprintf("%s|%s|%s|%s", localResourceID, reporterType, resourceType, reporterInstanceID))
 }
 
-// markTransactionIdAsProcessed marks a transaction ID as processed for idempotency testing
-// Note: This method assumes the caller already holds the appropriate lock
+// markTransactionIdAsProcessed marks a transaction ID as processed for idempotency testing.
 func (f *fakeResourceRepository) markTransactionIdAsProcessed(transactionId string) {
 	if transactionId == "" {
 		return
 	}
-
-	// Don't acquire lock here since Save method already holds it
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	f.processedTransactionIds[transactionId] = true
 }
 
@@ -392,12 +425,55 @@ func cloneJsonObject(src internal.JsonObject) internal.JsonObject {
 	return clone
 }
 
-// HasTransactionIdBeenProcessed checks if a transaction ID has been processed before
-// Returns true if the transaction has already been processed, false otherwise
-func (f *fakeResourceRepository) HasTransactionIdBeenProcessed(tx *gorm.DB, transactionId bizmodel.TransactionId) (bool, error) {
-	f.mu.RLock()
-	defer f.mu.RUnlock()
+// --- snapshot clone helpers ---
 
-	_, exists := f.processedTransactionIds[transactionId.String()]
-	return exists, nil
+func cloneResourcesByPrimaryKey(src map[uuid.UUID]*storedResource) map[uuid.UUID]*storedResource {
+	dst := make(map[uuid.UUID]*storedResource, len(src))
+	for k, v := range src {
+		copied := *v
+		copied.commonData = cloneJsonObject(v.commonData)
+		dst[k] = &copied
+	}
+	return dst
+}
+
+func cloneStringUUIDMap(src map[string]uuid.UUID) map[string]uuid.UUID {
+	dst := make(map[string]uuid.UUID, len(src))
+	for k, v := range src {
+		dst[k] = v
+	}
+	return dst
+}
+
+func cloneRepresentationsByVersion(src map[string]map[uint]*storedRepresentation) map[string]map[uint]*storedRepresentation {
+	dst := make(map[string]map[uint]*storedRepresentation, len(src))
+	for k, innerMap := range src {
+		dstInner := make(map[uint]*storedRepresentation, len(innerMap))
+		for v, rep := range innerMap {
+			copied := *rep
+			copied.commonData = cloneJsonObject(rep.commonData)
+			dstInner[v] = &copied
+		}
+		dst[k] = dstInner
+	}
+	return dst
+}
+
+func cloneBoolMap(src map[string]bool) map[string]bool {
+	dst := make(map[string]bool, len(src))
+	for k, v := range src {
+		dst[k] = v
+	}
+	return dst
+}
+
+func cloneUintPtrMap(src map[uuid.UUID]*uint) map[uuid.UUID]*uint {
+	dst := make(map[uuid.UUID]*uint, len(src))
+	for k, v := range src {
+		if v != nil {
+			val := *v
+			dst[k] = &val
+		}
+	}
+	return dst
 }

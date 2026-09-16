@@ -2,8 +2,11 @@ package data
 
 import (
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"sync/atomic"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -112,6 +115,28 @@ func TestLoadUnifiedSchemasFromDirectory_RejectsMissingDirectoryContent(t *testi
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "no unified YAML schemas found")
+}
+
+func TestLoadUnifiedSchemasFromDirectory_RejectsExternalSchemaReference(t *testing.T) {
+	var requests atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+		requests.Add(1)
+	}))
+	defer server.Close()
+
+	dir := t.TempDir()
+	contents := replaceOnce(
+		validUnifiedSchemaYAML("host"),
+		"        type: string\n",
+		fmt.Sprintf("        $ref: %q\n", server.URL),
+	)
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "host.yaml"), []byte(contents), 0o644))
+
+	_, err := LoadUnifiedSchemasFromDirectory(dir)
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "external JSON Schema reference")
+	assert.Zero(t, requests.Load(), "external references must be rejected before network resolution")
 }
 
 // validUnifiedSchemaYAML returns a valid schema fixture for loader tests.

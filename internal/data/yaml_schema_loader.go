@@ -129,8 +129,36 @@ func validateEmbeddedSchemas(schema UnifiedSchema) error {
 
 // compileEmbeddedSchema verifies that one embedded JSON Schema is valid.
 func compileEmbeddedSchema(resourceName, scope string, schema map[string]interface{}) error {
+	if err := rejectExternalSchemaReferences(schema, resourceName+":"+scope); err != nil {
+		return err
+	}
 	if _, err := gojsonschema.NewSchema(gojsonschema.NewGoLoader(schema)); err != nil {
 		return fmt.Errorf("invalid embedded JSON Schema for %s:%s: %w", resourceName, scope, err)
+	}
+	return nil
+}
+
+// rejectExternalSchemaReferences allows only local fragment references in a JSON Schema.
+func rejectExternalSchemaReferences(value interface{}, path string) error {
+	switch current := value.(type) {
+	case map[string]interface{}:
+		if rawReference, ok := current["$ref"]; ok {
+			reference, ok := rawReference.(string)
+			if !ok || !strings.HasPrefix(reference, "#") {
+				return fmt.Errorf("external JSON Schema reference %q is not allowed at %s; only local fragment references are supported", rawReference, path)
+			}
+		}
+		for key, child := range current {
+			if err := rejectExternalSchemaReferences(child, path+"."+key); err != nil {
+				return err
+			}
+		}
+	case []interface{}:
+		for index, child := range current {
+			if err := rejectExternalSchemaReferences(child, fmt.Sprintf("%s[%d]", path, index)); err != nil {
+				return err
+			}
+		}
 	}
 	return nil
 }

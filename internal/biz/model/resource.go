@@ -176,7 +176,7 @@ func (r *Resource) Delete(key ReporterResourceKey) error {
 		return nil
 	}
 
-	// Only process delete for non-tombstoned resources
+	// Tombstone the reporter resource (increments version, sets tombstone=true)
 	reporterResource.Delete()
 
 	resourceDeleteEvent, err := deleteEventAndRepresentations(
@@ -186,9 +186,9 @@ func (r *Resource) Delete(key ReporterResourceKey) error {
 		key.ReporterInstanceId(),
 		key.LocalResourceId(),
 		reporterResource.Id(),
-		reporterResource.representationVersion,
+		reporterResource.representationVersion, // Tombstone version (incremented)
 		reporterResource.generation,
-		r.commonVersion)
+		r.commonVersion) // Common version (unchanged - this IS the last live)
 
 	if err != nil {
 		return fmt.Errorf("failed to create ResourceDeleteEvent: %w", err)

@@ -12,7 +12,7 @@ type ResourceDeleteEvent struct {
 	reporterId             ReporterId
 	localResourceId        LocalResourceId
 	reporterRepresentation ReporterDeleteRepresentation
-	commonVersion          *Version // Track common version to enable fetching previous common representation
+	commonVersion          *Version // Last live common version (for tuple generation)
 	createdAt              time.Time
 	updatedAt              time.Time
 }
@@ -74,19 +74,19 @@ func (re ResourceDeleteEvent) WorkspaceId() *string {
 	return nil
 }
 
-// CurrentCommonVersion returns the common version at the time of deletion.
-// This allows the consumer to fetch the previous common representation to extract
-// workspace_id and other common fields needed for generating delete tuples.
+// CurrentCommonVersion returns the common version at deletion time.
+// Since common doesn't get tombstoned, this IS the last live version.
 func (re ResourceDeleteEvent) CurrentCommonVersion() *Version {
 	return re.commonVersion
 }
 
-// CurrentReporterRepresentationVersion returns the version from the ReporterRepresentation
+// CurrentReporterRepresentationVersion returns the tombstone version.
+// Consumer should fetch (version - 1) to get last live reporter data.
 func (re ResourceDeleteEvent) CurrentReporterRepresentationVersion() *Version {
 	return &re.reporterRepresentation.version
 }
 
-// CurrentReporterGeneration returns the generation from the ReporterRepresentation
+// CurrentReporterGeneration returns the generation from the ReporterRepresentation.
 func (re ResourceDeleteEvent) CurrentReporterGeneration() *Generation {
 	gen := re.reporterRepresentation.Generation()
 	return &gen

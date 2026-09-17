@@ -2603,10 +2603,6 @@ func TestFindCurrentAndPreviousVersionedRepresentations_TwoStreamScenarios(t *te
 // fetching previous reporter representation works correctly when a resource is
 // deleted and then revived (tombstone → new generation with version reset to 0).
 func TestFindCurrentAndPreviousVersionedRepresentations_TombstoneRevival(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping test requiring SpiceDB Docker container")
-	}
-
 	db := setupInMemoryDB(t)
 	mc := metricscollector.NewFakeMetricsCollector()
 	tm := NewGormTransactionManager(mc, 3)
@@ -2691,10 +2687,6 @@ func TestFindCurrentAndPreviousVersionedRepresentations_TombstoneRevival(t *test
 //   - WITHOUT generation tracking: would incorrectly fetch gen=1, ver=0 (wrong!)
 //   - WITH generation tracking: correctly fetches gen=0, ver=0 (correct!)
 func TestFindCurrentAndPreviousVersionedRepresentations_EventReplayRaceCondition(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping test requiring SpiceDB Docker container")
-	}
-
 	db := setupInMemoryDB(t)
 	mc := metricscollector.NewFakeMetricsCollector()
 	tm := NewGormTransactionManager(mc, 3)
@@ -2809,6 +2801,100 @@ func TestFindLatestRepresentations_ReporterOnlyAfterDelete(t *testing.T) {
 	require.NotNil(t, latest.ReporterVersion())
 	assert.Equal(t, bizmodel.NewVersion(0), *latest.ReporterVersion())
 	assert.Equal(t, "reporter-only-delete", latest.ReporterData()["cluster_id"])
+}
+
+// TestFindLatestRepresentations_GenerationOrdering tests that FindLatestRepresentations
+// correctly orders by generation FIRST, then version. This prevents returning stale data
+// from an older generation when a resource has been deleted and revived.
+//
+// Scenario: gen 0 v0 → v1 → v2 → delete (gen 0 v3 tombstone) → revive (gen 1 v0)
+// Expected: FindLatestRepresentations returns gen 1 v0 (current), not gen 0 v2 (stale)
+func TestFindLatestRepresentations_GenerationOrdering(t *testing.T) {
+	implementations := []struct {
+		name string
+		repo func() bizmodel.ResourceRepository
+		db   func() *gorm.DB
+	}{
+		{
+			name: "Real Repository",
+			repo: func() bizmodel.ResourceRepository {
+				db := setupInMemoryDB(t)
+				mc := metricscollector.NewFakeMetricsCollector()
+				tm := NewGormTransactionManager(mc, 3)
+				return NewResourceRepository(db, tm, noopOutboxPublisher())
+			},
+			db: func() *gorm.DB {
+				return setupInMemoryDB(t)
+			},
+		},
+		{
+			name: "Fake Repository",
+			repo: func() bizmodel.ResourceRepository {
+				return NewFakeResourceRepository()
+			},
+			db: func() *gorm.DB {
+				return nil
+			},
+		},
+	}
+
+	for _, impl := range implementations {
+		t.Run(impl.name, func(t *testing.T) {
+			if testing.Short() && impl.name == "Real Repository" {
+				t.Skip("skipping real repository test in short mode")
+			}
+
+			repo := impl.repo()
+			db := impl.db()
+
+			// Create reporter-only resource (gen 0, v0)
+			resource, key := createResourceNoCommon(t, "generation-ordering-test")
+			require.NoError(t, repo.Save(db, resource, bizmodel.OperationTypeCreated, emptyTxId))
+
+			// Update twice to advance version (gen 0: v0 → v1 → v2)
+			for i := 1; i <= 2; i++ {
+				found, err := repo.FindResourceByKeys(db, key)
+				require.NoError(t, err)
+
+				updatedReporter := bizmodel.Representation(internal.JsonObject{"iteration": i})
+				api, err := bizmodel.NewApiHref(fmt.Sprintf("https://api.example.com/gen0-v%d", i))
+				require.NoError(t, err)
+				con, err := bizmodel.NewConsoleHref(fmt.Sprintf("https://console.example.com/gen0-v%d", i))
+				require.NoError(t, err)
+				require.NoError(t, found.Update(key, api, &con, nil, &updatedReporter, nil, newUniqueTxID(fmt.Sprintf("gen0-v%d", i))))
+				require.NoError(t, repo.Save(db, *found, bizmodel.OperationTypeUpdated, emptyTxId))
+			}
+
+			// Delete the resource (creates tombstone at gen 0, v3)
+			found, err := repo.FindResourceByKeys(db, key)
+			require.NoError(t, err)
+			require.NoError(t, found.Delete(key))
+			require.NoError(t, repo.Save(db, *found, bizmodel.OperationTypeDeleted, emptyTxId))
+
+			// Revive the resource (starts new generation: gen 1, v0)
+			found, err = repo.FindResourceByKeys(db, key)
+			require.NoError(t, err)
+
+			revivalReporter := bizmodel.Representation(internal.JsonObject{"revived": true})
+			api, err := bizmodel.NewApiHref("https://api.example.com/gen1-v0")
+			require.NoError(t, err)
+			con, err := bizmodel.NewConsoleHref("https://console.example.com/gen1-v0")
+			require.NoError(t, err)
+			require.NoError(t, found.Update(key, api, &con, nil, &revivalReporter, nil, newUniqueTxID("gen1-v0")))
+			require.NoError(t, repo.Save(db, *found, bizmodel.OperationTypeUpdated, emptyTxId))
+
+			// FindLatestRepresentations must return gen 1 v0 (the revival), not gen 0 v2 (stale)
+			latest, err := repo.FindLatestRepresentations(db, key)
+			require.NoError(t, err)
+			require.NotNil(t, latest)
+			require.NotNil(t, latest.ReporterVersion())
+
+			// Verify we got the revival data, not the old generation's data
+			assert.Equal(t, bizmodel.NewVersion(0), *latest.ReporterVersion(), "should return gen 1 v0, not gen 0 v2")
+			assert.Equal(t, true, latest.ReporterData()["revived"], "should have revival data")
+			assert.NotContains(t, latest.ReporterData(), "iteration", "should not have old generation data")
+		})
+	}
 }
 
 // TestFindCurrentAndPreviousVersionedRepresentations_ReporterOnlyDelete tests that

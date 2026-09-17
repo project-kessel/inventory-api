@@ -441,7 +441,7 @@ func (f *fakeResourceRepository) FindLatestRepresentations(tx *gorm.DB, key bizm
 				if entry.tombstone {
 					continue
 				}
-				if maxEntry == nil || version > maxVersion || (version == maxVersion && gen > maxGen) {
+				if maxEntry == nil || gen > maxGen || (gen == maxGen && version > maxVersion) {
 					maxVersion = version
 					maxGen = gen
 					maxEntry = entry

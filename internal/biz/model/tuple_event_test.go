@@ -91,7 +91,10 @@ func TestTupleEvent_UnmarshalJSON_ValidatesInvariant(t *testing.T) {
 	t.Run("valid JSON with both versions", func(t *testing.T) {
 		commonVer := NewVersion(1)
 		reporterVer := NewVersion(2)
-		event, _ := NewTupleEvent(key, &commonVer, &reporterVer, nil)
+		event, err := NewTupleEvent(key, &commonVer, &reporterVer, nil)
+		if err != nil {
+			t.Fatalf("failed to create tuple event: %v", err)
+		}
 
 		jsonData, err := json.Marshal(event)
 		if err != nil {
@@ -114,7 +117,10 @@ func TestTupleEvent_UnmarshalJSON_ValidatesInvariant(t *testing.T) {
 
 	t.Run("valid JSON with only common version", func(t *testing.T) {
 		commonVer := NewVersion(1)
-		event, _ := NewTupleEvent(key, &commonVer, nil, nil)
+		event, err := NewTupleEvent(key, &commonVer, nil, nil)
+		if err != nil {
+			t.Fatalf("failed to create tuple event: %v", err)
+		}
 
 		jsonData, err := json.Marshal(event)
 		if err != nil {
@@ -137,7 +143,10 @@ func TestTupleEvent_UnmarshalJSON_ValidatesInvariant(t *testing.T) {
 
 	t.Run("valid JSON with only reporter version", func(t *testing.T) {
 		reporterVer := NewVersion(2)
-		event, _ := NewTupleEvent(key, nil, &reporterVer, nil)
+		event, err := NewTupleEvent(key, nil, &reporterVer, nil)
+		if err != nil {
+			t.Fatalf("failed to create tuple event: %v", err)
+		}
 
 		jsonData, err := json.Marshal(event)
 		if err != nil {

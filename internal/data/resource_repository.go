@@ -340,11 +340,6 @@ func (r *resourceRepository) fetchCommonRepresentation(db *gorm.DB, key bizmodel
 		}
 		return nil, nil, fmt.Errorf("database error fetching common representation: %w", err)
 	}
-	// Empty data also means "not found"
-	if len(result.Data) == 0 {
-		return nil, nil, nil
-	}
-
 	v := bizmodel.NewVersion(result.Version)
 	return bizmodel.Representation(result.Data), &v, nil
 }
@@ -371,11 +366,6 @@ func (r *resourceRepository) fetchLatestCommonRepresentation(db *gorm.DB, key bi
 		}
 		return nil, nil, fmt.Errorf("database error fetching latest common representation: %w", err)
 	}
-	// Empty data also means "not found"
-	if len(result.Data) == 0 {
-		return nil, nil, nil
-	}
-
 	v := bizmodel.NewVersion(result.Version)
 	return bizmodel.Representation(result.Data), &v, nil
 }
@@ -403,12 +393,7 @@ func (r *resourceRepository) fetchReporterRepresentation(db *gorm.DB, key bizmod
 		}
 		return nil, nil, fmt.Errorf("database error fetching reporter representation: %w", err)
 	}
-	// Empty data means tombstone or not found
-	// Return nil data but WITH version so caller can detect tombstones
-	if len(result.Data) == 0 {
-		return nil, nil, nil
-	}
-
+	// Empty data means tombstone - return nil data but WITH version so caller can detect it
 	v := bizmodel.NewVersion(result.Version)
 	return bizmodel.Representation(result.Data), &v, nil
 }
@@ -444,11 +429,7 @@ func (r *resourceRepository) fetchPreviousReporterRepresentation(db *gorm.DB, ke
 		}
 		return nil, nil, fmt.Errorf("database error fetching previous reporter representation: %w", err)
 	}
-	// Empty data also means "not found"
-	if len(result.Data) == 0 {
-		return nil, nil, nil
-	}
-
+	// Empty data means tombstone - return nil data but WITH version so caller can detect it
 	v := bizmodel.NewVersion(result.Version)
 	return bizmodel.Representation(result.Data), &v, nil
 }
@@ -470,7 +451,7 @@ func (r *resourceRepository) fetchLatestReporterRepresentation(db *gorm.DB, key 
 	// Skip tombstones - we want the latest live representation
 	query = query.Where("rrep.tombstone = ?", false)
 
-	err := query.Order("rrep.version DESC, rrep.generation DESC").Limit(1).Scan(&result).Error
+	err := query.Order("rrep.generation DESC, rrep.version DESC").Limit(1).Scan(&result).Error
 	if err != nil {
 		// ErrRecordNotFound is expected when the representation doesn't exist
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -478,11 +459,7 @@ func (r *resourceRepository) fetchLatestReporterRepresentation(db *gorm.DB, key 
 		}
 		return nil, nil, fmt.Errorf("database error fetching latest reporter representation: %w", err)
 	}
-	// Empty data also means "not found"
-	if len(result.Data) == 0 {
-		return nil, nil, nil
-	}
-
+	// Note: Empty JSON object {} is valid data (len(result.Data) == 0 but row exists)
 	v := bizmodel.NewVersion(result.Version)
 	return bizmodel.Representation(result.Data), &v, nil
 }

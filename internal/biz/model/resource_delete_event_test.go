@@ -23,13 +23,20 @@ func TestResourceDeleteEvent_Initialization(t *testing.T) {
 			t.Fatalf("Failed to create delete representation: %v", err)
 		}
 
+		localResourceId, err := NewLocalResourceId("valid-resource-id")
+		if err != nil {
+			t.Fatalf("Failed to create local resource ID: %v", err)
+		}
+
+		commonVersion := NewVersion(0)
 		event, err := NewResourceDeleteEvent(
 			fixture.ValidResourceIdType(),
 			fixture.ValidResourceTypeType(),
 			fixture.ValidReporterTypeType(),
 			fixture.ValidReporterInstanceIdType(),
-			fixture.ValidReporterDataType(),
+			localResourceId,
 			deleteRepresentation,
+			&commonVersion,
 		)
 
 		assertValidResourceDeleteEvent(t, event, err, "valid inputs")
@@ -47,13 +54,20 @@ func TestResourceDeleteEvent_Initialization(t *testing.T) {
 			t.Fatalf("Failed to create delete representation: %v", err)
 		}
 
+		localResourceId, err := NewLocalResourceId("another-resource-id")
+		if err != nil {
+			t.Fatalf("Failed to create local resource ID: %v", err)
+		}
+
+		commonVersion := NewVersion(1)
 		event, err := NewResourceDeleteEvent(
 			fixture.AnotherResourceIdType(),
 			fixture.AnotherResourceTypeType(),
 			fixture.ValidReporterTypeType(),
 			fixture.ValidReporterInstanceIdType(),
-			fixture.AnotherReporterDataType(),
+			localResourceId,
 			deleteRepresentation,
+			&commonVersion,
 		)
 
 		assertValidResourceDeleteEvent(t, event, err, "different values")
@@ -87,4 +101,87 @@ func assertInvalidResourceDeleteEvent(t *testing.T, err error, expectedErrorSubs
 	if !strings.Contains(err.Error(), expectedErrorSubstring) {
 		t.Errorf("Expected error containing %s, got %v", expectedErrorSubstring, err)
 	}
+}
+
+func TestResourceDeleteEvent_CommonVersion(t *testing.T) {
+	t.Parallel()
+	fixture := NewResourceEventTestFixture()
+
+	t.Run("should include common version when provided", func(t *testing.T) {
+		t.Parallel()
+
+		deleteRepresentation, err := NewReporterDeleteRepresentation(
+			fixture.ValidReporterResourceIdType(),
+			fixture.ValidReporterVersionType(),
+			fixture.ValidReporterGenerationType(),
+		)
+		if err != nil {
+			t.Fatalf("Failed to create delete representation: %v", err)
+		}
+
+		localResourceId, err := NewLocalResourceId("test-resource-123")
+		if err != nil {
+			t.Fatalf("Failed to create local resource ID: %v", err)
+		}
+
+		commonVersion := NewVersion(2)
+		event, err := NewResourceDeleteEvent(
+			fixture.ValidResourceIdType(),
+			fixture.ValidResourceTypeType(),
+			fixture.ValidReporterTypeType(),
+			fixture.ValidReporterInstanceIdType(),
+			localResourceId,
+			deleteRepresentation,
+			&commonVersion,
+		)
+
+		if err != nil {
+			t.Fatalf("Failed to create delete event with common version: %v", err)
+		}
+
+		retrievedVersion := event.CurrentCommonVersion()
+		if retrievedVersion == nil {
+			t.Error("Expected common version to be present, got nil")
+		}
+		if retrievedVersion != nil && retrievedVersion.Uint() != 2 {
+			t.Errorf("Expected common version 2, got %d", retrievedVersion.Uint())
+		}
+	})
+
+	t.Run("should allow nil common version for reporter-only resources", func(t *testing.T) {
+		t.Parallel()
+
+		deleteRepresentation, err := NewReporterDeleteRepresentation(
+			fixture.ValidReporterResourceIdType(),
+			fixture.ValidReporterVersionType(),
+			fixture.ValidReporterGenerationType(),
+		)
+		if err != nil {
+			t.Fatalf("Failed to create delete representation: %v", err)
+		}
+
+		localResourceId, err := NewLocalResourceId("reporter-only-resource")
+		if err != nil {
+			t.Fatalf("Failed to create local resource ID: %v", err)
+		}
+
+		event, err := NewResourceDeleteEvent(
+			fixture.ValidResourceIdType(),
+			fixture.ValidResourceTypeType(),
+			fixture.ValidReporterTypeType(),
+			fixture.ValidReporterInstanceIdType(),
+			localResourceId,
+			deleteRepresentation,
+			nil, // nil for reporter-only resources
+		)
+
+		if err != nil {
+			t.Fatalf("Failed to create delete event with nil common version: %v", err)
+		}
+
+		retrievedVersion := event.CurrentCommonVersion()
+		if retrievedVersion != nil {
+			t.Errorf("Expected nil common version for reporter-only resource, got %v", retrievedVersion)
+		}
+	})
 }

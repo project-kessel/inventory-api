@@ -12,6 +12,7 @@ type ResourceDeleteEvent struct {
 	reporterId             ReporterId
 	localResourceId        LocalResourceId
 	reporterRepresentation ReporterDeleteRepresentation
+	commonVersion          *Version // Track common version to enable fetching previous common representation
 	createdAt              time.Time
 	updatedAt              time.Time
 }
@@ -23,6 +24,7 @@ func NewResourceDeleteEvent(
 	reporterInstanceId ReporterInstanceId,
 	localResourceId LocalResourceId,
 	reporterRepresentation ReporterDeleteRepresentation,
+	commonVersion *Version,
 ) (ResourceDeleteEvent, error) {
 	reporterId := NewReporterId(reporterType, reporterInstanceId)
 
@@ -32,6 +34,7 @@ func NewResourceDeleteEvent(
 		reporterId:             reporterId,
 		localResourceId:        localResourceId,
 		reporterRepresentation: reporterRepresentation,
+		commonVersion:          commonVersion,
 	}, nil
 }
 
@@ -71,10 +74,11 @@ func (re ResourceDeleteEvent) WorkspaceId() *string {
 	return nil
 }
 
-// CurrentCommonVersion returns nil for delete events since common version is not applicable
-// Delete events do not have a CommonRepresentation, only a ReporterDeleteRepresentation
+// CurrentCommonVersion returns the common version at the time of deletion.
+// This allows the consumer to fetch the previous common representation to extract
+// workspace_id and other common fields needed for generating delete tuples.
 func (re ResourceDeleteEvent) CurrentCommonVersion() *Version {
-	return nil
+	return re.commonVersion
 }
 
 // CurrentReporterRepresentationVersion returns the version from the ReporterRepresentation

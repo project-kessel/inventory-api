@@ -1109,7 +1109,7 @@ func TestInventoryConsumer_VersionCombinations(t *testing.T) {
 				require.NoError(t, repo.Save(db, *testData.Resource, model.OperationTypeCreated, testData.InitialTransactionId))
 				return testData.Key
 			},
-			message:     `{"schema":{"type":"string"},"payload":{"reporter_resource_key":{"local_resource_id":"reporter-version-delete","resource_type":"integration","reporter":{"reporter_type":"notifications","reporter_instance_id":"notif-instance-1"}},"reporter_representation_version":0}}`,
+			message:     `{"schema":{"type":"string"},"payload":{"reporter_resource_key":{"local_resource_id":"reporter-version-delete","resource_type":"integration","reporter":{"reporter_type":"notifications","reporter_instance_id":"notif-instance-1"}},"reporter_representation_version":1}}`,
 			operation:   string(model.OperationTypeDeleted),
 			expectError: false,
 			expectToken: false,
@@ -1123,7 +1123,7 @@ func TestInventoryConsumer_VersionCombinations(t *testing.T) {
 				require.NoError(t, repo.Save(db, *testData.Resource, model.OperationTypeCreated, testData.InitialTransactionId))
 				return testData.Key
 			},
-			message:     `{"schema":{"type":"string"},"payload":{"reporter_resource_key":{"local_resource_id":"both-versions-delete","resource_type":"integration","reporter":{"reporter_type":"notifications","reporter_instance_id":"notif-instance-1"}},"common_version":0,"reporter_representation_version":0}}`,
+			message:     `{"schema":{"type":"string"},"payload":{"reporter_resource_key":{"local_resource_id":"both-versions-delete","resource_type":"integration","reporter":{"reporter_type":"notifications","reporter_instance_id":"notif-instance-1"}},"common_version":0,"reporter_representation_version":1}}`,
 			operation:   string(model.OperationTypeDeleted),
 			expectError: false,
 			expectToken: false,

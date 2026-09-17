@@ -29,10 +29,11 @@ func TestTupleEvent_NewTupleEvent_RequiresAtLeastOneVersion(t *testing.T) {
 		t.Fatalf("failed to create reporter resource key: %v", err)
 	}
 
-	t.Run("valid with both versions", func(t *testing.T) {
+	t.Run("valid with both versions and generation", func(t *testing.T) {
 		commonVer := NewVersion(1)
 		reporterVer := NewVersion(2)
-		_, err := NewTupleEvent(key, &commonVer, &reporterVer, nil)
+		generation := NewGeneration(1)
+		_, err := NewTupleEvent(key, &commonVer, &reporterVer, &generation)
 		if err != nil {
 			t.Errorf("expected no error with both versions present, got: %v", err)
 		}
@@ -46,11 +47,24 @@ func TestTupleEvent_NewTupleEvent_RequiresAtLeastOneVersion(t *testing.T) {
 		}
 	})
 
-	t.Run("valid with only reporter version", func(t *testing.T) {
+	t.Run("valid with only reporter version and generation", func(t *testing.T) {
+		reporterVer := NewVersion(2)
+		generation := NewGeneration(1)
+		_, err := NewTupleEvent(key, nil, &reporterVer, &generation)
+		if err != nil {
+			t.Errorf("expected no error with reporter version and generation, got: %v", err)
+		}
+	})
+
+	t.Run("invalid with reporter version but no generation", func(t *testing.T) {
 		reporterVer := NewVersion(2)
 		_, err := NewTupleEvent(key, nil, &reporterVer, nil)
-		if err != nil {
-			t.Errorf("expected no error with only reporter version, got: %v", err)
+		if err == nil {
+			t.Error("expected error when reporter version present without generation")
+		}
+		expectedMsg := "reporterRepresentationVersion requires reporterGeneration"
+		if err != nil && !contains(err.Error(), expectedMsg) {
+			t.Errorf("expected error message to contain %q, got: %v", expectedMsg, err)
 		}
 	})
 
@@ -88,10 +102,11 @@ func TestTupleEvent_UnmarshalJSON_ValidatesInvariant(t *testing.T) {
 		t.Fatalf("failed to create reporter resource key: %v", err)
 	}
 
-	t.Run("valid JSON with both versions", func(t *testing.T) {
+	t.Run("valid JSON with both versions and generation", func(t *testing.T) {
 		commonVer := NewVersion(1)
 		reporterVer := NewVersion(2)
-		event, err := NewTupleEvent(key, &commonVer, &reporterVer, nil)
+		generation := NewGeneration(1)
+		event, err := NewTupleEvent(key, &commonVer, &reporterVer, &generation)
 		if err != nil {
 			t.Fatalf("failed to create tuple event: %v", err)
 		}
@@ -112,6 +127,9 @@ func TestTupleEvent_UnmarshalJSON_ValidatesInvariant(t *testing.T) {
 		}
 		if unmarshaled.ReporterRepresentationVersion() == nil || unmarshaled.ReporterRepresentationVersion().Uint() != 2 {
 			t.Errorf("expected reporter version 2, got: %v", unmarshaled.ReporterRepresentationVersion())
+		}
+		if unmarshaled.ReporterGeneration() == nil || unmarshaled.ReporterGeneration().Uint() != 1 {
+			t.Errorf("expected reporter generation 1, got: %v", unmarshaled.ReporterGeneration())
 		}
 	})
 
@@ -141,9 +159,10 @@ func TestTupleEvent_UnmarshalJSON_ValidatesInvariant(t *testing.T) {
 		}
 	})
 
-	t.Run("valid JSON with only reporter version", func(t *testing.T) {
+	t.Run("valid JSON with only reporter version and generation", func(t *testing.T) {
 		reporterVer := NewVersion(2)
-		event, err := NewTupleEvent(key, nil, &reporterVer, nil)
+		generation := NewGeneration(1)
+		event, err := NewTupleEvent(key, nil, &reporterVer, &generation)
 		if err != nil {
 			t.Fatalf("failed to create tuple event: %v", err)
 		}
@@ -164,6 +183,36 @@ func TestTupleEvent_UnmarshalJSON_ValidatesInvariant(t *testing.T) {
 		}
 		if unmarshaled.ReporterRepresentationVersion() == nil || unmarshaled.ReporterRepresentationVersion().Uint() != 2 {
 			t.Errorf("expected reporter version 2, got: %v", unmarshaled.ReporterRepresentationVersion())
+		}
+		if unmarshaled.ReporterGeneration() == nil || unmarshaled.ReporterGeneration().Uint() != 1 {
+			t.Errorf("expected reporter generation 1, got: %v", unmarshaled.ReporterGeneration())
+		}
+	})
+
+	t.Run("backward compatible JSON with reporter version but no generation", func(t *testing.T) {
+		// Simulate a legacy Kafka message with reporter version but missing generation
+		// This is allowed for backward compatibility with existing queue data
+		legacyJSON := `{
+			"reporter_resource_key": {
+				"local_resource_id": "test-resource",
+				"resource_type": "test-type",
+				"reporter_type": "test-reporter",
+				"reporter_instance_id": "test-instance"
+			},
+			"reporter_representation_version": 2
+		}`
+
+		var unmarshaled TupleEvent
+		err := json.Unmarshal([]byte(legacyJSON), &unmarshaled)
+		if err != nil {
+			t.Errorf("expected backward compatibility for legacy events, got error: %v", err)
+		}
+
+		if unmarshaled.ReporterRepresentationVersion() == nil || unmarshaled.ReporterRepresentationVersion().Uint() != 2 {
+			t.Errorf("expected reporter version 2, got: %v", unmarshaled.ReporterRepresentationVersion())
+		}
+		if unmarshaled.ReporterGeneration() != nil {
+			t.Errorf("expected nil generation for legacy event, got: %v", unmarshaled.ReporterGeneration())
 		}
 	})
 
@@ -227,8 +276,9 @@ func TestTupleEvent_RoundTrip(t *testing.T) {
 	}
 	commonVer := NewVersion(5)
 	reporterVer := NewVersion(10)
+	generation := NewGeneration(3)
 
-	original, err := NewTupleEvent(key, &commonVer, &reporterVer, nil)
+	original, err := NewTupleEvent(key, &commonVer, &reporterVer, &generation)
 	if err != nil {
 		t.Fatalf("failed to create tuple event: %v", err)
 	}
@@ -263,6 +313,9 @@ func TestTupleEvent_RoundTrip(t *testing.T) {
 	}
 	if roundtripped.ReporterRepresentationVersion() == nil || roundtripped.ReporterRepresentationVersion().Uint() != 10 {
 		t.Errorf("reporter version mismatch: expected 10, got %v", roundtripped.ReporterRepresentationVersion())
+	}
+	if roundtripped.ReporterGeneration() == nil || roundtripped.ReporterGeneration().Uint() != 3 {
+		t.Errorf("reporter generation mismatch: expected 3, got %v", roundtripped.ReporterGeneration())
 	}
 }
 

@@ -28,6 +28,13 @@ func NewTupleEvent(
 		return TupleEvent{}, fmt.Errorf("at least one version (commonVersion or reporterRepresentationVersion) must be present")
 	}
 
+	// Enforce invariant: reporter version requires generation
+	// Without generation, event replay after reporter restart can select wrong representations
+	// (generation increments while reporter version resets, causing ambiguity)
+	if reporterRepresentationVersion != nil && reporterGeneration == nil {
+		return TupleEvent{}, fmt.Errorf("reporterRepresentationVersion requires reporterGeneration")
+	}
+
 	return TupleEvent{
 		reporterResourceKey:           reporterResourceKey,
 		commonVersion:                 commonVersion,
@@ -93,6 +100,11 @@ func (te *TupleEvent) UnmarshalJSON(data []byte) error {
 	if temp.CommonVersion == nil && temp.ReporterRepresentationVersion == nil {
 		return fmt.Errorf("at least one version (commonVersion or reporterRepresentationVersion) must be present")
 	}
+
+	// NOTE: We do NOT enforce reporterGeneration requirement during unmarshaling to maintain
+	// backward compatibility with events already in the Kafka queue. The constructor enforces
+	// the invariant for new events. Once existing queue data is drained, this validation can
+	// be added here as well.
 
 	te.reporterResourceKey = temp.ReporterResourceKey
 	te.commonVersion = temp.CommonVersion

@@ -24,6 +24,11 @@ func ptrVersion(v uint) *bizmodel.Version {
 	return &ver
 }
 
+func ptrGeneration(g uint) *bizmodel.Generation {
+	gen := bizmodel.NewGeneration(g)
+	return &gen
+}
+
 var emptyTxId = bizmodel.NewTransactionId("")
 
 func TestResourceRepositoryContract(t *testing.T) {
@@ -2222,7 +2227,7 @@ func TestFindCurrentAndPreviousVersionedRepresentations(t *testing.T) {
 
 				// Get current and previous versions
 				version := bizmodel.NewVersion(1)
-				cur, prev, err := repo.FindCurrentAndPreviousVersionedRepresentations(db, key, &version, bizmodel.OperationTypeUpdated)
+				cur, prev, err := repo.FindCurrentAndPreviousVersionedRepresentations(db, key, bizmodel.NewRepresentationVersions(&version, nil, nil), bizmodel.OperationTypeUpdated)
 				require.NoError(t, err)
 
 				currentWS, previousWS := GetCurrentAndPreviousWorkspaceID(cur, prev)
@@ -2243,7 +2248,7 @@ func TestFindCurrentAndPreviousVersionedRepresentations(t *testing.T) {
 
 				// Get version 0 representations
 				version := bizmodel.NewVersion(0)
-				cur, prev, err := repo.FindCurrentAndPreviousVersionedRepresentations(db, key, &version, bizmodel.OperationTypeCreated)
+				cur, prev, err := repo.FindCurrentAndPreviousVersionedRepresentations(db, key, bizmodel.NewRepresentationVersions(&version, nil, nil), bizmodel.OperationTypeCreated)
 				require.NoError(t, err)
 
 				currentWS, previousWS := GetCurrentAndPreviousWorkspaceID(cur, prev)
@@ -2276,6 +2281,773 @@ func TestFindCurrentAndPreviousVersionedRepresentations(t *testing.T) {
 				assert.Equal(t, "", currentWS)
 				assert.Equal(t, "", previousWS)
 			})
+		})
+	}
+}
+
+// createResourceNoCommon builds a resource that has reporter data but NO common
+// representation at all (common is never populated). Used to reproduce the
+// consistency gap where the write path only creates a common representation version
+// when common data is present, while FindCurrentAndPreviousVersionedRepresentations
+// keys its lookup off that (possibly non-existent) common representation version.
+func createResourceNoCommon(t *testing.T, localResourceId string) (bizmodel.Resource, bizmodel.ReporterResourceKey) {
+	t.Helper()
+	rID, err := bizmodel.NewResourceId(uuid.New())
+	require.NoError(t, err)
+	rrID, err := bizmodel.NewReporterResourceId(uuid.New())
+	require.NoError(t, err)
+	lid, err := bizmodel.NewLocalResourceId(localResourceId)
+	require.NoError(t, err)
+	rt, err := bizmodel.NewResourceType("k8s_cluster")
+	require.NoError(t, err)
+	rpt, err := bizmodel.NewReporterType("ocm")
+	require.NoError(t, err)
+	rinst, err := bizmodel.NewReporterInstanceId("ocm-instance-1")
+	require.NoError(t, err)
+	api, err := bizmodel.NewApiHref("https://api.example.com/no-common")
+	require.NoError(t, err)
+	con, err := bizmodel.NewConsoleHref("https://console.example.com/no-common")
+	require.NoError(t, err)
+	rep := bizmodel.Representation(internal.JsonObject{"cluster_id": localResourceId})
+	// Note the nil common representation: this resource never has common data.
+	resource, err := bizmodel.NewResource(rID, lid, rt, rpt, rinst, newUniqueTxID("no-common-create"), rrID, api, &con, &rep, nil, nil)
+	require.NoError(t, err)
+	key, err := bizmodel.NewReporterResourceKey(lid, rt, rpt, rinst)
+	require.NoError(t, err)
+	return resource, key
+}
+
+// TestFindCurrentAndPreviousVersionedRepresentations_NoCommonInconsistency reproduces the
+// consistency gap between the write path and the read path around common representations:
+//
+//   - Write path: a common representation (and its version) is only created/updated when
+//     there is data in common (see model.Resource.NewResource / Update).
+//   - Read path: FindCurrentAndPreviousVersionedRepresentations joins on and filters by the
+//     common representation version. When there is no common version it returns nothing.
+//
+// Both sub-tests assert the DESIRED behavior and are expected to FAIL against the current
+// implementation, documenting the two failure modes.
+func TestFindCurrentAndPreviousVersionedRepresentations_NoCommonInconsistency(t *testing.T) {
+	// Case 1: a resource that never has common data.
+	//
+	// Reporter data exists, but because no common representation was ever written there is no
+	// common version to key off. The consumer passes the event's CurrentCommonVersion(), which
+	// is nil for such a resource, so the lookup returns nothing and no tuples are ever computed
+	// -- the resource is effectively invisible to authorization.
+	t.Run("case 1: resource reported without common data yields no current representation", func(t *testing.T) {
+		db := setupInMemoryDB(t)
+		mc := metricscollector.NewFakeMetricsCollector()
+		tm := NewGormTransactionManager(mc, 3)
+		repo := NewResourceRepository(db, tm, noopOutboxPublisher())
+
+		resource, key := createResourceNoCommon(t, "case1-no-common")
+		require.NoError(t, repo.Save(db, resource, bizmodel.OperationTypeCreated, emptyTxId))
+
+		// For reporter-only resource: common version is nil, reporter version is 0
+		reporterVersion := ptrVersion(0)
+		cur, prev, err := repo.FindCurrentAndPreviousVersionedRepresentations(db, key, bizmodel.NewRepresentationVersions(nil, reporterVersion, nil), bizmodel.OperationTypeCreated)
+		require.NoError(t, err)
+		assert.Nil(t, prev, "no previous version on create")
+
+		// DESIRED: the current representation is retrievable so tuples can be generated.
+		require.NotNil(t, cur, "case 1: current representation should be retrievable even without common data")
+	})
+
+	// Case 2: a resource that had common data and then lost it.
+	//
+	// Create WITH common data (common version 0), then update WITHOUT common data (commonVersion
+	// is cleared to nil on the resource, but the common_representations v0 row remains, and the
+	// reporter representation advances to v1).
+	//
+	// Passing the event's (now nil) CurrentCommonVersion() would trivially return nothing (the
+	// nil-guard). Instead we anchor on the LAST KNOWN common version, which is still available
+	// via FindLatestRepresentations. The lookup then resolves the stale v0 common data -- but it
+	// carries no reporter data, while the current reporter representation has already advanced to
+	// "updated-host". This documents the inconsistency: the versioned lookup surfaces a stale v0
+	// common representation, decoupled from the latest reporter state.
+	t.Run("case 2: dropping common data resolves stale common via last known version, decoupled from latest reporter", func(t *testing.T) {
+		db := setupInMemoryDB(t)
+		mc := metricscollector.NewFakeMetricsCollector()
+		tm := NewGormTransactionManager(mc, 3)
+		repo := NewResourceRepository(db, tm, noopOutboxPublisher())
+
+		// Create WITH common data -> common version 0, workspace "test-workspace".
+		resource := createTestResourceWithLocalIdAndType(t, "case2-drop-common", "host")
+		require.NoError(t, repo.Save(db, resource, bizmodel.OperationTypeCreated, emptyTxId))
+
+		key, err := bizmodel.NewReporterResourceKey("case2-drop-common", "host", "hbi", "hbi-instance-1")
+		require.NoError(t, err)
+
+		found, err := repo.FindResourceByKeys(db, key)
+		require.NoError(t, err)
+
+		// Update WITHOUT common data -> commonVersion cleared to nil, reporter advances to v1.
+		reporterOnly := bizmodel.Representation(internal.JsonObject{"hostname": "updated-host"})
+		api, err := bizmodel.NewApiHref("https://api.example.com/case2-update")
+		require.NoError(t, err)
+		con, err := bizmodel.NewConsoleHref("https://console.example.com/case2-update")
+		require.NoError(t, err)
+		require.NoError(t, found.Update(key, api, &con, nil, &reporterOnly, nil, newUniqueTxID("case2-update-no-common")))
+		require.NoError(t, repo.Save(db, *found, bizmodel.OperationTypeUpdated, emptyTxId))
+
+		// Resolve using the LAST KNOWN common version instead of the (nil) current one.
+		// FindLatestRepresentations is the API that still surfaces the last-persisted common
+		// representation (v0) even though the resource "dropped" common data.
+		latest, err := repo.FindLatestRepresentations(db, key)
+		require.NoError(t, err)
+		require.NotNil(t, latest.CommonVersion(), "last known common version should still be available")
+		assert.Equal(t, bizmodel.NewVersion(0), *latest.CommonVersion(), "last known common version is 0")
+
+		lastKnownCommonVersion := latest.CommonVersion()
+		reporterVersion := ptrVersion(1)
+		cur, prev, err := repo.FindCurrentAndPreviousVersionedRepresentations(db, key, bizmodel.NewRepresentationVersions(lastKnownCommonVersion, reporterVersion, nil), bizmodel.OperationTypeUpdated)
+		require.NoError(t, err)
+
+		// NEW BEHAVIOR (after fix): Both streams are now properly tracked.
+		// Current has: common v0 (stale from create), reporter v1 (latest)
+		// Previous has: common nil (no v-1), reporter v0 (previous version)
+		require.NotNil(t, cur, "current should be resolvable")
+		assert.Equal(t, "test-workspace", cur.WorkspaceID(), "current has common v0 data")
+		require.NotNil(t, cur.ReporterVersion(), "current has reporter v1")
+		assert.Equal(t, bizmodel.NewVersion(1), *cur.ReporterVersion())
+
+		// Previous now correctly has the previous reporter representation (v0)
+		require.NotNil(t, prev, "previous should have reporter v0 data")
+		assert.Nil(t, prev.CommonVersion(), "previous has no common (no v-1 from v0)")
+		require.NotNil(t, prev.ReporterVersion(), "previous has reporter v0")
+		assert.Equal(t, bizmodel.NewVersion(0), *prev.ReporterVersion())
+
+		// The fix: both streams are now available in the same snapshot, so tuple calculation
+		// can correctly compute creates/deletes based on BOTH common and reporter data.
+	})
+}
+
+// TestFindCurrentAndPreviousVersionedRepresentations_TwoStreamScenarios tests the two-stream
+// model (common + reporter) where each stream can advance independently or together.
+func TestFindCurrentAndPreviousVersionedRepresentations_TwoStreamScenarios(t *testing.T) {
+
+	t.Run("reporter-only create", func(t *testing.T) {
+		db := setupInMemoryDB(t)
+		mc := metricscollector.NewFakeMetricsCollector()
+		tm := NewGormTransactionManager(mc, 3)
+		repo := NewResourceRepository(db, tm, noopOutboxPublisher())
+
+		resource, key := createResourceNoCommon(t, "reporter-only-create")
+		require.NoError(t, repo.Save(db, resource, bizmodel.OperationTypeCreated, emptyTxId))
+
+		// Reporter version is v0, common version is nil (no common data)
+		reporterVersion := ptrVersion(0)
+		current, previous, err := repo.FindCurrentAndPreviousVersionedRepresentations(
+			db, key, bizmodel.NewRepresentationVersions(nil, reporterVersion, nil), bizmodel.OperationTypeCreated)
+
+		require.NoError(t, err)
+		require.NotNil(t, current, "current representation should exist")
+		assert.Nil(t, previous, "no previous on create")
+
+		// Current should have reporter data but no common data
+		assert.Nil(t, current.CommonVersion(), "no common version for reporter-only resource")
+		assert.NotNil(t, current.ReporterVersion(), "reporter version should be present")
+		assert.Equal(t, bizmodel.NewVersion(0), *current.ReporterVersion())
+	})
+
+	t.Run("reporter-only update", func(t *testing.T) {
+		db := setupInMemoryDB(t)
+		mc := metricscollector.NewFakeMetricsCollector()
+		tm := NewGormTransactionManager(mc, 3)
+		repo := NewResourceRepository(db, tm, noopOutboxPublisher())
+
+		// Create reporter-only resource
+		resource, key := createResourceNoCommon(t, "reporter-only-update")
+		require.NoError(t, repo.Save(db, resource, bizmodel.OperationTypeCreated, emptyTxId))
+
+		// Update with new reporter data (advances reporter v0 -> v1)
+		found, err := repo.FindResourceByKeys(db, key)
+		require.NoError(t, err)
+
+		updatedReporter := bizmodel.Representation(internal.JsonObject{"cluster_id": "updated-cluster"})
+		api, err := bizmodel.NewApiHref("https://api.example.com/updated")
+		require.NoError(t, err)
+		con, err := bizmodel.NewConsoleHref("https://console.example.com/updated")
+		require.NoError(t, err)
+		require.NoError(t, found.Update(key, api, &con, nil, &updatedReporter, nil, newUniqueTxID("reporter-update")))
+		require.NoError(t, repo.Save(db, *found, bizmodel.OperationTypeUpdated, emptyTxId))
+
+		// Fetch with reporter version v1, common version still nil
+		reporterVersion := ptrVersion(1)
+		current, previous, err := repo.FindCurrentAndPreviousVersionedRepresentations(
+			db, key, bizmodel.NewRepresentationVersions(nil, reporterVersion, nil), bizmodel.OperationTypeUpdated)
+
+		require.NoError(t, err)
+		require.NotNil(t, current, "current should exist")
+		require.NotNil(t, previous, "previous should exist")
+
+		// Current = reporter v1, previous = reporter v0, no common in either
+		assert.Nil(t, current.CommonVersion())
+		assert.Equal(t, bizmodel.NewVersion(1), *current.ReporterVersion())
+		assert.Nil(t, previous.CommonVersion())
+		assert.Equal(t, bizmodel.NewVersion(0), *previous.ReporterVersion())
+	})
+
+	t.Run("common-only update while reporter unchanged", func(t *testing.T) {
+		db := setupInMemoryDB(t)
+		mc := metricscollector.NewFakeMetricsCollector()
+		tm := NewGormTransactionManager(mc, 3)
+		repo := NewResourceRepository(db, tm, noopOutboxPublisher())
+
+		// Create resource with both common and reporter data
+		resource := createTestResourceWithLocalIdAndType(t, "common-update", "host")
+		require.NoError(t, repo.Save(db, resource, bizmodel.OperationTypeCreated, emptyTxId))
+
+		key, err := bizmodel.NewReporterResourceKey("common-update", "host", "hbi", "hbi-instance-1")
+		require.NoError(t, err)
+
+		// Update with only common data (reporter version nil means reporter didn't advance)
+		found, err := repo.FindResourceByKeys(db, key)
+		require.NoError(t, err)
+
+		updatedCommon := bizmodel.Representation(internal.JsonObject{"workspace_id": "updated-workspace"})
+		api, err := bizmodel.NewApiHref("https://api.example.com/common-update")
+		require.NoError(t, err)
+		con, err := bizmodel.NewConsoleHref("https://console.example.com/common-update")
+		require.NoError(t, err)
+		require.NoError(t, found.Update(key, api, &con, nil, nil, &updatedCommon, newUniqueTxID("common-update")))
+		require.NoError(t, repo.Save(db, *found, bizmodel.OperationTypeUpdated, emptyTxId))
+
+		// Common advanced to v1, reporter version nil (not advanced)
+		commonVersion := ptrVersion(1)
+		current, previous, err := repo.FindCurrentAndPreviousVersionedRepresentations(
+			db, key, bizmodel.NewRepresentationVersions(commonVersion, nil, nil), bizmodel.OperationTypeUpdated)
+
+		require.NoError(t, err)
+		require.NotNil(t, current)
+		require.NotNil(t, previous)
+
+		// Common should differ between current/previous
+		assert.Equal(t, bizmodel.NewVersion(1), *current.CommonVersion())
+		assert.Equal(t, bizmodel.NewVersion(0), *previous.CommonVersion())
+
+		// Reporter should be nil in both (stream didn't advance, so not fetched)
+		assert.Nil(t, current.ReporterVersion(), "reporter should be nil when stream didn't advance")
+		assert.Nil(t, previous.ReporterVersion(), "reporter should be nil when stream didn't advance")
+	})
+
+	t.Run("both streams advance", func(t *testing.T) {
+		db := setupInMemoryDB(t)
+		mc := metricscollector.NewFakeMetricsCollector()
+		tm := NewGormTransactionManager(mc, 3)
+		repo := NewResourceRepository(db, tm, noopOutboxPublisher())
+
+		// Create with both streams
+		resource := createTestResourceWithLocalIdAndType(t, "both-streams", "host")
+		require.NoError(t, repo.Save(db, resource, bizmodel.OperationTypeCreated, emptyTxId))
+
+		key, err := bizmodel.NewReporterResourceKey("both-streams", "host", "hbi", "hbi-instance-1")
+		require.NoError(t, err)
+
+		// Update both streams
+		found, err := repo.FindResourceByKeys(db, key)
+		require.NoError(t, err)
+
+		updatedCommon := bizmodel.Representation(internal.JsonObject{"workspace_id": "new-workspace"})
+		updatedReporter := bizmodel.Representation(internal.JsonObject{"hostname": "new-host"})
+		api, err := bizmodel.NewApiHref("https://api.example.com/both")
+		require.NoError(t, err)
+		con, err := bizmodel.NewConsoleHref("https://console.example.com/both")
+		require.NoError(t, err)
+		require.NoError(t, found.Update(key, api, &con, nil, &updatedReporter, &updatedCommon, newUniqueTxID("both-update")))
+		require.NoError(t, repo.Save(db, *found, bizmodel.OperationTypeUpdated, emptyTxId))
+
+		// Both versions advanced
+		commonVersion := ptrVersion(1)
+		reporterVersion := ptrVersion(1)
+		current, previous, err := repo.FindCurrentAndPreviousVersionedRepresentations(
+			db, key, bizmodel.NewRepresentationVersions(commonVersion, reporterVersion, nil), bizmodel.OperationTypeUpdated)
+
+		require.NoError(t, err)
+		require.NotNil(t, current)
+		require.NotNil(t, previous)
+
+		// Both streams should have current/previous populated
+		assert.Equal(t, bizmodel.NewVersion(1), *current.CommonVersion())
+		assert.Equal(t, bizmodel.NewVersion(0), *previous.CommonVersion())
+		assert.Equal(t, bizmodel.NewVersion(1), *current.ReporterVersion())
+		assert.Equal(t, bizmodel.NewVersion(0), *previous.ReporterVersion())
+	})
+
+	t.Run("cv == 0 underflow guard", func(t *testing.T) {
+		db := setupInMemoryDB(t)
+		mc := metricscollector.NewFakeMetricsCollector()
+		tm := NewGormTransactionManager(mc, 3)
+		repo := NewResourceRepository(db, tm, noopOutboxPublisher())
+
+		// Create with common v0
+		resource := createTestResourceWithLocalIdAndType(t, "underflow-guard", "host")
+		require.NoError(t, repo.Save(db, resource, bizmodel.OperationTypeCreated, emptyTxId))
+
+		key, err := bizmodel.NewReporterResourceKey("underflow-guard", "host", "hbi", "hbi-instance-1")
+		require.NoError(t, err)
+
+		// Query with common version 0 - should not attempt cv-1 query
+		commonVersion := ptrVersion(0)
+		current, previous, err := repo.FindCurrentAndPreviousVersionedRepresentations(
+			db, key, bizmodel.NewRepresentationVersions(commonVersion, nil, nil), bizmodel.OperationTypeCreated)
+
+		require.NoError(t, err)
+		require.NotNil(t, current, "current should exist at v0")
+		assert.Nil(t, previous, "no previous on create at v0")
+		assert.Equal(t, bizmodel.NewVersion(0), *current.CommonVersion())
+	})
+}
+
+// TestFindCurrentAndPreviousVersionedRepresentations_TombstoneRevival tests that
+// fetching previous reporter representation works correctly when a resource is
+// deleted and then revived (tombstone → new generation with version reset to 0).
+func TestFindCurrentAndPreviousVersionedRepresentations_TombstoneRevival(t *testing.T) {
+	db := setupInMemoryDB(t)
+	mc := metricscollector.NewFakeMetricsCollector()
+	tm := NewGormTransactionManager(mc, 3)
+	repo := NewResourceRepository(db, tm, noopOutboxPublisher())
+
+	// Create reporter-only resource (no common representation)
+	resource, key := createResourceNoCommon(t, "revival-test")
+	require.NoError(t, repo.Save(db, resource, bizmodel.OperationTypeCreated, emptyTxId))
+
+	// Update a few times to advance version (gen 0, v0 → v1 → v2)
+	for i := 1; i <= 2; i++ {
+		found, err := repo.FindResourceByKeys(db, key)
+		require.NoError(t, err)
+
+		updatedReporter := bizmodel.Representation(internal.JsonObject{"iteration": i})
+		api, err := bizmodel.NewApiHref(fmt.Sprintf("https://api.example.com/update-%d", i))
+		require.NoError(t, err)
+		con, err := bizmodel.NewConsoleHref(fmt.Sprintf("https://console.example.com/update-%d", i))
+		require.NoError(t, err)
+		require.NoError(t, found.Update(key, api, &con, nil, &updatedReporter, nil, newUniqueTxID(fmt.Sprintf("update-%d", i))))
+		require.NoError(t, repo.Save(db, *found, bizmodel.OperationTypeUpdated, emptyTxId))
+	}
+
+	// Delete the resource (creates tombstone at gen 0, v3)
+	found, err := repo.FindResourceByKeys(db, key)
+	require.NoError(t, err)
+	require.NoError(t, found.Delete(key))
+	require.NoError(t, repo.Save(db, *found, bizmodel.OperationTypeDeleted, emptyTxId))
+
+	// Verify tombstone was created
+	var tombstoneCount int64
+	db.Table("reporter_representations").
+		Where("tombstone = true AND reporter_resource_id = (SELECT id FROM reporter_resources WHERE local_resource_id = ?)", "revival-test").
+		Count(&tombstoneCount)
+	require.Equal(t, int64(1), tombstoneCount, "should have one tombstone")
+
+	// Revive the resource (starts new generation: gen 1, v0)
+	// ReporterResource.Update calls startNewGeneration when tombstoned, which resets version to 0
+	found, err = repo.FindResourceByKeys(db, key)
+	require.NoError(t, err)
+
+	revivalReporter := bizmodel.Representation(internal.JsonObject{"revived": true})
+	api, err := bizmodel.NewApiHref("https://api.example.com/revival")
+	require.NoError(t, err)
+	con, err := bizmodel.NewConsoleHref("https://console.example.com/revival")
+	require.NoError(t, err)
+	require.NoError(t, found.Update(key, api, &con, nil, &revivalReporter, nil, newUniqueTxID("revival")))
+	require.NoError(t, repo.Save(db, *found, bizmodel.OperationTypeUpdated, emptyTxId))
+
+	// Fetch current and previous for the revival (gen 1, v0)
+	// This is the critical test: previous should be the tombstone (gen 0, v3), not nil
+	reporterVersion := ptrVersion(0)       // Version reset to 0 on revival
+	reporterGeneration := ptrGeneration(1) // Generation incremented on revival
+	current, previous, err := repo.FindCurrentAndPreviousVersionedRepresentations(
+		db, key, bizmodel.NewRepresentationVersions(nil, reporterVersion, reporterGeneration), bizmodel.OperationTypeUpdated)
+
+	require.NoError(t, err)
+	require.NotNil(t, current, "current should exist")
+	require.NotNil(t, previous, "previous should exist (the tombstone from previous generation)")
+
+	// Current should be the revival (gen 1, v0)
+	assert.Equal(t, bizmodel.NewVersion(0), *current.ReporterVersion(), "revival should be at version 0")
+	revivalData := current.ReporterData()
+	assert.Equal(t, true, revivalData["revived"], "current should be the revival data")
+
+	// Previous should be the tombstone (gen 0, v3)
+	assert.Equal(t, bizmodel.NewVersion(3), *previous.ReporterVersion(), "previous should be the tombstone at version 3")
+	// The tombstone has empty data (nil representation in the model)
+	previousData := previous.ReporterData()
+	assert.Nil(t, previousData, "tombstone representation should be nil")
+}
+
+// TestFindCurrentAndPreviousVersionedRepresentations_EventReplayRaceCondition tests the scenario
+// from PR #1465 review: when a resource is deleted and re-reported, an old event replayed after
+// the re-report must fetch the correct historical representation (not the new generation's data).
+//
+// Scenario:
+// 1. Resource reported at gen=0, ver=0
+// 2. Resource deleted (tombstone at gen=0, ver=1)
+// 3. Resource re-reported (new generation: gen=1, ver=0)
+// 4. Old event from step 1 is replayed (consumer restart/reprocessing)
+//   - WITHOUT generation tracking: would incorrectly fetch gen=1, ver=0 (wrong!)
+//   - WITH generation tracking: correctly fetches gen=0, ver=0 (correct!)
+func TestFindCurrentAndPreviousVersionedRepresentations_EventReplayRaceCondition(t *testing.T) {
+	db := setupInMemoryDB(t)
+	mc := metricscollector.NewFakeMetricsCollector()
+	tm := NewGormTransactionManager(mc, 3)
+	repo := NewResourceRepository(db, tm, noopOutboxPublisher())
+
+	// Step 1: Create resource at gen=0, ver=0
+	resource, key := createResourceNoCommon(t, "replay-race-test")
+	require.NoError(t, repo.Save(db, resource, bizmodel.OperationTypeCreated, emptyTxId))
+
+	// The initial creation creates gen=0, ver=0 with data: {"cluster_id": "replay-race-test"}
+	found, err := repo.FindResourceByKeys(db, key)
+	require.NoError(t, err)
+
+	// Step 2: Delete the resource (creates tombstone at gen=0, ver=1)
+	require.NoError(t, found.Delete(key))
+	require.NoError(t, repo.Save(db, *found, bizmodel.OperationTypeDeleted, emptyTxId))
+
+	// Step 3: Re-report the resource (starts new generation: gen=1, ver=0)
+	found, err = repo.FindResourceByKeys(db, key)
+	require.NoError(t, err)
+
+	revivalReporter := bizmodel.Representation(internal.JsonObject{"revived": "generation-1"})
+	api, err := bizmodel.NewApiHref("https://api.example.com/revival")
+	require.NoError(t, err)
+	con, err := bizmodel.NewConsoleHref("https://console.example.com/revival")
+	require.NoError(t, err)
+	require.NoError(t, found.Update(key, api, &con, nil, &revivalReporter, nil, newUniqueTxID("revival")))
+	require.NoError(t, repo.Save(db, *found, bizmodel.OperationTypeUpdated, emptyTxId))
+
+	// At this point, we have TWO representations at version=0:
+	// - gen=0, ver=0: original data ({"cluster_id": "replay-race-test"})
+	// - gen=1, ver=0: revival data ({"revived": "generation-1"})
+
+	// Step 4: Simulate replaying the old event (gen=0, ver=0)
+	// This is what happens when a consumer restarts and reprocesses an uncommitted event
+	// The event says: "fetch representation at version=0, generation=0"
+	oldEventVersion := ptrVersion(0)
+	oldEventGeneration := ptrGeneration(0)
+
+	// THE CRITICAL TEST: When we fetch (gen=0, ver=0), we MUST get the original data,
+	// NOT the new generation's data
+	current, previous, err := repo.FindCurrentAndPreviousVersionedRepresentations(
+		db, key, bizmodel.NewRepresentationVersions(nil, oldEventVersion, oldEventGeneration), bizmodel.OperationTypeCreated)
+
+	require.NoError(t, err)
+	require.NotNil(t, current, "current should exist")
+	assert.Nil(t, previous, "no previous for gen=0, ver=0 create event")
+
+	// Verify we got the ORIGINAL gen=0 data, not the gen=1 data
+	currentData := current.ReporterData()
+	assert.NotNil(t, currentData, "should have data")
+	assert.Equal(t, "replay-race-test", currentData["cluster_id"], "MUST fetch gen=0 data when event specifies gen=0")
+	assert.Nil(t, currentData["revived"], "MUST NOT fetch gen=1 data when event specifies gen=0")
+
+	// Also verify that fetching the NEW event (gen=1, ver=0) still works correctly
+	newEventVersion := ptrVersion(0)
+	newEventGeneration := ptrGeneration(1)
+
+	current, previous, err = repo.FindCurrentAndPreviousVersionedRepresentations(
+		db, key, bizmodel.NewRepresentationVersions(nil, newEventVersion, newEventGeneration), bizmodel.OperationTypeUpdated)
+
+	require.NoError(t, err)
+	require.NotNil(t, current, "current should exist")
+	require.NotNil(t, previous, "previous should be the tombstone")
+
+	currentData = current.ReporterData()
+	assert.Equal(t, "generation-1", currentData["revived"], "gen=1 event should fetch gen=1 data")
+	assert.Nil(t, currentData["cluster_id"], "gen=1 event should NOT fetch gen=0 data")
+}
+
+// TestFindLatestRepresentations_ReporterOnly tests that FindLatestRepresentations does not
+// error on reporter-only resources (regression test for delete-path bug).
+func TestFindLatestRepresentations_ReporterOnly(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping test requiring SpiceDB Docker container")
+	}
+
+	db := setupInMemoryDB(t)
+	mc := metricscollector.NewFakeMetricsCollector()
+	tm := NewGormTransactionManager(mc, 3)
+	repo := NewResourceRepository(db, tm, noopOutboxPublisher())
+
+	resource, key := createResourceNoCommon(t, "latest-reporter-only")
+	require.NoError(t, repo.Save(db, resource, bizmodel.OperationTypeCreated, emptyTxId))
+
+	latest, err := repo.FindLatestRepresentations(db, key)
+	require.NoError(t, err, "must not error on reporter-only resource")
+	require.NotNil(t, latest, "should return reporter data")
+
+	// Should have reporter data but no common data
+	assert.Nil(t, latest.CommonVersion(), "no common version")
+	assert.NotNil(t, latest.ReporterVersion(), "reporter version should be present")
+}
+
+func TestFindLatestRepresentations_ReporterOnlyAfterDelete(t *testing.T) {
+	db := setupInMemoryDB(t)
+	mc := metricscollector.NewFakeMetricsCollector()
+	tm := NewGormTransactionManager(mc, 3)
+	repo := NewResourceRepository(db, tm, noopOutboxPublisher())
+
+	resource, key := createResourceNoCommon(t, "reporter-only-delete")
+	require.NoError(t, repo.Save(db, resource, bizmodel.OperationTypeCreated, emptyTxId))
+
+	found, err := repo.FindResourceByKeys(db, key)
+	require.NoError(t, err)
+	require.NoError(t, found.Delete(key))
+	require.NoError(t, repo.Save(db, *found, bizmodel.OperationTypeDeleted, emptyTxId))
+
+	latest, err := repo.FindLatestRepresentations(db, key)
+	require.NoError(t, err)
+	require.NotNil(t, latest)
+	require.NotNil(t, latest.ReporterVersion())
+	assert.Equal(t, bizmodel.NewVersion(0), *latest.ReporterVersion())
+	assert.Equal(t, "reporter-only-delete", latest.ReporterData()["cluster_id"])
+}
+
+// TestFindLatestRepresentations_GenerationOrdering tests that FindLatestRepresentations
+// correctly orders by generation FIRST, then version. This prevents returning stale data
+// from an older generation when a resource has been deleted and revived.
+//
+// Scenario: gen 0 v0 → v1 → v2 → delete (gen 0 v3 tombstone) → revive (gen 1 v0)
+// Expected: FindLatestRepresentations returns gen 1 v0 (current), not gen 0 v2 (stale)
+func TestFindLatestRepresentations_GenerationOrdering(t *testing.T) {
+	implementations := []struct {
+		name string
+		repo func() bizmodel.ResourceRepository
+		db   func() *gorm.DB
+	}{
+		{
+			name: "Real Repository",
+			repo: func() bizmodel.ResourceRepository {
+				db := setupInMemoryDB(t)
+				mc := metricscollector.NewFakeMetricsCollector()
+				tm := NewGormTransactionManager(mc, 3)
+				return NewResourceRepository(db, tm, noopOutboxPublisher())
+			},
+			db: func() *gorm.DB {
+				return setupInMemoryDB(t)
+			},
+		},
+		{
+			name: "Fake Repository",
+			repo: func() bizmodel.ResourceRepository {
+				return NewFakeResourceRepository()
+			},
+			db: func() *gorm.DB {
+				return nil
+			},
+		},
+	}
+
+	for _, impl := range implementations {
+		t.Run(impl.name, func(t *testing.T) {
+			if testing.Short() && impl.name == "Real Repository" {
+				t.Skip("skipping real repository test in short mode")
+			}
+
+			repo := impl.repo()
+			db := impl.db()
+
+			// Create reporter-only resource (gen 0, v0)
+			resource, key := createResourceNoCommon(t, "generation-ordering-test")
+			require.NoError(t, repo.Save(db, resource, bizmodel.OperationTypeCreated, emptyTxId))
+
+			// Update twice to advance version (gen 0: v0 → v1 → v2)
+			for i := 1; i <= 2; i++ {
+				found, err := repo.FindResourceByKeys(db, key)
+				require.NoError(t, err)
+
+				updatedReporter := bizmodel.Representation(internal.JsonObject{"iteration": i})
+				api, err := bizmodel.NewApiHref(fmt.Sprintf("https://api.example.com/gen0-v%d", i))
+				require.NoError(t, err)
+				con, err := bizmodel.NewConsoleHref(fmt.Sprintf("https://console.example.com/gen0-v%d", i))
+				require.NoError(t, err)
+				require.NoError(t, found.Update(key, api, &con, nil, &updatedReporter, nil, newUniqueTxID(fmt.Sprintf("gen0-v%d", i))))
+				require.NoError(t, repo.Save(db, *found, bizmodel.OperationTypeUpdated, emptyTxId))
+			}
+
+			// Delete the resource (creates tombstone at gen 0, v3)
+			found, err := repo.FindResourceByKeys(db, key)
+			require.NoError(t, err)
+			require.NoError(t, found.Delete(key))
+			require.NoError(t, repo.Save(db, *found, bizmodel.OperationTypeDeleted, emptyTxId))
+
+			// Revive the resource (starts new generation: gen 1, v0)
+			found, err = repo.FindResourceByKeys(db, key)
+			require.NoError(t, err)
+
+			revivalReporter := bizmodel.Representation(internal.JsonObject{"revived": true})
+			api, err := bizmodel.NewApiHref("https://api.example.com/gen1-v0")
+			require.NoError(t, err)
+			con, err := bizmodel.NewConsoleHref("https://console.example.com/gen1-v0")
+			require.NoError(t, err)
+			require.NoError(t, found.Update(key, api, &con, nil, &revivalReporter, nil, newUniqueTxID("gen1-v0")))
+			require.NoError(t, repo.Save(db, *found, bizmodel.OperationTypeUpdated, emptyTxId))
+
+			// FindLatestRepresentations must return gen 1 v0 (the revival), not gen 0 v2 (stale)
+			latest, err := repo.FindLatestRepresentations(db, key)
+			require.NoError(t, err)
+			require.NotNil(t, latest)
+			require.NotNil(t, latest.ReporterVersion())
+
+			// Verify we got the revival data, not the old generation's data
+			assert.Equal(t, bizmodel.NewVersion(0), *latest.ReporterVersion(), "should return gen 1 v0, not gen 0 v2")
+			assert.Equal(t, true, latest.ReporterData()["revived"], "should have revival data")
+			assert.NotContains(t, latest.ReporterData(), "iteration", "should not have old generation data")
+		})
+	}
+}
+
+// TestFindCurrentAndPreviousVersionedRepresentations_ReporterOnlyDelete tests that
+// delete operations on reporter-only resources (no common representation) work correctly.
+// Regression test for the tombstone fetch bug where fetching a deleted reporter-only
+// resource would fail with "at least one of common or reporter representation must be present".
+func TestFindCurrentAndPreviousVersionedRepresentations_ReporterOnlyDelete(t *testing.T) {
+	implementations := []struct {
+		name string
+		repo func() bizmodel.ResourceRepository
+		db   func() *gorm.DB
+	}{
+		{
+			name: "Real Repository",
+			repo: func() bizmodel.ResourceRepository {
+				db := setupInMemoryDB(t)
+				mc := metricscollector.NewFakeMetricsCollector()
+				tm := NewGormTransactionManager(mc, 3)
+				return NewResourceRepository(db, tm, noopOutboxPublisher())
+			},
+			db: func() *gorm.DB {
+				return setupInMemoryDB(t)
+			},
+		},
+		{
+			name: "Fake Repository",
+			repo: func() bizmodel.ResourceRepository {
+				return NewFakeResourceRepository()
+			},
+			db: func() *gorm.DB {
+				return nil
+			},
+		},
+	}
+
+	for _, impl := range implementations {
+		t.Run(impl.name, func(t *testing.T) {
+			if testing.Short() && impl.name == "Real Repository" {
+				t.Skip("skipping real repository test in short mode")
+			}
+
+			repo := impl.repo()
+			db := impl.db()
+
+			// Create a reporter-only resource (no common representation)
+			resource, key := createResourceNoCommon(t, "reporter-only-delete-versioned")
+			require.NoError(t, repo.Save(db, resource, bizmodel.OperationTypeCreated, emptyTxId))
+
+			// Delete the resource
+			found, err := repo.FindResourceByKeys(db, key)
+			require.NoError(t, err)
+			require.NoError(t, found.Delete(key))
+			require.NoError(t, repo.Save(db, *found, bizmodel.OperationTypeDeleted, emptyTxId))
+
+			// Fetch using versioned method with the delete event's versions
+			// The delete event has reporter version=1 (the tombstone)
+			reporterVersion := bizmodel.NewVersion(1)
+			reporterGeneration := bizmodel.NewGeneration(0)
+			versions := bizmodel.NewRepresentationVersions(nil, &reporterVersion, &reporterGeneration)
+
+			current, previous, err := repo.FindCurrentAndPreviousVersionedRepresentations(db, key, versions, bizmodel.OperationTypeDeleted)
+			require.NoError(t, err, "must not error when fetching delete of reporter-only resource")
+
+			// For delete operations, the last-live state is in "current", and "previous" is nil
+			// This changed in Task 3: delete operations use upper-bound fetch to find last-live before tombstone
+			require.NotNil(t, current, "current should contain the last-live representation for delete")
+			assert.Nil(t, previous, "previous should be nil for delete operations")
+			assert.Equal(t, bizmodel.NewVersion(0), *current.ReporterVersion(), "current should be version 0 (last-live)")
+			assert.Equal(t, "reporter-only-delete-versioned", current.ReporterData()["cluster_id"])
+		})
+	}
+}
+
+// Verification test: UPDATE operations also handle gaps correctly via upper-bound query
+func TestFindCurrentAndPreviousVersionedRepresentations_UpdateAfterCommonOnlyUpdate(t *testing.T) {
+	implementations := []struct {
+		name string
+		repo func() bizmodel.ResourceRepository
+		db   func() *gorm.DB
+	}{
+		{
+			name: "Real Repository with GormTransactionManager",
+			repo: func() bizmodel.ResourceRepository {
+				db := setupInMemoryDB(t)
+				mc := metricscollector.NewFakeMetricsCollector()
+				tm := NewGormTransactionManager(mc, 3)
+				return NewResourceRepository(db, tm, noopOutboxPublisher())
+			},
+			db: func() *gorm.DB { return setupInMemoryDB(t) },
+		},
+		{
+			name: "Fake Repository",
+			repo: func() bizmodel.ResourceRepository {
+				return NewFakeResourceRepository()
+			},
+			db: func() *gorm.DB { return nil },
+		},
+	}
+
+	for _, impl := range implementations {
+		t.Run(impl.name, func(t *testing.T) {
+			repo := impl.repo()
+			db := impl.db()
+
+			// Step 1: Create resource with reporter data (v0)
+			resource := createTestResourceWithLocalId(t, "update-gap-test")
+			err := repo.Save(db, resource, bizmodel.OperationTypeCreated, bizmodel.NewTransactionId("tx-create"))
+			require.NoError(t, err)
+
+			key, err := bizmodel.NewReporterResourceKey("update-gap-test", "k8s_cluster", "ocm", "ocm-instance-1")
+			require.NoError(t, err)
+
+			// Step 2: Common-only update (creates gap at v1)
+			found, err := repo.FindResourceByKeys(db, key)
+			require.NoError(t, err)
+			apiHref, _ := bizmodel.NewApiHref("https://api.example.com/common-update")
+			commonDataObj := internal.JsonObject{"workspace_id": "updated-workspace"}
+			commonData := bizmodel.Representation(commonDataObj)
+			err = found.Update(key, apiHref, nil, nil, nil, &commonData, bizmodel.NewTransactionId("tx-common"))
+			require.NoError(t, err)
+			err = repo.Save(db, *found, bizmodel.OperationTypeUpdated, bizmodel.NewTransactionId("tx-common"))
+			require.NoError(t, err)
+
+			// Step 3: Update with reporter data (v2)
+			found, err = repo.FindResourceByKeys(db, key)
+			require.NoError(t, err)
+			apiHref2, _ := bizmodel.NewApiHref("https://api.example.com/reporter-update")
+			reporterDataObj := internal.JsonObject{"name": "updated-cluster"}
+			reporterData := bizmodel.Representation(reporterDataObj)
+			err = found.Update(key, apiHref2, nil, nil, &reporterData, nil, bizmodel.NewTransactionId("tx-reporter"))
+			require.NoError(t, err)
+			err = repo.Save(db, *found, bizmodel.OperationTypeUpdated, bizmodel.NewTransactionId("tx-reporter"))
+			require.NoError(t, err)
+
+			// Now fetch for UPDATE operation at v2 - previous should find v0 despite gap at v1
+			currentVersion := bizmodel.NewVersion(2)
+			currentGeneration := bizmodel.NewGeneration(0)
+			versions := bizmodel.NewRepresentationVersions(nil, &currentVersion, &currentGeneration)
+
+			current, previous, err := repo.FindCurrentAndPreviousVersionedRepresentations(db, key, versions, bizmodel.OperationTypeUpdated)
+			require.NoError(t, err, "update operation should succeed despite version gap")
+
+			// Current should be v2
+			require.NotNil(t, current, "current should contain v2 data")
+			require.NotNil(t, current.ReporterData(), "current reporter data should not be nil")
+			assert.Equal(t, "updated-cluster", current.ReporterData()["name"])
+			assert.Equal(t, bizmodel.NewVersion(2), *current.ReporterVersion())
+
+			// Previous should be v0 (upper-bound query skips gap at v1)
+			require.NotNil(t, previous, "previous should contain v0 data")
+			require.NotNil(t, previous.ReporterData(), "previous reporter data should not be nil")
+			assert.Equal(t, "test-cluster", previous.ReporterData()["name"], "should fetch v0 reporter data despite gap at v1")
+			assert.Equal(t, bizmodel.NewVersion(0), *previous.ReporterVersion())
 		})
 	}
 }
@@ -3279,19 +4051,166 @@ func TestEmptyAndNilRepresentationPersistence(t *testing.T) {
 		assert.Equal(t, int64(1), commonCount, "Should have one common representation row")
 	})
 
-	t.Run("empty common representation is rejected by domain model", func(t *testing.T) {
-		// Empty common (len=0) with valid reporter → domain rejects because
-		// NewCommonRepresentation validates data is non-empty. The service layer
-		// handles this by converting empty protobuf structs to nil pointers before
-		// reaching the domain.
+	t.Run("empty common representation is now accepted by domain model", func(t *testing.T) {
+		// Empty common (len=0) with valid reporter → domain now accepts this
+		// to support schema-only resources (like features/workspace) that only
+		// have reporter data and no common representation.
 		p := newResourceParams(t, "valid-reporter-empty-common")
 
-		_, err := bizmodel.NewResource(
+		resource, err := bizmodel.NewResource(
 			p.resourceId, p.localResourceId, p.resourceType, p.reporterType,
 			p.reporterInstanceId, newUniqueTxID("empty-common-test"), p.reporterResourceId,
 			p.apiHref, nil, validReporter(t), emptyRep(), nil,
 		)
-		require.Error(t, err, "Empty common representation should be rejected by the domain model")
-		assert.Contains(t, err.Error(), "CommonRepresentation")
+		require.NoError(t, err, "Empty common representation should be accepted by the domain model")
+		require.NotNil(t, resource)
 	})
+}
+
+// Test 1.1: Delete after common-only update - verifies gap-tolerant delete fetching
+func TestFindCurrentAndPreviousVersionedRepresentations_DeleteAfterCommonOnlyUpdate(t *testing.T) {
+	implementations := []struct {
+		name string
+		repo func() bizmodel.ResourceRepository
+		db   func() *gorm.DB
+	}{
+		{
+			name: "Real Repository with GormTransactionManager",
+			repo: func() bizmodel.ResourceRepository {
+				db := setupInMemoryDB(t)
+				mc := metricscollector.NewFakeMetricsCollector()
+				tm := NewGormTransactionManager(mc, 3)
+				return NewResourceRepository(db, tm, noopOutboxPublisher())
+			},
+			db: func() *gorm.DB { return setupInMemoryDB(t) },
+		},
+		{
+			name: "Fake Repository",
+			repo: func() bizmodel.ResourceRepository {
+				return NewFakeResourceRepository()
+			},
+			db: func() *gorm.DB { return nil },
+		},
+	}
+
+	for _, impl := range implementations {
+		t.Run(impl.name, func(t *testing.T) {
+			repo := impl.repo()
+			db := impl.db()
+
+			// Step 1: Create resource with reporter data (v0)
+			resource := createTestResourceWithLocalId(t, "gap-test-resource")
+			err := repo.Save(db, resource, bizmodel.OperationTypeCreated, bizmodel.NewTransactionId("tx-create"))
+			require.NoError(t, err)
+
+			key, err := bizmodel.NewReporterResourceKey("gap-test-resource", "k8s_cluster", "ocm", "ocm-instance-1")
+			require.NoError(t, err)
+
+			// Step 2: Common-only update (reporter version increments to v1 but no row written)
+			found, err := repo.FindResourceByKeys(db, key)
+			require.NoError(t, err)
+
+			// Update with only common data (reporter data = nil)
+			apiHref, _ := bizmodel.NewApiHref("https://api.example.com/updated")
+			commonDataObj := internal.JsonObject{"workspace_id": "updated-workspace"}
+			commonData := bizmodel.Representation(commonDataObj)
+			err = found.Update(key, apiHref, nil, nil, nil, &commonData, bizmodel.NewTransactionId("tx-update-common"))
+			require.NoError(t, err)
+			err = repo.Save(db, *found, bizmodel.OperationTypeUpdated, bizmodel.NewTransactionId("tx-update-common"))
+			require.NoError(t, err)
+
+			// Step 3: Delete (tombstone at v2)
+			found, err = repo.FindResourceByKeys(db, key)
+			require.NoError(t, err)
+			err = found.Delete(key)
+			require.NoError(t, err)
+			err = repo.Save(db, *found, bizmodel.OperationTypeDeleted, bizmodel.NewTransactionId("tx-delete"))
+			require.NoError(t, err)
+
+			// Now test the delete scenario using OperationTypeDeleted
+			// After Task 3, the delete branch uses upper-bound semantics to find the last live
+			// reporter data before the tombstone, tolerating version gaps.
+			tombstoneVersion := bizmodel.NewVersion(2) // The delete incremented to v2 (tombstone)
+			tombstoneGeneration := bizmodel.NewGeneration(0)
+			// Pass the tombstone version (not tombstone-1) with OperationTypeDeleted
+			versions := bizmodel.NewRepresentationVersions(nil, &tombstoneVersion, &tombstoneGeneration)
+
+			current, previous, err := repo.FindCurrentAndPreviousVersionedRepresentations(db, key, versions, bizmodel.OperationTypeDeleted)
+			require.NoError(t, err, "delete operation should succeed despite version gap")
+
+			// For delete operations, the last-live state is in "current", and "previous" is nil
+			require.NotNil(t, current, "current should contain last-live state for delete")
+			assert.Nil(t, previous, "previous should be nil for delete operations")
+
+			// The current should contain the v0 reporter data (last live before tombstone at v2)
+			require.NotNil(t, current.ReporterData(), "reporter data should be found")
+			assert.Equal(t, "test-cluster", current.ReporterData()["name"], "should fetch v0 reporter data despite gap at v1")
+			assert.Equal(t, bizmodel.NewVersion(0), *current.ReporterVersion(), "should be version 0 (last live)")
+		})
+	}
+}
+
+// Test 1.2: Phantom version test - missing rows should return (nil, nil, nil), not (data, version=0, nil)
+// This test verifies the fix for Defect 2 by attempting to fetch a non-existent version through
+// the public API. The FindCurrentAndPreviousVersionedRepresentations method internally calls
+// fetchReporterRepresentation, and a missing row should result in nil data/version, not a phantom.
+func TestFetchRepresentations_MissingRowReturnsNil(t *testing.T) {
+	implementations := []struct {
+		name string
+		repo func() bizmodel.ResourceRepository
+		db   func() *gorm.DB
+	}{
+		{
+			name: "Real Repository with GormTransactionManager",
+			repo: func() bizmodel.ResourceRepository {
+				db := setupInMemoryDB(t)
+				mc := metricscollector.NewFakeMetricsCollector()
+				tm := NewGormTransactionManager(mc, 3)
+				return NewResourceRepository(db, tm, noopOutboxPublisher())
+			},
+			db: func() *gorm.DB { return setupInMemoryDB(t) },
+		},
+		{
+			name: "Fake Repository",
+			repo: func() bizmodel.ResourceRepository {
+				return NewFakeResourceRepository()
+			},
+			db: func() *gorm.DB { return nil },
+		},
+	}
+
+	for _, impl := range implementations {
+		t.Run(impl.name, func(t *testing.T) {
+			repo := impl.repo()
+			db := impl.db()
+
+			// Create a resource with v0 only
+			resource := createTestResourceWithLocalId(t, "phantom-test-resource")
+			err := repo.Save(db, resource, bizmodel.OperationTypeCreated, bizmodel.NewTransactionId("tx-phantom"))
+			require.NoError(t, err)
+
+			key, err := bizmodel.NewReporterResourceKey("phantom-test-resource", "k8s_cluster", "ocm", "ocm-instance-1")
+			require.NoError(t, err)
+
+			// Try to fetch a non-existent version (v99, generation 0) via the public API
+			// Current should be nil (exact match fails), but previous might find v0 (upper bound)
+			nonExistentVersion := bizmodel.NewVersion(99)
+			nonExistentGeneration := bizmodel.NewGeneration(0)
+			versions := bizmodel.NewRepresentationVersions(nil, &nonExistentVersion, &nonExistentGeneration)
+
+			current, previous, err := repo.FindCurrentAndPreviousVersionedRepresentations(db, key, versions, bizmodel.OperationTypeUpdated)
+			require.NoError(t, err, "missing row should not error")
+
+			// Current should be nil because v99 doesn't exist (exact match fails)
+			// Before Task 2 fix: real repo would return phantom version=0 due to zero-valued result struct
+			// After Task 2 fix: correctly returns nil when RowsAffected == 0
+			assert.Nil(t, current, "current should be nil when exact version doesn't exist")
+
+			// Previous may find v0 via upper-bound query - that's correct behavior
+			// We're only testing that missing rows don't create phantom versions
+			if previous != nil {
+				assert.NotNil(t, previous.ReporterVersion(), "if previous found, should have real version")
+			}
+		})
+	}
 }

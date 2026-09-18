@@ -188,7 +188,7 @@ func (r *Resource) Delete(key ReporterResourceKey) error {
 		reporterResource.Id(),
 		reporterResource.representationVersion, // Tombstone version (incremented)
 		reporterResource.generation,
-		r.commonVersion) // Common version (unchanged - this IS the last live)
+		r.lastCommonVersion) // Last persisted common version
 
 	if err != nil {
 		return fmt.Errorf("failed to create ResourceDeleteEvent: %w", err)

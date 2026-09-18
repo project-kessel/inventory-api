@@ -338,10 +338,6 @@ func (r *resourceRepository) fetchCommonRepresentation(db *gorm.DB, key bizmodel
 
 	tx := query.Limit(1).Scan(&result)
 	if tx.Error != nil {
-		// ErrRecordNotFound is expected when the representation doesn't exist
-		if errors.Is(tx.Error, gorm.ErrRecordNotFound) {
-			return nil, nil, nil
-		}
 		return nil, nil, fmt.Errorf("database error fetching common representation: %w", tx.Error)
 	}
 
@@ -371,10 +367,6 @@ func (r *resourceRepository) fetchLatestCommonRepresentation(db *gorm.DB, key bi
 
 	tx := query.Order("cr.version DESC").Limit(1).Scan(&result)
 	if tx.Error != nil {
-		// ErrRecordNotFound is expected when the representation doesn't exist
-		if errors.Is(tx.Error, gorm.ErrRecordNotFound) {
-			return nil, nil, nil
-		}
 		return nil, nil, fmt.Errorf("database error fetching latest common representation: %w", tx.Error)
 	}
 
@@ -404,10 +396,6 @@ func (r *resourceRepository) fetchReporterRepresentation(db *gorm.DB, key bizmod
 
 	tx := query.Limit(1).Scan(&result)
 	if tx.Error != nil {
-		// ErrRecordNotFound is expected when the representation doesn't exist
-		if errors.Is(tx.Error, gorm.ErrRecordNotFound) {
-			return nil, nil, nil
-		}
 		return nil, nil, fmt.Errorf("database error fetching reporter representation: %w", tx.Error)
 	}
 
@@ -446,10 +434,6 @@ func (r *resourceRepository) fetchPreviousReporterRepresentation(db *gorm.DB, ke
 	// Order by generation first, then version, to properly handle generation boundaries
 	tx := query.Order("rrep.generation DESC, rrep.version DESC").Limit(1).Scan(&result)
 	if tx.Error != nil {
-		// ErrRecordNotFound is expected when the representation doesn't exist
-		if errors.Is(tx.Error, gorm.ErrRecordNotFound) {
-			return nil, nil, nil
-		}
 		return nil, nil, fmt.Errorf("database error fetching previous reporter representation: %w", tx.Error)
 	}
 
@@ -482,10 +466,6 @@ func (r *resourceRepository) fetchLatestReporterRepresentation(db *gorm.DB, key 
 
 	tx := query.Order("rrep.generation DESC, rrep.version DESC").Limit(1).Scan(&result)
 	if tx.Error != nil {
-		// ErrRecordNotFound is expected when the representation doesn't exist
-		if errors.Is(tx.Error, gorm.ErrRecordNotFound) {
-			return nil, nil, nil
-		}
 		return nil, nil, fmt.Errorf("database error fetching latest reporter representation: %w", tx.Error)
 	}
 
@@ -526,9 +506,6 @@ func (r *resourceRepository) fetchLastLiveReporterBefore(db *gorm.DB, key bizmod
 	// Order by generation DESC, version DESC to get the most recent
 	tx := query.Order("rrep.generation DESC, rrep.version DESC").Limit(1).Scan(&result)
 	if tx.Error != nil {
-		if errors.Is(tx.Error, gorm.ErrRecordNotFound) {
-			return nil, nil, nil
-		}
 		return nil, nil, fmt.Errorf("database error fetching last live reporter before (%d, %d): %w", beforeVersion, beforeGeneration, tx.Error)
 	}
 

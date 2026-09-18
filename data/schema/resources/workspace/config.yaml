@@ -1,0 +1,3 @@
+resource_type: workspace
+resource_reporters:
+  - features

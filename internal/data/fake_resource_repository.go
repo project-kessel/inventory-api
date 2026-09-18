@@ -327,7 +327,8 @@ func (m *inMemoryRepresentationFetcher) fetchReporter(version uint, generation u
 		if entry, ok := generations[generation]; ok {
 			data := bizmodel.Representation(cloneJsonObject(entry.data))
 			// Empty data means "not found" (e.g., tombstone with nil data)
-			// Match real repository behavior: return (nil, nil, nil)
+			// Return (nil, nil, nil) - aligned with real repository behavior after Task 2 fix.
+			// This behavior is enforced by TestFetchRepresentations_MissingRowReturnsNil.
 			if len(data) == 0 {
 				return nil, nil, nil
 			}
@@ -335,6 +336,8 @@ func (m *inMemoryRepresentationFetcher) fetchReporter(version uint, generation u
 			return data, &v, nil
 		}
 	}
+	// No entry found at this version/generation - return (nil, nil, nil)
+	// Aligned with real repository: RowsAffected == 0 returns (nil, nil, nil)
 	return nil, nil, nil
 }
 
@@ -368,6 +371,44 @@ func (m *inMemoryRepresentationFetcher) fetchPreviousReporter(currentVersion uin
 			}
 		}
 	}
+	if maxRep != nil {
+		v := bizmodel.NewVersion(maxRep.entry.version)
+		return bizmodel.Representation(cloneJsonObject(maxRep.entry.data)), &v, nil
+	}
+	return nil, nil, nil
+}
+
+func (m *inMemoryRepresentationFetcher) fetchLastLiveReporterBefore(beforeVersion uint, beforeGeneration uint) (bizmodel.Representation, *bizmodel.Version, error) {
+	if m.reporterReps == nil {
+		return nil, nil, nil
+	}
+	// Find the most recent non-tombstone reporter representation before (beforeVersion, beforeGeneration)
+	// Same upper-bound logic as fetchPreviousReporter, but filter out tombstones
+	type versionGen struct {
+		version    uint
+		generation uint
+		entry      *storedReporterRepresentation
+	}
+	var allReps []versionGen
+	for v, generations := range m.reporterReps {
+		for g, entry := range generations {
+			allReps = append(allReps, versionGen{v, g, entry})
+		}
+	}
+
+	// Find max version/generation that is before (beforeVersion, beforeGeneration) and not a tombstone
+	var maxRep *versionGen
+	for i := range allReps {
+		rep := &allReps[i]
+		// Upper-bound condition: (generation = beforeGeneration AND version < beforeVersion) OR generation < beforeGeneration
+		// Plus tombstone filter: AND tombstone = false
+		if ((rep.generation == beforeGeneration && rep.version < beforeVersion) || rep.generation < beforeGeneration) && !rep.entry.tombstone {
+			if maxRep == nil || rep.generation > maxRep.generation || (rep.generation == maxRep.generation && rep.version > maxRep.version) {
+				maxRep = rep
+			}
+		}
+	}
+
 	if maxRep != nil {
 		v := bizmodel.NewVersion(maxRep.entry.version)
 		return bizmodel.Representation(cloneJsonObject(maxRep.entry.data)), &v, nil

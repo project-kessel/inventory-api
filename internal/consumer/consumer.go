@@ -320,41 +320,21 @@ func (i *InventoryConsumer) ProcessMessage(headers map[string]string, relationsE
 		if relationsEnabled {
 			return i.processRelationsOperation(operation, txid, msg, operationConfig{
 				fetchRepresentations: func(i *InventoryConsumer, key model.ReporterResourceKey, versions model.RepresentationVersions) (*model.Representations, *model.Representations, error) {
-					// For DELETE operations, fetch the EXACT last live versions for replayability.
-					// The event is self-contained and doesn't rely on "what's currently latest" in the database.
+					// For DELETE operations, fetch the last live state using OperationTypeDeleted.
+					// The delete branch uses upper-bound semantics to tolerate version gaps:
+					// - commonVersion: exact fetch (unchanged during delete, already last-live)
+					// - reporterVersion: upper-bound fetch before tombstone (gap-tolerant, tombstone-filtered)
 					//
-					// Delete event contains:
-					// - commonVersion: unchanged during delete, so this IS the last live common version
-					// - reporterVersion: tombstone version (incremented, OR 0 if no reporter data existed before)
+					// The event versions are:
+					// - commonVersion: unchanged during delete (this IS the last live common version)
+					// - reporterVersion: tombstone version (incremented during delete)
 					// - reporterGeneration: unchanged
 					//
-					// Edge case: If tombstone version is 0, the resource was created without reporter
-					// representation data (only metadata: api_href, console_href). There's no "last live"
-					// reporter representation to fetch. In this case, only fetch common representation.
-					//
-					// Calculate last live reporter version: tombstone_version - 1 (same generation).
-					var lastLiveReporterVersion *model.Version
-					if versions.ReporterVersion() != nil {
-						tombstoneVersion := versions.ReporterVersion().Uint()
-						if tombstoneVersion > 0 {
-							// Normal case: tombstone_version - 1 is the last live reporter data
-							llrv := model.NewVersion(tombstoneVersion - 1)
-							lastLiveReporterVersion = &llrv
-						}
-						// else: tombstone version is 0 - no previous reporter data existed (leave nil)
-					}
-
-					// Build versions pointing to last live state
-					lastLiveVersions := model.NewRepresentationVersions(
-						versions.CommonVersion(),      // Common unchanged - already last live
-						lastLiveReporterVersion,       // Reporter: tombstone - 1, or nil if no live data existed
-						versions.ReporterGeneration(), // Generation unchanged
-					)
-
-					// Fetch the last live state using exact versions from the event.
-					// If lastLiveReporterVersion is nil, only common representation is fetched.
+					// OperationTypeDeleted handles the edge case where tombstone version is 0
+					// (no prior reporter data) automatically: the upper bound (gen=0, ver < 0) is
+					// unsatisfiable, so nothing is fetched.
 					lastLiveState, _, err := i.ResourceRepository.FindCurrentAndPreviousVersionedRepresentations(
-						nil, key, lastLiveVersions, model.OperationTypeUpdated)
+						nil, key, versions, model.OperationTypeDeleted)
 					if err != nil {
 						return nil, nil, err
 					}

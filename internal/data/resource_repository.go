@@ -306,6 +306,10 @@ func (s *sqlRepresentationFetcher) fetchPreviousReporter(currentVersion uint, cu
 	return s.repo.fetchPreviousReporterRepresentation(s.db, s.key, currentVersion, currentGeneration)
 }
 
+func (s *sqlRepresentationFetcher) fetchLastLiveReporterBefore(beforeVersion uint, beforeGeneration uint) (bizmodel.Representation, *bizmodel.Version, error) {
+	return s.repo.fetchLastLiveReporterBefore(s.db, s.key, beforeVersion, beforeGeneration)
+}
+
 func (r *resourceRepository) FindCurrentAndPreviousVersionedRepresentations(
 	tx *gorm.DB,
 	key bizmodel.ReporterResourceKey,
@@ -332,14 +336,21 @@ func (r *resourceRepository) fetchCommonRepresentation(db *gorm.DB, key bizmodel
 	query = r.buildReporterResourceKeyQuery(query, key)
 	query = query.Where("cr.version = ?", version)
 
-	err := query.Limit(1).Scan(&result).Error
-	if err != nil {
+	tx := query.Limit(1).Scan(&result)
+	if tx.Error != nil {
 		// ErrRecordNotFound is expected when the representation doesn't exist
-		if errors.Is(err, gorm.ErrRecordNotFound) {
+		if errors.Is(tx.Error, gorm.ErrRecordNotFound) {
 			return nil, nil, nil
 		}
-		return nil, nil, fmt.Errorf("database error fetching common representation: %w", err)
+		return nil, nil, fmt.Errorf("database error fetching common representation: %w", tx.Error)
 	}
+
+	// Check if any row was actually found. Scan() does not set ErrRecordNotFound when
+	// no row matches, so we must check RowsAffected to distinguish "no row" from "row with zero-valued fields".
+	if tx.RowsAffected == 0 {
+		return nil, nil, nil
+	}
+
 	v := bizmodel.NewVersion(result.Version)
 	return bizmodel.Representation(result.Data), &v, nil
 }
@@ -358,14 +369,20 @@ func (r *resourceRepository) fetchLatestCommonRepresentation(db *gorm.DB, key bi
 
 	query = r.buildReporterResourceKeyQuery(query, key)
 
-	err := query.Order("cr.version DESC").Limit(1).Scan(&result).Error
-	if err != nil {
+	tx := query.Order("cr.version DESC").Limit(1).Scan(&result)
+	if tx.Error != nil {
 		// ErrRecordNotFound is expected when the representation doesn't exist
-		if errors.Is(err, gorm.ErrRecordNotFound) {
+		if errors.Is(tx.Error, gorm.ErrRecordNotFound) {
 			return nil, nil, nil
 		}
-		return nil, nil, fmt.Errorf("database error fetching latest common representation: %w", err)
+		return nil, nil, fmt.Errorf("database error fetching latest common representation: %w", tx.Error)
 	}
+
+	// Check if any row was actually found
+	if tx.RowsAffected == 0 {
+		return nil, nil, nil
+	}
+
 	v := bizmodel.NewVersion(result.Version)
 	return bizmodel.Representation(result.Data), &v, nil
 }
@@ -385,14 +402,20 @@ func (r *resourceRepository) fetchReporterRepresentation(db *gorm.DB, key bizmod
 	query = r.buildReporterResourceKeyQuery(query, key)
 	query = query.Where("rrep.version = ? AND rrep.generation = ?", version, generation)
 
-	err := query.Limit(1).Scan(&result).Error
-	if err != nil {
+	tx := query.Limit(1).Scan(&result)
+	if tx.Error != nil {
 		// ErrRecordNotFound is expected when the representation doesn't exist
-		if errors.Is(err, gorm.ErrRecordNotFound) {
+		if errors.Is(tx.Error, gorm.ErrRecordNotFound) {
 			return nil, nil, nil
 		}
-		return nil, nil, fmt.Errorf("database error fetching reporter representation: %w", err)
+		return nil, nil, fmt.Errorf("database error fetching reporter representation: %w", tx.Error)
 	}
+
+	// Check if any row was actually found. This distinguishes "no row" from "row with empty data (tombstone)".
+	if tx.RowsAffected == 0 {
+		return nil, nil, nil
+	}
+
 	// Empty data means tombstone - return nil data but WITH version so caller can detect it
 	v := bizmodel.NewVersion(result.Version)
 	return bizmodel.Representation(result.Data), &v, nil
@@ -421,14 +444,20 @@ func (r *resourceRepository) fetchPreviousReporterRepresentation(db *gorm.DB, ke
 	`, currentGeneration, currentVersion, currentGeneration)
 
 	// Order by generation first, then version, to properly handle generation boundaries
-	err := query.Order("rrep.generation DESC, rrep.version DESC").Limit(1).Scan(&result).Error
-	if err != nil {
+	tx := query.Order("rrep.generation DESC, rrep.version DESC").Limit(1).Scan(&result)
+	if tx.Error != nil {
 		// ErrRecordNotFound is expected when the representation doesn't exist
-		if errors.Is(err, gorm.ErrRecordNotFound) {
+		if errors.Is(tx.Error, gorm.ErrRecordNotFound) {
 			return nil, nil, nil
 		}
-		return nil, nil, fmt.Errorf("database error fetching previous reporter representation: %w", err)
+		return nil, nil, fmt.Errorf("database error fetching previous reporter representation: %w", tx.Error)
 	}
+
+	// Check if any row was actually found
+	if tx.RowsAffected == 0 {
+		return nil, nil, nil
+	}
+
 	// Empty data means tombstone - return nil data but WITH version so caller can detect it
 	v := bizmodel.NewVersion(result.Version)
 	return bizmodel.Representation(result.Data), &v, nil
@@ -451,15 +480,63 @@ func (r *resourceRepository) fetchLatestReporterRepresentation(db *gorm.DB, key 
 	// Skip tombstones - we want the latest live representation
 	query = query.Where("rrep.tombstone = ?", false)
 
-	err := query.Order("rrep.generation DESC, rrep.version DESC").Limit(1).Scan(&result).Error
-	if err != nil {
+	tx := query.Order("rrep.generation DESC, rrep.version DESC").Limit(1).Scan(&result)
+	if tx.Error != nil {
 		// ErrRecordNotFound is expected when the representation doesn't exist
-		if errors.Is(err, gorm.ErrRecordNotFound) {
+		if errors.Is(tx.Error, gorm.ErrRecordNotFound) {
 			return nil, nil, nil
 		}
-		return nil, nil, fmt.Errorf("database error fetching latest reporter representation: %w", err)
+		return nil, nil, fmt.Errorf("database error fetching latest reporter representation: %w", tx.Error)
 	}
+
+	// Check if any row was actually found
+	if tx.RowsAffected == 0 {
+		return nil, nil, nil
+	}
+
 	// Note: Empty JSON object {} is valid data (len(result.Data) == 0 but row exists)
+	v := bizmodel.NewVersion(result.Version)
+	return bizmodel.Representation(result.Data), &v, nil
+}
+
+// fetchLastLiveReporterBefore fetches the most recent non-tombstone reporter representation
+// strictly before (version, generation), using an upper-bound query to tolerate version gaps.
+// This is used for delete operations to find the last live data that needs tuple cleanup.
+func (r *resourceRepository) fetchLastLiveReporterBefore(db *gorm.DB, key bizmodel.ReporterResourceKey, beforeVersion uint, beforeGeneration uint) (bizmodel.Representation, *bizmodel.Version, error) {
+	type reporterRepresentationRow struct {
+		Data    internal.JsonObject
+		Version uint
+	}
+
+	var result reporterRepresentationRow
+	query := db.Table("reporter_resources rr").
+		Select("rrep.data, rrep.version").
+		Joins("JOIN reporter_representations rrep ON rr.id = rrep.reporter_resource_id")
+
+	query = r.buildReporterResourceKeyQuery(query, key)
+
+	// Find the most recent non-tombstone row strictly before (beforeGeneration, beforeVersion)
+	// Same upper-bound logic as fetchPreviousReporterRepresentation, plus tombstone filter
+	query = query.Where(`
+		((rrep.generation = ? AND rrep.version < ?)
+		OR rrep.generation < ?)
+		AND rrep.tombstone = ?
+	`, beforeGeneration, beforeVersion, beforeGeneration, false)
+
+	// Order by generation DESC, version DESC to get the most recent
+	tx := query.Order("rrep.generation DESC, rrep.version DESC").Limit(1).Scan(&result)
+	if tx.Error != nil {
+		if errors.Is(tx.Error, gorm.ErrRecordNotFound) {
+			return nil, nil, nil
+		}
+		return nil, nil, fmt.Errorf("database error fetching last live reporter before (%d, %d): %w", beforeVersion, beforeGeneration, tx.Error)
+	}
+
+	// Check if any row was actually found
+	if tx.RowsAffected == 0 {
+		return nil, nil, nil
+	}
+
 	v := bizmodel.NewVersion(result.Version)
 	return bizmodel.Representation(result.Data), &v, nil
 }

@@ -1125,3 +1125,78 @@ func TestResource_FindReporterResourceToUpdateByKey(t *testing.T) {
 		}
 	})
 }
+
+// Test 1.3: Characterization test for common-only update asymmetry
+// Documents that representationVersion increments even when no reporter representation is written.
+// This creates version gaps that the delete path must tolerate.
+func TestResource_CommonOnlyUpdate_IncrementVersionWithoutRepresentation(t *testing.T) {
+	t.Parallel()
+	fixture := NewResourceTestFixture()
+
+	t.Run("common-only update increments representationVersion but event has no reporter representation", func(t *testing.T) {
+		t.Parallel()
+
+		// Create resource with reporter data
+		resource, err := NewResource(
+			fixture.ValidResourceIdType(),
+			fixture.ValidLocalResourceIdType(),
+			fixture.ValidResourceTypeType(),
+			fixture.ValidReporterTypeType(),
+			fixture.ValidReporterInstanceIdType(),
+			NewTransactionId("tx-create"),
+			fixture.ValidReporterResourceIdType(),
+			fixture.ValidApiHrefType(),
+			fixture.ValidConsoleHrefType(),
+			fixture.ValidReporterRepresentationType(),
+			fixture.ValidCommonRepresentationType(),
+			nil,
+		)
+		require.NoError(t, err)
+
+		// Initial state: representationVersion should be 0
+		snap, _, _, _, err := resource.Serialize()
+		require.NoError(t, err)
+		initialVersion := snap.ReporterResources[0].RepresentationVersion
+		assert.Equal(t, uint(0), initialVersion, "initial representation version should be 0")
+
+		// Create event should have reporter representation
+		createEvents := resource.ResourceReportEvents()
+		require.Len(t, createEvents, 1, "should have one create event")
+		assert.NotNil(t, createEvents[0].reporterRepresentation, "create event should have reporter representation")
+
+		// Perform common-only update (nil reporter data)
+		key, err := NewReporterResourceKey(
+			fixture.ValidLocalResourceIdType(),
+			fixture.ValidResourceTypeType(),
+			fixture.ValidReporterTypeType(),
+			fixture.ValidReporterInstanceIdType(),
+		)
+		require.NoError(t, err)
+
+		commonData := internal.JsonObject{"workspace_id": "updated-workspace"}
+		err = resource.Update(
+			key,
+			NewTransactionId("tx-update-common"),
+			fixture.ValidApiHrefType(),
+			nil, // no console href
+			nil, // nil reporter data - this is the key: common-only update
+			&commonData,
+		)
+		require.NoError(t, err)
+
+		// representationVersion should have incremented to 1
+		snap, _, _, _, err = resource.Serialize()
+		require.NoError(t, err)
+		afterUpdateVersion := snap.ReporterResources[0].RepresentationVersion
+		assert.Equal(t, uint(1), afterUpdateVersion, "representation version should increment to 1")
+
+		// But the event should NOT have a reporter representation
+		updateEvents := resource.ResourceReportEvents()
+		require.Len(t, updateEvents, 1, "should have one update event")
+		assert.Nil(t, updateEvents[0].reporterRepresentation, "common-only update event should have nil reporter representation")
+		assert.NotNil(t, updateEvents[0].commonRepresentation, "common-only update event should have common representation")
+
+		// This is the asymmetry: version advanced from 0 to 1, but no v1 row will be written.
+		// The delete path must tolerate this gap.
+	})
+}

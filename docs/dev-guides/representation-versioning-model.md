@@ -20,6 +20,21 @@ This document explains:
 
 ## Key Concepts
 
+### ⚠️ Critical Distinction: Common vs Reporter Version Navigation
+
+**Common Versions (sequential, no gaps):**
+- ✅ Arithmetic navigation is **SAFE**: `previousCommonVersion = currentCommonVersion - 1`
+- Always sequential: v0, v1, v2, v3...
+- Every increment writes a row
+
+**Reporter Versions (non-sequential, gaps possible):**
+- ❌ Arithmetic navigation is **UNSAFE**: `previousReporterVersion = currentReporterVersion - 1` (may skip gaps or hit tombstones)
+- Can have gaps: v0, [gap at v1], v2, [gap at v3], v4...
+- Version counter always increments, but rows only written when reporter data provided
+- **Must use upper-bound queries** to find previous/last-live versions
+
+This document's "Never Use Arithmetic" guidance applies **only to reporter versions**.
+
 ### Two Independent Version Streams
 
 Every resource maintains two separate version streams:
@@ -83,9 +98,12 @@ type ReporterResource struct {
 
 ### The Version Asymmetry Problem
 
-**Critical: Reporter versions are NOT contiguous.**
+**Critical: Reporter versions are NOT contiguous. Common versions ARE contiguous.**
 
-The `representationVersion` field increments on every update (`ReporterResource.Update()`), but `reporter_representations` rows are **only written when reporter data is provided**. This creates a fundamental asymmetry:
+The `representationVersion` field increments on every update (`ReporterResource.Update()`), but `reporter_representations` rows are **only written when reporter data is provided**. This creates a fundamental asymmetry for the reporter stream:
+
+**Reporter stream:** Version counter always increments, rows conditionally written → **gaps possible**  
+**Common stream:** Version counter and rows both advance together → **no gaps**
 
 ```go
 // internal/biz/model/reporter_resource.go:93
@@ -126,12 +144,16 @@ v1: Update with only common data → version increments, NO row at v1 (GAP)
 v2: Delete resource → tombstone at v2
 ```
 
-**The Golden Rule: Never derive a neighboring version by arithmetic.**
+**The Golden Rule for Reporter Versions: Never derive a neighboring version by arithmetic.**
 
-❌ **Wrong:** `lastLiveVersion = tombstoneVersion - 1`  
-✅ **Correct:** Use upper-bound queries to find the last live version
+❌ **Wrong:** `lastLiveReporterVersion = tombstoneVersion - 1`  
+✅ **Correct:** Use upper-bound queries to find the last live reporter version
 
-## Version Gaps and Gap-Tolerant Queries
+**Note:** This rule applies **only to reporter versions**, which can have gaps. Common versions are sequential (no gaps), so arithmetic navigation is safe: `previousCommonVersion = currentCommonVersion - 1`.
+
+## Reporter Version Gaps and Gap-Tolerant Queries
+
+**This section applies to reporter versions only.** Common versions are sequential and do not have gaps.
 
 ### The Problem
 
@@ -650,10 +672,12 @@ reporter_representations:
 
 | Component | File | Lines | Description |
 |-----------|------|-------|-------------|
+| **Safe common arithmetic** | `internal/data/representation_fetcher.go` | 96 | `fetchCommon(cv - 1)` - arithmetic is safe for common versions |
 | Version increment | `internal/biz/model/reporter_resource.go` | 87-98 | `Update()` unconditionally increments `representationVersion` |
 | Conditional row write | `internal/biz/model/resource.go` | 223-239 | `ReporterDataRepresentation` only created when data provided |
 | Gap-tolerant delete | `internal/data/representation_fetcher.go` | 48-84 | `OperationTypeDeleted` branch with upper-bound fetch |
-| Upper-bound query | `internal/data/resource_repository.go` | 485-519 | `fetchLastLiveReporterBefore` implementation |
+| **Gap-tolerant reporter query** | `internal/data/resource_repository.go` | 485-519 | `fetchLastLiveReporterBefore` - upper-bound query avoids gaps |
+| **Unsafe reporter arithmetic avoided** | `internal/data/representation_fetcher.go` | 118 | `fetchPreviousReporter(rv, rg)` - uses query, NOT `rv - 1` |
 | Consumer delete handling | `internal/consumer/consumer.go` | 320-368 | Delete operation uses `OperationTypeDeleted` |
 | Generation lifecycle | `internal/biz/model/reporter_resource.go` | 100-104 | `startNewGeneration` resets version and increments generation |
 
@@ -667,18 +691,32 @@ reporter_representations:
 
 ## Best Practices
 
-### 1. Never Use Arithmetic for Version Navigation
+### 1. Never Use Arithmetic for Reporter Version Navigation
+
+**Reporter versions can have gaps** due to common-only updates, so arithmetic navigation is unsafe.
 
 ❌ **Wrong:**
 ```go
-previousVersion := currentVersion - 1
+// UNSAFE for reporter versions (gaps possible)
+previousReporterVersion := currentReporterVersion - 1
 ```
 
 ✅ **Correct:**
 ```go
-// Use upper-bound queries
+// Use upper-bound queries for reporter versions
 repo.fetchPreviousReporterRepresentation(db, key, currentVersion, currentGeneration)
 ```
+
+**Common versions are sequential** (no gaps), so arithmetic navigation is safe:
+
+✅ **Correct:**
+```go
+// SAFE for common versions (always sequential)
+previousCommonVersion := currentCommonVersion - 1
+repo.fetchCommon(db, key, previousCommonVersion)
+```
+
+See `internal/data/representation_fetcher.go:96` for an example of safe arithmetic with common versions.
 
 ### 2. Always Check for nil Versions
 

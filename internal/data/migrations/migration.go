@@ -16,6 +16,7 @@ var MigrationsList = []*gormigrate.Migration{
 	schema.MetricsSummaryMigration(),
 	schema.ReporterResourcesNotTombstoneIdxMigration(),
 	schema.DropOutboxEventsMigration(),
+	schema.ReporterRepCommonVersionNullable(),
 }
 
 func init() {

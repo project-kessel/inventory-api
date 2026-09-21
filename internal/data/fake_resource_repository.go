@@ -14,13 +14,14 @@ import (
 )
 
 type fakeResourceRepository struct {
-	mu                           sync.RWMutex
-	resourcesByPrimaryKey        map[uuid.UUID]*storedResource // keyed by primary key (ResourceID) - simulates database primary storage
-	resourcesByCompositeKey      map[string]uuid.UUID          // composite key -> primary key mapping for unique constraint
-	resources                    map[string]*storedResource    // legacy field for backward compatibility
-	representationsByVersion     map[string]map[uint]*storedRepresentation
-	processedTransactionIds      map[string]bool     // track processed transaction IDs for idempotency testing
-	maxCommonVersionByResourceID map[uuid.UUID]*uint // mirrors MAX(version) FROM common_representations WHERE resource_id = ?
+	mu                              sync.RWMutex
+	resourcesByPrimaryKey           map[uuid.UUID]*storedResource                                 // keyed by primary key (ResourceID) - simulates database primary storage
+	resourcesByCompositeKey         map[string]uuid.UUID                                          // composite key -> primary key mapping for unique constraint
+	resources                       map[string]*storedResource                                    // legacy field for backward compatibility
+	commonRepresentationsByResource map[uuid.UUID]map[uint]*storedCommonRepresentation            // keyed by resource_id -> version (simulates common_representations table)
+	reporterRepsByReporterResource  map[uuid.UUID]map[uint]map[uint]*storedReporterRepresentation // keyed by reporter_resource_id -> version -> generation (simulates reporter_representations table)
+	processedTransactionIds         map[string]bool                                               // track processed transaction IDs for idempotency testing
+	maxCommonVersionByResourceID    map[uuid.UUID]*uint                                           // mirrors MAX(version) FROM common_representations WHERE resource_id = ?
 }
 
 type storedResource struct {
@@ -40,19 +41,27 @@ type storedResource struct {
 	updatedAt             time.Time
 }
 
-type storedRepresentation struct {
-	commonData    internal.JsonObject
-	commonVersion uint
+type storedCommonRepresentation struct {
+	data    internal.JsonObject
+	version uint
+}
+
+type storedReporterRepresentation struct {
+	data       internal.JsonObject
+	version    uint
+	generation uint
+	tombstone  bool
 }
 
 func NewFakeResourceRepository() bizmodel.ResourceRepository {
 	return &fakeResourceRepository{
-		resourcesByPrimaryKey:        make(map[uuid.UUID]*storedResource),
-		resourcesByCompositeKey:      make(map[string]uuid.UUID),
-		resources:                    make(map[string]*storedResource),
-		representationsByVersion:     make(map[string]map[uint]*storedRepresentation),
-		processedTransactionIds:      make(map[string]bool),
-		maxCommonVersionByResourceID: make(map[uuid.UUID]*uint),
+		resourcesByPrimaryKey:           make(map[uuid.UUID]*storedResource),
+		resourcesByCompositeKey:         make(map[string]uuid.UUID),
+		resources:                       make(map[string]*storedResource),
+		commonRepresentationsByResource: make(map[uuid.UUID]map[uint]*storedCommonRepresentation),
+		reporterRepsByReporterResource:  make(map[uuid.UUID]map[uint]map[uint]*storedReporterRepresentation),
+		processedTransactionIds:         make(map[string]bool),
+		maxCommonVersionByResourceID:    make(map[uuid.UUID]*uint),
 	}
 }
 
@@ -144,18 +153,34 @@ func (f *fakeResourceRepository) Save(tx *gorm.DB, resource bizmodel.Resource, o
 	f.resourcesByPrimaryKey[reporterResourcePrimaryKey] = stored
 	f.resourcesByCompositeKey[compositeKey] = reporterResourcePrimaryKey
 
-	historyKey := f.makeHistoryKey(
-		stored.localResourceID,
-		stored.reporterType,
-		stored.resourceType,
-		stored.reporterInstanceID,
-	)
-	if _, ok := f.representationsByVersion[historyKey]; !ok {
-		f.representationsByVersion[historyKey] = make(map[uint]*storedRepresentation)
+	// Store common representation if present (simulates common_representations table)
+	if commonRepresentationSnapshot != nil {
+		resourceID := resourceSnapshot.ID
+		if _, ok := f.commonRepresentationsByResource[resourceID]; !ok {
+			f.commonRepresentationsByResource[resourceID] = make(map[uint]*storedCommonRepresentation)
+		}
+		f.commonRepresentationsByResource[resourceID][commonVersion] = &storedCommonRepresentation{
+			data:    cloneJsonObject(commonRepresentationSnapshot.Representation.Data),
+			version: commonVersion,
+		}
 	}
-	f.representationsByVersion[historyKey][stored.representationVersion] = &storedRepresentation{
-		commonData:    cloneJsonObject(stored.commonData),
-		commonVersion: commonVersion,
+
+	// Store reporter representation if present (simulates reporter_representations table)
+	if reporterRepresentationSnapshot != nil {
+		reporterResourceID := reporterResourceSnapshot.ID
+		if _, ok := f.reporterRepsByReporterResource[reporterResourceID]; !ok {
+			f.reporterRepsByReporterResource[reporterResourceID] = make(map[uint]map[uint]*storedReporterRepresentation)
+		}
+		reporterVersion := reporterResourceSnapshot.RepresentationVersion
+		if _, ok := f.reporterRepsByReporterResource[reporterResourceID][reporterVersion]; !ok {
+			f.reporterRepsByReporterResource[reporterResourceID][reporterVersion] = make(map[uint]*storedReporterRepresentation)
+		}
+		f.reporterRepsByReporterResource[reporterResourceID][reporterVersion][reporterResourceSnapshot.Generation] = &storedReporterRepresentation{
+			data:       cloneJsonObject(reporterRepresentationSnapshot.Representation.Data),
+			version:    reporterVersion,
+			generation: reporterResourceSnapshot.Generation,
+			tombstone:  reporterRepresentationSnapshot.Tombstone,
+		}
 	}
 
 	if reporterRepresentationSnapshot != nil && reporterRepresentationSnapshot.TransactionId != "" {
@@ -253,95 +278,230 @@ func (f *fakeResourceRepository) FindResourceByKeys(tx *gorm.DB, key bizmodel.Re
 	return nil, gorm.ErrRecordNotFound
 }
 
-func (f *fakeResourceRepository) FindCurrentAndPreviousVersionedRepresentations(tx *gorm.DB, key bizmodel.ReporterResourceKey, currentVersion *bizmodel.Version, operationType bizmodel.EventOperationType) (*bizmodel.Representations, *bizmodel.Representations, error) {
-	if currentVersion == nil {
+// inMemoryRepresentationFetcher implements the representationFetcher interface using in-memory maps.
+// findResourceIDs locates the resource_id and reporter_resource_id for a given ReporterResourceKey.
+// This mimics the JOIN on reporter_resources table in the real SQL implementation.
+func (f *fakeResourceRepository) findResourceIDs(key bizmodel.ReporterResourceKey) (resourceID, reporterResourceID uuid.UUID, found bool) {
+	for _, stored := range f.resourcesByPrimaryKey {
+		if strings.EqualFold(stored.localResourceID, key.LocalResourceId().Serialize()) &&
+			strings.EqualFold(stored.resourceType, key.ResourceType().Serialize()) &&
+			strings.EqualFold(stored.reporterType, key.ReporterType().Serialize()) {
+			searchReporterInstanceId := key.ReporterInstanceId().Serialize()
+			if searchReporterInstanceId == "" || strings.EqualFold(stored.reporterInstanceID, searchReporterInstanceId) {
+				return stored.resourceID, stored.reporterResourceID, true
+			}
+		}
+	}
+	return uuid.UUID{}, uuid.UUID{}, false
+}
+
+type inMemoryRepresentationFetcher struct {
+	resourceID         uuid.UUID
+	reporterResourceID uuid.UUID
+	commonReps         map[uint]*storedCommonRepresentation
+	reporterReps       map[uint]map[uint]*storedReporterRepresentation
+}
+
+func (m *inMemoryRepresentationFetcher) fetchCommon(version uint) (bizmodel.Representation, *bizmodel.Version, error) {
+	if m.commonReps == nil {
 		return nil, nil, nil
 	}
-
-	historyKey := f.makeHistoryKey(
-		key.LocalResourceId().Serialize(),
-		key.ReporterType().Serialize(),
-		key.ResourceType().Serialize(),
-		key.ReporterInstanceId().Serialize(),
-	)
-
-	f.mu.RLock()
-	defer f.mu.RUnlock()
-
-	versionMap := f.representationsByVersion[historyKey]
-	if versionMap == nil {
-		return nil, nil, fmt.Errorf("no representations found for key")
+	if entry, ok := m.commonReps[version]; ok {
+		data := bizmodel.Representation(cloneJsonObject(entry.data))
+		// Empty data means "not found" - match real repository behavior
+		if len(data) == 0 {
+			return nil, nil, nil
+		}
+		v := bizmodel.NewVersion(entry.version)
+		return data, &v, nil
 	}
+	return nil, nil, nil
+}
 
-	cv := currentVersion.Uint()
-	var current *bizmodel.Representations
-	var previous *bizmodel.Representations
+func (m *inMemoryRepresentationFetcher) fetchReporter(version uint, generation uint) (bizmodel.Representation, *bizmodel.Version, error) {
+	if m.reporterReps == nil {
+		return nil, nil, nil
+	}
+	// Find reporter representation at exact version and generation
+	if generations, ok := m.reporterReps[version]; ok {
+		if entry, ok := generations[generation]; ok {
+			data := bizmodel.Representation(cloneJsonObject(entry.data))
+			// Empty data means "not found" (e.g., tombstone with nil data)
+			// Return (nil, nil, nil) - aligned with real repository behavior after Task 2 fix.
+			// This behavior is enforced by TestFetchRepresentations_MissingRowReturnsNil.
+			if len(data) == 0 {
+				return nil, nil, nil
+			}
+			v := bizmodel.NewVersion(entry.version)
+			return data, &v, nil
+		}
+	}
+	// No entry found at this version/generation - return (nil, nil, nil)
+	// Aligned with real repository: RowsAffected == 0 returns (nil, nil, nil)
+	return nil, nil, nil
+}
 
-	if entry, ok := versionMap[cv]; ok {
-		v := bizmodel.NewVersion(entry.commonVersion)
-		var err error
-		current, err = bizmodel.NewRepresentations(
-			bizmodel.Representation(cloneJsonObject(entry.commonData)),
-			&v,
-			nil,
-			nil,
-		)
-		if err != nil {
-			return nil, nil, err
+func (m *inMemoryRepresentationFetcher) fetchPreviousReporter(currentVersion uint, currentGeneration uint) (bizmodel.Representation, *bizmodel.Version, error) {
+	if m.reporterReps == nil {
+		return nil, nil, nil
+	}
+	// Find previous reporter representation (immediately before current version/generation)
+	// This handles both:
+	// 1. Previous version in same generation (normal update)
+	// 2. Any version in previous generation (revival after tombstone)
+	type versionGen struct {
+		version    uint
+		generation uint
+		entry      *storedReporterRepresentation
+	}
+	var allReps []versionGen
+	for v, generations := range m.reporterReps {
+		for g, entry := range generations {
+			allReps = append(allReps, versionGen{v, g, entry})
+		}
+	}
+	// Find max version/generation that is before current (version, generation)
+	var maxRep *versionGen
+	for i := range allReps {
+		rep := &allReps[i]
+		// Match the SQL logic: (generation = currentGeneration AND version < currentVersion) OR generation < currentGeneration
+		if (rep.generation == currentGeneration && rep.version < currentVersion) || rep.generation < currentGeneration {
+			if maxRep == nil || rep.generation > maxRep.generation || (rep.generation == maxRep.generation && rep.version > maxRep.version) {
+				maxRep = rep
+			}
+		}
+	}
+	if maxRep != nil {
+		v := bizmodel.NewVersion(maxRep.entry.version)
+		return bizmodel.Representation(cloneJsonObject(maxRep.entry.data)), &v, nil
+	}
+	return nil, nil, nil
+}
+
+func (m *inMemoryRepresentationFetcher) fetchLastLiveReporterBefore(beforeVersion uint, beforeGeneration uint) (bizmodel.Representation, *bizmodel.Version, error) {
+	if m.reporterReps == nil {
+		return nil, nil, nil
+	}
+	// Find the most recent non-tombstone reporter representation before (beforeVersion, beforeGeneration)
+	// Same upper-bound logic as fetchPreviousReporter, but filter out tombstones
+	type versionGen struct {
+		version    uint
+		generation uint
+		entry      *storedReporterRepresentation
+	}
+	var allReps []versionGen
+	for v, generations := range m.reporterReps {
+		for g, entry := range generations {
+			allReps = append(allReps, versionGen{v, g, entry})
 		}
 	}
 
-	if cv > 0 {
-		if entry, ok := versionMap[cv-1]; ok {
-			v := bizmodel.NewVersion(entry.commonVersion)
-			var err error
-			previous, err = bizmodel.NewRepresentations(
-				bizmodel.Representation(cloneJsonObject(entry.commonData)),
-				&v,
-				nil,
-				nil,
-			)
-			if err != nil {
-				return nil, nil, err
+	// Find max version/generation that is before (beforeVersion, beforeGeneration) and not a tombstone
+	var maxRep *versionGen
+	for i := range allReps {
+		rep := &allReps[i]
+		// Upper-bound condition: (generation = beforeGeneration AND version < beforeVersion) OR generation < beforeGeneration
+		// Plus tombstone filter: AND tombstone = false
+		if ((rep.generation == beforeGeneration && rep.version < beforeVersion) || rep.generation < beforeGeneration) && !rep.entry.tombstone {
+			if maxRep == nil || rep.generation > maxRep.generation || (rep.generation == maxRep.generation && rep.version > maxRep.version) {
+				maxRep = rep
 			}
 		}
 	}
 
-	return current, previous, nil
+	if maxRep != nil {
+		v := bizmodel.NewVersion(maxRep.entry.version)
+		return bizmodel.Representation(cloneJsonObject(maxRep.entry.data)), &v, nil
+	}
+	return nil, nil, nil
 }
 
-func (f *fakeResourceRepository) FindLatestRepresentations(tx *gorm.DB, key bizmodel.ReporterResourceKey) (*bizmodel.Representations, error) {
-	historyKey := f.makeHistoryKey(
-		key.LocalResourceId().Serialize(),
-		key.ReporterType().Serialize(),
-		key.ResourceType().Serialize(),
-		key.ReporterInstanceId().Serialize(),
-	)
-
+func (f *fakeResourceRepository) FindCurrentAndPreviousVersionedRepresentations(
+	tx *gorm.DB,
+	key bizmodel.ReporterResourceKey,
+	versions bizmodel.RepresentationVersions,
+	operationType bizmodel.EventOperationType,
+) (*bizmodel.Representations, *bizmodel.Representations, error) {
 	f.mu.RLock()
 	defer f.mu.RUnlock()
 
-	versionMap := f.representationsByVersion[historyKey]
-	if len(versionMap) == 0 {
-		return nil, fmt.Errorf("no representations found for key")
+	resourceID, reporterResourceID, found := f.findResourceIDs(key)
+	if !found {
+		return nil, nil, fmt.Errorf("resource not found for key")
 	}
 
-	var maxVersion uint
-	var latest *storedRepresentation
-	for version, entry := range versionMap {
-		if latest == nil || version > maxVersion {
-			maxVersion = version
-			latest = entry
+	fetcher := &inMemoryRepresentationFetcher{
+		resourceID:         resourceID,
+		reporterResourceID: reporterResourceID,
+		commonReps:         f.commonRepresentationsByResource[resourceID],
+		reporterReps:       f.reporterRepsByReporterResource[reporterResourceID],
+	}
+
+	return fetchCurrentAndPreviousRepresentations(fetcher, versions, operationType)
+}
+
+func (f *fakeResourceRepository) FindLatestRepresentations(tx *gorm.DB, key bizmodel.ReporterResourceKey) (*bizmodel.Representations, error) {
+	f.mu.RLock()
+	defer f.mu.RUnlock()
+
+	resourceID, reporterResourceID, found := f.findResourceIDs(key)
+	if !found {
+		return nil, fmt.Errorf("resource not found for key")
+	}
+
+	// Find latest common representation
+	var latestCommon bizmodel.Representation
+	var latestCommonVer *bizmodel.Version
+
+	if commonVersions, ok := f.commonRepresentationsByResource[resourceID]; ok {
+		var maxVersion uint
+		var maxEntry *storedCommonRepresentation
+		for version, entry := range commonVersions {
+			if maxEntry == nil || version > maxVersion {
+				maxVersion = version
+				maxEntry = entry
+			}
+		}
+		if maxEntry != nil {
+			v := bizmodel.NewVersion(maxEntry.version)
+			latestCommon = bizmodel.Representation(cloneJsonObject(maxEntry.data))
+			latestCommonVer = &v
 		}
 	}
 
-	v := bizmodel.NewVersion(latest.commonVersion)
-	return bizmodel.NewRepresentations(
-		bizmodel.Representation(cloneJsonObject(latest.commonData)),
-		&v,
-		nil,
-		nil,
-	)
+	// Find latest reporter representation
+	var latestReporter bizmodel.Representation
+	var latestReporterVer *bizmodel.Version
+
+	if reporterVersions, ok := f.reporterRepsByReporterResource[reporterResourceID]; ok {
+		var maxVersion, maxGen uint
+		var maxEntry *storedReporterRepresentation
+		for version, generations := range reporterVersions {
+			for gen, entry := range generations {
+				// Skip tombstones - we want the latest live representation
+				if entry.tombstone {
+					continue
+				}
+				if maxEntry == nil || gen > maxGen || (gen == maxGen && version > maxVersion) {
+					maxVersion = version
+					maxGen = gen
+					maxEntry = entry
+				}
+			}
+		}
+		if maxEntry != nil {
+			v := bizmodel.NewVersion(maxEntry.version)
+			latestReporter = bizmodel.Representation(cloneJsonObject(maxEntry.data))
+			latestReporterVer = &v
+		}
+	}
+
+	// Must have at least one stream
+	if len(latestCommon) == 0 && len(latestReporter) == 0 {
+		return nil, fmt.Errorf("no representations found for key")
+	}
+
+	return bizmodel.NewRepresentations(latestCommon, latestCommonVer, latestReporter, latestReporterVer)
 }
 
 func (f *fakeResourceRepository) GetDB() *gorm.DB {
@@ -356,10 +516,6 @@ func (f *fakeResourceRepository) GetTransactionManager() bizmodel.TransactionMan
 
 func (f *fakeResourceRepository) makeCompositeKey(localResourceID, reporterType, resourceType, reporterInstanceID string, representationVersion, generation uint) string {
 	return fmt.Sprintf("%s|%s|%s|%s|%d|%d", localResourceID, reporterType, resourceType, reporterInstanceID, representationVersion, generation)
-}
-
-func (f *fakeResourceRepository) makeHistoryKey(localResourceID, reporterType, resourceType, reporterInstanceID string) string {
-	return strings.ToLower(fmt.Sprintf("%s|%s|%s|%s", localResourceID, reporterType, resourceType, reporterInstanceID))
 }
 
 // markTransactionIdAsProcessed marks a transaction ID as processed for idempotency testing

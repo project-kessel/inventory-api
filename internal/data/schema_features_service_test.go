@@ -401,8 +401,10 @@ func TestSchemaService_CalculateTuplesForResource_FeaturesWorkspace(t *testing.T
 	// Create schema repository with Features workspace schema
 	repo := NewInMemorySchemaRepository()
 
-	resourceType, _ := model.NewResourceType("workspace")
-	reporterType, _ := model.NewReporterType("features")
+	resourceType, err := model.NewResourceType("workspace")
+	require.NoError(t, err)
+	reporterType, err := model.NewReporterType("features")
+	require.NoError(t, err)
 
 	// Create resource schema first (empty common representation)
 	emptyCommonSchema := `{"type": "object", "properties": {}, "required": []}`
@@ -639,8 +641,10 @@ func TestSchemaService_MergesReporterAndCommonSchemas(t *testing.T) {
 	ctx := context.Background()
 	repo := NewInMemorySchemaRepository()
 
-	resourceType, _ := model.NewResourceType("workspace")
-	reporterType, _ := model.NewReporterType("features")
+	resourceType, err := model.NewResourceType("workspace")
+	require.NoError(t, err)
+	reporterType, err := model.NewReporterType("features")
+	require.NoError(t, err)
 
 	// Create common/resource schema with workspace_id relation
 	workspaceIdRelations := []model.RelationDef{

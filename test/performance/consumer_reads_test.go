@@ -64,7 +64,7 @@ type consumerCase struct {
 
 func newConsumerCase(t *testing.T, key model.ReporterResourceKey, name string, operation model.EventOperationType, commonVersion *model.Version, creates, deletes int64) consumerCase {
 	t.Helper()
-	event, err := model.NewTupleEvent(key, commonVersion, nil)
+	event, err := model.NewTupleEvent(key, commonVersion, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

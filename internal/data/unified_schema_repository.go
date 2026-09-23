@@ -23,7 +23,12 @@ func NewInMemorySchemaRepositoryFromUnifiedYAMLDir(ctx context.Context, dir stri
 			return nil, fmt.Errorf("invalid resource type %q: %w", schema.Name, err)
 		}
 
-		commonSchema := NewUnifiedSchemaImpl(schema.Common.Schema, schema.Common.Relations, nil)
+		reporterRelations := make(map[string][]UnifiedSchemaRelation, len(schema.Reporters))
+		for _, reporter := range schema.Reporters {
+			reporterRelations[reporter.Name] = reporter.Relations
+		}
+
+		commonSchema := NewUnifiedSchemaImpl(schema.Common.Schema, schema.Common.Relations, reporterRelations)
 		resourceSchema, err := model.NewResourceSchemaRepresentation(resourceType, commonSchema)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create resource schema for %q: %w", schema.Name, err)
@@ -42,8 +47,8 @@ func NewInMemorySchemaRepositoryFromUnifiedYAMLDir(ctx context.Context, dir stri
 			if reporter.Schema != nil {
 				reporterSchema = NewUnifiedSchemaImpl(
 					reporter.Schema,
-					schema.Common.Relations,
-					reporter.Relations,
+					nil,
+					nil,
 				)
 			}
 

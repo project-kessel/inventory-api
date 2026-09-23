@@ -34,11 +34,133 @@ func TestUnifiedSchemaImpl_Validate(t *testing.T) {
 	})
 }
 
-func TestUnifiedSchemaImpl_CalculateTuplesDelegatesToLegacySchema(t *testing.T) {
-	implementation := NewUnifiedSchemaImpl(map[string]interface{}{}, nil, nil)
+func TestUnifiedSchemaImpl_CalculateTuples_CommonOneRelation(t *testing.T) {
+	key := newUnifiedSchemaTestKey(t, "hbi")
+	implementation := NewUnifiedSchemaImpl(map[string]interface{}{}, []UnifiedSchemaRelation{
+		{
+			Name:        "workspace",
+			Target:      "rbac/workspace",
+			Field:       "workspace_id",
+			Cardinality: "one",
+		},
+	}, nil)
+	current := newUnifiedSchemaRepresentations(t, map[string]interface{}{"workspace_id": "workspace-new"}, nil)
+	previous := newUnifiedSchemaRepresentations(t, map[string]interface{}{"workspace_id": "workspace-old"}, nil)
+
+	tuples, err := implementation.CalculateTuples(current, previous, key)
+
+	require.NoError(t, err)
+	require.Len(t, *tuples.TuplesToCreate(), 1)
+	require.Len(t, *tuples.TuplesToDelete(), 1)
+	assert.Equal(t, model.NewRelationTupleForSubject(key, "workspace", "rbac", "workspace", "workspace-new"), (*tuples.TuplesToCreate())[0])
+	assert.Equal(t, model.NewRelationTupleForSubject(key, "workspace", "rbac", "workspace", "workspace-old"), (*tuples.TuplesToDelete())[0])
+}
+
+func TestUnifiedSchemaImpl_CalculateTuples_CommonManyRelation(t *testing.T) {
+	key := newUnifiedSchemaTestKey(t, "hbi")
+	implementation := NewUnifiedSchemaImpl(map[string]interface{}{}, []UnifiedSchemaRelation{
+		{
+			Name:        "tag",
+			Target:      "rbac/tag",
+			Field:       "tag_ids",
+			Cardinality: "many",
+		},
+	}, nil)
+	current := newUnifiedSchemaRepresentations(t, map[string]interface{}{"tag_ids": []interface{}{"tag-2", "tag-3"}}, nil)
+	previous := newUnifiedSchemaRepresentations(t, map[string]interface{}{"tag_ids": []interface{}{"tag-1", "tag-2"}}, nil)
+
+	tuples, err := implementation.CalculateTuples(current, previous, key)
+
+	require.NoError(t, err)
+	require.Len(t, *tuples.TuplesToCreate(), 1)
+	require.Len(t, *tuples.TuplesToDelete(), 1)
+	assert.Equal(t, "tag-3", (*tuples.TuplesToCreate())[0].Subject().Resource().ResourceId().String())
+	assert.Equal(t, "tag-1", (*tuples.TuplesToDelete())[0].Subject().Resource().ResourceId().String())
+}
+
+func TestUnifiedSchemaImpl_CalculateTuples_ReporterRelation(t *testing.T) {
+	key := newUnifiedSchemaTestKey(t, "hbi")
+	implementation := NewUnifiedSchemaImpl(map[string]interface{}{}, []UnifiedSchemaRelation{
+		{
+			Name:        "workspace",
+			Target:      "rbac/workspace",
+			Field:       "workspace_id",
+			Cardinality: "one",
+		},
+	}, map[string][]UnifiedSchemaRelation{
+		"hbi": {
+			{
+				Name:        "host",
+				Target:      "hbi/host",
+				Field:       "host_id",
+				Cardinality: "one",
+			},
+		},
+	})
+	current := newUnifiedSchemaRepresentations(t, map[string]interface{}{"workspace_id": "workspace-1"}, map[string]interface{}{"host_id": "host-1"})
+
+	tuples, err := implementation.CalculateTuples(current, nil, key)
+
+	require.NoError(t, err)
+	require.Len(t, *tuples.TuplesToCreate(), 2)
+	assert.Equal(t, "workspace", (*tuples.TuplesToCreate())[0].Relation().String())
+	assert.Equal(t, "host", (*tuples.TuplesToCreate())[1].Relation().String())
+}
+
+func TestUnifiedSchemaImpl_CalculateTuples_OptionalRelationRemoval(t *testing.T) {
+	key := newUnifiedSchemaTestKey(t, "hbi")
+	implementation := NewUnifiedSchemaImpl(map[string]interface{}{}, []UnifiedSchemaRelation{
+		{
+			Name:        "tenant",
+			Target:      "rbac/tenant",
+			Field:       "tenant_id",
+			Cardinality: "one",
+		},
+	}, nil)
+	current := newUnifiedSchemaRepresentations(t, map[string]interface{}{}, nil)
+	previous := newUnifiedSchemaRepresentations(t, map[string]interface{}{"tenant_id": "tenant-1"}, nil)
+
+	tuples, err := implementation.CalculateTuples(current, previous, key)
+
+	require.NoError(t, err)
+	assert.False(t, tuples.HasTuplesToCreate())
+	require.Len(t, *tuples.TuplesToDelete(), 1)
+	assert.Equal(t, "tenant-1", (*tuples.TuplesToDelete())[0].Subject().Resource().ResourceId().String())
+}
+
+func TestUnifiedSchemaImpl_CalculateTuples_ResourceDeletion(t *testing.T) {
+	key := newUnifiedSchemaTestKey(t, "hbi")
+	implementation := NewUnifiedSchemaImpl(map[string]interface{}{}, []UnifiedSchemaRelation{
+		{
+			Name:        "workspace",
+			Target:      "rbac/workspace",
+			Field:       "workspace_id",
+			Cardinality: "one",
+		},
+	}, map[string][]UnifiedSchemaRelation{
+		"hbi": {
+			{
+				Name:        "host",
+				Target:      "hbi/host",
+				Field:       "host_id",
+				Cardinality: "one",
+			},
+		},
+	})
+	previous := newUnifiedSchemaRepresentations(t, map[string]interface{}{"workspace_id": "workspace-1"}, map[string]interface{}{"host_id": "host-1"})
+
+	tuples, err := implementation.CalculateTuples(nil, previous, key)
+
+	require.NoError(t, err)
+	assert.False(t, tuples.HasTuplesToCreate())
+	require.Len(t, *tuples.TuplesToDelete(), 2)
+}
+
+func newUnifiedSchemaTestKey(t *testing.T, reporterName string) model.ReporterResourceKey {
+	t.Helper()
 	resourceType, err := model.NewResourceType("host")
 	require.NoError(t, err)
-	reporterType, err := model.NewReporterType("hbi")
+	reporterType, err := model.NewReporterType(reporterName)
 	require.NoError(t, err)
 	reporterInstanceID, err := model.NewReporterInstanceId("instance-1")
 	require.NoError(t, err)
@@ -49,20 +171,14 @@ func TestUnifiedSchemaImpl_CalculateTuplesDelegatesToLegacySchema(t *testing.T) 
 		reporterInstanceID,
 	)
 	require.NoError(t, err)
+	return key
+}
 
-	version := model.NewVersion(1)
-	current, err := model.NewRepresentations(
-		model.Representation{"workspace_id": "workspace-1"},
-		&version,
-		nil,
-		nil,
-	)
+func newUnifiedSchemaRepresentations(t *testing.T, common, reporter map[string]interface{}) *model.Representations {
+	t.Helper()
+	commonVersion := model.NewVersion(1)
+	reporterVersion := model.NewVersion(1)
+	current, err := model.NewRepresentations(common, &commonVersion, reporter, &reporterVersion)
 	require.NoError(t, err)
-
-	expected, err := model.NewDefaultSchema().CalculateTuples(current, nil, key)
-	require.NoError(t, err)
-	actual, err := implementation.CalculateTuples(current, nil, key)
-	require.NoError(t, err)
-
-	assert.Equal(t, expected, actual)
+	return current
 }

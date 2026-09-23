@@ -369,6 +369,47 @@ func TestDecorator_CreateTuplesLeavesCommonRelationUnprefixed(t *testing.T) {
 	assert.Equal(t, "workspace", inner.gotCreateTuples[0].Relation().Serialize())
 }
 
+func TestDecorator_CreateTuplesTranslatesSchemaRelationsAndPreservesParent(t *testing.T) {
+	tests := []struct {
+		name       string
+		relation   string
+		translated string
+	}{
+		{name: "desire_all_services", relation: "desire_all_services", translated: "features_workspace_desire_all_services"},
+		{name: "ignore_inherited_desired_services", relation: "ignore_inherited_desired_services", translated: "features_workspace_ignore_inherited_desired_services"},
+		{name: "ignore_inherited_paid_services", relation: "ignore_inherited_paid_services", translated: "features_workspace_ignore_inherited_paid_services"},
+		{name: "RBAC-owned parent", relation: "parent", translated: "parent"},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			inner := &recordingRelationsRepository{}
+			repo := newDecorator(inner)
+			subjectResource := resourceRef("features", "service", "*")
+			if test.relation == "parent" {
+				subjectResource = resourceRef("rbac", "workspace", "parent-1")
+			}
+			subject := model.NewSubjectReferenceWithoutRelation(subjectResource)
+			tuple := model.NewRelationsTuple(
+				resourceRef("features", "workspace", "uuid-1"),
+				model.DeserializeRelation(test.relation),
+				subject,
+			)
+
+			_, err := repo.CreateTuples(context.Background(), []model.RelationsTuple{tuple}, true, nil)
+			require.NoError(t, err)
+
+			require.Len(t, inner.gotCreateTuples, 1)
+			want := model.NewRelationsTuple(
+				resourceRef("rbac", "workspace", "uuid-1"),
+				model.DeserializeRelation(test.translated),
+				model.NewSubjectReferenceWithoutRelation(subjectResource),
+			)
+			assert.Equal(t, want, inner.gotCreateTuples[0])
+		})
+	}
+}
+
 func TestDecorator_DeleteTuplesLeavesCommonRelationUnprefixed(t *testing.T) {
 	// Symmetric with create: a delete filtering on a common relation folds the
 	// type to the parent and forwards the relation unprefixed (not rejected).
@@ -405,6 +446,140 @@ func TestDecorator_DeleteTuplesTranslatesFilter(t *testing.T) {
 	assert.Equal(t, "rbac", inner.gotDeleteFilter.ReporterType().Serialize())
 	assert.Equal(t, "workspace", inner.gotDeleteFilter.ObjectType().Serialize())
 	assert.Equal(t, "features_workspace_enabled_services", inner.gotDeleteFilter.Relation().Serialize())
+}
+
+func TestDecorator_DeleteTuplesTranslatesWildcardSchemaRelations(t *testing.T) {
+	tests := []struct {
+		name       string
+		relation   string
+		translated string
+	}{
+		{name: "desire_all_services", relation: "desire_all_services", translated: "features_workspace_desire_all_services"},
+		{name: "ignore_inherited_desired_services", relation: "ignore_inherited_desired_services", translated: "features_workspace_ignore_inherited_desired_services"},
+		{name: "ignore_inherited_paid_services", relation: "ignore_inherited_paid_services", translated: "features_workspace_ignore_inherited_paid_services"},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			inner := &recordingRelationsRepository{}
+			repo := newDecorator(inner)
+			filter := model.NewTupleFilter().
+				WithReporterType(model.DeserializeReporterType("features")).
+				WithObjectType(model.DeserializeResourceType("workspace")).
+				WithObjectId(model.DeserializeLocalResourceId("object-1")).
+				WithRelation(model.DeserializeRelation(test.relation)).
+				WithSubject(model.NewTupleSubjectFilter().
+					WithReporterType(model.DeserializeReporterType("features")).
+					WithSubjectType(model.DeserializeResourceType("service")).
+					WithSubjectId(model.DeserializeLocalResourceId("*")))
+
+			_, err := repo.DeleteTuples(context.Background(), filter, nil)
+			require.NoError(t, err)
+
+			want := model.NewTupleFilter().
+				WithReporterType(model.DeserializeReporterType("rbac")).
+				WithObjectType(model.DeserializeResourceType("workspace")).
+				WithObjectId(model.DeserializeLocalResourceId("object-1")).
+				WithRelation(model.DeserializeRelation(test.translated)).
+				WithSubject(model.NewTupleSubjectFilter().
+					WithReporterType(model.DeserializeReporterType("features")).
+					WithSubjectType(model.DeserializeResourceType("service")).
+					WithSubjectId(model.DeserializeLocalResourceId("*")))
+			assert.True(t, inner.deleteCalled)
+			assert.Equal(t, want, inner.gotDeleteFilter)
+		})
+	}
+}
+
+func TestDecorator_DeleteTuplesTranslatesExplicitParentRelationFilter(t *testing.T) {
+	inner := &recordingRelationsRepository{}
+	repo := newDecorator(inner)
+	filter := model.NewTupleFilter().
+		WithReporterType(model.DeserializeReporterType("features")).
+		WithObjectType(model.DeserializeResourceType("workspace")).
+		WithObjectId(model.DeserializeLocalResourceId("object-1")).
+		WithRelation(model.DeserializeRelation("parent")).
+		WithSubject(model.NewTupleSubjectFilter().
+			WithReporterType(model.DeserializeReporterType("rbac")).
+			WithSubjectType(model.DeserializeResourceType("workspace")).
+			WithSubjectId(model.DeserializeLocalResourceId("parent-1")))
+
+	_, err := repo.DeleteTuples(context.Background(), filter, nil)
+	require.NoError(t, err)
+
+	want := model.NewTupleFilter().
+		WithReporterType(model.DeserializeReporterType("rbac")).
+		WithObjectType(model.DeserializeResourceType("workspace")).
+		WithObjectId(model.DeserializeLocalResourceId("object-1")).
+		WithRelation(model.DeserializeRelation("parent")).
+		WithSubject(model.NewTupleSubjectFilter().
+			WithReporterType(model.DeserializeReporterType("rbac")).
+			WithSubjectType(model.DeserializeResourceType("workspace")).
+			WithSubjectId(model.DeserializeLocalResourceId("parent-1")))
+	assert.True(t, inner.deleteCalled)
+	assert.Equal(t, want, inner.gotDeleteFilter)
+}
+
+func TestDecorator_DeleteFeaturesOwnedTuplesPreservesRBACParentTuple(t *testing.T) {
+	ctx := context.Background()
+	inner := data.NewSimpleRelationsRepository()
+	repo := newDecorator(inner)
+	const workspaceID = "workspace-1"
+	const parentWorkspaceID = "parent-workspace-1"
+
+	parentTuple := model.NewRelationsTuple(
+		resourceRef("features", "workspace", workspaceID),
+		model.DeserializeRelation("parent"),
+		model.NewSubjectReferenceWithoutRelation(resourceRef("rbac", "workspace", parentWorkspaceID)),
+	)
+	featureRelations := []string{
+		"desire_all_services",
+		"ignore_inherited_desired_services",
+		"ignore_inherited_paid_services",
+	}
+	featureTuples := make([]model.RelationsTuple, 0, len(featureRelations))
+	for _, relation := range featureRelations {
+		featureTuples = append(featureTuples, model.NewRelationsTuple(
+			resourceRef("features", "workspace", workspaceID),
+			model.DeserializeRelation(relation),
+			model.NewSubjectReferenceWithoutRelation(resourceRef("features", "service", "*")),
+		))
+	}
+
+	_, err := repo.CreateTuples(ctx, append([]model.RelationsTuple{parentTuple}, featureTuples...), true, nil)
+	require.NoError(t, err)
+
+	// A Features representation deletion scopes each delete to a Features-owned
+	// relation on this workspace. Those relations share the serialized
+	// rbac/workspace object type with the RBAC-owned parent tuple, so dropping the
+	// relation scope would delete the parent tuple too.
+	for _, relation := range featureRelations {
+		filter := model.NewTupleFilter().
+			WithReporterType(model.DeserializeReporterType("features")).
+			WithObjectType(model.DeserializeResourceType("workspace")).
+			WithObjectId(model.DeserializeLocalResourceId(workspaceID)).
+			WithRelation(model.DeserializeRelation(relation))
+		_, err := repo.DeleteTuples(ctx, filter, nil)
+		require.NoError(t, err, "delete Features-owned relation %q", relation)
+	}
+
+	parentResult, err := repo.Check(ctx, model.NewRelationship(
+		resourceRef("features", "workspace", workspaceID),
+		model.DeserializeRelation("parent"),
+		model.NewSubjectReferenceWithoutRelation(resourceRef("rbac", "workspace", parentWorkspaceID)),
+	), model.NewConsistencyMinimizeLatency())
+	require.NoError(t, err)
+	assert.True(t, parentResult.Allowed(), "RBAC-owned parent tuple must survive Features representation deletion")
+
+	for _, relation := range featureRelations {
+		result, err := repo.Check(ctx, model.NewRelationship(
+			resourceRef("features", "workspace", workspaceID),
+			model.DeserializeRelation(relation),
+			model.NewSubjectReferenceWithoutRelation(resourceRef("features", "service", "*")),
+		), model.NewConsistencyMinimizeLatency())
+		require.NoError(t, err)
+		assert.False(t, result.Allowed(), "Features-owned wildcard tuple for relation %q must be deleted", relation)
+	}
 }
 
 func TestDecorator_DeleteTuplesRejectsUnscopedDerivedFilter(t *testing.T) {

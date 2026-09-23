@@ -4051,20 +4051,19 @@ func TestEmptyAndNilRepresentationPersistence(t *testing.T) {
 		assert.Equal(t, int64(1), commonCount, "Should have one common representation row")
 	})
 
-	t.Run("empty common representation is rejected by domain model", func(t *testing.T) {
-		// Empty common (len=0) with valid reporter → domain rejects because
-		// NewCommonRepresentation validates data is non-empty. The service layer
-		// handles this by converting empty protobuf structs to nil pointers before
-		// reaching the domain.
+	t.Run("empty common representation is now accepted by domain model", func(t *testing.T) {
+		// Empty common (len=0) with valid reporter → domain now accepts this
+		// to support schema-only resources (like features/workspace) that only
+		// have reporter data and no common representation.
 		p := newResourceParams(t, "valid-reporter-empty-common")
 
-		_, err := bizmodel.NewResource(
+		resource, err := bizmodel.NewResource(
 			p.resourceId, p.localResourceId, p.resourceType, p.reporterType,
 			p.reporterInstanceId, newUniqueTxID("empty-common-test"), p.reporterResourceId,
 			p.apiHref, nil, validReporter(t), emptyRep(), nil,
 		)
-		require.Error(t, err, "Empty common representation should be rejected by the domain model")
-		assert.Contains(t, err.Error(), "CommonRepresentation")
+		require.NoError(t, err, "Empty common representation should be accepted by the domain model")
+		require.NotNil(t, resource)
 	})
 }
 

@@ -2,6 +2,7 @@ package data
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/project-kessel/inventory-api/internal/biz/model"
 	"github.com/xeipuuv/gojsonschema"
@@ -13,7 +14,7 @@ import (
 type UnifiedSchemaImpl struct {
 	schemaLoader      gojsonschema.JSONLoader
 	commonRelations   []UnifiedSchemaRelation
-	reporterRelations []UnifiedSchemaRelation
+	reporterRelations map[string][]UnifiedSchemaRelation
 }
 
 // NewUnifiedSchemaImpl creates a schema adapter for a common or reporter
@@ -21,7 +22,7 @@ type UnifiedSchemaImpl struct {
 func NewUnifiedSchemaImpl(
 	schema map[string]interface{},
 	commonRelations []UnifiedSchemaRelation,
-	reporterRelations []UnifiedSchemaRelation,
+	reporterRelations map[string][]UnifiedSchemaRelation,
 ) *UnifiedSchemaImpl {
 	return &UnifiedSchemaImpl{
 		schemaLoader:      gojsonschema.NewGoLoader(schema),
@@ -47,15 +48,134 @@ func (s *UnifiedSchemaImpl) Validate(data interface{}) (bool, error) {
 	return false, fmt.Errorf("validation failed: %s", joinValidationErrors(validationErrors))
 }
 
-// CalculateTuples preserves the existing tuple behavior until the unified
-// relation calculation is implemented.
+// CalculateTuples calculates common and reporter-specific relation changes.
 func (s *UnifiedSchemaImpl) CalculateTuples(
 	currentRepresentation, previousRepresentation *model.Representations,
 	key model.ReporterResourceKey,
 ) (model.TuplesToReplicate, error) {
-	return model.NewDefaultSchema().CalculateTuples(currentRepresentation, previousRepresentation, key)
+	var tuplesToCreate, tuplesToDelete []model.RelationsTuple
+
+	for _, relation := range s.commonRelations {
+		creates, deletes, err := calculateUnifiedRelation(
+			currentRepresentation,
+			previousRepresentation,
+			key,
+			relation,
+			extractCommonRelationValues,
+		)
+		if err != nil {
+			return model.TuplesToReplicate{}, fmt.Errorf("failed to calculate relation %q: %w", relation.Name, err)
+		}
+		tuplesToCreate = append(tuplesToCreate, creates...)
+		tuplesToDelete = append(tuplesToDelete, deletes...)
+	}
+
+	for _, relation := range s.reporterRelations[key.ReporterType().String()] {
+		creates, deletes, err := calculateUnifiedRelation(
+			currentRepresentation,
+			previousRepresentation,
+			key,
+			relation,
+			extractReporterRelationValues,
+		)
+		if err != nil {
+			return model.TuplesToReplicate{}, fmt.Errorf("failed to calculate reporter relation %q: %w", relation.Name, err)
+		}
+		tuplesToCreate = append(tuplesToCreate, creates...)
+		tuplesToDelete = append(tuplesToDelete, deletes...)
+	}
+
+	return model.NewTuplesToReplicate(tuplesToCreate, tuplesToDelete)
 }
 
+// unifiedRelationValueExtractor reads scalar or array relation values from a representation.
+type unifiedRelationValueExtractor func(*model.Representations, string, string) []string
+
+// calculateUnifiedRelation computes tuple changes for one unified relation.
+func calculateUnifiedRelation(
+	currentRepresentation, previousRepresentation *model.Representations,
+	key model.ReporterResourceKey,
+	relation UnifiedSchemaRelation,
+	extract unifiedRelationValueExtractor,
+) ([]model.RelationsTuple, []model.RelationsTuple, error) {
+	namespace, resourceType, err := parseUnifiedRelationTarget(relation.Target)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	creates, deletes := model.DiffRelationValues(
+		key,
+		relation.Name,
+		namespace,
+		resourceType,
+		extract(currentRepresentation, relation.Field, relation.Cardinality),
+		extract(previousRepresentation, relation.Field, relation.Cardinality),
+	)
+	return creates, deletes, nil
+}
+
+// parseUnifiedRelationTarget splits a relation target into namespace and resource type.
+func parseUnifiedRelationTarget(target string) (string, string, error) {
+	parts := strings.Split(target, "/")
+	if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
+		return "", "", fmt.Errorf("invalid relation target %q", target)
+	}
+	return parts[0], parts[1], nil
+}
+
+// extractCommonRelationValues reads relation values from the common representation.
+func extractCommonRelationValues(representations *model.Representations, field, cardinality string) []string {
+	if representations == nil || !representations.HasCommon() {
+		return nil
+	}
+	return extractRelationValues(representations.CommonData()[field], cardinality)
+}
+
+// extractReporterRelationValues reads relation values from the reporter representation.
+func extractReporterRelationValues(representations *model.Representations, field, cardinality string) []string {
+	if representations == nil || !representations.HasReporter() {
+		return nil
+	}
+	return extractRelationValues(representations.ReporterData()[field], cardinality)
+}
+
+// extractRelationValues converts a scalar or array field to relation values.
+func extractRelationValues(value interface{}, cardinality string) []string {
+	if cardinality == "one" {
+		if value, ok := value.(string); ok && value != "" {
+			return []string{value}
+		}
+		return nil
+	}
+
+	return extractStringSlice(value)
+}
+
+// extractStringSlice returns non-empty strings from supported array representations.
+func extractStringSlice(value interface{}) []string {
+	switch values := value.(type) {
+	case []interface{}:
+		result := make([]string, 0, len(values))
+		for _, value := range values {
+			if value, ok := value.(string); ok && value != "" {
+				result = append(result, value)
+			}
+		}
+		return result
+	case []string:
+		result := make([]string, 0, len(values))
+		for _, value := range values {
+			if value != "" {
+				result = append(result, value)
+			}
+		}
+		return result
+	default:
+		return nil
+	}
+}
+
+// joinValidationErrors combines JSON Schema validation messages for callers.
 func joinValidationErrors(errors []string) string {
 	if len(errors) == 0 {
 		return ""

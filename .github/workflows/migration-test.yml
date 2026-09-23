@@ -6,6 +6,9 @@ on:
   pull_request:
     branches: [ "main" ]
 
+permissions:
+  contents: read
+
 jobs:
   test-migrations:
     name: Smoke Test
@@ -49,4 +52,3 @@ jobs:
           --storage.postgres.user=inventory \
           --storage.postgres.password=inventory_password \
           --storage.postgres.sslmode=disable
-

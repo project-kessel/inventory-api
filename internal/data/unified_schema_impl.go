@@ -88,8 +88,10 @@ func (s *UnifiedSchemaImpl) CalculateTuples(
 	return model.NewTuplesToReplicate(tuplesToCreate, tuplesToDelete)
 }
 
+// unifiedRelationValueExtractor reads scalar or array relation values from a representation.
 type unifiedRelationValueExtractor func(*model.Representations, string, string) []string
 
+// calculateUnifiedRelation computes tuple changes for one unified relation.
 func calculateUnifiedRelation(
 	currentRepresentation, previousRepresentation *model.Representations,
 	key model.ReporterResourceKey,
@@ -112,6 +114,7 @@ func calculateUnifiedRelation(
 	return creates, deletes, nil
 }
 
+// parseUnifiedRelationTarget splits a relation target into namespace and resource type.
 func parseUnifiedRelationTarget(target string) (string, string, error) {
 	parts := strings.Split(target, "/")
 	if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
@@ -120,6 +123,7 @@ func parseUnifiedRelationTarget(target string) (string, string, error) {
 	return parts[0], parts[1], nil
 }
 
+// extractCommonRelationValues reads relation values from the common representation.
 func extractCommonRelationValues(representations *model.Representations, field, cardinality string) []string {
 	if representations == nil || !representations.HasCommon() {
 		return nil
@@ -127,6 +131,7 @@ func extractCommonRelationValues(representations *model.Representations, field, 
 	return extractRelationValues(representations.CommonData()[field], cardinality)
 }
 
+// extractReporterRelationValues reads relation values from the reporter representation.
 func extractReporterRelationValues(representations *model.Representations, field, cardinality string) []string {
 	if representations == nil || !representations.HasReporter() {
 		return nil
@@ -134,6 +139,7 @@ func extractReporterRelationValues(representations *model.Representations, field
 	return extractRelationValues(representations.ReporterData()[field], cardinality)
 }
 
+// extractRelationValues converts a scalar or array field to relation values.
 func extractRelationValues(value interface{}, cardinality string) []string {
 	if cardinality == "one" {
 		if value, ok := value.(string); ok && value != "" {
@@ -145,6 +151,7 @@ func extractRelationValues(value interface{}, cardinality string) []string {
 	return extractStringSlice(value)
 }
 
+// extractStringSlice returns non-empty strings from supported array representations.
 func extractStringSlice(value interface{}) []string {
 	switch values := value.(type) {
 	case []interface{}:
@@ -168,6 +175,7 @@ func extractStringSlice(value interface{}) []string {
 	}
 }
 
+// joinValidationErrors combines JSON Schema validation messages for callers.
 func joinValidationErrors(errors []string) string {
 	if len(errors) == 0 {
 		return ""

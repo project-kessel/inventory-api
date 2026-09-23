@@ -8,6 +8,7 @@ Guidelines are organized by architectural layer and scoped to the directories th
 
 | Layer | File | Scope |
 |-------|------|-------|
+| Cross-cutting | [internal/ARCHITECTURE.md](internal/ARCHITECTURE.md) | Hexagonal/DDD architecture: layer map, Dependency Direction Rule, ACL pattern, DDD checks |
 | Cross-cutting | [internal/GUIDELINES.md](internal/GUIDELINES.md) | All code under `internal/` |
 | API Definitions | [api/GUIDELINES.md](api/GUIDELINES.md) | Protobuf definitions under `api/` |
 | Presentation | [internal/service/GUIDELINES.md](internal/service/GUIDELINES.md) | gRPC/HTTP service implementations |

@@ -25,7 +25,11 @@ func NewInMemorySchemaRepositoryFromUnifiedYAMLDir(ctx context.Context, dir stri
 
 		reporterRelations := make(map[string][]UnifiedSchemaRelation, len(schema.Reporters))
 		for _, reporter := range schema.Reporters {
-			reporterRelations[reporter.Name] = reporter.Relations
+			reporterType, err := model.NewReporterType(reporter.Name)
+			if err != nil {
+				return nil, fmt.Errorf("invalid reporter type %q for resource %q: %w", reporter.Name, schema.Name, err)
+			}
+			reporterRelations[reporterType.String()] = reporter.Relations
 		}
 
 		commonSchema := NewUnifiedSchemaImpl(schema.Common.Schema, schema.Common.Relations, reporterRelations)

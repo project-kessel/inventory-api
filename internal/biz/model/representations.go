@@ -122,3 +122,41 @@ func (r *Representations) StringSliceField(fieldName string) []string {
 	}
 	return result
 }
+
+// ReporterStringField returns a single string value from the reporter representation.
+// Returns empty string if not present, not a string, or if reporter representation is unavailable.
+func (r *Representations) ReporterStringField(fieldName string) string {
+	if r != nil && r.HasReporter() {
+		if value, ok := r.reporterData[fieldName].(string); ok {
+			return value
+		}
+	}
+	return ""
+}
+
+// ReporterStringSliceField returns a string slice from the reporter representation.
+// Returns nil if not present, not an array, or if reporter representation is unavailable.
+// Non-string elements within the array are silently skipped.
+func (r *Representations) ReporterStringSliceField(fieldName string) []string {
+	if r == nil || !r.HasReporter() {
+		return nil
+	}
+	raw, ok := r.reporterData[fieldName]
+	if !ok || raw == nil {
+		return nil
+	}
+	arr, ok := raw.([]interface{})
+	if !ok {
+		return nil
+	}
+	result := make([]string, 0, len(arr))
+	for _, item := range arr {
+		if s, ok := item.(string); ok {
+			result = append(result, s)
+		}
+	}
+	if len(result) == 0 {
+		return nil
+	}
+	return result
+}

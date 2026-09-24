@@ -1,0 +1,19 @@
+schema_version: "unified-schema-local-test"
+name: service
+description: "Features service resource"
+common:
+  schema:
+    type: object
+    additionalProperties: false
+    properties: {}
+    required: []
+  relations: []
+reporters:
+  - name: features
+    description: "Features reporter"
+    schema:
+      type: object
+      additionalProperties: false
+      properties: {}
+      required: []
+    relations: []

@@ -131,6 +131,9 @@ func TestTranslateRelationsTuple_AllOwnedRelationsPrefixed(t *testing.T) {
 	owned := []string{
 		"direct_billing_account",
 		"direct_service_preferences",
+		"desire_all_services",
+		"ignore_inherited_desired_services",
+		"ignore_inherited_paid_services",
 		"_paid_services",
 		"_desired_services",
 		"enabled_services",
@@ -145,6 +148,33 @@ func TestTranslateRelationsTuple_AllOwnedRelationsPrefixed(t *testing.T) {
 
 			assert.Equal(t, "rbac/workspace", got.Object().Reporter().ReporterType().Serialize()+"/"+got.Object().ResourceType().Serialize())
 			assert.Equal(t, "features_workspace_"+relation, got.Relation().Serialize())
+		})
+	}
+}
+
+func TestTranslateRelationsTuple_FeaturesWorkspaceSchemaRelations(t *testing.T) {
+	sc := translationService()
+
+	for _, relation := range []string{
+		"desire_all_services",
+		"ignore_inherited_desired_services",
+		"ignore_inherited_paid_services",
+	} {
+		t.Run(relation, func(t *testing.T) {
+			object := resourceRef("features", "workspace", "uuid-schema")
+			subject := model.NewSubjectReferenceWithoutRelation(resourceRef("features", "service", "*"))
+			got := sc.TranslateRelationsTuple(model.NewRelationsTuple(
+				object,
+				model.DeserializeRelation(relation),
+				subject,
+			))
+
+			want := model.NewRelationsTuple(
+				resourceRef("rbac", "workspace", "uuid-schema"),
+				model.DeserializeRelation("features_workspace_"+relation),
+				model.NewSubjectReferenceWithoutRelation(resourceRef("features", "service", "*")),
+			)
+			assert.Equal(t, want, got)
 		})
 	}
 }

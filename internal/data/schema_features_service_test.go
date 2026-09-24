@@ -2,6 +2,7 @@ package data
 
 import (
 	"context"
+	"os"
 	"testing"
 
 	"github.com/go-kratos/kratos/v2/log"
@@ -64,6 +65,48 @@ func TestFeaturesWorkspaceSchema_Validate(t *testing.T) {
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "validation failed")
 	})
+}
+
+func TestFeaturesWorkspaceSchema_ValidateWildcardFields(t *testing.T) {
+	schema := NewFeaturesWorkspaceSchemaFromString(featuresWorkspaceJsonSchemaFromFile(t))
+
+	wildcardFields := []string{
+		"desire_all_services",
+		"ignore_inherited_desired_services",
+		"ignore_inherited_paid_services",
+	}
+
+	t.Run("accepts the service wildcard", func(t *testing.T) {
+		representation := make(map[string]interface{}, len(wildcardFields))
+		for _, fieldName := range wildcardFields {
+			representation[fieldName] = "features/service:*"
+		}
+
+		valid, err := schema.Validate(representation)
+		assert.True(t, valid)
+		assert.NoError(t, err)
+	})
+
+	for _, fieldName := range wildcardFields {
+		for _, invalidValue := range []interface{}{
+			[]interface{}{"features/service:*"},
+			true,
+			"features/service:svc-1",
+		} {
+			t.Run(fieldName+" rejects invalid value", func(t *testing.T) {
+				valid, err := schema.Validate(map[string]interface{}{fieldName: invalidValue})
+				assert.False(t, valid)
+				assert.Error(t, err)
+			})
+		}
+	}
+}
+
+func featuresWorkspaceJsonSchemaFromFile(t *testing.T) string {
+	t.Helper()
+	jsonSchema, err := os.ReadFile("../../data/schema/resources/workspace/reporters/features/workspace.json")
+	require.NoError(t, err)
+	return string(jsonSchema)
 }
 
 func TestFeaturesBillingAccountSchema_Validate(t *testing.T) {
@@ -132,6 +175,122 @@ func featuresBillingAccountKey(t *testing.T) model.ReporterResourceKey {
 func TestFeaturesWorkspaceSchema_CalculateTuples(t *testing.T) {
 	schema := NewFeaturesWorkspaceSchemaFromString(workspaceJsonSchema)
 	key := featuresWorkspaceKey(t)
+
+	t.Run("wildcard fields create service wildcard tuples", func(t *testing.T) {
+		ver := model.NewVersion(0)
+		current, err := model.NewRepresentations(
+			nil, nil,
+			model.Representation(map[string]interface{}{
+				"desire_all_services":               "features/service:*",
+				"ignore_inherited_desired_services": "features/service:*",
+				"ignore_inherited_paid_services":    "features/service:*",
+				"direct_billing_account":            "ba-100",
+				"direct_service_preferences":        []interface{}{"svc-1"},
+			}),
+			&ver,
+		)
+		require.NoError(t, err)
+
+		result, err := schema.CalculateTuples(current, nil, key)
+		require.NoError(t, err)
+		require.True(t, result.HasTuplesToCreate())
+
+		expected := []model.RelationsTuple{
+			model.NewRelationTupleForSubject(key, "desire_all_services", "features", "service", "*"),
+			model.NewRelationTupleForSubject(key, "ignore_inherited_desired_services", "features", "service", "*"),
+			model.NewRelationTupleForSubject(key, "ignore_inherited_paid_services", "features", "service", "*"),
+			model.NewRelationTupleForSubject(key, "direct_billing_account", "features", "billing_account", "ba-100"),
+			model.NewRelationTupleForSubject(key, "direct_service_preferences", "features", "service", "svc-1"),
+		}
+		require.NotNil(t, result.TuplesToCreate())
+		assert.ElementsMatch(t, expected, *result.TuplesToCreate())
+	})
+
+	t.Run("update creates and deletes wildcard field tuples", func(t *testing.T) {
+		ver1 := model.NewVersion(1)
+		previous, err := model.NewRepresentations(
+			nil, nil,
+			model.Representation(map[string]interface{}{
+				"desire_all_services":               "features/service:*",
+				"ignore_inherited_desired_services": "features/service:*",
+			}),
+			&ver1,
+		)
+		require.NoError(t, err)
+
+		ver2 := model.NewVersion(2)
+		current, err := model.NewRepresentations(
+			nil, nil,
+			model.Representation(map[string]interface{}{
+				"ignore_inherited_desired_services": "features/service:*",
+				"ignore_inherited_paid_services":    "features/service:*",
+			}),
+			&ver2,
+		)
+		require.NoError(t, err)
+
+		result, err := schema.CalculateTuples(current, previous, key)
+		require.NoError(t, err)
+
+		require.True(t, result.HasTuplesToCreate())
+		assert.ElementsMatch(t, []model.RelationsTuple{
+			model.NewRelationTupleForSubject(key, "ignore_inherited_paid_services", "features", "service", "*"),
+		}, *result.TuplesToCreate())
+		require.True(t, result.HasTuplesToDelete())
+		assert.ElementsMatch(t, []model.RelationsTuple{
+			model.NewRelationTupleForSubject(key, "desire_all_services", "features", "service", "*"),
+		}, *result.TuplesToDelete())
+	})
+
+	t.Run("removing a wildcard field deletes its tuple", func(t *testing.T) {
+		ver1 := model.NewVersion(1)
+		previous, err := model.NewRepresentations(
+			nil, nil,
+			model.Representation(map[string]interface{}{
+				"ignore_inherited_paid_services": "features/service:*",
+			}),
+			&ver1,
+		)
+		require.NoError(t, err)
+
+		ver2 := model.NewVersion(2)
+		current, err := model.NewRepresentations(nil, nil, model.Representation(map[string]interface{}{}), &ver2)
+		require.NoError(t, err)
+
+		result, err := schema.CalculateTuples(current, previous, key)
+		require.NoError(t, err)
+
+		assert.False(t, result.HasTuplesToCreate())
+		require.NotNil(t, result.TuplesToDelete())
+		assert.Equal(t, []model.RelationsTuple{
+			model.NewRelationTupleForSubject(key, "ignore_inherited_paid_services", "features", "service", "*"),
+		}, *result.TuplesToDelete())
+	})
+
+	t.Run("delete removes wildcard field tuples", func(t *testing.T) {
+		ver := model.NewVersion(1)
+		previous, err := model.NewRepresentations(
+			nil, nil,
+			model.Representation(map[string]interface{}{
+				"desire_all_services":               "features/service:*",
+				"ignore_inherited_desired_services": "features/service:*",
+				"ignore_inherited_paid_services":    "features/service:*",
+			}),
+			&ver,
+		)
+		require.NoError(t, err)
+
+		result, err := schema.CalculateTuples(nil, previous, key)
+		require.NoError(t, err)
+
+		assert.False(t, result.HasTuplesToCreate())
+		require.True(t, result.HasTuplesToDelete())
+		assert.ElementsMatch(t, []model.RelationsTuple{
+			model.NewRelationTupleForSubject(key, "desire_all_services", "features", "service", "*"),
+			model.NewRelationTupleForSubject(key, "ignore_inherited_desired_services", "features", "service", "*"),
+			model.NewRelationTupleForSubject(key, "ignore_inherited_paid_services", "features", "service", "*"),
+		}, *result.TuplesToDelete())
+	})
 
 	t.Run("create produces tuples for all relations", func(t *testing.T) {
 		ver := model.NewVersion(0)
@@ -417,7 +576,7 @@ func TestSchemaService_CalculateTuplesForResource_FeaturesWorkspace(t *testing.T
 	require.NoError(t, err)
 
 	// Register reporter schema (this should be used for tuple calculation)
-	reporterSchema := NewFeaturesWorkspaceSchemaFromString(workspaceJsonSchema)
+	reporterSchema := NewFeaturesWorkspaceSchemaFromString(featuresWorkspaceJsonSchemaFromFile(t))
 	reporterSchemaRepr, err := model.NewReporterSchemaRepresentation(
 		resourceType, reporterType, reporterSchema,
 	)
@@ -432,13 +591,18 @@ func TestSchemaService_CalculateTuplesForResource_FeaturesWorkspace(t *testing.T
 	// Create resource key
 	key := featuresWorkspaceKey(t)
 
-	// Create representations with data in REPORTER representation (not common)
+	// Keep one wildcard in common data and one in reporter data to verify that
+	// reporter schema tuple calculation remains isolated from common fields.
 	ver := model.NewVersion(1)
 	current, err := model.NewRepresentations(
-		nil, nil, // Empty common representation
+		model.Representation(map[string]interface{}{
+			"ignore_inherited_paid_services": "features/service:*",
+		}),
+		&ver,
 		model.Representation(map[string]interface{}{
 			"direct_billing_account":     "ba-100",
 			"direct_service_preferences": []interface{}{"svc-1", "svc-2"},
+			"desire_all_services":        "features/service:*",
 		}),
 		&ver, // Reporter representation
 	)
@@ -448,15 +612,17 @@ func TestSchemaService_CalculateTuplesForResource_FeaturesWorkspace(t *testing.T
 	result, err := schemaService.CalculateTuplesForResource(ctx, current, nil, key)
 	require.NoError(t, err)
 
-	// Verify tuples were created from reporter data
+	// Verify direct and wildcard tuples come from reporter data; the common
+	// ignore_inherited_paid_services value is not read by the reporter schema.
 	assert.True(t, result.HasTuplesToCreate())
 	creates := *result.TuplesToCreate()
-	assert.Len(t, creates, 3) // 1 billing_account + 2 service_preferences
+	assert.Len(t, creates, 4) // 1 wildcard + 1 billing_account + 2 service_preferences
 
 	expected := []model.RelationsTuple{
 		model.NewRelationTupleForSubject(key, "direct_billing_account", "features", "billing_account", "ba-100"),
 		model.NewRelationTupleForSubject(key, "direct_service_preferences", "features", "service", "svc-1"),
 		model.NewRelationTupleForSubject(key, "direct_service_preferences", "features", "service", "svc-2"),
+		model.NewRelationTupleForSubject(key, "desire_all_services", "features", "service", "*"),
 	}
 	assert.ElementsMatch(t, expected, creates)
 }
@@ -480,8 +646,11 @@ func TestFeaturesSchemas_FromDirectory(t *testing.T) {
 		current, err := model.NewRepresentations(
 			nil, nil,
 			model.Representation(map[string]interface{}{
-				"direct_billing_account":     "ba-100",
-				"direct_service_preferences": []interface{}{"svc-1", "svc-2"},
+				"direct_billing_account":            "ba-100",
+				"direct_service_preferences":        []interface{}{"svc-1", "svc-2"},
+				"desire_all_services":               "features/service:*",
+				"ignore_inherited_desired_services": "features/service:*",
+				"ignore_inherited_paid_services":    "features/service:*",
 			}),
 			&ver,
 		)
@@ -492,12 +661,15 @@ func TestFeaturesSchemas_FromDirectory(t *testing.T) {
 
 		assert.True(t, result.HasTuplesToCreate())
 		creates := *result.TuplesToCreate()
-		assert.Len(t, creates, 3)
+		assert.Len(t, creates, 6)
 
 		expected := []model.RelationsTuple{
 			model.NewRelationTupleForSubject(key, "direct_billing_account", "features", "billing_account", "ba-100"),
 			model.NewRelationTupleForSubject(key, "direct_service_preferences", "features", "service", "svc-1"),
 			model.NewRelationTupleForSubject(key, "direct_service_preferences", "features", "service", "svc-2"),
+			model.NewRelationTupleForSubject(key, "desire_all_services", "features", "service", "*"),
+			model.NewRelationTupleForSubject(key, "ignore_inherited_desired_services", "features", "service", "*"),
+			model.NewRelationTupleForSubject(key, "ignore_inherited_paid_services", "features", "service", "*"),
 		}
 		assert.ElementsMatch(t, expected, creates)
 	})

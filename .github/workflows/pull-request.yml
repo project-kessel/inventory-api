@@ -4,7 +4,6 @@ on:
     types: [opened, synchronize, reopened, labeled, unlabeled]
 permissions:
   contents: read
-  pull-requests: write
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -14,4 +13,5 @@ jobs:
         with:
           format: false
           lint: true
+          pr_comment: false
           input: "api"

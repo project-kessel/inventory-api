@@ -1,3 +1,5 @@
+# DEVELOPMENT ONLY — DO NOT USE IN PRODUCTION.
+# This configuration disables or weakens authentication, TLS, or related security controls.
 # This config is designed to run with Relations locally
 # ports have been updated to prevent conflicts
 # authz configured for local running relations binary

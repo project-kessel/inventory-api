@@ -12,8 +12,7 @@ on:
         type: string
 
 permissions:
-  contents: write
-  pull-requests: write
+  contents: read
 
 concurrency:
   group: schema-sync
@@ -24,6 +23,9 @@ jobs:
     name: Sync schema release
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    permissions:
+      contents: write
+      pull-requests: write
     env:
       SCHEMA_REPO: project-kessel/starlark-unified-schema
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

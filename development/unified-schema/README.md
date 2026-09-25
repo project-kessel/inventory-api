@@ -51,7 +51,7 @@ apps:
   components:
   - name: kessel-inventory
     host: local
-    repo: /home/anatale/go/src/github.com/tonytheleg/inventory-api
+    repo: path/to/inventory-api-cloned-repo
     path: development/unified-schema/kessel-inventory-ephem-unified.yaml
 ```
 

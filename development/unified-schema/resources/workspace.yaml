@@ -1,0 +1,46 @@
+schema_version: "unified-schema-local-test"
+name: workspace
+description: "Workspace resource"
+common:
+  schema:
+    type: object
+    additionalProperties: false
+    properties: {}
+    required: []
+  relations: []
+reporters:
+  - name: features
+    description: "Features reporter"
+    schema:
+      type: object
+      additionalProperties: false
+      properties:
+        desire_all_services:
+          pattern: "^features/service:\\*$"
+          type: string
+        direct_billing_account:
+          format: uuid
+          type: string
+        direct_service_preferences:
+          type: array
+          items:
+            format: uuid
+            type: string
+        ignore_inherited_desired_services:
+          pattern: "^features/service:\\*$"
+          type: string
+        ignore_inherited_paid_services:
+          pattern: "^features/service:\\*$"
+          type: string
+      required: []
+    relations:
+      - name: direct_billing_account
+        target: features/billing_account
+        field: direct_billing_account
+        cardinality: one
+        description: "Direct billing account relation"
+      - name: direct_service_preferences
+        target: features/service
+        field: direct_service_preferences
+        cardinality: many
+        description: "Direct service preference relations"

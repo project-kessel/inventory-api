@@ -1,0 +1,40 @@
+schema_version: "unified-schema-local-test"
+name: k8s_policy
+description: "A Kubernetes policy definition"
+common:
+  schema:
+    type: object
+    properties:
+      workspace_id:
+        type: string
+    required:
+      - workspace_id
+  relations:
+    - name: workspace
+      target: rbac/workspace
+      field: workspace_id
+      cardinality: one
+      description: "Workspace relation"
+reporters:
+  - name: acm
+    description: "Advanced Cluster Management policy reporter"
+    schema:
+      type: object
+      properties:
+        disabled:
+          type: boolean
+          description: "Defines if the policy is currently enabled or disabled across all targets."
+        severity:
+          type: string
+          enum:
+            - SEVERITY_UNSPECIFIED
+            - SEVERITY_OTHER
+            - LOW
+            - MEDIUM
+            - HIGH
+            - CRITICAL
+          description: "The severity level of the policy."
+      required:
+        - disabled
+        - severity
+    relations: []

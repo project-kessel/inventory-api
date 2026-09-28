@@ -1,0 +1,29 @@
+schema_version: "unified-schema-local-test"
+name: billing_account
+description: "Features billing account resource"
+common:
+  schema:
+    type: object
+    additionalProperties: false
+    properties: {}
+    required: []
+  relations: []
+reporters:
+  - name: features
+    description: "Features reporter"
+    schema:
+      type: object
+      additionalProperties: false
+      properties:
+        services:
+          type: array
+          items:
+            format: uuid
+            type: string
+      required: []
+    relations:
+      - name: services
+        target: features/service
+        field: services
+        cardinality: many
+        description: "Services associated with the billing account"

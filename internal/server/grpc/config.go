@@ -10,6 +10,8 @@ import (
 	"time"
 
 	kgrpc "github.com/go-kratos/kratos/v2/transport/grpc"
+	googlegrpc "google.golang.org/grpc"
+	"google.golang.org/grpc/keepalive"
 )
 
 type Config struct {
@@ -84,6 +86,10 @@ func (c *Config) Complete() (CompletedConfig, error) {
 		kgrpc.Address(c.Options.Addr),
 		kgrpc.TLSConfig(tlsConfig),
 		kgrpc.Timeout(time.Duration(c.Options.Timeout) * time.Second),
+		kgrpc.Options(googlegrpc.KeepaliveEnforcementPolicy(keepalive.EnforcementPolicy{
+			MinTime:             30 * time.Second,
+			PermitWithoutStream: true,
+		})),
 	}
 
 	return CompletedConfig{&completedConfig{

@@ -14,7 +14,7 @@ func ReporterRepCommonVersionNotNullMigration() *gormigrate.Migration {
 	return &gormigrate.Migration{
 		ID: "20260930180000",
 		Migrate: func(tx *gorm.DB) error {
-			if err := tx.Exec("ALTER TABLE reporter_representations ALTER COLUMN common_version SET NOT NULL").Error; err != nil { 
+			if err := tx.Exec("ALTER TABLE reporter_representations ALTER COLUMN common_version SET NOT NULL").Error; err != nil {
 				return fmt.Errorf("failed to enforce NOT NULL on reporter_representations.common_version; resolve existing NULL values before retrying: %w", err)
 			}
 			return nil

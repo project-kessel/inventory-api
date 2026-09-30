@@ -10,8 +10,6 @@ import (
 	"time"
 
 	kgrpc "github.com/go-kratos/kratos/v2/transport/grpc"
-	googlegrpc "google.golang.org/grpc"
-	"google.golang.org/grpc/keepalive"
 )
 
 type Config struct {
@@ -22,13 +20,6 @@ type Config struct {
 type completedConfig struct {
 	Options       *Options
 	ServerOptions []kgrpc.ServerOption
-	// GRPCOptions are raw grpc.ServerOption values (e.g. keepalive policy) that
-	// must be passed to the underlying grpc.Server.  They are stored separately
-	// from ServerOptions so that NewWithDeps can merge them with interceptors
-	// into a single kgrpc.Options() call — Kratos's Options() is a setter that
-	// replaces s.grpcOpts on every call, so multiple kgrpc.Options() invocations
-	// cause only the last one to survive.
-	GRPCOptions []googlegrpc.ServerOption
 }
 
 // CompletedConfig can be constructed only from Config.Complete
@@ -95,19 +86,9 @@ func (c *Config) Complete() (CompletedConfig, error) {
 		kgrpc.Timeout(time.Duration(c.Options.Timeout) * time.Second),
 	}
 
-	// Raw gRPC options are collected separately so that NewWithDeps can merge
-	// them with interceptors into a single kgrpc.Options() call.
-	grpcOpts := []googlegrpc.ServerOption{
-		googlegrpc.KeepaliveEnforcementPolicy(keepalive.EnforcementPolicy{
-			MinTime:             30 * time.Second,
-			PermitWithoutStream: true,
-		}),
-	}
-
 	return CompletedConfig{&completedConfig{
 		Options:       c.Options,
 		ServerOptions: opts,
-		GRPCOptions:   grpcOpts,
 	}}, nil
 }
 

@@ -8,7 +8,6 @@ Guidelines are organized by architectural layer and scoped to the directories th
 
 | Layer | File | Scope |
 |-------|------|-------|
-| Cross-cutting | [ARCHITECTURE.md](ARCHITECTURE.md) | Hexagonal/DDD architecture: layer map, Dependency Direction Rule, ACL pattern, DDD checks -- whole repo |
 | Cross-cutting | [internal/GUIDELINES.md](internal/GUIDELINES.md) | All code under `internal/` |
 | API Definitions | [api/GUIDELINES.md](api/GUIDELINES.md) | Protobuf definitions under `api/` |
 | Presentation | [internal/service/GUIDELINES.md](internal/service/GUIDELINES.md) | gRPC/HTTP service implementations |
@@ -85,7 +84,6 @@ When working in this codebase, AI agents should:
 5. **Test-driven development** - Prefer writing tests first (TDD). When adding features or fixing bugs, start with a failing test, then implement the code to pass it. Follow the no-mocks philosophy in [Testing Guidelines](test/GUIDELINES.md).
 6. **End-to-end type changes** - When replacing a type (e.g., `ReporterResourceKey` -> `ResourceReference`), propagate the change through the entire call chain. Do not insert local adapter/shim calls at the boundary (e.g., `ResourceReferenceFromKey(key)` at the call site). Instead, update the method signature, the callers, and the callers' callers until the new type flows naturally from entry point to implementation. Lossy back-and-forth conversions are a bug.
 7. **Do not remove comments** unless they are clearly wrong or obsolete. Preserve existing documentation.
-8. **Go documentation comments** - Add Go doc comments to all newly added exported types and functions. Add comments to non-exported functions when their logic is not obvious. When unsure whether a comment is needed or how it should be written, follow the [Go doc comments guide](https://go.dev/doc/comment).
 
 ### Docker Compose / Local Development
 When changing CLI flags, config keys, default values, authentication/authorization modes, ports, or service dependencies, check whether the local development setup still reflects those changes. The following files must stay in sync:

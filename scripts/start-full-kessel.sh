@@ -11,7 +11,6 @@ TEMP_DIR=""
 RBAC_CONFIG_SRC=""
 RBAC_OVERRIDE_PATH=""
 RBAC_INVENTORY_API_CONFIG_DIR="${TMPDIR:-/tmp}/inventory-api-full-kessel"
-INVENTORY_API_COMPOSE_OVERRIDE="${INVENTORY_API_COMPOSE_OVERRIDE:-}"
 
 cleanup() {
   if [[ -n "${TEMP_DIR}" ]]; then
@@ -117,15 +116,8 @@ for key in $(yq '.objects[0].data | keys | .[]' "${RBAC_CONFIG_SRC}"); do
 done
 echo "Extracted $(ls "${RBAC_DEFS_DIR}"/*.json 2>/dev/null | wc -l) RBAC role definition files"
 
-COMPOSE_FILES=(
-  -f "${COMPOSE_DIR}/docker-compose.yaml"
-  -f "${RBAC_OVERRIDE_PATH}"
-)
-if [[ -n "${INVENTORY_API_COMPOSE_OVERRIDE}" ]]; then
-  COMPOSE_FILES+=( -f "${INVENTORY_API_COMPOSE_OVERRIDE}" )
-fi
-
 ${DOCKER} compose --env-file "${ENV_FILE}" \
   --profile relations --profile consumer --profile rbac "$@" \
-  "${COMPOSE_FILES[@]}" \
+  -f "${COMPOSE_DIR}/docker-compose.yaml" \
+  -f "${RBAC_OVERRIDE_PATH}" \
   up --pull "${COMPOSE_PULL_MODE:-always}" -d

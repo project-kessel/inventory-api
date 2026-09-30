@@ -32,7 +32,7 @@ ifeq ($(VERSION),)
 VERSION:=$(shell git describe --tags --always)
 endif
 SCHEMA_REPO ?= project-kessel/starlark-unified-schema
-SCHEMA_VERSION=v20260910.1
+SCHEMA_VERSION=v20260820.1
 
 # Postgres configuration
 DB_PORT ?= 5435
@@ -250,10 +250,6 @@ get-token:
 kessel-up:
 	./scripts/start-full-kessel.sh
 
-.PHONY: kessel-up-unified
-kessel-up-unified:
-	INVENTORY_API_COMPOSE_OVERRIDE=development/unified-schema/docker-compose.override.yaml ./scripts/start-full-kessel.sh
-
 .PHONY: kessel-up-monitoring
 kessel-up-monitoring:
 	./scripts/start-full-kessel.sh --profile monitoring
@@ -381,3 +377,4 @@ check-tuple:
 .PHONY: check-token-update
 check-token-update:
 	psql "postgresql://${DB_USER}:${DB_PASSWORD}@localhost:${LOCAL_DB_PORT}/${DB_NAME}" -x -c "select id,inventory_id,consistency_token,workspace_id,reporter from resources;"
+

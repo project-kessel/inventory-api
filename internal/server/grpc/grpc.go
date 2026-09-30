@@ -27,7 +27,12 @@ type ServerConfig struct {
 	Logger          log.Logger
 	Validator       protovalidate.Validator
 	ServerOptions   []kgrpc.ServerOption
-	ReadOnlyMode    bool
+	// GRPCOptions are raw grpc.ServerOption values (e.g. keepalive, max message
+	// size) that NewWithDeps merges with interceptors into a single
+	// kgrpc.Options() call.  Never wrap these in kgrpc.Options() yourself —
+	// Kratos's Options() is a setter, not an appender.
+	GRPCOptions  []grpc.ServerOption
+	ReadOnlyMode bool
 }
 
 // New creates a new a gRPC server.
@@ -65,6 +70,7 @@ func New(c CompletedConfig, authnMiddleware middleware.Middleware, authnConfig a
 		Logger:          logger,
 		Validator:       validator,
 		ServerOptions:   c.ServerOptions,
+		GRPCOptions:     c.GRPCOptions,
 		ReadOnlyMode:    readOnlyMode,
 	})
 }
@@ -103,6 +109,22 @@ func NewWithDeps(deps ServerConfig) (*kgrpc.Server, error) {
 		authnMiddleware = m.Authentication(deps.Authenticator)
 	}
 
+	// Build a single set of raw grpc.ServerOption that combines interceptors
+	// with any options from the server config (e.g. keepalive policy).
+	//
+	// IMPORTANT: Kratos's kgrpc.Options() is a SETTER — each call replaces
+	// s.grpcOpts rather than appending.  We must therefore produce exactly ONE
+	// kgrpc.Options() call containing every raw grpc.ServerOption.  Splitting
+	// them across multiple kgrpc.Options() calls causes only the last one to
+	// survive, silently dropping interceptors or config.
+	rawGRPCOpts := []grpc.ServerOption{
+		grpc.ChainStreamInterceptor(streamingInterceptor...),
+	}
+	if deps.ReadOnlyMode {
+		rawGRPCOpts = append(rawGRPCOpts, grpc.ChainUnaryInterceptor(m.UnaryReadOnlyInterceptor()))
+	}
+	rawGRPCOpts = append(rawGRPCOpts, deps.GRPCOptions...)
+
 	var opts = []kgrpc.ServerOption{
 		kgrpc.Middleware(
 			recovery.Recovery(),
@@ -125,18 +147,7 @@ func NewWithDeps(deps ServerConfig) (*kgrpc.Server, error) {
 			// Metrics intentionally omitted: Kratos StreamMiddleware counts per-message
 			// instead of per-stream. Stream metrics are handled by newStreamCounterInterceptor.
 		),
-		kgrpc.Options(
-			grpc.ChainStreamInterceptor(streamingInterceptor...),
-		),
-	}
-	// only enables the read-only interceptor if in read only mode to reduce overhead
-	if deps.ReadOnlyMode {
-		unaryInterceptor := []grpc.UnaryServerInterceptor{
-			m.UnaryReadOnlyInterceptor(),
-		}
-		opts = append(opts, kgrpc.Options(
-			grpc.ChainStreamInterceptor(streamingInterceptor...),
-			grpc.ChainUnaryInterceptor(unaryInterceptor...)))
+		kgrpc.Options(rawGRPCOpts...),
 	}
 	opts = append(opts, deps.ServerOptions...)
 	srv := kgrpc.NewServer(opts...)

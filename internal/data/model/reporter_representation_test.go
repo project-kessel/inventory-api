@@ -47,7 +47,7 @@ func TestReporterRepresentation_Structure(t *testing.T) {
 			"ReporterResourceID": reflect.TypeOf(uuid.UUID{}),
 			"Version":            reflect.TypeOf(uint(0)),
 			"Generation":         reflect.TypeOf(uint(0)),
-			"CommonVersion":      reflect.TypeOf((*uint)(nil)),
+			"CommonVersion":      reflect.TypeOf(uint(0)),
 			"Tombstone":          reflect.TypeOf(false),
 			"ReporterVersion":    reflect.TypeOf((*string)(nil)),
 		}
@@ -690,8 +690,7 @@ func TestReporterRepresentation_Serialization(t *testing.T) {
 		rr := fixture.ValidReporterRepresentation()
 		rr.Version = 4294967295 // Max uint32
 		rr.Generation = 4294967295
-		commonVersion := uint(4294967295)
-		rr.CommonVersion = &commonVersion
+		rr.CommonVersion = uint(4294967295)
 
 		// Test JSON marshaling with large integer values
 		jsonData, err := json.Marshal(rr)
@@ -705,30 +704,24 @@ func TestReporterRepresentation_Serialization(t *testing.T) {
 		// Check that large integer values are preserved
 		AssertEqual(t, uint(4294967295), unmarshaled.Version, "Large Version should match after JSON round-trip")
 		AssertEqual(t, uint(4294967295), unmarshaled.Generation, "Large Generation should match after JSON round-trip")
-		if unmarshaled.CommonVersion != nil {
-			AssertEqual(t, uint(4294967295), *unmarshaled.CommonVersion, "Large CommonVersion should match after JSON round-trip")
-		} else {
-			t.Error("CommonVersion should not be nil after JSON round-trip")
-		}
+		AssertEqual(t, uint(4294967295), unmarshaled.CommonVersion, "Large CommonVersion should match after JSON round-trip")
 	})
 
-	t.Run("should preserve nil CommonVersion through JSON round-trip", func(t *testing.T) {
+	t.Run("should default CommonVersion to 0 through JSON round-trip when not set", func(t *testing.T) {
 		t.Parallel()
 
 		fixture := NewTestFixture(t)
 		rr := fixture.ValidReporterRepresentation()
-		rr.CommonVersion = nil
+		rr.CommonVersion = 0
 
 		jsonData, err := json.Marshal(rr)
-		AssertNoError(t, err, "Should be able to marshal ReporterRepresentation with nil CommonVersion to JSON")
+		AssertNoError(t, err, "Should be able to marshal ReporterRepresentation with zero CommonVersion to JSON")
 
 		var unmarshaled ReporterRepresentation
 		err = json.Unmarshal(jsonData, &unmarshaled)
-		AssertNoError(t, err, "Should be able to unmarshal ReporterRepresentation with nil CommonVersion from JSON")
+		AssertNoError(t, err, "Should be able to unmarshal ReporterRepresentation with zero CommonVersion from JSON")
 
-		if unmarshaled.CommonVersion != nil {
-			t.Errorf("expected CommonVersion to be nil after JSON round-trip, got: %v", *unmarshaled.CommonVersion)
-		}
+		AssertEqual(t, uint(0), unmarshaled.CommonVersion, "CommonVersion should be 0 after JSON round-trip")
 	})
 
 	t.Run("should handle empty data object in JSON serialization", func(t *testing.T) {

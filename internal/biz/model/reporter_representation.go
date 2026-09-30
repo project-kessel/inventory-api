@@ -74,7 +74,7 @@ func NewReporterDeleteRepresentation(
 			reporterResourceID: reporterResourceID,
 			version:            version,
 			generation:         generation,
-			commonVersion:      nil, // For delete operations, common_version is always nil
+			commonVersion:      nil, // Data layer stores 0 for tombstone rows to satisfy the NOT NULL constraint
 			tombstone:          NewTombstone(true),
 		},
 	}, nil

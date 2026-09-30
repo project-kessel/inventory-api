@@ -20,10 +20,7 @@ func ReporterRepCommonVersionNotNullMigration() *gormigrate.Migration {
 			return nil
 		},
 		Rollback: func(tx *gorm.DB) error {
-			if err := tx.Exec("ALTER TABLE reporter_representations ALTER COLUMN common_version DROP NOT NULL").Error; err != nil {
-				return fmt.Errorf("failed to restore nullable reporter_representations.common_version: %w", err)
-			}
-			return nil
+			return fmt.Errorf("irreversible migration: common_version has been made nullable to support reporter-only resources, and the database may contain legitimate NULL values that cannot be safely converted back to NOT NULL")
 		},
 	}
 }

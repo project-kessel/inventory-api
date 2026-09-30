@@ -18,7 +18,7 @@ type ReporterRepresentation struct {
 	Version            uint      `gorm:"type:bigint;primaryKey;check:version >= 0"`
 	Generation         uint      `gorm:"type:bigint;primaryKey;check:generation >= 0"`
 	ReporterVersion    *string   `gorm:"size:128"`
-	CommonVersion      *uint     `gorm:"type:bigint;check:common_version >= 0"`
+	CommonVersion      uint      `gorm:"type:bigint;not null;check:common_version >= 0"`
 	TransactionId      string    `gorm:"size:128;index:ux_reporter_reps_txid_nn,where:transaction_id IS NOT NULL AND transaction_id != '',unique"`
 	Tombstone          bool      `gorm:"not null"`
 	CreatedAt          time.Time
@@ -39,6 +39,11 @@ func NewReporterRepresentation(
 	tombstone bool,
 	reporterVersion *string,
 ) (*ReporterRepresentation, error) {
+	var cv uint
+	if commonVersion != nil {
+		cv = *commonVersion
+	}
+
 	rr := &ReporterRepresentation{
 		Representation: Representation{
 			Data: data,
@@ -46,7 +51,7 @@ func NewReporterRepresentation(
 		ReporterResourceID: reporterResourceID,
 		Version:            version,
 		Generation:         generation,
-		CommonVersion:      commonVersion,
+		CommonVersion:      cv,
 		TransactionId:      transactionId,
 		Tombstone:          tombstone,
 		ReporterVersion:    reporterVersion,
@@ -60,26 +65,11 @@ func NewReporterRepresentation(
 }
 
 func validateReporterRepresentation(rr *ReporterRepresentation) error {
-	// A tombstone row represents a deletion and must not carry common representation
-	// version metadata, which belongs exclusively to live reporter representations.
-	if rr.Tombstone && rr.CommonVersion != nil {
-		return bizmodel.ValidationError{
-			Field:   "CommonVersion",
-			Message: "must be nil when Tombstone is true",
-		}
-	}
-
-	// Validate common version only if it's provided
-	var commonVersionErr error
-	if rr.CommonVersion != nil {
-		commonVersionErr = bizmodel.ValidateMinValueUint("CommonVersion", *rr.CommonVersion, MinCommonVersion)
-	}
-
 	return bizmodel.AggregateErrors(
 		bizmodel.ValidateUUIDRequired("ReporterResourceID", rr.ReporterResourceID),
 		bizmodel.ValidateMinValueUint("Version", rr.Version, MinVersionValue),
 		bizmodel.ValidateMinValueUint("Generation", rr.Generation, MinGenerationValue),
-		commonVersionErr,
+		bizmodel.ValidateMinValueUint("CommonVersion", rr.CommonVersion, MinCommonVersion),
 		bizmodel.ValidateMaxLength("TransactionId", rr.TransactionId, MaxTransactionIdLength),
 		bizmodel.ValidateOptionalString("ReporterVersion", rr.ReporterVersion, MaxReporterVersionLength),
 	)
@@ -92,13 +82,14 @@ func (rr ReporterRepresentation) SerializeToSnapshot() bizmodel.ReporterRepresen
 		Data: rr.Data,
 	}
 
+	cv := rr.CommonVersion
 	return bizmodel.ReporterRepresentationSnapshot{
 		Representation:     representationSnapshot,
 		ReporterResourceID: rr.ReporterResourceID,
 		Version:            rr.Version,
 		Generation:         rr.Generation,
 		ReporterVersion:    rr.ReporterVersion,
-		CommonVersion:      rr.CommonVersion,
+		CommonVersion:      &cv,
 		TransactionId:      rr.TransactionId,
 		Tombstone:          rr.Tombstone,
 		CreatedAt:          rr.CreatedAt,
@@ -107,6 +98,10 @@ func (rr ReporterRepresentation) SerializeToSnapshot() bizmodel.ReporterRepresen
 
 // DeserializeReporterRepresentationFromSnapshot creates GORM ReporterRepresentation from snapshot - direct initialization without validation
 func DeserializeReporterRepresentationFromSnapshot(snapshot bizmodel.ReporterRepresentationSnapshot) ReporterRepresentation {
+	var cv uint
+	if snapshot.CommonVersion != nil {
+		cv = *snapshot.CommonVersion
+	}
 	return ReporterRepresentation{
 		Representation: Representation{
 			Data: snapshot.Representation.Data,
@@ -115,7 +110,7 @@ func DeserializeReporterRepresentationFromSnapshot(snapshot bizmodel.ReporterRep
 		Version:            snapshot.Version,
 		Generation:         snapshot.Generation,
 		ReporterVersion:    snapshot.ReporterVersion,
-		CommonVersion:      snapshot.CommonVersion,
+		CommonVersion:      cv,
 		TransactionId:      snapshot.TransactionId,
 		Tombstone:          snapshot.Tombstone,
 		CreatedAt:          snapshot.CreatedAt,

@@ -1,120 +1,41 @@
 package data
 
 import (
-	"context"
-	"os"
 	"testing"
 
-	"github.com/go-kratos/kratos/v2/log"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
+var serviceJsonSchema = `{
+	"$schema": "http://json-schema.org/draft-07/schema#",
+	"type": "object",
+	"properties": {
+		"allowed_workspaces": { "type": "array", "items": { "type": "string" } },
+		"billing_account": { "type": "array", "items": { "type": "string" } },
+		"parent": { "type": "string" }
+	},
+	"required": []
+}`
+
 var billingAccountJsonSchema = `{
 	"$schema": "http://json-schema.org/draft-07/schema#",
 	"type": "object",
 	"properties": {
-		"services": { "type": "array", "items": { "type": "string" } }
+		"workspaces": { "type": "array", "items": { "type": "string" } }
 	},
 	"required": []
 }`
 
-var workspaceJsonSchema = `{
-	"$schema": "http://json-schema.org/draft-07/schema#",
-	"type": "object",
-	"properties": {
-		"direct_billing_account": { "type": "string" },
-		"direct_service_preferences": { "type": "array", "items": { "type": "string" } }
-	},
-	"required": []
-}`
-
-func TestFeaturesWorkspaceSchema_Validate(t *testing.T) {
-	schema := NewFeaturesWorkspaceSchemaFromString(workspaceJsonSchema)
+func TestFeaturesServiceSchema_Validate(t *testing.T) {
+	schema := NewFeaturesServiceSchemaFromString(serviceJsonSchema)
 
 	t.Run("valid data passes", func(t *testing.T) {
 		valid, err := schema.Validate(map[string]interface{}{
-			"direct_billing_account":     "ba-1",
-			"direct_service_preferences": []interface{}{"svc-1", "svc-2"},
-		})
-		assert.True(t, valid)
-		assert.NoError(t, err)
-	})
-
-	t.Run("empty object passes with no required fields", func(t *testing.T) {
-		valid, err := schema.Validate(map[string]interface{}{})
-		assert.True(t, valid)
-		assert.NoError(t, err)
-	})
-
-	t.Run("wrong type for direct_billing_account fails", func(t *testing.T) {
-		valid, err := schema.Validate(map[string]interface{}{
-			"direct_billing_account": []interface{}{"not-a-string"},
-		})
-		assert.False(t, valid)
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "validation failed")
-	})
-
-	t.Run("wrong type for direct_service_preferences fails", func(t *testing.T) {
-		valid, err := schema.Validate(map[string]interface{}{
-			"direct_service_preferences": "not-an-array",
-		})
-		assert.False(t, valid)
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "validation failed")
-	})
-}
-
-func TestFeaturesWorkspaceSchema_ValidateWildcardFields(t *testing.T) {
-	schema := NewFeaturesWorkspaceSchemaFromString(featuresWorkspaceJsonSchemaFromFile(t))
-
-	wildcardFields := []string{
-		"desire_all_services",
-		"ignore_inherited_desired_services",
-		"ignore_inherited_paid_services",
-	}
-
-	t.Run("accepts the service wildcard", func(t *testing.T) {
-		representation := make(map[string]interface{}, len(wildcardFields))
-		for _, fieldName := range wildcardFields {
-			representation[fieldName] = "features/service:*"
-		}
-
-		valid, err := schema.Validate(representation)
-		assert.True(t, valid)
-		assert.NoError(t, err)
-	})
-
-	for _, fieldName := range wildcardFields {
-		for _, invalidValue := range []interface{}{
-			[]interface{}{"features/service:*"},
-			true,
-			"features/service:svc-1",
-		} {
-			t.Run(fieldName+" rejects invalid value", func(t *testing.T) {
-				valid, err := schema.Validate(map[string]interface{}{fieldName: invalidValue})
-				assert.False(t, valid)
-				assert.Error(t, err)
-			})
-		}
-	}
-}
-
-func featuresWorkspaceJsonSchemaFromFile(t *testing.T) string {
-	t.Helper()
-	jsonSchema, err := os.ReadFile("../../data/schema/resources/workspace/reporters/features/workspace.json")
-	require.NoError(t, err)
-	return string(jsonSchema)
-}
-
-func TestFeaturesBillingAccountSchema_Validate(t *testing.T) {
-	schema := NewFeaturesBillingAccountSchemaFromString(billingAccountJsonSchema)
-
-	t.Run("valid data passes", func(t *testing.T) {
-		valid, err := schema.Validate(map[string]interface{}{
-			"services": []interface{}{"svc-1", "svc-2"},
+			"allowed_workspaces": []interface{}{"ws-1", "ws-2"},
+			"billing_account":    []interface{}{"ba-1"},
+			"parent":             "parent-svc-1",
 		})
 		assert.True(t, valid)
 		assert.NoError(t, err)
@@ -128,7 +49,8 @@ func TestFeaturesBillingAccountSchema_Validate(t *testing.T) {
 
 	t.Run("wrong type fails", func(t *testing.T) {
 		valid, err := schema.Validate(map[string]interface{}{
-			"services": "not-an-array",
+			"allowed_workspaces": "not-an-array",
+			"billing_account":    []interface{}{"ba-1"},
 		})
 		assert.False(t, valid)
 		assert.Error(t, err)
@@ -136,15 +58,42 @@ func TestFeaturesBillingAccountSchema_Validate(t *testing.T) {
 	})
 }
 
-func featuresWorkspaceKey(t *testing.T) model.ReporterResourceKey {
+func TestFeaturesBillingAccountSchema_Validate(t *testing.T) {
+	schema := NewFeaturesBillingAccountSchemaFromString(billingAccountJsonSchema)
+
+	t.Run("valid data passes", func(t *testing.T) {
+		valid, err := schema.Validate(map[string]interface{}{
+			"workspaces": []interface{}{"ws-1", "ws-2"},
+		})
+		assert.True(t, valid)
+		assert.NoError(t, err)
+	})
+
+	t.Run("empty object passes with no required fields", func(t *testing.T) {
+		valid, err := schema.Validate(map[string]interface{}{})
+		assert.True(t, valid)
+		assert.NoError(t, err)
+	})
+
+	t.Run("wrong type fails", func(t *testing.T) {
+		valid, err := schema.Validate(map[string]interface{}{
+			"workspaces": "not-an-array",
+		})
+		assert.False(t, valid)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "validation failed")
+	})
+}
+
+func featuresServiceKey(t *testing.T) model.ReporterResourceKey {
 	t.Helper()
-	resourceType, err := model.NewResourceType("workspace")
+	resourceType, err := model.NewResourceType("service")
 	require.NoError(t, err)
 	reporterType, err := model.NewReporterType("features")
 	require.NoError(t, err)
 	reporterInstanceId, err := model.NewReporterInstanceId("features-instance")
 	require.NoError(t, err)
-	localResourceId, err := model.NewLocalResourceId("ws-001")
+	localResourceId, err := model.NewLocalResourceId("svc-001")
 	require.NoError(t, err)
 	key, err := model.NewReporterResourceKey(
 		localResourceId,
@@ -172,135 +121,19 @@ func featuresBillingAccountKey(t *testing.T) model.ReporterResourceKey {
 	return key
 }
 
-func TestFeaturesWorkspaceSchema_CalculateTuples(t *testing.T) {
-	schema := NewFeaturesWorkspaceSchemaFromString(workspaceJsonSchema)
-	key := featuresWorkspaceKey(t)
-
-	t.Run("wildcard fields create service wildcard tuples", func(t *testing.T) {
-		ver := model.NewVersion(0)
-		current, err := model.NewRepresentations(
-			nil, nil,
-			model.Representation(map[string]interface{}{
-				"desire_all_services":               "features/service:*",
-				"ignore_inherited_desired_services": "features/service:*",
-				"ignore_inherited_paid_services":    "features/service:*",
-				"direct_billing_account":            "ba-100",
-				"direct_service_preferences":        []interface{}{"svc-1"},
-			}),
-			&ver,
-		)
-		require.NoError(t, err)
-
-		result, err := schema.CalculateTuples(current, nil, key)
-		require.NoError(t, err)
-		require.True(t, result.HasTuplesToCreate())
-
-		expected := []model.RelationsTuple{
-			model.NewRelationTupleForSubject(key, "desire_all_services", "features", "service", "*"),
-			model.NewRelationTupleForSubject(key, "ignore_inherited_desired_services", "features", "service", "*"),
-			model.NewRelationTupleForSubject(key, "ignore_inherited_paid_services", "features", "service", "*"),
-			model.NewRelationTupleForSubject(key, "direct_billing_account", "features", "billing_account", "ba-100"),
-			model.NewRelationTupleForSubject(key, "direct_service_preferences", "features", "service", "svc-1"),
-		}
-		require.NotNil(t, result.TuplesToCreate())
-		assert.ElementsMatch(t, expected, *result.TuplesToCreate())
-	})
-
-	t.Run("update creates and deletes wildcard field tuples", func(t *testing.T) {
-		ver1 := model.NewVersion(1)
-		previous, err := model.NewRepresentations(
-			nil, nil,
-			model.Representation(map[string]interface{}{
-				"desire_all_services":               "features/service:*",
-				"ignore_inherited_desired_services": "features/service:*",
-			}),
-			&ver1,
-		)
-		require.NoError(t, err)
-
-		ver2 := model.NewVersion(2)
-		current, err := model.NewRepresentations(
-			nil, nil,
-			model.Representation(map[string]interface{}{
-				"ignore_inherited_desired_services": "features/service:*",
-				"ignore_inherited_paid_services":    "features/service:*",
-			}),
-			&ver2,
-		)
-		require.NoError(t, err)
-
-		result, err := schema.CalculateTuples(current, previous, key)
-		require.NoError(t, err)
-
-		require.True(t, result.HasTuplesToCreate())
-		assert.ElementsMatch(t, []model.RelationsTuple{
-			model.NewRelationTupleForSubject(key, "ignore_inherited_paid_services", "features", "service", "*"),
-		}, *result.TuplesToCreate())
-		require.True(t, result.HasTuplesToDelete())
-		assert.ElementsMatch(t, []model.RelationsTuple{
-			model.NewRelationTupleForSubject(key, "desire_all_services", "features", "service", "*"),
-		}, *result.TuplesToDelete())
-	})
-
-	t.Run("removing a wildcard field deletes its tuple", func(t *testing.T) {
-		ver1 := model.NewVersion(1)
-		previous, err := model.NewRepresentations(
-			nil, nil,
-			model.Representation(map[string]interface{}{
-				"ignore_inherited_paid_services": "features/service:*",
-			}),
-			&ver1,
-		)
-		require.NoError(t, err)
-
-		ver2 := model.NewVersion(2)
-		current, err := model.NewRepresentations(nil, nil, model.Representation(map[string]interface{}{}), &ver2)
-		require.NoError(t, err)
-
-		result, err := schema.CalculateTuples(current, previous, key)
-		require.NoError(t, err)
-
-		assert.False(t, result.HasTuplesToCreate())
-		require.NotNil(t, result.TuplesToDelete())
-		assert.Equal(t, []model.RelationsTuple{
-			model.NewRelationTupleForSubject(key, "ignore_inherited_paid_services", "features", "service", "*"),
-		}, *result.TuplesToDelete())
-	})
-
-	t.Run("delete removes wildcard field tuples", func(t *testing.T) {
-		ver := model.NewVersion(1)
-		previous, err := model.NewRepresentations(
-			nil, nil,
-			model.Representation(map[string]interface{}{
-				"desire_all_services":               "features/service:*",
-				"ignore_inherited_desired_services": "features/service:*",
-				"ignore_inherited_paid_services":    "features/service:*",
-			}),
-			&ver,
-		)
-		require.NoError(t, err)
-
-		result, err := schema.CalculateTuples(nil, previous, key)
-		require.NoError(t, err)
-
-		assert.False(t, result.HasTuplesToCreate())
-		require.True(t, result.HasTuplesToDelete())
-		assert.ElementsMatch(t, []model.RelationsTuple{
-			model.NewRelationTupleForSubject(key, "desire_all_services", "features", "service", "*"),
-			model.NewRelationTupleForSubject(key, "ignore_inherited_desired_services", "features", "service", "*"),
-			model.NewRelationTupleForSubject(key, "ignore_inherited_paid_services", "features", "service", "*"),
-		}, *result.TuplesToDelete())
-	})
+func TestFeaturesServiceSchema_CalculateTuples(t *testing.T) {
+	schema := NewFeaturesServiceSchemaFromString(serviceJsonSchema)
+	key := featuresServiceKey(t)
 
 	t.Run("create produces tuples for all relations", func(t *testing.T) {
 		ver := model.NewVersion(0)
 		current, err := model.NewRepresentations(
-			nil, nil,
 			model.Representation(map[string]interface{}{
-				"direct_billing_account":     "ba-100",
-				"direct_service_preferences": []interface{}{"svc-1", "svc-2"},
+				"allowed_workspaces": []interface{}{"ws-1", "ws-2"},
+				"billing_account":    []interface{}{"ba-100"},
+				"parent":             "parent-svc",
 			}),
-			&ver,
+			&ver, nil, nil,
 		)
 		require.NoError(t, err)
 
@@ -311,9 +144,10 @@ func TestFeaturesWorkspaceSchema_CalculateTuples(t *testing.T) {
 		assert.False(t, result.HasTuplesToDelete())
 
 		expected := []model.RelationsTuple{
-			model.NewRelationTupleForSubject(key, "direct_billing_account", "features", "billing_account", "ba-100"),
-			model.NewRelationTupleForSubject(key, "direct_service_preferences", "features", "service", "svc-1"),
-			model.NewRelationTupleForSubject(key, "direct_service_preferences", "features", "service", "svc-2"),
+			model.NewRelationTupleForSubject(key, "allowed_workspaces", "rbac", "workspace", "ws-1"),
+			model.NewRelationTupleForSubject(key, "allowed_workspaces", "rbac", "workspace", "ws-2"),
+			model.NewRelationTupleForSubject(key, "billing_account", "features", "billing_account", "ba-100"),
+			model.NewRelationTupleForSubject(key, "parent", "features", "service", "parent-svc"),
 		}
 		assert.ElementsMatch(t, expected, *result.TuplesToCreate())
 	})
@@ -321,23 +155,23 @@ func TestFeaturesWorkspaceSchema_CalculateTuples(t *testing.T) {
 	t.Run("update creates and deletes changed values", func(t *testing.T) {
 		ver1 := model.NewVersion(1)
 		previous, err := model.NewRepresentations(
-			nil, nil,
 			model.Representation(map[string]interface{}{
-				"direct_billing_account":     "ba-100",
-				"direct_service_preferences": []interface{}{"svc-1", "svc-2"},
+				"allowed_workspaces": []interface{}{"ws-1", "ws-2"},
+				"billing_account":    []interface{}{"ba-100"},
+				"parent":             "parent-svc",
 			}),
-			&ver1,
+			&ver1, nil, nil,
 		)
 		require.NoError(t, err)
 
 		ver2 := model.NewVersion(2)
 		current, err := model.NewRepresentations(
-			nil, nil,
 			model.Representation(map[string]interface{}{
-				"direct_billing_account":     "ba-200",
-				"direct_service_preferences": []interface{}{"svc-2", "svc-3"},
+				"allowed_workspaces": []interface{}{"ws-2", "ws-3"},
+				"billing_account":    []interface{}{"ba-200"},
+				"parent":             "parent-svc",
 			}),
-			&ver2,
+			&ver2, nil, nil,
 		)
 		require.NoError(t, err)
 
@@ -348,14 +182,14 @@ func TestFeaturesWorkspaceSchema_CalculateTuples(t *testing.T) {
 		assert.True(t, result.HasTuplesToDelete())
 
 		expectedCreates := []model.RelationsTuple{
-			model.NewRelationTupleForSubject(key, "direct_billing_account", "features", "billing_account", "ba-200"),
-			model.NewRelationTupleForSubject(key, "direct_service_preferences", "features", "service", "svc-3"),
+			model.NewRelationTupleForSubject(key, "allowed_workspaces", "rbac", "workspace", "ws-3"),
+			model.NewRelationTupleForSubject(key, "billing_account", "features", "billing_account", "ba-200"),
 		}
 		assert.ElementsMatch(t, expectedCreates, *result.TuplesToCreate())
 
 		expectedDeletes := []model.RelationsTuple{
-			model.NewRelationTupleForSubject(key, "direct_billing_account", "features", "billing_account", "ba-100"),
-			model.NewRelationTupleForSubject(key, "direct_service_preferences", "features", "service", "svc-1"),
+			model.NewRelationTupleForSubject(key, "allowed_workspaces", "rbac", "workspace", "ws-1"),
+			model.NewRelationTupleForSubject(key, "billing_account", "features", "billing_account", "ba-100"),
 		}
 		assert.ElementsMatch(t, expectedDeletes, *result.TuplesToDelete())
 	})
@@ -363,12 +197,12 @@ func TestFeaturesWorkspaceSchema_CalculateTuples(t *testing.T) {
 	t.Run("delete produces only deletes", func(t *testing.T) {
 		ver := model.NewVersion(1)
 		previous, err := model.NewRepresentations(
-			nil, nil,
 			model.Representation(map[string]interface{}{
-				"direct_billing_account":     "ba-100",
-				"direct_service_preferences": []interface{}{"svc-1"},
+				"allowed_workspaces": []interface{}{"ws-1"},
+				"billing_account":    []interface{}{"ba-100"},
+				"parent":             "parent-svc",
 			}),
-			&ver,
+			&ver, nil, nil,
 		)
 		require.NoError(t, err)
 
@@ -379,24 +213,25 @@ func TestFeaturesWorkspaceSchema_CalculateTuples(t *testing.T) {
 		assert.True(t, result.HasTuplesToDelete())
 
 		deletes := *result.TuplesToDelete()
-		assert.Len(t, deletes, 2) // 1 direct_billing_account + 1 direct_service_preferences
+		assert.Len(t, deletes, 3) // 1 allowed_workspaces + 1 billing_account + 1 parent
 	})
 
 	t.Run("same data produces no tuples", func(t *testing.T) {
 		sameData := map[string]interface{}{
-			"direct_billing_account":     "ba-100",
-			"direct_service_preferences": []interface{}{"svc-1"},
+			"allowed_workspaces": []interface{}{"ws-1"},
+			"billing_account":    []interface{}{"ba-100"},
+			"parent":             "parent-svc",
 		}
 
 		ver1 := model.NewVersion(1)
 		previous, err := model.NewRepresentations(
-			nil, nil, model.Representation(sameData), &ver1,
+			model.Representation(sameData), &ver1, nil, nil,
 		)
 		require.NoError(t, err)
 
 		ver2 := model.NewVersion(2)
 		current, err := model.NewRepresentations(
-			nil, nil, model.Representation(sameData), &ver2,
+			model.Representation(sameData), &ver2, nil, nil,
 		)
 		require.NoError(t, err)
 
@@ -406,120 +241,39 @@ func TestFeaturesWorkspaceSchema_CalculateTuples(t *testing.T) {
 		assert.False(t, result.HasTuplesToCreate())
 		assert.False(t, result.HasTuplesToDelete())
 	})
-
-	t.Run("handles nil direct_billing_account", func(t *testing.T) {
-		ver := model.NewVersion(0)
-		current, err := model.NewRepresentations(
-			nil, nil,
-			model.Representation(map[string]interface{}{
-				"direct_service_preferences": []interface{}{"svc-1"},
-			}),
-			&ver,
-		)
-		require.NoError(t, err)
-
-		result, err := schema.CalculateTuples(current, nil, key)
-		require.NoError(t, err)
-
-		assert.True(t, result.HasTuplesToCreate())
-		creates := *result.TuplesToCreate()
-		assert.Len(t, creates, 1) // Only direct_service_preferences tuple
-		assert.Equal(t, model.NewRelationTupleForSubject(key, "direct_service_preferences", "features", "service", "svc-1"), creates[0])
-	})
-
-	t.Run("handles empty direct_service_preferences", func(t *testing.T) {
-		ver := model.NewVersion(0)
-		current, err := model.NewRepresentations(
-			nil, nil,
-			model.Representation(map[string]interface{}{
-				"direct_billing_account": "ba-100",
-			}),
-			&ver,
-		)
-		require.NoError(t, err)
-
-		result, err := schema.CalculateTuples(current, nil, key)
-		require.NoError(t, err)
-
-		assert.True(t, result.HasTuplesToCreate())
-		creates := *result.TuplesToCreate()
-		assert.Len(t, creates, 1) // Only direct_billing_account tuple
-		assert.Equal(t, model.NewRelationTupleForSubject(key, "direct_billing_account", "features", "billing_account", "ba-100"), creates[0])
-	})
 }
 
 func TestFeaturesBillingAccountSchema_CalculateTuples(t *testing.T) {
 	schema := NewFeaturesBillingAccountSchemaFromString(billingAccountJsonSchema)
 	key := featuresBillingAccountKey(t)
 
-	t.Run("create produces tuples for services relation", func(t *testing.T) {
-		ver := model.NewVersion(0)
-		current, err := model.NewRepresentations(
-			nil, nil,
-			model.Representation(map[string]interface{}{
-				"services": []interface{}{"svc-1", "svc-2"},
-			}),
-			&ver,
-		)
-		require.NoError(t, err)
+	ver := model.NewVersion(0)
+	current, err := model.NewRepresentations(
+		model.Representation(map[string]interface{}{
+			"workspaces": []interface{}{"ws-billing-1", "ws-billing-2"},
+		}),
+		&ver, nil, nil,
+	)
+	require.NoError(t, err)
 
-		result, err := schema.CalculateTuples(current, nil, key)
-		require.NoError(t, err)
+	result, err := schema.CalculateTuples(current, nil, key)
+	require.NoError(t, err)
 
-		assert.True(t, result.HasTuplesToCreate())
-		assert.False(t, result.HasTuplesToDelete())
+	assert.True(t, result.HasTuplesToCreate())
+	assert.False(t, result.HasTuplesToDelete())
 
-		expected := []model.RelationsTuple{
-			model.NewRelationTupleForSubject(key, "services", "features", "service", "svc-1"),
-			model.NewRelationTupleForSubject(key, "services", "features", "service", "svc-2"),
-		}
-		assert.ElementsMatch(t, expected, *result.TuplesToCreate())
-	})
-
-	t.Run("update creates and deletes changed services", func(t *testing.T) {
-		ver1 := model.NewVersion(1)
-		previous, err := model.NewRepresentations(
-			nil, nil,
-			model.Representation(map[string]interface{}{
-				"services": []interface{}{"svc-1", "svc-2"},
-			}),
-			&ver1,
-		)
-		require.NoError(t, err)
-
-		ver2 := model.NewVersion(2)
-		current, err := model.NewRepresentations(
-			nil, nil,
-			model.Representation(map[string]interface{}{
-				"services": []interface{}{"svc-2", "svc-3"},
-			}),
-			&ver2,
-		)
-		require.NoError(t, err)
-
-		result, err := schema.CalculateTuples(current, previous, key)
-		require.NoError(t, err)
-
-		assert.True(t, result.HasTuplesToCreate())
-		assert.True(t, result.HasTuplesToDelete())
-
-		expectedCreates := []model.RelationsTuple{
-			model.NewRelationTupleForSubject(key, "services", "features", "service", "svc-3"),
-		}
-		assert.ElementsMatch(t, expectedCreates, *result.TuplesToCreate())
-
-		expectedDeletes := []model.RelationsTuple{
-			model.NewRelationTupleForSubject(key, "services", "features", "service", "svc-1"),
-		}
-		assert.ElementsMatch(t, expectedDeletes, *result.TuplesToDelete())
-	})
+	expected := []model.RelationsTuple{
+		model.NewRelationTupleForSubject(key, "workspace", "rbac", "workspace", "ws-billing-1"),
+		model.NewRelationTupleForSubject(key, "workspace", "rbac", "workspace", "ws-billing-2"),
+	}
+	assert.ElementsMatch(t, expected, *result.TuplesToCreate())
 }
 
 func TestFeaturesAwareSchemaFactory_FallsBackForOtherTypes(t *testing.T) {
 	resourceType, err := model.NewResourceType("host")
 	require.NoError(t, err)
 
-	schema := FeaturesAwareSchemaFactory(resourceType, false, `{"type": "object"}`)
+	schema := FeaturesAwareSchemaFactory(resourceType, `{"type": "object"}`)
 
 	reporterType, err := model.NewReporterType("HBI")
 	require.NoError(t, err)
@@ -549,327 +303,4 @@ func TestFeaturesAwareSchemaFactory_FallsBackForOtherTypes(t *testing.T) {
 	creates := *result.TuplesToCreate()
 	require.Len(t, creates, 1)
 	assert.Equal(t, model.NewWorkspaceRelationsTuple("ws-host", key), creates[0])
-}
-
-// TestSchemaService_CalculateTuplesForResource_FeaturesWorkspace verifies that
-// SchemaService correctly uses reporter schema for Features workspace resources
-// and reads from reporter representation data.
-func TestSchemaService_CalculateTuplesForResource_FeaturesWorkspace(t *testing.T) {
-	ctx := context.Background()
-
-	// Create schema repository with Features workspace schema
-	repo := NewInMemorySchemaRepository()
-
-	resourceType, err := model.NewResourceType("workspace")
-	require.NoError(t, err)
-	reporterType, err := model.NewReporterType("features")
-	require.NoError(t, err)
-
-	// Create resource schema first (empty common representation)
-	emptyCommonSchema := `{"type": "object", "properties": {}, "required": []}`
-	resourceSchema := NewJsonSchemaWithRelations(emptyCommonSchema, nil)
-	resourceSchemaRepr, err := model.NewResourceSchemaRepresentation(
-		resourceType, resourceSchema,
-	)
-	require.NoError(t, err)
-	err = repo.CreateResourceSchema(ctx, resourceSchemaRepr)
-	require.NoError(t, err)
-
-	// Register reporter schema (this should be used for tuple calculation)
-	reporterSchema := NewFeaturesWorkspaceSchemaFromString(featuresWorkspaceJsonSchemaFromFile(t))
-	reporterSchemaRepr, err := model.NewReporterSchemaRepresentation(
-		resourceType, reporterType, reporterSchema,
-	)
-	require.NoError(t, err)
-	err = repo.CreateReporterSchema(ctx, reporterSchemaRepr)
-	require.NoError(t, err)
-
-	// Create schema service
-	logger := log.NewHelper(log.DefaultLogger)
-	schemaService := model.NewSchemaService(repo, logger)
-
-	// Create resource key
-	key := featuresWorkspaceKey(t)
-
-	// Keep one wildcard in common data and one in reporter data to verify that
-	// reporter schema tuple calculation remains isolated from common fields.
-	ver := model.NewVersion(1)
-	current, err := model.NewRepresentations(
-		model.Representation(map[string]interface{}{
-			"ignore_inherited_paid_services": "features/service:*",
-		}),
-		&ver,
-		model.Representation(map[string]interface{}{
-			"direct_billing_account":     "ba-100",
-			"direct_service_preferences": []interface{}{"svc-1", "svc-2"},
-			"desire_all_services":        "features/service:*",
-		}),
-		&ver, // Reporter representation
-	)
-	require.NoError(t, err)
-
-	// Calculate tuples using SchemaService
-	result, err := schemaService.CalculateTuplesForResource(ctx, current, nil, key)
-	require.NoError(t, err)
-
-	// Verify direct and wildcard tuples come from reporter data; the common
-	// ignore_inherited_paid_services value is not read by the reporter schema.
-	assert.True(t, result.HasTuplesToCreate())
-	creates := *result.TuplesToCreate()
-	assert.Len(t, creates, 4) // 1 wildcard + 1 billing_account + 2 service_preferences
-
-	expected := []model.RelationsTuple{
-		model.NewRelationTupleForSubject(key, "direct_billing_account", "features", "billing_account", "ba-100"),
-		model.NewRelationTupleForSubject(key, "direct_service_preferences", "features", "service", "svc-1"),
-		model.NewRelationTupleForSubject(key, "direct_service_preferences", "features", "service", "svc-2"),
-		model.NewRelationTupleForSubject(key, "desire_all_services", "features", "service", "*"),
-	}
-	assert.ElementsMatch(t, expected, creates)
-}
-
-// TestFeaturesSchemas_FromDirectory loads schemas from data/schema directory
-// and verifies tuple calculation works with real schema files.
-func TestFeaturesSchemas_FromDirectory(t *testing.T) {
-	ctx := context.Background()
-
-	// Load schemas from actual directory
-	repo, err := NewInMemorySchemaRepositoryFromDir(ctx, "../../data/schema/resources", FeaturesAwareSchemaFactory)
-	require.NoError(t, err)
-
-	logger := log.NewHelper(log.DefaultLogger)
-	schemaService := model.NewSchemaService(repo, logger)
-
-	t.Run("workspace with reporter data", func(t *testing.T) {
-		key := featuresWorkspaceKey(t)
-
-		ver := model.NewVersion(1)
-		current, err := model.NewRepresentations(
-			nil, nil,
-			model.Representation(map[string]interface{}{
-				"direct_billing_account":            "ba-100",
-				"direct_service_preferences":        []interface{}{"svc-1", "svc-2"},
-				"desire_all_services":               "features/service:*",
-				"ignore_inherited_desired_services": "features/service:*",
-				"ignore_inherited_paid_services":    "features/service:*",
-			}),
-			&ver,
-		)
-		require.NoError(t, err)
-
-		result, err := schemaService.CalculateTuplesForResource(ctx, current, nil, key)
-		require.NoError(t, err)
-
-		assert.True(t, result.HasTuplesToCreate())
-		creates := *result.TuplesToCreate()
-		assert.Len(t, creates, 6)
-
-		expected := []model.RelationsTuple{
-			model.NewRelationTupleForSubject(key, "direct_billing_account", "features", "billing_account", "ba-100"),
-			model.NewRelationTupleForSubject(key, "direct_service_preferences", "features", "service", "svc-1"),
-			model.NewRelationTupleForSubject(key, "direct_service_preferences", "features", "service", "svc-2"),
-			model.NewRelationTupleForSubject(key, "desire_all_services", "features", "service", "*"),
-			model.NewRelationTupleForSubject(key, "ignore_inherited_desired_services", "features", "service", "*"),
-			model.NewRelationTupleForSubject(key, "ignore_inherited_paid_services", "features", "service", "*"),
-		}
-		assert.ElementsMatch(t, expected, creates)
-	})
-
-	t.Run("billing_account with reporter data", func(t *testing.T) {
-		key := featuresBillingAccountKey(t)
-
-		ver := model.NewVersion(1)
-		current, err := model.NewRepresentations(
-			nil, nil,
-			model.Representation(map[string]interface{}{
-				"services": []interface{}{"svc-1", "svc-2"},
-			}),
-			&ver,
-		)
-		require.NoError(t, err)
-
-		result, err := schemaService.CalculateTuplesForResource(ctx, current, nil, key)
-		require.NoError(t, err)
-
-		assert.True(t, result.HasTuplesToCreate())
-		creates := *result.TuplesToCreate()
-		assert.Len(t, creates, 2)
-
-		expected := []model.RelationsTuple{
-			model.NewRelationTupleForSubject(key, "services", "features", "service", "svc-1"),
-			model.NewRelationTupleForSubject(key, "services", "features", "service", "svc-2"),
-		}
-		assert.ElementsMatch(t, expected, creates)
-	})
-}
-
-// TestFeaturesSchemas_MergeBehavior verifies that tuple calculation
-// merges fields from both common and reporter representations.
-func TestFeaturesSchemas_MergeBehavior(t *testing.T) {
-	schema := NewFeaturesWorkspaceSchemaFromString(workspaceJsonSchema)
-	key := featuresWorkspaceKey(t)
-
-	t.Run("uses only common data when reporter is empty", func(t *testing.T) {
-		ver := model.NewVersion(1)
-		current, err := model.NewRepresentations(
-			model.Representation(map[string]interface{}{
-				"direct_billing_account": "ba-from-common",
-			}),
-			&ver,
-			nil, nil, // No reporter data
-		)
-		require.NoError(t, err)
-
-		result, err := schema.CalculateTuples(current, nil, key)
-		require.NoError(t, err)
-
-		creates := *result.TuplesToCreate()
-		require.Len(t, creates, 1)
-		assert.Equal(t, "ba-from-common", creates[0].Subject().Resource().ResourceId().String())
-	})
-
-	t.Run("uses only reporter data when common is empty", func(t *testing.T) {
-		ver := model.NewVersion(1)
-		current, err := model.NewRepresentations(
-			nil, nil, // No common data
-			model.Representation(map[string]interface{}{
-				"direct_billing_account": "ba-from-reporter",
-			}),
-			&ver,
-		)
-		require.NoError(t, err)
-
-		result, err := schema.CalculateTuples(current, nil, key)
-		require.NoError(t, err)
-
-		creates := *result.TuplesToCreate()
-		require.Len(t, creates, 1)
-		assert.Equal(t, "ba-from-reporter", creates[0].Subject().Resource().ResourceId().String())
-	})
-
-	t.Run("merges different fields from both representations", func(t *testing.T) {
-		ver := model.NewVersion(1)
-		current, err := model.NewRepresentations(
-			model.Representation(map[string]interface{}{
-				"direct_billing_account": "ba-from-common",
-			}),
-			&ver,
-			model.Representation(map[string]interface{}{
-				"direct_service_preferences": []interface{}{"svc-1", "svc-2"},
-			}),
-			&ver,
-		)
-		require.NoError(t, err)
-
-		result, err := schema.CalculateTuples(current, nil, key)
-		require.NoError(t, err)
-
-		creates := *result.TuplesToCreate()
-		require.Len(t, creates, 3)
-
-		// billing_account from common, service_preferences from reporter
-		expected := []model.RelationsTuple{
-			model.NewRelationTupleForSubject(key, "direct_billing_account", "features", "billing_account", "ba-from-common"),
-			model.NewRelationTupleForSubject(key, "direct_service_preferences", "features", "service", "svc-1"),
-			model.NewRelationTupleForSubject(key, "direct_service_preferences", "features", "service", "svc-2"),
-		}
-		assert.ElementsMatch(t, expected, creates)
-	})
-
-	t.Run("merges same single-valued field from both representations", func(t *testing.T) {
-		ver := model.NewVersion(1)
-		current, err := model.NewRepresentations(
-			model.Representation(map[string]interface{}{
-				"direct_billing_account": "ba-from-common",
-			}),
-			&ver,
-			model.Representation(map[string]interface{}{
-				"direct_billing_account":     "ba-from-reporter",
-				"direct_service_preferences": []interface{}{"svc-1"},
-			}),
-			&ver,
-		)
-		require.NoError(t, err)
-
-		result, err := schema.CalculateTuples(current, nil, key)
-		require.NoError(t, err)
-
-		creates := *result.TuplesToCreate()
-		// Should emit only one subject for direct_billing_account (reporter takes precedence)
-		// and one for direct_service_preferences
-		require.Len(t, creates, 2)
-
-		expected := []model.RelationsTuple{
-			model.NewRelationTupleForSubject(key, "direct_billing_account", "features", "billing_account", "ba-from-reporter"),
-			model.NewRelationTupleForSubject(key, "direct_service_preferences", "features", "service", "svc-1"),
-		}
-		assert.ElementsMatch(t, expected, creates)
-	})
-
-}
-
-// TestSchemaService_MergesReporterAndCommonSchemas verifies that
-// CalculateTuplesForResource merges tuples from both reporter schema and common schema.
-func TestSchemaService_MergesReporterAndCommonSchemas(t *testing.T) {
-	ctx := context.Background()
-	repo := NewInMemorySchemaRepository()
-
-	resourceType, err := model.NewResourceType("workspace")
-	require.NoError(t, err)
-	reporterType, err := model.NewReporterType("features")
-	require.NoError(t, err)
-
-	// Create common/resource schema with workspace_id relation
-	workspaceIdRelations := []model.RelationDef{
-		mustRelationDef("workspace_id", "workspace", "rbac", "workspace", false),
-	}
-	commonSchema := NewJsonSchemaWithRelations(`{"type": "object"}`, workspaceIdRelations)
-	resourceSchemaRepr, err := model.NewResourceSchemaRepresentation(resourceType, commonSchema)
-	require.NoError(t, err)
-	err = repo.CreateResourceSchema(ctx, resourceSchemaRepr)
-	require.NoError(t, err)
-
-	// Create reporter schema with Features-specific relations
-	reporterSchema := NewFeaturesWorkspaceSchemaFromString(workspaceJsonSchema)
-	reporterSchemaRepr, err := model.NewReporterSchemaRepresentation(resourceType, reporterType, reporterSchema)
-	require.NoError(t, err)
-	err = repo.CreateReporterSchema(ctx, reporterSchemaRepr)
-	require.NoError(t, err)
-
-	// Create schema service
-	logger := log.NewHelper(log.DefaultLogger)
-	schemaService := model.NewSchemaService(repo, logger)
-
-	key := featuresWorkspaceKey(t)
-
-	// Create representations with data in BOTH common and reporter
-	ver := model.NewVersion(1)
-	current, err := model.NewRepresentations(
-		model.Representation(map[string]interface{}{
-			"workspace_id": "ws-123", // Common schema field
-		}),
-		&ver,
-		model.Representation(map[string]interface{}{
-			"direct_billing_account":     "ba-100",               // Reporter schema field
-			"direct_service_preferences": []interface{}{"svc-1"}, // Reporter schema field
-		}),
-		&ver,
-	)
-	require.NoError(t, err)
-
-	// Calculate tuples - should get tuples from BOTH schemas
-	result, err := schemaService.CalculateTuplesForResource(ctx, current, nil, key)
-	require.NoError(t, err)
-
-	assert.True(t, result.HasTuplesToCreate())
-	creates := *result.TuplesToCreate()
-	assert.Len(t, creates, 3) // 1 from common schema + 2 from reporter schema
-
-	expected := []model.RelationsTuple{
-		// From common schema
-		model.NewRelationTupleForSubject(key, "workspace", "rbac", "workspace", "ws-123"),
-		// From reporter schema
-		model.NewRelationTupleForSubject(key, "direct_billing_account", "features", "billing_account", "ba-100"),
-		model.NewRelationTupleForSubject(key, "direct_service_preferences", "features", "service", "svc-1"),
-	}
-	assert.ElementsMatch(t, expected, creates)
 }

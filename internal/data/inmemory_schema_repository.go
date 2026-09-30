@@ -191,7 +191,7 @@ func NewInMemorySchemaRepositoryFromDir(ctx context.Context, resourceDir string,
 
 		commonResourceSchema, err := loadCommonResourceDataSchema(resourceType.String(), resourceDir)
 		if err == nil {
-			resourceSchema, err := model.NewResourceSchemaRepresentation(resourceType, schemaFromString(resourceType, false, commonResourceSchema))
+			resourceSchema, err := model.NewResourceSchemaRepresentation(resourceType, schemaFromString(resourceType, commonResourceSchema))
 			if err != nil {
 				return nil, err
 			}
@@ -222,7 +222,7 @@ func NewInMemorySchemaRepositoryFromDir(ctx context.Context, resourceDir string,
 			}
 			reporterSchema, isReporterSchemaExists, err := loadResourceSchema(resourceType.String(), reporterType.String(), resourceDir)
 			if err == nil && isReporterSchemaExists {
-				reporterSchemaRepr, err := model.NewReporterSchemaRepresentation(resourceType, reporterType, schemaFromString(resourceType, true, reporterSchema))
+				reporterSchemaRepr, err := model.NewReporterSchemaRepresentation(resourceType, reporterType, schemaFromString(resourceType, reporterSchema))
 				if err != nil {
 					return nil, err
 				}
@@ -281,7 +281,7 @@ func NewFromJsonBytes(ctx context.Context, jsonBytes []byte, schemaFromString mo
 			if !ok {
 				return nil, fmt.Errorf("expected string schema value for resource type %q, got %T", resourceTypeStr, value)
 			}
-			resourceSchema, err := model.NewResourceSchemaRepresentation(resourceType, schemaFromString(resourceType, false, s))
+			resourceSchema, err := model.NewResourceSchemaRepresentation(resourceType, schemaFromString(resourceType, s))
 			if err != nil {
 				return nil, err
 			}
@@ -312,7 +312,7 @@ func NewFromJsonBytes(ctx context.Context, jsonBytes []byte, schemaFromString mo
 		if !ok {
 			return nil, fmt.Errorf("expected string schema value for reporter type %q of resource %q, got %T", remainder, resourceType, value)
 		}
-		reporterSchemaRepr, err := model.NewReporterSchemaRepresentation(resourceType, reporterType, schemaFromString(resourceType, true, s))
+		reporterSchemaRepr, err := model.NewReporterSchemaRepresentation(resourceType, reporterType, schemaFromString(resourceType, s))
 		if err != nil {
 			return nil, err
 		}

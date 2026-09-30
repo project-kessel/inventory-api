@@ -9,6 +9,5 @@ type ResourceEvent interface {
 	WorkspaceId() *string
 	CurrentCommonVersion() *Version
 	CurrentReporterRepresentationVersion() *Version
-	CurrentReporterGeneration() *Generation
 	ReporterResourceKey() ReporterResourceKey
 }

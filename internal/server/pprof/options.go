@@ -8,7 +8,7 @@ import (
 
 const (
 	DefaultPprofPort = "5000"
-	DefaultPprofAddr = "127.0.0.1"
+	DefaultPprofAddr = "0.0.0.0"
 )
 
 type Options struct {

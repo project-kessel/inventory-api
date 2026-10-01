@@ -1,6 +1,10 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
+  "additionalProperties": false,
   "properties": {
+    "desire_all_services": {
+      "type": "boolean"
+    },
     "direct_billing_account": {
       "format": "uuid",
       "type": "string"
@@ -11,6 +15,12 @@
         "type": "string"
       },
       "type": "array"
+    },
+    "ignore_inherited_desired_services": {
+      "type": "boolean"
+    },
+    "ignore_inherited_paid_services": {
+      "type": "boolean"
     }
   },
   "required": [],

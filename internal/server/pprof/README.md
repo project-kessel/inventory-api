@@ -10,7 +10,7 @@ The pprof server is **disabled by default** and must be explicitly enabled via c
 
 - `--server.pprof.enabled`: Enable the pprof profiling server (default: `false`)
 - `--server.pprof.port`: Port for the pprof server (default: `5000`)
-- `--server.pprof.addr`: Address for the pprof server to bind to (default: `0.0.0.0`)
+- `--server.pprof.addr`: Address for the pprof server to bind to (default: `127.0.0.1`)
 
 ### Example Usage
 
@@ -86,7 +86,7 @@ go tool pprof -http=:8080 heap.prof
 
 In production, consider:
 - Using firewall rules to restrict access to the pprof port
-- Binding to `127.0.0.1` for local-only access
+- Keeping the default `127.0.0.1` binding for local-only access
 - Only enabling it when actively debugging performance issues
 - Disabling it immediately after collecting necessary data
 

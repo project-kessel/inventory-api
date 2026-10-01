@@ -80,12 +80,14 @@ func TestDevelopmentUnifiedSchemaFixtures_BillingAccountServicesTuples(t *testin
 	tuples, err := schemaService.CalculateTuplesForResource(context.Background(), current, nil, key)
 
 	require.NoError(t, err)
-	require.Len(t, *tuples.TuplesToCreate(), 2)
-	assert.Equal(t, "services", (*tuples.TuplesToCreate())[0].Relation().String())
-	assert.Equal(t, "services", (*tuples.TuplesToCreate())[1].Relation().String())
+	creates := tuples.TuplesToCreate()
+	require.NotNil(t, creates)
+	require.Len(t, *creates, 2)
+	assert.Equal(t, "services", (*creates)[0].Relation().String())
+	assert.Equal(t, "services", (*creates)[1].Relation().String())
 	serviceIDs := []string{
-		(*tuples.TuplesToCreate())[0].Subject().Resource().ResourceId().String(),
-		(*tuples.TuplesToCreate())[1].Subject().Resource().ResourceId().String(),
+		(*creates)[0].Subject().Resource().ResourceId().String(),
+		(*creates)[1].Subject().Resource().ResourceId().String(),
 	}
 	assert.ElementsMatch(t, []string{"service-1", "service-2"}, serviceIDs)
 }

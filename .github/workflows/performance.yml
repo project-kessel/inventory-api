@@ -2,9 +2,9 @@ name: Performance baseline
 
 on:
   pull_request:
-    branches: [main]
+    branches: [base-testing]
   push:
-    branches: [main]
+    branches: [base-testing]
   workflow_dispatch:
 
 permissions:

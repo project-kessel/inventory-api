@@ -117,7 +117,7 @@ func TestUnifiedSchemaImpl_CalculateTuples_OptionalRelationRemoval(t *testing.T)
 			Cardinality: "one",
 		},
 	}, nil)
-	current := newUnifiedSchemaRepresentations(t, map[string]interface{}{}, nil)
+	current := (*model.Representations)(nil)
 	previous := newUnifiedSchemaRepresentations(t, map[string]interface{}{"tenant_id": "tenant-1"}, nil)
 
 	tuples, err := implementation.CalculateTuples(current, previous, key)
@@ -176,9 +176,22 @@ func newUnifiedSchemaTestKey(t *testing.T, reporterName string) model.ReporterRe
 
 func newUnifiedSchemaRepresentations(t *testing.T, common, reporter map[string]interface{}) *model.Representations {
 	t.Helper()
-	commonVersion := model.NewVersion(1)
-	reporterVersion := model.NewVersion(1)
-	current, err := model.NewRepresentations(common, &commonVersion, reporter, &reporterVersion)
+	var commonVersion *model.Version
+	if len(common) > 0 {
+		version := model.NewVersion(1)
+		commonVersion = &version
+	}
+	var reporterVersion *model.Version
+	if len(reporter) > 0 {
+		version := model.NewVersion(1)
+		reporterVersion = &version
+	}
+	current, err := model.NewRepresentations(
+		model.Representation(common),
+		commonVersion,
+		model.Representation(reporter),
+		reporterVersion,
+	)
 	require.NoError(t, err)
 	return current
 }

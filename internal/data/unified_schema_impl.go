@@ -10,7 +10,7 @@ import (
 
 // UnifiedSchemaImpl adapts an embedded unified JSON Schema to the existing
 // model.Schema contract. Relation metadata is retained for tuple calculation.
-// Tuple calculation currently preserves legacy behavior.
+// Tuple calculation is driven by the relation metadata.
 type UnifiedSchemaImpl struct {
 	schemaLoader      gojsonschema.JSONLoader
 	commonRelations   []UnifiedSchemaRelation

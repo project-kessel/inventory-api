@@ -380,7 +380,24 @@ check-token-update:
 
 .PHONY: test-performance
 test-performance:
-	go test -tags=performance ./test/performance -run TestResourceLifecyclePerformance -count=1 -timeout=30m
+	@set -e; \
+	if [ -z "$${DOCKER_HOST}" ]; then \
+		if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then \
+			echo "Using Docker for performance tests"; \
+		elif [ -n "$${XDG_RUNTIME_DIR}" ] && [ -S "$${XDG_RUNTIME_DIR}/podman/podman.sock" ]; then \
+			export DOCKER_HOST="unix://$${XDG_RUNTIME_DIR}/podman/podman.sock"; \
+			echo "Using rootless Podman for performance tests"; \
+		elif [ -S /var/run/docker.sock ]; then \
+			echo "Using Docker socket for performance tests"; \
+		else \
+			echo "No container runtime found; start Docker or run: systemctl --user start podman.socket" >&2; \
+			exit 1; \
+		fi; \
+	fi; \
+	case "$${DOCKER_HOST}" in \
+		*podman*) export TESTCONTAINERS_RYUK_DISABLED="$${TESTCONTAINERS_RYUK_DISABLED:-true}";; \
+	esac; \
+	go test -tags=performance ./test/performance -run TestResourceLifecyclePerformance -count=1 -timeout=30m; \
 	go run -tags=performance ./test/performance/cmd/summary
 
 .PHONY: test-performance-podman

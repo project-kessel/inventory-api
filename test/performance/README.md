@@ -1,6 +1,6 @@
 # Performance baseline suite
 
-Run the full suite with `make test-performance`. It uses an available Docker daemon, or automatically selects the rootless Podman socket when Docker is unavailable. For Podman, start the socket with `systemctl --user start podman.socket` first. Set `DOCKER_HOST` to override detection, or run `make test-performance-podman` to force the local Podman socket. The Podman path disables the privileged Testcontainers reaper; the test terminates PostgreSQL during normal cleanup. CI runs `make test-performance` on pull requests and `main` and uploads the JSON results.
+Run the full suite with `make test-performance`; it detects Docker or rootless Podman automatically. For Podman, start the socket with `systemctl --user start podman.socket` first. Use `make test-performance-podman` to force Podman, or set `DOCKER_HOST` to select a specific endpoint. CI runs the standard target on pull requests and `main` and uploads the JSON results.
 
 The suite starts PostgreSQL 16.6 through Testcontainers and applies the real migrations. The gRPC workload measures resource create, update, delete, and recreate at 1 and 4 workers in fresh and history scenarios. The consumer workload calls `ProcessMessage` directly at 1, 4, and 8 clients for create, workspace-changing update, unchanged update, and delete events. Its Relations backend is stateless; Kafka polling and delivery are outside the timed calls.
 

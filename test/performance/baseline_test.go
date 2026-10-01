@@ -33,6 +33,18 @@ func TestDefaultBaselineRejectsSlowConsumerCase(t *testing.T) {
 	}
 }
 
+func TestBaselineRejectsStaleOperation(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "baseline.json")
+	if err := os.WriteFile(path, []byte(`{"fresh/1/create":50,"fresh/1/obsolete":50,"fresh/4/update":50}`), 0600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PERF_BASELINE", path)
+	r := result{Protocol: "grpc", Scenario: "fresh", Concurrency: 1, Operations: map[string]stats{"create": {Count: 10, P95MS: 2}}}
+	if err := checkBaseline(r); err == nil || !strings.Contains(err.Error(), "stale baseline: fresh/1/obsolete") {
+		t.Fatalf("expected stale baseline failure, got %v", err)
+	}
+}
+
 func TestSummarizeIncludesMinimumMeanAndMaximum(t *testing.T) {
 	got := summarize([]time.Duration{3 * time.Millisecond, time.Millisecond, 2 * time.Millisecond})
 	if got.Count != 3 || got.MinMS != 1 || got.MeanMS != 2 || got.MaxMS != 3 {

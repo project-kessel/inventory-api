@@ -530,5 +530,13 @@ func checkBaseline(r result) error {
 			return fmt.Errorf("%s p95 %.2fms exceeds %.2fms", key, stat.P95MS, limit)
 		}
 	}
+	prefix := fmt.Sprintf("%s/%d/", r.Scenario, r.Concurrency)
+	for key := range limits {
+		if strings.HasPrefix(key, prefix) {
+			if _, ok := r.Operations[strings.TrimPrefix(key, prefix)]; !ok {
+				return fmt.Errorf("stale baseline: %s", key)
+			}
+		}
+	}
 	return nil
 }

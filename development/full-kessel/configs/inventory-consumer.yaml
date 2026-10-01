@@ -1,3 +1,5 @@
+# DEVELOPMENT ONLY — DO NOT USE IN PRODUCTION.
+# This configuration disables or weakens authentication, TLS, or related security controls.
 consumer:
   bootstrap-servers: ["kafka:9093"]
   commit-modulo: 300

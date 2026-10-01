@@ -15,6 +15,14 @@ This file covers server setup under `internal/server/`. For service implementati
 - Support CA certificate validation with custom root cert pools
 - Handle certificate loading errors gracefully with informative logging
 
+## gRPC Keepalive Compatibility
+
+- Preserve the server enforcement policy in `grpc/config.go`: `MinTime: 30 * time.Second` and `PermitWithoutStream: true`.
+- This accepts the SDK keepalive defaults: a 45-second ping interval, a 10-second acknowledgement timeout, and pings without active RPCs. These are client settings, not server-originated ping settings.
+- Keep raw gRPC options in `CompletedConfig.GRPCOptions` and merge them with interceptors into a single `kgrpc.Options()` call in `NewWithDeps`; multiple calls replace, rather than append to, the underlying options.
+- Coordinate changes with the [shared SDK specification](https://project-kessel.github.io/docs/contributing/client-api/service-version/) and deployed gateways: receiving endpoints must permit idle pings and accept the configured cadence.
+- When changing this policy or its wiring, verify a direct local connection using the SDK defaults remains idle for at least three 45-second ping intervals without policy-triggered `GOAWAY` (`ENHANCE_YOUR_CALM` / `too_many_pings`), then completes an RPC without a policy-triggered reconnect.
+
 ## Custom Stream Metrics
 ```go
 // Separate metrics for stream connections vs. individual messages

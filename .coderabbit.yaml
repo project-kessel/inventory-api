@@ -344,6 +344,7 @@ knowledge_base:
       - "**/CLAUDE.md"
       - "**/CONTRIBUTING.md"
       - "**/GUIDELINES.md"
+      - "**/ARCHITECTURE.md"
   issues:
     scope: "auto"
   pull_requests:

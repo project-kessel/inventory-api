@@ -36,6 +36,38 @@ func TestNewInMemorySchemaRepositoryFromUnifiedYAMLDir_RegistersSchemas(t *testi
 	assert.NoError(t, err)
 }
 
+func TestNewInMemorySchemaRepositoryFromUnifiedYAMLDir_CalculatesCommonAndReporterRelations(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "host.yaml"), []byte(validUnifiedSchemaYAML("host")), 0o644))
+
+	repository, err := NewInMemorySchemaRepositoryFromUnifiedYAMLDir(context.Background(), dir)
+	require.NoError(t, err)
+
+	resourceType, err := model.NewResourceType("host")
+	require.NoError(t, err)
+	resourceSchema, err := repository.GetResourceSchema(context.Background(), resourceType)
+	require.NoError(t, err)
+
+	key := newUnifiedSchemaTestKey(t, "hbi")
+	commonVersion := model.NewVersion(1)
+	reporterVersion := model.NewVersion(1)
+	current, err := model.NewRepresentations(
+		model.Representation(map[string]interface{}{"workspace_id": "workspace-1"}),
+		&commonVersion,
+		model.Representation(map[string]interface{}{"host_id": "host-1"}),
+		&reporterVersion,
+	)
+	require.NoError(t, err)
+
+	tuples, err := resourceSchema.Schema().CalculateTuples(current, nil, key)
+	require.NoError(t, err)
+	require.Len(t, *tuples.TuplesToCreate(), 2)
+	assert.ElementsMatch(t, []model.RelationsTuple{
+		model.NewRelationTupleForSubject(key, "workspace", "rbac", "workspace", "workspace-1"),
+		model.NewRelationTupleForSubject(key, "host", "hbi", "host", "host-1"),
+	}, *tuples.TuplesToCreate())
+}
+
 func TestNewInMemorySchemaRepositoryFromUnifiedYAMLDir_AllowsReporterWithoutSchema(t *testing.T) {
 	dir := t.TempDir()
 	contents := validUnifiedSchemaYAML("host") + "\n  - name: rbac\n    description: RBAC reporter\n"

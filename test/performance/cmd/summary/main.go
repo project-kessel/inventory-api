@@ -97,7 +97,7 @@ func main() {
 		if r.Scenario != "consumer" || r.Concurrency != clients || r.ReadParallelWorkers == nil {
 			fail("unexpected consumer result in %s", path)
 		}
-		for _, operation := range []string{"create", "update_common", "update_unchanged", "delete"} {
+		for _, operation := range []string{"create", "update_common", "update_reporter", "update_both", "update_unchanged", "delete"} {
 			stat, ok := r.Operations[operation]
 			if !ok {
 				fail("missing %s samples in %s", operation, path)

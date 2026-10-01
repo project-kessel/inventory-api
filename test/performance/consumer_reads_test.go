@@ -62,9 +62,14 @@ type consumerCase struct {
 	wantDeletes int64
 }
 
-func newConsumerCase(t *testing.T, key model.ReporterResourceKey, name string, operation model.EventOperationType, commonVersion *model.Version, creates, deletes int64) consumerCase {
+func newConsumerCase(t *testing.T, key model.ReporterResourceKey, name string, operation model.EventOperationType, commonVersion, reporterVersion *model.Version, creates, deletes int64) consumerCase {
 	t.Helper()
-	event, err := model.NewTupleEvent(key, commonVersion, nil)
+	var generation *model.Generation
+	if reporterVersion != nil {
+		zero := model.NewGeneration(0)
+		generation = &zero
+	}
+	event, err := model.NewTupleEvent(key, commonVersion, reporterVersion, generation)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -81,8 +86,8 @@ func newConsumerCase(t *testing.T, key model.ReporterResourceKey, name string, o
 	}
 }
 
-// runConsumerReads times the consumer's common-representation paths on this
-// branch. Reporter history remains in the fixture but this API does not read it.
+// runConsumerReads times ProcessMessage with common-only, reporter-only, and
+// combined stream advances, including the expensive previous-reporter lookup.
 func runConsumerReads(t *testing.T, ctx context.Context, seedDB *gorm.DB, dsn string, s settings) {
 	t.Helper()
 	if err := resetAndSeed(ctx, seedDB, s, "history", 1); err != nil {
@@ -170,11 +175,16 @@ func runConsumerReads(t *testing.T, ctx context.Context, seedDB *gorm.DB, dsn st
 		t.Fatal(err)
 	}
 	commonOne, commonTwo := model.NewVersion(1), model.NewVersion(2)
+	reporterFirst := model.NewVersion(1)
+	reporterLive := model.NewVersion(uint(s.History - 1))
+	reporterTombstone := model.NewVersion(uint(s.History))
 	cases := []consumerCase{
-		newConsumerCase(t, key, "create", model.OperationTypeCreated, &commonOne, 1, 0),
-		newConsumerCase(t, key, "update_common", model.OperationTypeUpdated, &commonOne, 1, 1),
-		newConsumerCase(t, key, "update_unchanged", model.OperationTypeUpdated, &commonTwo, 0, 0),
-		newConsumerCase(t, key, "delete", model.OperationTypeDeleted, &commonTwo, 0, 1),
+		newConsumerCase(t, key, "create", model.OperationTypeCreated, &commonOne, &reporterFirst, 1, 0),
+		newConsumerCase(t, key, "update_common", model.OperationTypeUpdated, &commonOne, nil, 1, 1),
+		newConsumerCase(t, key, "update_reporter", model.OperationTypeUpdated, nil, &reporterLive, 0, 0),
+		newConsumerCase(t, key, "update_both", model.OperationTypeUpdated, &commonOne, &reporterLive, 1, 1),
+		newConsumerCase(t, key, "update_unchanged", model.OperationTypeUpdated, &commonTwo, nil, 0, 0),
+		newConsumerCase(t, key, "delete", model.OperationTypeDeleted, &commonTwo, &reporterTombstone, 0, 1),
 	}
 	process := func(testCase consumerCase) error {
 		response, err := inventoryConsumer.ProcessMessage(testCase.headers, true, testCase.message)

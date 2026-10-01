@@ -2,7 +2,7 @@
 
 Run the full suite with `make test-performance` (Docker) or `make test-performance-podman` (rootless Podman). For Podman, start the socket with `systemctl --user start podman.socket` first. The Make target configures `DOCKER_HOST` and disables the privileged Testcontainers reaper; the test terminates PostgreSQL during normal cleanup. CI runs `make test-performance` on pull requests and `main` and uploads the JSON results.
 
-The suite starts PostgreSQL 16.6 through Testcontainers and applies the real migrations. The gRPC workload measures resource create, update, delete, and recreate at 1 and 4 workers in fresh and history scenarios. The consumer workload calls `ProcessMessage` directly at 1, 4, and 8 clients for create, workspace-changing update, unchanged update, and delete events. Its Relations backend is stateless; Kafka polling and delivery are outside the timed calls.
+The suite starts PostgreSQL 16.6 through Testcontainers and applies the real migrations. The gRPC workload measures resource create, update, delete, and recreate at 1 and 4 workers in fresh and history scenarios. The consumer workload calls `ProcessMessage` directly at 1, 4, and 8 clients for create, common-only update, reporter-only update, combined update, unchanged update, and delete events. Its Relations backend is stateless; Kafka polling and delivery are outside the timed calls.
 
 ## Fixture shape and tuning
 
@@ -12,7 +12,7 @@ Each scenario truncates and reseeds the tables before timing; rows from earlier 
 
 `PERF_PAYLOAD_BYTES=1024` controls the reporter payload in seeded rows and measured gRPC requests. The payload is repeated `x` characters, not random data, so PostgreSQL compresses it well and increasing this setting may add less disk usage than expected. `PERF_BACKGROUND` changes the number of background resources; `PERF_HISTORY` changes the total extra history versions. `PERF_ROUNDS`, `PERF_UPDATES`, and `PERF_READ_ITERATIONS` change measured work rather than the initial seed. For example, `PERF_BACKGROUND=300000 PERF_HISTORY=500000 PERF_PAYLOAD_BYTES=2048 make test-performance-podman` runs a larger fixture. Check the database size in the result summary when tuning toward production scale.
 
-This branch's consumer reads common representations, so its measurements do not exercise the previous-reporter query, even though reporter history is present in the database.
+The reporter-only and combined update events include reporter version and generation, so the consumer reads current and previous reporter representations from the seeded history. Common-only and unchanged events exercise the common-representation paths. These payloads reach the consumer's real representation-retrieval logic; Kafka polling and the external Relations service are outside the timed calls.
 
 `baseline.json` sets provisional p95 limits of 1000 ms for gRPC lifecycle operations and 5 ms for consumer operations. The test fails on operation errors, missing consumer samples or baseline entries, and p95 values above those limits. Calibrate the limits from repeated runs on the CI runner before treating them as service objectives.
 

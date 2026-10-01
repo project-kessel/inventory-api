@@ -18,6 +18,12 @@ make build
 # Run tests
 make test
 
+# Run resource lifecycle performance tests and print a summary (auto-detects Docker/Podman)
+make test-performance
+
+# Run performance tests with rootless Podman (requires an active user Podman socket)
+make test-performance-podman
+
 # Run with coverage
 make test-coverage
 

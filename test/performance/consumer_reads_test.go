@@ -111,8 +111,8 @@ func runConsumerReads(t *testing.T, ctx context.Context, seedDB *gorm.DB, dsn st
 		t.Fatal(err)
 	}
 
-	parallelWorkers := envInt("PERF_READ_PARALLEL_WORKERS", 0)
-	iterations := envInt("PERF_READ_ITERATIONS", 30)
+	parallelWorkers := envInt(t, "PERF_READ_PARALLEL_WORKERS", 0)
+	iterations := envInt(t, "PERF_READ_ITERATIONS", 30)
 	if parallelWorkers < 0 || parallelWorkers > 8 || iterations < 1 {
 		t.Fatal("PERF_READ_PARALLEL_WORKERS must be 0..8 and PERF_READ_ITERATIONS must be positive")
 	}
@@ -182,7 +182,7 @@ func runConsumerReads(t *testing.T, ctx context.Context, seedDB *gorm.DB, dsn st
 			return err
 		}
 		if response != model.MinimizeLatencyToken.Serialize() {
-			return fmt.Errorf("unexpected allow-all consistency token %q", response)
+			return fmt.Errorf("unexpected allow-all consistency token")
 		}
 		return nil
 	}

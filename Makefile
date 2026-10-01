@@ -390,4 +390,4 @@ test-performance:
 .PHONY: test-performance-podman
 test-performance-podman:
 	@test -n "$${XDG_RUNTIME_DIR}" && test -S "$${XDG_RUNTIME_DIR}/podman/podman.sock" || { echo "Podman socket unavailable; start it with: systemctl --user start podman.socket" >&2; exit 1; }
-	DOCKER_HOST="unix://$${XDG_RUNTIME_DIR}/podman/podman.sock" TESTCONTAINERS_RYUK_CONTAINER_PRIVILEGED=true $(MAKE) test-performance
+	DOCKER_HOST="unix://$${XDG_RUNTIME_DIR}/podman/podman.sock" TESTCONTAINERS_RYUK_DISABLED=true $(MAKE) test-performance

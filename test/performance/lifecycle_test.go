@@ -103,14 +103,17 @@ func (authorizer) Check(_ context.Context, _ metaauthorizer.MetaObject, relation
 	return relation == metaauthorizer.RelationReportResource || relation == metaauthorizer.RelationDeleteResource, nil
 }
 
-func envInt(name string, fallback int) int {
-	if s := os.Getenv(name); s != "" {
-		n, e := strconv.Atoi(s)
-		if e == nil && n >= 0 {
-			return n
-		}
+func envInt(t *testing.T, name string, fallback int) int {
+	t.Helper()
+	value, set := os.LookupEnv(name)
+	if !set {
+		return fallback
 	}
-	return fallback
+	n, err := strconv.Atoi(value)
+	if err != nil || n < 0 {
+		t.Fatalf("%s must be a non-negative integer, got %q", name, value)
+	}
+	return n
 }
 func config(t *testing.T) settings {
 	t.Helper()
@@ -121,12 +124,12 @@ func config(t *testing.T) settings {
 		s.PayloadBytes = 128
 		s.Rounds = 3
 	}
-	s.Background = envInt("PERF_BACKGROUND", s.Background)
-	s.History = envInt("PERF_HISTORY", s.History)
-	s.PayloadBytes = envInt("PERF_PAYLOAD_BYTES", s.PayloadBytes)
-	s.Rounds = envInt("PERF_ROUNDS", s.Rounds)
-	s.Updates = envInt("PERF_UPDATES", s.Updates)
-	s.Deadline = time.Duration(envInt("PERF_REQUEST_TIMEOUT_SECONDS", 10)) * time.Second
+	s.Background = envInt(t, "PERF_BACKGROUND", s.Background)
+	s.History = envInt(t, "PERF_HISTORY", s.History)
+	s.PayloadBytes = envInt(t, "PERF_PAYLOAD_BYTES", s.PayloadBytes)
+	s.Rounds = envInt(t, "PERF_ROUNDS", s.Rounds)
+	s.Updates = envInt(t, "PERF_UPDATES", s.Updates)
+	s.Deadline = time.Duration(envInt(t, "PERF_REQUEST_TIMEOUT_SECONDS", 10)) * time.Second
 	s.DeadlineSeconds = int(s.Deadline / time.Second)
 	if s.Rounds < 1 || s.Updates < 1 || s.History < 4 || s.Deadline <= 0 {
 		t.Fatal("rounds, updates, and deadline must be positive; history must be at least four")
@@ -138,7 +141,8 @@ func TestResourceLifecyclePerformance(t *testing.T) {
 	s := config(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
 	defer cancel()
-	ctr, err := testcontainers.Run(ctx, image, testcontainers.WithEnv(map[string]string{"POSTGRES_USER": "perf", "POSTGRES_PASSWORD": "perf", "POSTGRES_DB": "perf"}), testcontainers.WithExposedPorts("5432/tcp"), testcontainers.WithWaitStrategy(wait.ForListeningPort("5432/tcp")), testcontainers.WithHostConfigModifier(func(h *container.HostConfig) { h.ShmSize = 256 << 20 }))
+	password := uuid.NewString()
+	ctr, err := testcontainers.Run(ctx, image, testcontainers.WithEnv(map[string]string{"POSTGRES_USER": "perf", "POSTGRES_PASSWORD": password, "POSTGRES_DB": "perf"}), testcontainers.WithExposedPorts("5432/tcp"), testcontainers.WithWaitStrategy(wait.ForListeningPort("5432/tcp")), testcontainers.WithHostConfigModifier(func(h *container.HostConfig) { h.ShmSize = 256 << 20 }))
 	if err != nil {
 		t.Fatalf("start PostgreSQL: %v", err)
 	}
@@ -155,7 +159,7 @@ func TestResourceLifecyclePerformance(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	dsn := fmt.Sprintf("host=%s port=%s user=perf password=perf dbname=perf sslmode=disable", host, port.Port())
+	dsn := fmt.Sprintf("host=%s port=%s user=perf password=%s dbname=perf sslmode=disable", host, port.Port(), password)
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{TranslateError: true})
 	if err != nil {
 		t.Fatal(err)
@@ -218,7 +222,8 @@ func TestResourceLifecyclePerformance(t *testing.T) {
 			t.Fatal(err)
 		}
 		pb.RegisterKesselInventoryServiceServer(srv, service.NewKesselInventoryServiceV1beta2(uc))
-		go func() { _ = srv.Start(context.Background()) }()
+		startErr := make(chan error, 1)
+		go func() { startErr <- srv.Start(context.Background()) }()
 		t.Cleanup(func() { _ = srv.Stop(context.Background()) })
 		conn, err := grpc.NewClient(listener.Addr().String(), grpc.WithTransportCredentials(insecure.NewCredentials()))
 		if err != nil {
@@ -237,6 +242,11 @@ func TestResourceLifecyclePerformance(t *testing.T) {
 		healthCtx, done := context.WithTimeout(ctx, 10*time.Second)
 		defer done()
 		if err := invoke(healthCtx, "create", uuid.NewString(), 0); err != nil {
+			select {
+			case serverErr := <-startErr:
+				t.Fatalf("service readiness: %v (server start: %v)", err, serverErr)
+			default:
+			}
 			t.Fatalf("service readiness: %v", err)
 		}
 		for _, scenario := range []string{"fresh", "history"} {
@@ -346,26 +356,24 @@ func deleteRequest(id string) *pb.DeleteResourceRequest {
 // History is total across targets. Each history target has one current reporter
 // resource and many versions of its representation, unlike the SQL-only fixture.
 func resetAndSeed(ctx context.Context, db *gorm.DB, s settings, scenario string, workers int) error {
-	for _, table := range []string{"reporter_representations", "common_representations", "reporter_resources", "resource"} {
-		if e := db.WithContext(ctx).Exec("TRUNCATE TABLE " + table + " CASCADE").Error; e != nil {
-			return e
-		}
+	if err := db.WithContext(ctx).Exec("TRUNCATE TABLE reporter_representations, common_representations, reporter_resources, resource CASCADE").Error; err != nil {
+		return err
 	}
 	payload := strings.Repeat("x", s.PayloadBytes)
 	if s.Background > 0 {
-		sql := `INSERT INTO resource (id,type,common_version,ktn,created_at,updated_at) SELECT md5('bg-resource-'||n)::uuid,'host',1,'',now(),now() FROM generate_series(1,?) n`
+		sql := `INSERT INTO resource (id,type,common_version,ktn,created_at,updated_at) SELECT ('00000000-0000-4000-8000-' || lpad(to_hex(n),12,'0'))::uuid,'host',1,'',now(),now() FROM generate_series(1,?) n`
 		if e := db.WithContext(ctx).Exec(sql, s.Background).Error; e != nil {
 			return e
 		}
-		sql = `INSERT INTO common_representations (resource_id,version,data,reported_by_reporter_type,reported_by_reporter_instance,transaction_id,created_at) SELECT md5('bg-resource-'||n)::uuid,1,jsonb_build_object('workspace_id','perf'),'hbi','perf','bg-common-'||n,now() FROM generate_series(1,?) n`
+		sql = `INSERT INTO common_representations (resource_id,version,data,reported_by_reporter_type,reported_by_reporter_instance,transaction_id,created_at) SELECT ('00000000-0000-4000-8000-' || lpad(to_hex(n),12,'0'))::uuid,1,jsonb_build_object('workspace_id','perf'),'hbi','perf','bg-common-'||n,now() FROM generate_series(1,?) n`
 		if e := db.WithContext(ctx).Exec(sql, s.Background).Error; e != nil {
 			return e
 		}
-		sql = `INSERT INTO reporter_resources (id,local_resource_id,reporter_type,resource_type,reporter_instance_id,resource_id,api_href,representation_version,generation,tombstone,created_at,updated_at) SELECT md5('bg-reporter-'||n)::uuid,'background-'||n,'hbi','host','perf',md5('bg-resource-'||n)::uuid,'/perf/background-'||n,1,0,false,now(),now() FROM generate_series(1,?) n`
+		sql = `INSERT INTO reporter_resources (id,local_resource_id,reporter_type,resource_type,reporter_instance_id,resource_id,api_href,representation_version,generation,tombstone,created_at,updated_at) SELECT ('00000000-0000-4001-8000-' || lpad(to_hex(n),12,'0'))::uuid,'background-'||n,'hbi','host','perf',('00000000-0000-4000-8000-' || lpad(to_hex(n),12,'0'))::uuid,'/perf/background-'||n,1,0,false,now(),now() FROM generate_series(1,?) n`
 		if e := db.WithContext(ctx).Exec(sql, s.Background).Error; e != nil {
 			return e
 		}
-		sql = `INSERT INTO reporter_representations (reporter_resource_id,version,generation,data,common_version,transaction_id,tombstone,created_at) SELECT md5('bg-reporter-'||n)::uuid,1,0,jsonb_build_object('payload',?::text),1,'bg-reporter-'||n,false,now() FROM generate_series(1,?) n`
+		sql = `INSERT INTO reporter_representations (reporter_resource_id,version,generation,data,common_version,transaction_id,tombstone,created_at) SELECT ('00000000-0000-4001-8000-' || lpad(to_hex(n),12,'0'))::uuid,1,0,jsonb_build_object('payload',?::text),1,'bg-reporter-'||n,false,now() FROM generate_series(1,?) n`
 		if e := db.WithContext(ctx).Exec(sql, payload, s.Background).Error; e != nil {
 			return e
 		}
@@ -396,8 +404,8 @@ func resetAndSeed(ctx context.Context, db *gorm.DB, s settings, scenario string,
 			}
 		}
 	}
-	for _, table := range []string{"resource", "common_representations", "reporter_resources", "reporter_representations"} {
-		if e := db.WithContext(ctx).Exec("ANALYZE " + table).Error; e != nil {
+	for _, query := range []string{"ANALYZE resource", "ANALYZE common_representations", "ANALYZE reporter_resources", "ANALYZE reporter_representations"} {
+		if e := db.WithContext(ctx).Exec(query).Error; e != nil {
 			return e
 		}
 	}

@@ -18,6 +18,11 @@ func NewRunJobCommand(storageOptions *storage.Options, loggerOptions common.Logg
 
 	cmds := []*cobra.Command{
 		NewResourceDeleteJobCommand(storageOptions, loggerOptions),
+		NewReporterRepresentationsCleanupJobCommand(storageOptions, loggerOptions),
+		NewTombstonedResourcesCleanupJobCommand(storageOptions, loggerOptions),
+		NewCommonRepresentationsCleanupJobCommand(storageOptions, loggerOptions),
+		NewTestDataGeneratorJobCommand(storageOptions, loggerOptions),
+		NewPerformanceTestJobCommand(storageOptions, loggerOptions),
 		NewMetricsCollectJobCommand(storageOptions, loggerOptions),
 	}
 

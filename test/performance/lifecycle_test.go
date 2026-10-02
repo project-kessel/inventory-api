@@ -46,7 +46,7 @@ import (
 	"gorm.io/gorm"
 )
 
-const image = "postgres:16.6"
+const image = "postgres:17.8"
 
 //go:embed baseline.json
 var defaultBaseline []byte

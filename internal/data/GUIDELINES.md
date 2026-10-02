@@ -163,6 +163,14 @@ Use timestamp-based IDs: `20251210120000_initial_schema.go`
 - Using advisory locks for safe concurrent migration execution
 - Rollback procedures and migration validation
 
+**Compatibility rules:**
+- Every migration must be backward compatible with previously released application versions so the application can be rolled back without rolling back the database
+- Keep schema migrations and dependent application behavior in separate commits so application fixes can be cherry-picked or reverted independently
+- Use expand-and-contract across releases for destructive changes
+- Any incompatible migration is an exception that requires explicit human approval and a documented rollout and recovery plan
+- Applied migrations are immutable; use a new forward migration to correct or reverse an applied change
+- Application rollback must remain possible after a backward-compatible migration; migration execution and bookkeeping must not make an otherwise compatible older application undeployable
+
 ## Database Configuration
 
 ### Multi-Database Support

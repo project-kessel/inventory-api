@@ -20,6 +20,15 @@ Tips:
 - Your migration's name should be used in the file name and in the function name and should adequately represent the actions your migration is taking. If your migration is doing too much to fit in a name, you should consider creating multiple migrations.
 - Use inline structs (or explicit SQL) inside each migration to represent the schema at that point in time.
 
+### Deployment and rollback compatibility
+
+Every migration must remain backward compatible with previously released application versions. Deploy schema changes before the application behavior that depends on them, and use an expand-and-contract sequence when a change cannot be made compatibly in one step. Any exception requires explicit human approval and a documented rollout and recovery plan.
+
+- Keep the migration and its dependent application behavior in separate commits so either application change can be cherry-picked or reverted independently.
+- Expand first by adding compatible tables, columns, or indexes. Switch application reads and writes in a later change. Treat any incompatible contract step as an exception requiring explicit human approval.
+- Treat applied migrations as immutable. Do not edit, delete, reorder, or roll back an applied migration during incident recovery. Correct it with a new forward migration.
+- Application rollback must remain possible after a backward-compatible migration. Migration execution and bookkeeping must not make an otherwise compatible older application undeployable.
+
 ### Data Backfills
 Keep migration files focused on structure (schema) changes and ensure they execute quickly. Because migrations run during the application startup phase, long-running operations will block the service from launching and may cause deployment timeouts. If you need to perform a large data backfill or heavy transformation, use a migration only to add the necessary columns, then handle the actual data processing separately using a background worker or a one-off Kubernetes Job after the deployment succeeds.
 

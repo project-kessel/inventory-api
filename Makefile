@@ -378,3 +378,12 @@ check-tuple:
 check-token-update:
 	psql "postgresql://${DB_USER}:${DB_PASSWORD}@localhost:${LOCAL_DB_PORT}/${DB_NAME}" -x -c "select id,inventory_id,consistency_token,workspace_id,reporter from resources;"
 
+.PHONY: test-performance
+test-performance:
+	@./scripts/testcontainers-run.sh go test -tags=performance ./test/performance -count=1 -timeout=30m
+	go run -tags=performance ./test/performance/cmd/summary
+
+.PHONY: test-performance-podman
+test-performance-podman:
+	@test -n "$${XDG_RUNTIME_DIR}" && test -S "$${XDG_RUNTIME_DIR}/podman/podman.sock" || { echo "Podman socket unavailable; start it with: systemctl --user start podman.socket" >&2; exit 1; }
+	DOCKER_HOST="unix://$${XDG_RUNTIME_DIR}/podman/podman.sock" TESTCONTAINERS_RYUK_DISABLED=true $(MAKE) test-performance

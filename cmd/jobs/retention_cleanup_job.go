@@ -29,7 +29,13 @@ func NewRetentionCleanupJobCommand(storageOptions *storage.Options, loggerOption
 	cmd := &cobra.Command{
 		Use:   "retention-cleanup-job",
 		Short: "Clean up old representation data based on retention policy",
-		Long: `Delete reporter_representations and common_representations based on retention policy:
+		Long: `Delete reporter_representations and common_representations based on retention policy.
+Deletion happens in three phases ordered by production impact:
+  Phase 1 (lowest impact): Delete old reporter_representations
+  Phase 2 (medium impact): Delete tombstoned resources completely (>M days old)
+  Phase 3 (highest impact): Delete old common_representations (consumer queries)
+
+Retention policy:
   - Active resources: Delete representations older than N days from latest
   - Tombstoned ≤M days: Delete representations older than N days from latest
   - Tombstoned >M days: Delete resource and all representations completely`,
@@ -74,8 +80,8 @@ func cleanupRetentionData(storageOptions *storage.Options, loggerOptions common.
 		logHelper.Infof("Using batch size: %d rows, delay between batches: %dms", batchSize, batchDelayMs)
 	}
 
-	// Phase 1: Delete old representations (active + recently tombstoned)
-	logHelper.Info("=== Phase 1: Cleaning up old representations ===")
+	// Phase 1: Delete old reporter_representations (lowest production impact)
+	logHelper.Info("=== Phase 1: Cleaning up old reporter_representations ===")
 
 	totalReporterRepresentations, err := deleteOldReporterRepresentations(db, logHelper, dryRun, retentionDays, tombstoneDays, reporterType, batchSize, batchDelayMs)
 	if err != nil {
@@ -92,22 +98,7 @@ func cleanupRetentionData(storageOptions *storage.Options, loggerOptions common.
 	}
 	logDeleteResult(logHelper, dryRun, "ReporterRepresentation records (Phase 1)", totalReporterRepresentations)
 
-	totalCommonRepresentations, err := deleteOldCommonRepresentations(db, logHelper, dryRun, retentionDays, tombstoneDays, reporterType, batchSize, batchDelayMs)
-	if err != nil {
-		logHelper.Warnw("msg", "Retention cleanup failed",
-			"action", "RETENTION_CLEANUP",
-			"phase", "common_representations",
-			"retention_days", retentionDays,
-			"tombstone_days", tombstoneDays,
-			"reporter_type", reporterType,
-			"outcome", "failure",
-			"error", err.Error(),
-		)
-		return err
-	}
-	logDeleteResult(logHelper, dryRun, "CommonRepresentation records (Phase 1)", totalCommonRepresentations)
-
-	// Phase 2: Delete old tombstoned resources completely
+	// Phase 2: Delete old tombstoned resources completely (medium production impact)
 	logHelper.Info("=== Phase 2: Deleting old tombstoned resources ===")
 
 	tombstoneCleanupBatchSize := DefaultTombstoneCleanupBatchSize
@@ -126,17 +117,37 @@ func cleanupRetentionData(storageOptions *storage.Options, loggerOptions common.
 	}
 	logDeleteResult(logHelper, dryRun, "Tombstoned resources completely deleted (Phase 2)", deletedResources)
 
+	// Phase 3: Delete old common_representations (highest production impact - consumer queries)
+	logHelper.Info("=== Phase 3: Cleaning up old common_representations ===")
+
+	totalCommonRepresentations, err := deleteOldCommonRepresentations(db, logHelper, dryRun, retentionDays, tombstoneDays, reporterType, batchSize, batchDelayMs)
+	if err != nil {
+		logHelper.Warnw("msg", "Retention cleanup failed",
+			"action", "RETENTION_CLEANUP",
+			"phase", "common_representations",
+			"retention_days", retentionDays,
+			"tombstone_days", tombstoneDays,
+			"reporter_type", reporterType,
+			"outcome", "failure",
+			"error", err.Error(),
+		)
+		return err
+	}
+	logDeleteResult(logHelper, dryRun, "CommonRepresentation records (Phase 3)", totalCommonRepresentations)
+
 	if dryRun {
 		logHelper.Infof("[DRY-RUN] Summary:")
-		logHelper.Infof("  Phase 1 - Old representations: ReporterRepresentation=%d, CommonRepresentation=%d",
-			totalReporterRepresentations, totalCommonRepresentations)
+		logHelper.Infof("  Phase 1 - Reporter representations: %d records", totalReporterRepresentations)
 		logHelper.Infof("  Phase 2 - Old tombstoned resources: %d resources", deletedResources)
+		logHelper.Infof("  Phase 3 - Common representations: %d records", totalCommonRepresentations)
 		logHelper.Info("[DRY-RUN] No data was modified")
 	} else {
 		logHelper.Infof("Retention cleanup completed successfully")
-		logHelper.Infof("  Phase 1: Deleted %d ReporterRepresentations, %d CommonRepresentations",
-			totalReporterRepresentations, totalCommonRepresentations)
+		logHelper.Infof("  Phase 1: Deleted %d ReporterRepresentations",
+			totalReporterRepresentations)
 		logHelper.Infof("  Phase 2: Deleted %d tombstoned resources completely", deletedResources)
+		logHelper.Infof("  Phase 3: Deleted %d CommonRepresentations",
+			totalCommonRepresentations)
 
 		logHelper.Infow("msg", "Retention cleanup completed",
 			"action", "RETENTION_CLEANUP",

@@ -22,6 +22,7 @@ func NewRunJobCommand(storageOptions *storage.Options, loggerOptions common.Logg
 		NewTombstonedResourcesCleanupJobCommand(storageOptions, loggerOptions),
 		NewCommonRepresentationsCleanupJobCommand(storageOptions, loggerOptions),
 		NewTestDataGeneratorJobCommand(storageOptions, loggerOptions),
+		NewPerformanceTestJobCommand(storageOptions, loggerOptions),
 		NewMetricsCollectJobCommand(storageOptions, loggerOptions),
 	}
 

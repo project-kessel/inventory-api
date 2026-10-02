@@ -380,7 +380,7 @@ check-token-update:
 
 .PHONY: test-performance
 test-performance:
-	@./scripts/testcontainers-run.sh go test -tags=performance ./test/performance -run TestResourceLifecyclePerformance -count=1 -timeout=30m
+	@./scripts/testcontainers-run.sh go test -tags=performance ./test/performance -count=1 -timeout=30m
 	go run -tags=performance ./test/performance/cmd/summary
 
 .PHONY: test-performance-podman

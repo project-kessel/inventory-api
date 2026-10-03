@@ -51,6 +51,17 @@ run_job() {
   echo ""
   echo "===> Running job: $job_name"
 
+  # Get the inventory-api image
+  local image=$(oc get deployment kessel-inventory-api -n "$NAMESPACE" -o jsonpath='{.spec.template.spec.containers[0].image}')
+
+  # Format extra args as YAML list items
+  local formatted_args=""
+  if [ -n "$extra_args" ]; then
+    for arg in $extra_args; do
+      formatted_args="${formatted_args}        - $arg"$'\n'
+    done
+  fi
+
   # Create job from template
   cat <<EOF | oc apply -f - -n "$NAMESPACE"
 apiVersion: batch/v1
@@ -62,18 +73,18 @@ spec:
     spec:
       containers:
       - name: inventory-job
-        image: \$(oc get deployment kessel-inventory-api -n $NAMESPACE -o jsonpath='{.spec.template.spec.containers[0].image}')
+        image: $image
         command:
         - /usr/local/bin/inventory-api
         - run-job
         - $job_command
-        $(echo "$extra_args" | sed 's/^/        - /')
+${formatted_args}        - --config=/config/inventory-api-config.yaml
         - --storage.database=postgres
         - --storage.postgres.host=\$(DB_HOST)
         - --storage.postgres.dbname=\$(DB_NAME)
         - --storage.postgres.user=\$(DB_USER)
         - --storage.postgres.password=\$(DB_PASSWORD)
-        - --storage.postgres.sslmode=require
+        - --storage.postgres.sslmode=disable
         env:
         - name: DB_HOST
           valueFrom:
@@ -95,6 +106,14 @@ spec:
             secretKeyRef:
               name: kessel-inventory-db
               key: db.password
+        volumeMounts:
+        - name: config
+          mountPath: /config
+          readOnly: true
+      volumes:
+      - name: config
+        configMap:
+          name: inventory-api-config
       restartPolicy: Never
   backoffLimit: 0
 EOF
@@ -131,10 +150,10 @@ get_table_stats() {
   echo "===> Getting table statistics for phase: $phase"
 
   # Get stats using oc exec
-  POD=$(oc get pods -n "$NAMESPACE" -l app=kessel-inventory-db -o jsonpath='{.items[0].metadata.name}')
+  POD=$(oc get pods -n "$NAMESPACE" -l app=kessel-inventory,service=db -o jsonpath='{.items[0].metadata.name}')
 
   oc exec "$POD" -n "$NAMESPACE" -- bash -c "
-    PGPASSWORD=\$(cat /run/secrets/db.password) psql -h localhost -U \$(cat /run/secrets/db.user) -d \$(cat /run/secrets/db.name) -t -A -F',' -c \"
+    PGPASSWORD=\$POSTGRESQL_PASSWORD psql -h localhost -U \$POSTGRESQL_USER -d \$POSTGRESQL_DATABASE -t -A -F',' -c \"
       SELECT
         c.relname as table_name,
         c.reltuples::bigint as estimated_rows,

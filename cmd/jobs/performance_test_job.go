@@ -234,13 +234,17 @@ func testFindVersionedRepresentations(db *gorm.DB, logHelper *log.Helper, resour
 
 				var results []commonRepresentationRow
 				cv := key.LatestVersion
+				pv := uint(0)
+				if cv > 0 {
+					pv = cv - 1
+				}
 
 				err := db.Table("reporter_resources rr").
 					Select("cr.data, cr.version, cr.resource_id, cr.reported_by_reporter_type, cr.reported_by_reporter_instance, cr.transaction_id").
 					Joins("JOIN common_representations cr ON rr.resource_id = cr.resource_id").
 					Where("rr.local_resource_id = ? AND rr.reporter_type = ? AND rr.resource_type = ? AND rr.reporter_instance_id = ?",
 						key.LocalResourceID, key.ReporterType, key.ResourceType, key.ReporterInstanceID).
-					Where("(cr.version = ? OR cr.version = ?)", cv, cv-1).
+					Where("(cr.version = ? OR cr.version = ?)", cv, pv).
 					Find(&results).Error
 
 				latency := time.Since(start)
@@ -277,8 +281,10 @@ func printMetrics(logHelper *log.Helper, testName string, metrics *PerformanceMe
 	logHelper.Infof("p50 latency: %v", calculatePercentile(metrics.Latencies, 50))
 	logHelper.Infof("p95 latency: %v", calculatePercentile(metrics.Latencies, 95))
 	logHelper.Infof("p99 latency: %v", calculatePercentile(metrics.Latencies, 99))
-	logHelper.Infof("Min latency: %v", metrics.Latencies[0])
-	logHelper.Infof("Max latency: %v", metrics.Latencies[len(metrics.Latencies)-1])
+	if len(metrics.Latencies) > 0 {
+		logHelper.Infof("Min latency: %v", metrics.Latencies[0])
+		logHelper.Infof("Max latency: %v", metrics.Latencies[len(metrics.Latencies)-1])
+	}
 }
 
 func calculatePercentile(latencies []time.Duration, percentile int) time.Duration {

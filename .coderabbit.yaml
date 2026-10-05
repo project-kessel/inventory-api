@@ -59,6 +59,29 @@ reviews:
         - Avoid API keys; prefer IdP-issued short-lived tokens
         - Rate limit auth attempts where applicable
 
+    # ── Database migrations ──────────────────────────────────────
+    - path: "internal/data/migrations/**/*"
+      instructions: |
+        Migration compatibility:
+        - Flag migrations that are not backward compatible with previously
+          released application versions. Application rollback must not require
+          database rollback.
+        - Require expand-and-contract across releases for destructive
+          changes such as drops, renames, incompatible type changes, and
+          new non-null constraints without safe defaults or backfills.
+        - Do not infer that an incompatible migration is safe. It is an
+          exception that requires explicit human approval and a documented
+          rollout and recovery plan.
+        - Applied migrations are immutable. Flag edits, deletions, or
+          reordering of existing migrations; corrections must use a new
+          forward migration.
+        - Check commit history when available. Schema migrations and the
+          dependent application behavior must be separate commits so the
+          application change can be cherry-picked or reverted independently.
+        - Migration execution and bookkeeping must not make an otherwise
+          compatible older application undeployable. Require a regression test
+          when migration behavior or compatibility changes.
+
     # ── Database & data layer ────────────────────────────────────
     - path: "internal/{data,storage}/**/*"
       instructions: |

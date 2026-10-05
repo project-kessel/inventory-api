@@ -86,10 +86,10 @@ func main() {
 			fmt.Printf("; %.1f successful requests/s\n", r.Throughput)
 		}
 	}
-	fmt.Println("Consumer ProcessMessage latency (ms); measured without Kafka polling or delivery")
-	fmt.Printf("%-9s %7s %-21s %7s %9s %9s %9s %9s %9s %9s\n", "scenario", "clients", "case", "samples", "min", "average", "p50", "p95", "p99", "max")
+	fmt.Println("Consumer repository reads (ms); excludes Kafka, tuple calculation, and Relations API")
+	fmt.Printf("%-9s %7s %-21s %7s %9s %9s %9s %9s %9s %9s\n", "scenario", "clients", "lookup", "samples", "min", "average", "p50", "p95", "p99", "max")
 	for _, clients := range []int{1, 4, 8} {
-		path := filepath.Join(dir, fmt.Sprintf("consumer-consumer-%d.json", clients))
+		path := filepath.Join(dir, fmt.Sprintf("repository-consumer-%d.json", clients))
 		b, err := os.ReadFile(path)
 		if err != nil {
 			fail("read %s: %v", path, err)
@@ -104,14 +104,14 @@ func main() {
 		if r.Settings.Profile == "small" {
 			fmt.Println("  SMALL PROFILE: latency limits skipped; timings are informational, correctness checks remain enabled.")
 		}
-		for _, operation := range []string{"create", "update_common", "update_unchanged", "delete"} {
+		for _, operation := range []string{"resource", "common", "reporter_current", "reporter_previous", "combined", "reporter_revival", "reporter_delete"} {
 			stat, ok := r.Operations[operation]
 			if !ok {
 				fail("missing %s samples in %s", operation, path)
 			}
 			fmt.Printf("%-9s %7d %-21s %7d %9.2f %9.2f %9.2f %9.2f %9.2f %9.2f\n", "consumer", clients, operation, stat.Count, stat.MinMS, stat.MeanMS, stat.P50MS, stat.P95MS, stat.P99MS, stat.MaxMS)
 		}
-		fmt.Printf("  seed: %d background resources, %d history representations under one target; database %.2f GiB; max_parallel_workers_per_gather=%d; %.1f successful messages/s\n", r.Settings.Background, r.Settings.History, float64(r.DatabaseBytes)/(1<<30), *r.ReadParallelWorkers, r.Throughput)
+		fmt.Printf("  seed: %d background resources, %d reporter history rows + 3 revival rows and %d common versions under one target; database %.2f GiB; max_parallel_workers_per_gather=%d; %.1f successful reads/s\n", r.Settings.Background, r.Settings.History, r.Settings.History, float64(r.DatabaseBytes)/(1<<30), *r.ReadParallelWorkers, r.Throughput)
 	}
 }
 

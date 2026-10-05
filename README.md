@@ -306,6 +306,9 @@ Tests can be run using:
 
 ```shell
 make test
+
+# Run resource lifecycle performance tests and print a summary (ensure Docker or Podman is running)
+make test-performance
 ```
 
 For end-to-test info see [here](./test/README.md).

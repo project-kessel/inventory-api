@@ -378,3 +378,8 @@ check-tuple:
 check-token-update:
 	psql "postgresql://${DB_USER}:${DB_PASSWORD}@localhost:${LOCAL_DB_PORT}/${DB_NAME}" -x -c "select id,inventory_id,consistency_token,workspace_id,reporter from resources;"
 
+.PHONY: test-performance
+test-performance:
+	@if [ "$${PERF_PROFILE:-}" = small ]; then echo "SMALL PROFILE: latency limits are skipped; correctness checks and timing measurements remain enabled."; fi
+	@./scripts/testcontainers-run.sh go test -tags=performance ./test/performance -count=1 -timeout=30m
+	go run -tags=performance ./test/performance/cmd/summary

@@ -26,10 +26,10 @@ func TestBaselineRejectsSlowAndMissingOperations(t *testing.T) {
 	}
 }
 
-func TestDefaultBaselineRejectsSlowConsumerCase(t *testing.T) {
-	r := result{Protocol: "consumer", Scenario: "consumer", Concurrency: 8, Operations: map[string]stats{"update_common": {Count: 240, P95MS: 5.01}}}
-	if err := checkBaseline(r); err == nil || !strings.Contains(err.Error(), "consumer/8/update_common") {
-		t.Fatalf("expected consumer baseline failure, got %v", err)
+func TestDefaultBaselineRejectsSlowRepositoryCase(t *testing.T) {
+	r := result{Protocol: "repository", Scenario: "consumer", Concurrency: 8, Operations: map[string]stats{"reporter_previous": {Count: 240, P95MS: 5.01}}}
+	if err := checkBaseline(r); err == nil || !strings.Contains(err.Error(), "consumer/8/reporter_previous") {
+		t.Fatalf("expected repository baseline failure, got %v", err)
 	}
 }
 
@@ -39,7 +39,7 @@ func TestSmallProfileSkipsLatencyLimits(t *testing.T) {
 			r := result{Scenario: scenario, Concurrency: 1, Settings: settings{Profile: "small"}, Operations: map[string]stats{}}
 			operations := []string{"create", "update", "delete", "recreate"}
 			if scenario == "consumer" {
-				operations = []string{"create", "update_common", "update_unchanged", "delete"}
+				operations = []string{"resource", "common", "reporter_current", "reporter_previous", "combined", "reporter_revival", "reporter_delete"}
 			}
 			for _, operation := range operations {
 				r.Operations[operation] = stats{Count: 3, P95MS: 1000}

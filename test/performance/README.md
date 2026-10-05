@@ -2,6 +2,8 @@
 
 Run the full suite with `make test-performance`; it detects Docker or Podman automatically, including Podman machines on macOS. Ensure Docker or Podman is installed and running properly with its API socket available before running the suite. Set `DOCKER_HOST` to select a specific endpoint. The wrapper disables Ryuk for Podman unless `TESTCONTAINERS_RYUK_DISABLED` is explicitly set. CI runs the standard target on pull requests and `main` using Ubuntu 24.04 and uploads the JSON results.
 
+When both runtimes are installed, select one with `CONTAINER_RUNTIME=docker make test-performance` or `CONTAINER_RUNTIME=podman make test-performance`. The default is `auto`, which prefers a working Docker context. An explicitly selected runtime never falls back to the other runtime. An explicit `DOCKER_HOST` takes precedence over runtime detection.
+
 The suite starts PostgreSQL 16.6 through Testcontainers and applies the real migrations. The gRPC workload measures resource create, update, delete, and recreate at 1 and 4 workers in fresh and history scenarios. The consumer workload calls `ProcessMessage` directly at 1, 4, and 8 clients for create, workspace-changing update, unchanged update, and delete events. Its Relations backend is stateless; Kafka polling and delivery are outside the timed calls.
 
 ## Fixture shape and tuning

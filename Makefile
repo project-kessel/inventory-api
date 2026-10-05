@@ -380,10 +380,6 @@ check-token-update:
 
 .PHONY: test-performance
 test-performance:
+	@if [ "$${PERF_PROFILE:-}" = small ]; then echo "SMALL PROFILE: latency limits are skipped; correctness checks and timing measurements remain enabled."; fi
 	@./scripts/testcontainers-run.sh go test -tags=performance ./test/performance -count=1 -timeout=30m
 	go run -tags=performance ./test/performance/cmd/summary
-
-.PHONY: test-performance-podman
-test-performance-podman:
-	@test -n "$${XDG_RUNTIME_DIR}" && test -S "$${XDG_RUNTIME_DIR}/podman/podman.sock" || { echo "Podman socket unavailable; start it with: systemctl --user start podman.socket" >&2; exit 1; }
-	DOCKER_HOST="unix://$${XDG_RUNTIME_DIR}/podman/podman.sock" TESTCONTAINERS_RYUK_DISABLED=true $(MAKE) test-performance

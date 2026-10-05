@@ -526,7 +526,8 @@ func checkBaseline(r result) error {
 		if !ok {
 			return fmt.Errorf("missing baseline: %s", key)
 		}
-		if stat.P95MS > limit {
+		// Small verifies the harness with too few samples for a latency gate.
+		if r.Settings.Profile != "small" && stat.P95MS > limit {
 			return fmt.Errorf("%s p95 %.2fms exceeds %.2fms", key, stat.P95MS, limit)
 		}
 	}

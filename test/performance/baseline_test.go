@@ -33,6 +33,33 @@ func TestDefaultBaselineRejectsSlowConsumerCase(t *testing.T) {
 	}
 }
 
+func TestSmallProfileSkipsLatencyLimits(t *testing.T) {
+	for _, scenario := range []string{"fresh", "consumer"} {
+		t.Run(scenario, func(t *testing.T) {
+			r := result{Scenario: scenario, Concurrency: 1, Settings: settings{Profile: "small"}, Operations: map[string]stats{}}
+			operations := []string{"create", "update", "delete", "recreate"}
+			if scenario == "consumer" {
+				operations = []string{"create", "update_common", "update_unchanged", "delete"}
+			}
+			for _, operation := range operations {
+				r.Operations[operation] = stats{Count: 3, P95MS: 1000}
+			}
+			if err := checkBaseline(r); err != nil {
+				t.Fatalf("small profile should accept slow samples: %v", err)
+			}
+			r.Settings.Profile = ""
+			if err := checkBaseline(r); err == nil || !strings.Contains(err.Error(), "exceeds") {
+				t.Fatalf("full profile should reject slow samples: %v", err)
+			}
+			r.Settings.Profile = "small"
+			r.Operations["unexpected"] = stats{Count: 3}
+			if err := checkBaseline(r); err == nil || !strings.Contains(err.Error(), "missing baseline") {
+				t.Fatalf("small profile should still validate baseline entries: %v", err)
+			}
+		})
+	}
+}
+
 func TestBaselineRejectsStaleOperation(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "baseline.json")
 	if err := os.WriteFile(path, []byte(`{"fresh/1/create":50,"fresh/1/obsolete":50,"fresh/4/update":50}`), 0600); err != nil {

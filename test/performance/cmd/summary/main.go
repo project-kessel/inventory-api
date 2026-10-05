@@ -26,8 +26,9 @@ type result struct {
 	DatabaseBytes int64            `json:"database_bytes"`
 	TableBytes    map[string]int64 `json:"table_bytes"`
 	Settings      struct {
-		Background int `json:"background"`
-		History    int `json:"history"`
+		Background int    `json:"background"`
+		History    int    `json:"history"`
+		Profile    string `json:"profile"`
 	} `json:"settings"`
 	Operations          map[string]operationStats `json:"operations"`
 	Throughput          float64                   `json:"throughput_per_second"`
@@ -58,6 +59,9 @@ func main() {
 			}
 			if r.Scenario != scenario || r.Concurrency != workers {
 				fail("unexpected scenario or concurrency in %s", path)
+			}
+			if r.Settings.Profile == "small" {
+				fmt.Println("  SMALL PROFILE: latency limits skipped; timings are informational, correctness checks remain enabled.")
 			}
 			for _, operation := range []string{"create", "update", "delete", "recreate"} {
 				stat, ok := r.Operations[operation]
@@ -96,6 +100,9 @@ func main() {
 		}
 		if r.Scenario != "consumer" || r.Concurrency != clients || r.ReadParallelWorkers == nil {
 			fail("unexpected consumer result in %s", path)
+		}
+		if r.Settings.Profile == "small" {
+			fmt.Println("  SMALL PROFILE: latency limits skipped; timings are informational, correctness checks remain enabled.")
 		}
 		for _, operation := range []string{"create", "update_common", "update_unchanged", "delete"} {
 			stat, ok := r.Operations[operation]

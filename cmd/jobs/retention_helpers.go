@@ -71,8 +71,8 @@ func deleteOldReporterRepresentations(db *gorm.DB, logHelper *log.Helper, dryRun
 					GROUP BY reporter_resource_id
 				) latest ON rr_rep.reporter_resource_id = latest.reporter_resource_id
 				JOIN reporter_resources rr ON rr_rep.reporter_resource_id = rr.id
-				WHERE rr_rep.created_at < (latest.latest_created_at - INTERVAL '? days')
-				  AND (rr.tombstone = false OR (rr.tombstone = true AND rr.updated_at >= NOW() - INTERVAL '? days'))
+				WHERE rr_rep.created_at < (latest.latest_created_at - (? || ' days')::INTERVAL)
+				  AND (rr.tombstone = false OR (rr.tombstone = true AND rr.updated_at >= NOW() - (? || ' days')::INTERVAL))
 		`
 
 		if reporterType != "" {
@@ -121,8 +121,8 @@ func deleteOldCommonRepresentations(db *gorm.DB, logHelper *log.Helper, dryRun b
 			) latest ON cr.resource_id = latest.resource_id
 			JOIN resource r ON cr.resource_id = r.id
 			LEFT JOIN reporter_resources rr ON r.id = rr.resource_id
-			WHERE cr.created_at < (latest.latest_created_at - INTERVAL '? days')
-			  AND (rr.tombstone = false OR (rr.tombstone = true AND rr.updated_at >= NOW() - INTERVAL '? days'))
+			WHERE cr.created_at < (latest.latest_created_at - (? || ' days')::INTERVAL)
+			  AND (rr.tombstone = false OR (rr.tombstone = true AND rr.updated_at >= NOW() - (? || ' days')::INTERVAL))
 		`
 
 		if reporterType != "" {

@@ -418,18 +418,27 @@ func (r *resourceRepository) fetchPreviousReporterRepresentation(db *gorm.DB, ke
 	}
 
 	var result reporterRepresentationRow
-	query := db.Table("reporter_resources rr").
-		Select("rrep.data, rrep.version").
-		Joins("JOIN reporter_representations rrep ON rr.id = rrep.reporter_resource_id")
-
+	query := db.Table("reporter_resources rr").Select("rrep.data, rrep.version")
 	query = r.buildReporterResourceKeyQuery(query, key)
 	// Find either:
 	// 1. Previous version in the same generation (normal update)
 	// 2. Any version in a previous generation (revival after tombstone)
-	query = query.Where(`
-		(rrep.generation = ? AND rrep.version < ?)
-		OR rrep.generation < ?
-	`, currentGeneration, currentVersion, currentGeneration)
+	if db.Name() == "postgres" {
+		// Limit before joining so long histories are not scanned and sorted.
+		// Include tombstones: a revival must observe the previous deletion.
+		query = query.Joins(`JOIN LATERAL (
+			SELECT candidate.data, candidate.version, candidate.generation
+			FROM reporter_representations candidate
+			WHERE candidate.reporter_resource_id = rr.id
+				AND (candidate.generation, candidate.version) < (?, ?)
+			ORDER BY candidate.generation DESC, candidate.version DESC
+			LIMIT 1
+		) rrep ON true`, currentGeneration, currentVersion)
+	} else {
+		// SQLite does not support LATERAL; retain the equivalent joined lookup.
+		query = query.Joins("JOIN reporter_representations rrep ON rr.id = rrep.reporter_resource_id").
+			Where("(rrep.generation, rrep.version) < (?, ?)", currentGeneration, currentVersion)
+	}
 
 	// Order by generation first, then version, to properly handle generation boundaries
 	tx := query.Order("rrep.generation DESC, rrep.version DESC").Limit(1).Scan(&result)
@@ -489,19 +498,28 @@ func (r *resourceRepository) fetchLastLiveReporterBefore(db *gorm.DB, key bizmod
 	}
 
 	var result reporterRepresentationRow
-	query := db.Table("reporter_resources rr").
-		Select("rrep.data, rrep.version").
-		Joins("JOIN reporter_representations rrep ON rr.id = rrep.reporter_resource_id")
-
+	query := db.Table("reporter_resources rr").Select("rrep.data, rrep.version")
 	query = r.buildReporterResourceKeyQuery(query, key)
 
 	// Find the most recent non-tombstone row strictly before (beforeGeneration, beforeVersion)
 	// Same upper-bound logic as fetchPreviousReporterRepresentation, plus tombstone filter
-	query = query.Where(`
-		((rrep.generation = ? AND rrep.version < ?)
-		OR rrep.generation < ?)
-		AND rrep.tombstone = ?
-	`, beforeGeneration, beforeVersion, beforeGeneration, false)
+	if db.Name() == "postgres" {
+		// Limit inside the lateral lookup: limiting only after the join can scan
+		// and sort the entire history even with a matching generation/version index.
+		query = query.Joins(`JOIN LATERAL (
+			SELECT candidate.data, candidate.version, candidate.generation
+			FROM reporter_representations candidate
+			WHERE candidate.reporter_resource_id = rr.id
+				AND (candidate.generation, candidate.version) < (?, ?)
+				AND candidate.tombstone = false
+			ORDER BY candidate.generation DESC, candidate.version DESC
+			LIMIT 1
+		) rrep ON true`, beforeGeneration, beforeVersion)
+	} else {
+		// SQLite does not support LATERAL; retain the equivalent joined lookup.
+		query = query.Joins("JOIN reporter_representations rrep ON rr.id = rrep.reporter_resource_id").
+			Where("(rrep.generation, rrep.version) < (?, ?) AND rrep.tombstone = false", beforeGeneration, beforeVersion)
+	}
 
 	// Order by generation DESC, version DESC to get the most recent
 	tx := query.Order("rrep.generation DESC, rrep.version DESC").Limit(1).Scan(&result)

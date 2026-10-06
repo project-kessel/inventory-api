@@ -1,6 +1,7 @@
 package jobs
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/go-kratos/kratos/v2/log"
@@ -30,18 +31,18 @@ func deleteOldReporterRepresentations(db *gorm.DB, logHelper *log.Helper, dryRun
 				GROUP BY reporter_resource_id
 			) latest ON rr_rep.reporter_resource_id = latest.reporter_resource_id
 			JOIN reporter_resources rr ON rr_rep.reporter_resource_id = rr.id
-			WHERE rr_rep.created_at < (latest.latest_created_at - INTERVAL '? days')
-			  AND (rr.tombstone = false OR (rr.tombstone = true AND rr.updated_at >= NOW() - INTERVAL '? days'))
+			WHERE rr_rep.created_at < (latest.latest_created_at - (? || ' days')::INTERVAL)
+			  AND (rr.tombstone = false OR (rr.tombstone = true AND rr.updated_at >= NOW() - (? || ' days')::INTERVAL))
 		`
 
 		if reporterType != "" {
 			query += " AND rr.reporter_type = ?"
-			err := db.Raw(query, retentionDays, tombstoneDays, reporterType).Scan(&count).Error
+			err := db.Raw(query, fmt.Sprintf("%d", retentionDays), fmt.Sprintf("%d", tombstoneDays), reporterType).Scan(&count).Error
 			if err != nil {
 				return 0, err
 			}
 		} else {
-			err := db.Raw(query, retentionDays, tombstoneDays).Scan(&count).Error
+			err := db.Raw(query, fmt.Sprintf("%d", retentionDays), fmt.Sprintf("%d", tombstoneDays)).Scan(&count).Error
 			if err != nil {
 				return 0, err
 			}
@@ -77,10 +78,10 @@ func deleteOldReporterRepresentations(db *gorm.DB, logHelper *log.Helper, dryRun
 
 		if reporterType != "" {
 			deleteQuery = baseQuery + " AND rr.reporter_type = ? LIMIT ?)"
-			args = []interface{}{retentionDays, tombstoneDays, reporterType, batchSize}
+			args = []interface{}{fmt.Sprintf("%d", retentionDays), fmt.Sprintf("%d", tombstoneDays), reporterType, batchSize}
 		} else {
 			deleteQuery = baseQuery + " LIMIT ?)"
-			args = []interface{}{retentionDays, tombstoneDays, batchSize}
+			args = []interface{}{fmt.Sprintf("%d", retentionDays), fmt.Sprintf("%d", tombstoneDays), batchSize}
 		}
 
 		result := db.Exec(deleteQuery, args...)
@@ -127,12 +128,12 @@ func deleteOldCommonRepresentations(db *gorm.DB, logHelper *log.Helper, dryRun b
 
 		if reporterType != "" {
 			query += " AND rr.reporter_type = ?"
-			err := db.Raw(query, retentionDays, tombstoneDays, reporterType).Scan(&count).Error
+			err := db.Raw(query, fmt.Sprintf("%d", retentionDays), fmt.Sprintf("%d", tombstoneDays), reporterType).Scan(&count).Error
 			if err != nil {
 				return 0, err
 			}
 		} else {
-			err := db.Raw(query, retentionDays, tombstoneDays).Scan(&count).Error
+			err := db.Raw(query, fmt.Sprintf("%d", retentionDays), fmt.Sprintf("%d", tombstoneDays)).Scan(&count).Error
 			if err != nil {
 				return 0, err
 			}
@@ -169,10 +170,10 @@ func deleteOldCommonRepresentations(db *gorm.DB, logHelper *log.Helper, dryRun b
 
 		if reporterType != "" {
 			deleteQuery = baseQuery + " AND rr.reporter_type = ? LIMIT ?)"
-			args = []interface{}{retentionDays, tombstoneDays, reporterType, batchSize}
+			args = []interface{}{fmt.Sprintf("%d", retentionDays), fmt.Sprintf("%d", tombstoneDays), reporterType, batchSize}
 		} else {
 			deleteQuery = baseQuery + " LIMIT ?)"
-			args = []interface{}{retentionDays, tombstoneDays, batchSize}
+			args = []interface{}{fmt.Sprintf("%d", retentionDays), fmt.Sprintf("%d", tombstoneDays), batchSize}
 		}
 
 		result := db.Exec(deleteQuery, args...)

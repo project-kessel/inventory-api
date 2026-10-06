@@ -4,10 +4,7 @@ package performance
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"os"
-	"path/filepath"
 	"runtime"
 	"strconv"
 	"sync"
@@ -101,9 +98,6 @@ func runConsumerReads(t *testing.T, ctx context.Context, seedDB *gorm.DB, dsn st
 	}
 	if configured != strconv.Itoa(parallelWorkers) {
 		t.Fatalf("read connection parallel workers: got %s, want %d", configured, parallelWorkers)
-	}
-	if err := savePreviousReporterPlan(ctx, readDB, s); err != nil {
-		t.Fatal(err)
 	}
 	repo := data.NewResourceRepository(readDB, data.NewGormTransactionManager(metricscollector.NewFakeMetricsCollector(), 10), nil)
 	localID, err := model.NewLocalResourceId("perf-history-0")
@@ -292,33 +286,4 @@ func runConsumerReads(t *testing.T, ctx context.Context, seedDB *gorm.DB, dsn st
 			}
 		})
 	}
-}
-
-// savePreviousReporterPlan profiles the same previous-representation predicate
-// used by the repository. EXPLAIN ANALYZE executes the query, so keep it out of
-// timed samples and do not treat its execution time as a request measurement.
-func savePreviousReporterPlan(ctx context.Context, db *gorm.DB, s settings) error {
-	var plan string
-	query := `EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON)
-		SELECT rrep.data, rrep.version
-		FROM reporter_resources rr
-		JOIN reporter_representations rrep ON rr.id = rrep.reporter_resource_id
-		WHERE rr.local_resource_id = ? AND rr.resource_type = ?
-			AND rr.reporter_type = ? AND rr.reporter_instance_id = ?
-			AND ((rrep.generation = ? AND rrep.version < ?) OR rrep.generation < ?)
-		ORDER BY rrep.generation DESC, rrep.version DESC LIMIT 1`
-	if err := db.WithContext(ctx).Raw(query, "perf-history-0", "host", "hbi", "perf", 0, s.History-1, 0).Scan(&plan).Error; err != nil {
-		return fmt.Errorf("explain previous reporter lookup: %w", err)
-	}
-	if !json.Valid([]byte(plan)) {
-		return fmt.Errorf("invalid JSON from previous reporter EXPLAIN")
-	}
-	dir := os.Getenv("PERF_RESULTS_DIR")
-	if dir == "" {
-		dir = "results"
-	}
-	if err := os.MkdirAll(dir, 0755); err != nil {
-		return err
-	}
-	return os.WriteFile(filepath.Join(dir, "consumer-previous-plan.json"), []byte(plan), 0644)
 }

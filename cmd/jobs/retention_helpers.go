@@ -19,6 +19,10 @@ const (
 
 // deleteOldReporterRepresentations deletes reporter_representations older than N days from latest per resource.
 // Excludes tombstoned resources older than M days (handled by deleteOldTombstonedResources).
+//
+// OPTIMIZED: Uses temp table to materialize "latest timestamp per resource" once,
+// then reuses it for all batch deletions. This avoids recalculating the expensive
+// window function (MAX + GROUP BY on ~10M rows) for every batch.
 func deleteOldReporterRepresentations(db *gorm.DB, logHelper *log.Helper, dryRun bool, retentionDays int, tombstoneDays int, reporterType string, batchSize int, batchDelayMs int) (int64, error) {
 	if dryRun {
 		var count int64
@@ -52,27 +56,58 @@ func deleteOldReporterRepresentations(db *gorm.DB, logHelper *log.Helper, dryRun
 		return count, nil
 	}
 
+	// OPTIMIZATION: Create temp table with latest timestamps (calculated ONCE)
+	logHelper.Info("Creating temp table for latest timestamps...")
+	createTempTable := `
+		CREATE TEMP TABLE IF NOT EXISTS latest_reporter_timestamps (
+			reporter_resource_id UUID PRIMARY KEY,
+			latest_created_at TIMESTAMP WITH TIME ZONE NOT NULL
+		)
+	`
+	if err := db.Exec(createTempTable).Error; err != nil {
+		logHelper.Errorf("Failed to create temp table: %v", err)
+		return 0, err
+	}
+
+	// Populate temp table with latest timestamps per resource
+	populateTemp := `
+		INSERT INTO latest_reporter_timestamps (reporter_resource_id, latest_created_at)
+		SELECT reporter_resource_id, MAX(created_at) as latest_created_at
+		FROM reporter_representations
+		GROUP BY reporter_resource_id
+	`
+	startTime := time.Now()
+	if err := db.Exec(populateTemp).Error; err != nil {
+		logHelper.Errorf("Failed to populate temp table: %v", err)
+		return 0, err
+	}
+	logHelper.Infof("Temp table populated in %v", time.Since(startTime))
+
+	// Create index on temp table for faster joins
+	createIndex := `CREATE INDEX IF NOT EXISTS idx_latest_reporter_timestamps ON latest_reporter_timestamps(reporter_resource_id)`
+	if err := db.Exec(createIndex).Error; err != nil {
+		logHelper.Warnf("Failed to create index on temp table (non-fatal): %v", err)
+	}
+
+	// Now delete in batches using the temp table (FAST - no recalculation)
 	var totalDeleted int64
 	batchCount := 0
 
-	logHelper.Info("Deleting old reporter_representations (active + recently tombstoned)...")
+	logHelper.Info("Deleting old reporter_representations using temp table...")
 
 	for {
 		var deleteQuery string
 		var args []interface{}
 
+		// Use temp table instead of recalculating window function
 		baseQuery := `
 			DELETE FROM reporter_representations
 			WHERE (reporter_resource_id, version, generation) IN (
 				SELECT rr_rep.reporter_resource_id, rr_rep.version, rr_rep.generation
 				FROM reporter_representations rr_rep
-				JOIN (
-					SELECT reporter_resource_id, MAX(created_at) as latest_created_at
-					FROM reporter_representations
-					GROUP BY reporter_resource_id
-				) latest ON rr_rep.reporter_resource_id = latest.reporter_resource_id
+				JOIN latest_reporter_timestamps lt ON rr_rep.reporter_resource_id = lt.reporter_resource_id
 				JOIN reporter_resources rr ON rr_rep.reporter_resource_id = rr.id
-				WHERE rr_rep.created_at < (latest.latest_created_at - (? || ' days')::INTERVAL)
+				WHERE rr_rep.created_at < (lt.latest_created_at - (? || ' days')::INTERVAL)
 				  AND (rr.tombstone = false OR (rr.tombstone = true AND rr.updated_at >= NOW() - (? || ' days')::INTERVAL))
 		`
 
@@ -104,11 +139,19 @@ func deleteOldReporterRepresentations(db *gorm.DB, logHelper *log.Helper, dryRun
 		}
 	}
 
+	// Manually drop temp table
+	db.Exec("DROP TABLE IF EXISTS latest_reporter_timestamps")
+	logHelper.Info("Cleanup complete, temp table dropped")
+
 	return totalDeleted, nil
 }
 
 // deleteOldCommonRepresentations deletes common_representations older than N days from latest per resource.
 // Excludes tombstoned resources older than M days (handled by deleteOldTombstonedResources).
+//
+// OPTIMIZED: Uses temp table to materialize "latest timestamp per resource" once,
+// then reuses it for all batch deletions. This avoids recalculating the expensive
+// window function (MAX + GROUP BY on ~10M rows) for every batch.
 func deleteOldCommonRepresentations(db *gorm.DB, logHelper *log.Helper, dryRun bool, retentionDays int, tombstoneDays int, reporterType string, batchSize int, batchDelayMs int) (int64, error) {
 	if dryRun {
 		var count int64
@@ -143,29 +186,60 @@ func deleteOldCommonRepresentations(db *gorm.DB, logHelper *log.Helper, dryRun b
 		return count, nil
 	}
 
+	// OPTIMIZATION: Create temp table with latest timestamps (calculated ONCE)
+	logHelper.Info("Creating temp table for latest timestamps...")
+	createTempTable := `
+		CREATE TEMP TABLE IF NOT EXISTS latest_common_timestamps (
+			resource_id UUID PRIMARY KEY,
+			latest_created_at TIMESTAMP WITH TIME ZONE NOT NULL
+		)
+	`
+	if err := db.Exec(createTempTable).Error; err != nil {
+		logHelper.Errorf("Failed to create temp table: %v", err)
+		return 0, err
+	}
+
+	// Populate temp table with latest timestamps per resource
+	populateTemp := `
+		INSERT INTO latest_common_timestamps (resource_id, latest_created_at)
+		SELECT resource_id, MAX(created_at) as latest_created_at
+		FROM common_representations
+		GROUP BY resource_id
+	`
+	startTime := time.Now()
+	if err := db.Exec(populateTemp).Error; err != nil {
+		logHelper.Errorf("Failed to populate temp table: %v", err)
+		return 0, err
+	}
+	logHelper.Infof("Temp table populated in %v", time.Since(startTime))
+
+	// Create index on temp table for faster joins
+	createIndex := `CREATE INDEX IF NOT EXISTS idx_latest_common_timestamps ON latest_common_timestamps(resource_id)`
+	if err := db.Exec(createIndex).Error; err != nil {
+		logHelper.Warnf("Failed to create index on temp table (non-fatal): %v", err)
+	}
+
+	// Now delete in batches using the temp table (FAST)
 	var totalDeleted int64
 	batchCount := 0
 
-	logHelper.Info("Deleting old common_representations (active + recently tombstoned)...")
+	logHelper.Info("Deleting old common_representations using temp table...")
 
 	for {
 		var deleteQuery string
 		var args []interface{}
 
+		// Use temp table instead of recalculating window function
 		baseQuery := `
 			DELETE FROM common_representations
 			WHERE (resource_id, version) IN (
 				SELECT cr.resource_id, cr.version
 				FROM common_representations cr
-				JOIN (
-					SELECT resource_id, MAX(created_at) as latest_created_at
-					FROM common_representations
-					GROUP BY resource_id
-				) latest ON cr.resource_id = latest.resource_id
+				JOIN latest_common_timestamps lt ON cr.resource_id = lt.resource_id
 				JOIN resource r ON cr.resource_id = r.id
 				LEFT JOIN reporter_resources rr ON r.id = rr.resource_id
-				WHERE cr.created_at < (latest.latest_created_at - INTERVAL '? days')
-				  AND (rr.tombstone = false OR (rr.tombstone = true AND rr.updated_at >= NOW() - INTERVAL '? days'))
+				WHERE cr.created_at < (lt.latest_created_at - (? || ' days')::INTERVAL)
+				  AND (rr.tombstone = false OR (rr.tombstone = true AND rr.updated_at >= NOW() - (? || ' days')::INTERVAL))
 		`
 
 		if reporterType != "" {
@@ -195,6 +269,10 @@ func deleteOldCommonRepresentations(db *gorm.DB, logHelper *log.Helper, dryRun b
 			time.Sleep(time.Duration(batchDelayMs) * time.Millisecond)
 		}
 	}
+
+	// Manually drop temp table
+	db.Exec("DROP TABLE IF EXISTS latest_common_timestamps")
+	logHelper.Info("Cleanup complete, temp table dropped")
 
 	return totalDeleted, nil
 }

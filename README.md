@@ -1,5 +1,7 @@
 # Inventory API
 
+[![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/project-kessel/inventory-api/badge)](https://securityscorecards.dev/viewer/?uri=github.com/project-kessel/inventory-api)
+
 This repository implements a common inventory system.
 
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)

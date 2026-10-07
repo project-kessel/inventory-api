@@ -285,17 +285,17 @@ func deleteOldTombstonedResources(db *gorm.DB, logHelper *log.Helper, dryRun boo
 			SELECT COUNT(DISTINCT rr.id)
 			FROM reporter_resources rr
 			WHERE rr.tombstone = true
-			  AND rr.updated_at < NOW() - INTERVAL '? days'
+			  AND rr.updated_at < NOW() - (? || ' days')::INTERVAL
 		`
 
 		if reporterType != "" {
 			query += " AND rr.reporter_type = ?"
-			err := db.Raw(query, tombstoneDays, reporterType).Scan(&count).Error
+			err := db.Raw(query, fmt.Sprintf("%d", tombstoneDays), reporterType).Scan(&count).Error
 			if err != nil {
 				return 0, err
 			}
 		} else {
-			err := db.Raw(query, tombstoneDays).Scan(&count).Error
+			err := db.Raw(query, fmt.Sprintf("%d", tombstoneDays)).Scan(&count).Error
 			if err != nil {
 				return 0, err
 			}
@@ -321,23 +321,23 @@ func deleteOldTombstonedResources(db *gorm.DB, logHelper *log.Helper, dryRun boo
 				WHERE id IN (
 					SELECT id FROM reporter_resources
 					WHERE tombstone = true
-					  AND updated_at < NOW() - INTERVAL '? days'
+					  AND updated_at < NOW() - (? || ' days')::INTERVAL
 					  AND reporter_type = ?
 					LIMIT ?
 				)
 			`
-			args = []interface{}{tombstoneDays, reporterType, batchSize}
+			args = []interface{}{fmt.Sprintf("%d", tombstoneDays), reporterType, batchSize}
 		} else {
 			deleteQuery = `
 				DELETE FROM reporter_resources
 				WHERE id IN (
 					SELECT id FROM reporter_resources
 					WHERE tombstone = true
-					  AND updated_at < NOW() - INTERVAL '? days'
+					  AND updated_at < NOW() - (? || ' days')::INTERVAL
 					LIMIT ?
 				)
 			`
-			args = []interface{}{tombstoneDays, batchSize}
+			args = []interface{}{fmt.Sprintf("%d", tombstoneDays), batchSize}
 		}
 
 		result := db.Exec(deleteQuery, args...)

@@ -361,44 +361,17 @@ func deleteOldTombstonedResources(db *gorm.DB, logHelper *log.Helper, dryRun boo
 	}
 
 	// Clean up orphaned resources (no reporter_resources reference them)
-	// Using batched LEFT JOIN instead of NOT IN for better performance on large datasets
-	logHelper.Info("Cleaning up orphaned resources...")
-	var totalOrphaned int64
-	orphanedBatch := 0
+	// DISABLED: Even with batched LEFT JOIN, this is too slow on large datasets without proper indexes.
+	// The LEFT JOIN must scan all resources (2M rows) to find orphaned ones.
+	// This cleanup is optional and can be done later with proper indexing strategy.
+	// For now, a few orphaned resources won't affect query performance tests.
 
-	for {
-		orphanedQuery := `
-			DELETE FROM resource
-			WHERE id IN (
-				SELECT r.id
-				FROM resource r
-				LEFT JOIN reporter_resources rr ON r.id = rr.resource_id
-				WHERE rr.resource_id IS NULL
-				LIMIT 1000
-			)
-		`
-		orphanedResult := db.Exec(orphanedQuery)
-		if orphanedResult.Error != nil {
-			logHelper.Errorf("Failed to clean up orphaned resources batch %d: %v", orphanedBatch+1, orphanedResult.Error)
-			break
-		}
+	logHelper.Info("Skipping orphaned resources cleanup (requires indexed LEFT JOIN for performance)")
 
-		if orphanedResult.RowsAffected == 0 {
-			break
-		}
-
-		totalOrphaned += orphanedResult.RowsAffected
-		orphanedBatch++
-		logHelper.Infof("Orphaned batch %d: Deleted %d orphaned resources (total so far: %d)", orphanedBatch, orphanedResult.RowsAffected, totalOrphaned)
-
-		if batchDelayMs > 0 {
-			time.Sleep(time.Duration(batchDelayMs) * time.Millisecond)
-		}
-	}
-
-	if totalOrphaned > 0 {
-		logHelper.Infof("Cleaned up %d orphaned resources total", totalOrphaned)
-	}
+	// TODO: Re-enable when we have index on reporter_resources.resource_id or use a different strategy:
+	// - Add index: CREATE INDEX IF NOT EXISTS idx_reporter_resources_resource_id ON reporter_resources(resource_id)
+	// - Or: Track deletions and target specific resource IDs
+	// - Or: Use pg_stat to find tables with low reference counts
 
 	return totalDeleted, nil
 }

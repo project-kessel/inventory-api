@@ -147,14 +147,22 @@ func deleteOldReporterRepresentations(db *gorm.DB, logHelper *log.Helper, dryRun
 }
 
 // deleteOldCommonRepresentations deletes common_representations older than N days from latest per resource.
-// Excludes tombstoned resources older than M days (handled by deleteOldTombstonedResources).
+//
+// SCOPE: Retention cleanup only (keep last N days for all resources).
+// Does NOT handle orphaned common_representations when resource is completely deleted.
+// Orphan cleanup should be a separate job that deletes ALL versions when resource_id
+// has no reporter_resources entries.
 //
 // OPTIMIZED: Uses temp table to materialize "latest timestamp per resource" once,
 // then reuses it for all batch deletions. This avoids recalculating the expensive
 // window function (MAX + GROUP BY on ~10M rows) for every batch.
+//
+// NOTE: tombstoneDays parameter is ignored in this implementation since we don't
+// check reporter_resources table. This simplifies the query and improves performance.
 func deleteOldCommonRepresentations(db *gorm.DB, logHelper *log.Helper, dryRun bool, retentionDays int, tombstoneDays int, reporterType string, batchSize int, batchDelayMs int) (int64, error) {
 	if dryRun {
 		var count int64
+		// Simplified query - no joins to resource or reporter_resources tables
 		query := `
 			SELECT COUNT(*)
 			FROM common_representations cr
@@ -163,26 +171,23 @@ func deleteOldCommonRepresentations(db *gorm.DB, logHelper *log.Helper, dryRun b
 				FROM common_representations
 				GROUP BY resource_id
 			) latest ON cr.resource_id = latest.resource_id
-			JOIN resource r ON cr.resource_id = r.id
-			LEFT JOIN reporter_resources rr ON r.id = rr.resource_id
 			WHERE cr.created_at < (latest.latest_created_at - (? || ' days')::INTERVAL)
-			  AND (rr.tombstone = false OR (rr.tombstone = true AND rr.updated_at >= NOW() - (? || ' days')::INTERVAL))
 		`
 
 		if reporterType != "" {
-			query += " AND rr.reporter_type = ?"
-			err := db.Raw(query, fmt.Sprintf("%d", retentionDays), fmt.Sprintf("%d", tombstoneDays), reporterType).Scan(&count).Error
+			query += " AND cr.reported_by_reporter_type = ?"
+			err := db.Raw(query, fmt.Sprintf("%d", retentionDays), reporterType).Scan(&count).Error
 			if err != nil {
 				return 0, err
 			}
 		} else {
-			err := db.Raw(query, fmt.Sprintf("%d", retentionDays), fmt.Sprintf("%d", tombstoneDays)).Scan(&count).Error
+			err := db.Raw(query, fmt.Sprintf("%d", retentionDays)).Scan(&count).Error
 			if err != nil {
 				return 0, err
 			}
 		}
 
-		logDryRunEstimate(logHelper, "CommonRepresentation (old representations)", count, batchSize, batchDelayMs)
+		logDryRunEstimate(logHelper, "CommonRepresentation (old representations, retention only)", count, batchSize, batchDelayMs)
 		return count, nil
 	}
 
@@ -229,25 +234,26 @@ func deleteOldCommonRepresentations(db *gorm.DB, logHelper *log.Helper, dryRun b
 		var deleteQuery string
 		var args []interface{}
 
-		// Use temp table instead of recalculating window function
+		// OPTIMIZED: Use temp table with minimal joins
+		// NOTE: This only handles retention cleanup (old versions for active resources).
+		// Orphaned common_representations (when ALL reporters deleted) are NOT handled here.
+		// That would require separate orphan cleanup job checking resource existence.
 		baseQuery := `
 			DELETE FROM common_representations
 			WHERE (resource_id, version) IN (
 				SELECT cr.resource_id, cr.version
 				FROM common_representations cr
 				JOIN latest_common_timestamps lt ON cr.resource_id = lt.resource_id
-				JOIN resource r ON cr.resource_id = r.id
-				LEFT JOIN reporter_resources rr ON r.id = rr.resource_id
 				WHERE cr.created_at < (lt.latest_created_at - (? || ' days')::INTERVAL)
-				  AND (rr.tombstone = false OR (rr.tombstone = true AND rr.updated_at >= NOW() - (? || ' days')::INTERVAL))
 		`
 
 		if reporterType != "" {
-			deleteQuery = baseQuery + " AND rr.reporter_type = ? LIMIT ?)"
-			args = []interface{}{fmt.Sprintf("%d", retentionDays), fmt.Sprintf("%d", tombstoneDays), reporterType, batchSize}
+			// When filtering by reporter_type, we need to check reported_by column
+			deleteQuery = baseQuery + " AND cr.reported_by_reporter_type = ? LIMIT ?)"
+			args = []interface{}{fmt.Sprintf("%d", retentionDays), reporterType, batchSize}
 		} else {
 			deleteQuery = baseQuery + " LIMIT ?)"
-			args = []interface{}{fmt.Sprintf("%d", retentionDays), fmt.Sprintf("%d", tombstoneDays), batchSize}
+			args = []interface{}{fmt.Sprintf("%d", retentionDays), batchSize}
 		}
 
 		result := db.Exec(deleteQuery, args...)

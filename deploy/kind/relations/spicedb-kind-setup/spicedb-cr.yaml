@@ -12,13 +12,64 @@ spec:
     #datastoreTLSSecretName: datastore-tls
     replicas: 1
   secretName: spicedb-config
-
+  patches:
+    - kind: Job
+      patch:
+        spec:
+          template:
+            spec:
+              securityContext:
+                runAsNonRoot: true
+                seccompProfile:
+                  type: RuntimeDefault
+              containers:
+                - name: migrate
+                  securityContext:
+                    runAsNonRoot: true
+                    allowPrivilegeEscalation: false
+                    readOnlyRootFilesystem: true
+                    capabilities:
+                      drop:
+                        - ALL
+                  resources:
+                    requests:
+                      cpu: 100m
+                      memory: 128Mi
+                    limits:
+                      cpu: 500m
+                      memory: 512Mi
+    - kind: Deployment
+      patch:
+        spec:
+          template:
+            spec:
+              securityContext:
+                runAsNonRoot: true
+                seccompProfile:
+                  type: RuntimeDefault
+              containers:
+                - name: spicedb
+                  securityContext:
+                    runAsNonRoot: true
+                    allowPrivilegeEscalation: false
+                    readOnlyRootFilesystem: true
+                    capabilities:
+                      drop:
+                        - ALL
+                  resources:
+                    requests:
+                      cpu: 100m
+                      memory: 256Mi
+                    limits:
+                      cpu: 500m
+                      memory: 1Gi
 ---
 apiVersion: v1
 kind: Secret
 metadata:
   name: spicedb-config
 stringData:
+  # Development-only SpiceDB credentials.
   datastore_uri: "postgres://postgres:yPsw5e6ab4bvAGe5H@postgres:5432/spicedb?sslmode=disable"
   preshared_key: "foobar"
 ---
@@ -33,4 +84,3 @@ stringData:
 #    --- example aws rds ca cert
 #     -----END CERTIFICATE-----
 # ---
-

@@ -29,6 +29,11 @@ spec:
       labels:
         app: postgres
     spec:
+      securityContext:
+        runAsNonRoot: true
+        fsGroup: 999
+        seccompProfile:
+          type: RuntimeDefault
       containers:
       - image: postgres:17.8
         name: postgres
@@ -42,7 +47,13 @@ spec:
         - containerPort: 5432
           name: postgres
         securityContext:
+          runAsNonRoot: true
+          allowPrivilegeEscalation: false
           privileged: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+              - ALL
         volumeMounts:
         - name: postgres-storage
           mountPath: /var/lib/postgresql/data
@@ -53,8 +64,16 @@ spec:
             requests:
               memory: 256Mi
               cpu: "0.2"
+        volumeMounts:
+        - name: postgres-tmp
+          mountPath: /tmp
+        - name: postgres-run
+          mountPath: /var/run/postgresql
       volumes:
       - name: postgres-storage
         persistentVolumeClaim:
           claimName: postgres-pvc
-
+      - name: postgres-tmp
+        emptyDir: {}
+      - name: postgres-run
+        emptyDir: {}

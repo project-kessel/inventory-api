@@ -107,6 +107,10 @@ objects:
         - name: api
           replicas: ${{REPLICAS}}
           podSpec:
+            securityContext:
+              runAsNonRoot: true
+              seccompProfile:
+                type: RuntimeDefault
             initContainers:
               - name: fetch-spicedb-schema
                 image: ${SCHEMA_INIT_IMAGE}
@@ -116,6 +120,20 @@ objects:
                   - |
                     curl -sSfL -o /etc/spicedb-schema/schema.zed \
                       "https://raw.githubusercontent.com/${SPICEDB_SCHEMA_REPO}/${SPICEDB_SCHEMA_REF}/${SPICEDB_SCHEMA_PATH}"
+                securityContext:
+                  runAsNonRoot: true
+                  allowPrivilegeEscalation: false
+                  readOnlyRootFilesystem: true
+                  capabilities:
+                    drop:
+                      - ALL
+                resources:
+                  requests:
+                    cpu: 10m
+                    memory: 32Mi
+                  limits:
+                    cpu: 100m
+                    memory: 128Mi
                 inheritEnv: false
                 volumeMounts:
                   - name: spicedb-schema
@@ -123,6 +141,22 @@ objects:
               - name: copy-resources
                 image: registry.access.redhat.com/ubi9
                 imagePullPolicy: Always
+                securityContext:
+                  runAsUser: 1001
+                  runAsGroup: 1001
+                  runAsNonRoot: true
+                  allowPrivilegeEscalation: false
+                  readOnlyRootFilesystem: true
+                  capabilities:
+                    drop:
+                      - ALL
+                resources:
+                  requests:
+                    cpu: 10m
+                    memory: 32Mi
+                  limits:
+                    cpu: 100m
+                    memory: 128Mi
                 command:
                   - /bin/sh
                   - "-c"
@@ -138,11 +172,39 @@ objects:
               - name: migration
                 image: ${INVENTORY_IMAGE}:${IMAGE_TAG}
                 imagePullPolicy: Always
+                securityContext:
+                  runAsNonRoot: true
+                  allowPrivilegeEscalation: false
+                  readOnlyRootFilesystem: true
+                  capabilities:
+                    drop:
+                      - ALL
+                resources:
+                  requests:
+                    cpu: 100m
+                    memory: 256Mi
+                  limits:
+                    cpu: 500m
+                    memory: 1Gi
                 command: ["inventory-api"]
                 args: ["migrate"]
                 inheritEnv: true
             image: ${INVENTORY_IMAGE}:${IMAGE_TAG}
             imagePullPolicy: Always
+            securityContext:
+              runAsNonRoot: true
+              allowPrivilegeEscalation: false
+              readOnlyRootFilesystem: true
+              capabilities:
+                drop:
+                  - ALL
+            resources:
+              requests:
+                cpu: 250m
+                memory: 512Mi
+              limits:
+                cpu: 500m
+                memory: 1Gi
             command: ["inventory-api"]
             args: ["serve"]
             livenessProbe:
@@ -224,10 +286,21 @@ objects:
                 job-type: metrics-collect
             spec:
               restartPolicy: OnFailure
+              securityContext:
+                runAsNonRoot: true
+                seccompProfile:
+                  type: RuntimeDefault
               containers:
                 - name: metrics-collect
                   image: ${INVENTORY_IMAGE}:${IMAGE_TAG}
                   imagePullPolicy: Always
+                  securityContext:
+                    runAsNonRoot: true
+                    allowPrivilegeEscalation: false
+                    readOnlyRootFilesystem: true
+                    capabilities:
+                      drop:
+                        - ALL
                   command:
                     - inventory-api
                     - run-job

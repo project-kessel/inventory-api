@@ -164,9 +164,25 @@ while true; do
       --image=fullstorydev/grpcurl:latest \
       --overrides="$(jq -n --arg data "$SCHEMA_JSON" '{
         "spec": {
+          "securityContext": {
+            "runAsNonRoot": true,
+            "seccompProfile": {"type": "RuntimeDefault"}
+          },
           "containers": [{
             "name": "schema-loader",
             "image": "fullstorydev/grpcurl:latest",
+            "securityContext": {
+              "runAsUser": 65532,
+              "runAsGroup": 65532,
+              "runAsNonRoot": true,
+              "allowPrivilegeEscalation": false,
+              "readOnlyRootFilesystem": true,
+              "capabilities": {"drop": ["ALL"]}
+            },
+            "resources": {
+              "requests": {"cpu": "10m", "memory": "16Mi"},
+              "limits": {"cpu": "100m", "memory": "64Mi"}
+            },
             "command": ["grpcurl", "-plaintext",
               "-H", "Authorization: Bearer foobar",
               "-d", $data,

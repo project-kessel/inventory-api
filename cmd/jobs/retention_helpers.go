@@ -361,15 +361,43 @@ func deleteOldTombstonedResources(db *gorm.DB, logHelper *log.Helper, dryRun boo
 	}
 
 	// Clean up orphaned resources (no reporter_resources reference them)
-	orphanedQuery := `
-		DELETE FROM resource
-		WHERE id NOT IN (SELECT DISTINCT resource_id FROM reporter_resources)
-	`
-	orphanedResult := db.Exec(orphanedQuery)
-	if orphanedResult.Error != nil {
-		logHelper.Errorf("Failed to clean up orphaned resources: %v", orphanedResult.Error)
-	} else if orphanedResult.RowsAffected > 0 {
-		logHelper.Infof("Cleaned up %d orphaned resources", orphanedResult.RowsAffected)
+	// Using batched LEFT JOIN instead of NOT IN for better performance on large datasets
+	logHelper.Info("Cleaning up orphaned resources...")
+	var totalOrphaned int64
+	orphanedBatch := 0
+
+	for {
+		orphanedQuery := `
+			DELETE FROM resource
+			WHERE id IN (
+				SELECT r.id
+				FROM resource r
+				LEFT JOIN reporter_resources rr ON r.id = rr.resource_id
+				WHERE rr.resource_id IS NULL
+				LIMIT 1000
+			)
+		`
+		orphanedResult := db.Exec(orphanedQuery)
+		if orphanedResult.Error != nil {
+			logHelper.Errorf("Failed to clean up orphaned resources batch %d: %v", orphanedBatch+1, orphanedResult.Error)
+			break
+		}
+
+		if orphanedResult.RowsAffected == 0 {
+			break
+		}
+
+		totalOrphaned += orphanedResult.RowsAffected
+		orphanedBatch++
+		logHelper.Infof("Orphaned batch %d: Deleted %d orphaned resources (total so far: %d)", orphanedBatch, orphanedResult.RowsAffected, totalOrphaned)
+
+		if batchDelayMs > 0 {
+			time.Sleep(time.Duration(batchDelayMs) * time.Millisecond)
+		}
+	}
+
+	if totalOrphaned > 0 {
+		logHelper.Infof("Cleaned up %d orphaned resources total", totalOrphaned)
 	}
 
 	return totalDeleted, nil

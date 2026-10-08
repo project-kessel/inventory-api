@@ -88,6 +88,10 @@ func (r ReporterRepresentation) IsTombstone() bool {
 	return r.tombstone.Bool()
 }
 
+func (r ReporterRepresentation) Generation() Generation {
+	return r.generation
+}
+
 func (rr ReporterRepresentation) Serialize() ReporterRepresentationSnapshot {
 	var reporterVersionStr *string
 	if rr.reporterVersion != nil {

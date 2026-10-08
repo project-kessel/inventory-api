@@ -13,10 +13,13 @@ spec:
         runAsNonRoot: true
         seccompProfile:
           type: RuntimeDefault
+      automountServiceAccountToken: false
       initContainers:
         - name: wait-for-inventory
           image: curlimages/curl:latest
           securityContext:
+            runAsUser: 100
+            runAsGroup: 101
             runAsNonRoot: true
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true

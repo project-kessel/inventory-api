@@ -82,14 +82,6 @@ spec:
           capabilities:
             drop:
               - ALL
-      initContainer:
-        securityContext:
-          runAsNonRoot: true
-          allowPrivilegeEscalation: false
-          readOnlyRootFilesystem: true
-          capabilities:
-            drop:
-              - ALL
     storage:
       type: ephemeral
 

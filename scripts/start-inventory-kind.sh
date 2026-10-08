@@ -134,6 +134,21 @@ SPICEDB_OPERATOR_BUNDLE_URL="https://github.com/authzed/spicedb-operator/release
 kubectl get crd spicedbclusters.authzed.com > /dev/null 2>&1 || \
   kubectl apply --server-side -f "${SPICEDB_OPERATOR_BUNDLE_URL}"
 
+# Podman cannot route the Kubernetes service ClusterIP from a pod. Run the
+# SpiceDB operator on the Kind node network so it can reach the API server.
+if [ "$DOCKER" = "podman" ]; then
+  echo "Patching SpiceDB operator for Podman networking..."
+  for i in $(seq 1 60); do
+    if kubectl get deployment/spicedb-operator -n spicedb-operator >/dev/null 2>&1; then
+      break
+    fi
+    sleep 2
+  done
+  kubectl patch deployment/spicedb-operator -n spicedb-operator --type=merge \
+    -p '{"spec":{"template":{"spec":{"hostNetwork":true,"dnsPolicy":"ClusterFirstWithHostNet"}}}}'
+  kubectl rollout status deployment/spicedb-operator -n spicedb-operator --timeout=120s
+fi
+
 kubectl apply -f deploy/kind/relations/spicedb-kind-setup/spicedb-cr.yaml
 kubectl apply -f deploy/kind/relations/spicedb-kind-setup/svc-ingress.yaml
 kubectl apply -f deploy/kind/relations/spicedb-kind-setup/relations-api/secret.yaml
@@ -168,6 +183,7 @@ while true; do
             "runAsNonRoot": true,
             "seccompProfile": {"type": "RuntimeDefault"}
           },
+          "automountServiceAccountToken": false,
           "containers": [{
             "name": "schema-loader",
             "image": "fullstorydev/grpcurl:latest",

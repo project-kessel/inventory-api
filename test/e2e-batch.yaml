@@ -9,6 +9,7 @@ spec:
         runAsNonRoot: true
         seccompProfile:
           type: RuntimeDefault
+      automountServiceAccountToken: false
       containers:
         - name: inventory-e2e-tests
           image: localhost/inventory-e2e-tests:latest

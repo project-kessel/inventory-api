@@ -21,6 +21,7 @@ objects:
             job-type: ${JOB_NAME}
         spec:
           restartPolicy: Never
+          automountServiceAccountToken: false
           securityContext:
             runAsNonRoot: true
             seccompProfile:

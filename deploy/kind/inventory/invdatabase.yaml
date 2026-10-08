@@ -31,20 +31,18 @@ spec:
         app: invdatabase
     spec:
       securityContext:
-        runAsNonRoot: true
         fsGroup: 999
         seccompProfile:
           type: RuntimeDefault
       containers:
         - name: postgres
-          image: postgres:latest
+          image: postgres:17.8
           securityContext:
-            runAsNonRoot: true
+            # The PostgreSQL entrypoint initializes and owns mounted data as root.
+            runAsUser: 0
+            runAsNonRoot: false
             allowPrivilegeEscalation: false
-            readOnlyRootFilesystem: true
-            capabilities:
-              drop:
-                - ALL
+            readOnlyRootFilesystem: false
           resources:
             requests:
               cpu: 100m
@@ -57,6 +55,12 @@ spec:
           - name: postgres-config
             mountPath: /etc/postgresql/postgresql.conf
             subPath: postgresql.conf
+          - name: postgres-data
+            mountPath: /var/lib/postgresql/data
+          - name: postgres-tmp
+            mountPath: /tmp
+          - name: postgres-run
+            mountPath: /var/run/postgresql
           env:
             - name: POSTGRES_DB
               value: spicedb
@@ -69,13 +73,6 @@ spec:
                   key: db_password
           ports:
             - containerPort: 5432
-          volumeMounts:
-            - name: postgres-data
-              mountPath: /var/lib/postgresql/data
-            - name: postgres-tmp
-              mountPath: /tmp
-            - name: postgres-run
-              mountPath: /var/run/postgresql
       volumes:
         - name: postgres-config
           configMap:

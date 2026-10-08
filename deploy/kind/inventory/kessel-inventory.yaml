@@ -46,7 +46,7 @@ spec:
             - "-c"
             - |
               echo "Extracting resources from tarball..."
-              tar -xzf /mnt/resources/resources.tar.gz -C /data/schema/resources
+               tar --no-same-owner --no-same-permissions --no-overwrite-dir --touch -xzf /mnt/resources/resources.tar.gz -C /data/schema/resources
               echo "Extraction complete!"
           volumeMounts:
             - name: resources-tarball

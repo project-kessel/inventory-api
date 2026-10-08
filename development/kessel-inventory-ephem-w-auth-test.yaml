@@ -92,16 +92,36 @@ objects:
         - name: api
           replicas: ${{REPLICAS}}
           podSpec:
+            securityContext:
+              runAsNonRoot: true
+              seccompProfile:
+                type: RuntimeDefault
             initContainers:
               - name: copy-resources
                 image: registry.access.redhat.com/ubi9
                 imagePullPolicy: Always
+                securityContext:
+                  runAsUser: 1001
+                  runAsGroup: 1001
+                  runAsNonRoot: true
+                  allowPrivilegeEscalation: false
+                  readOnlyRootFilesystem: true
+                  capabilities:
+                    drop:
+                      - ALL
+                resources:
+                  requests:
+                    cpu: 10m
+                    memory: 32Mi
+                  limits:
+                    cpu: 100m
+                    memory: 128Mi
                 command:
                   - /bin/sh
                   - "-c"
                   - |
                     echo "Extracting resources from tarball..."
-                    tar -xzf /mnt/resources/resources.tar.gz -C /data/schema/resources
+                     tar --no-same-owner --no-same-permissions --no-overwrite-dir --touch -xzf /mnt/resources/resources.tar.gz -C /data/schema/resources
                     echo "Extraction complete!"
                 volumeMounts:
                   - name: resources-tarball
@@ -111,11 +131,38 @@ objects:
               - name: migration
                 image: ${INVENTORY_IMAGE}:${IMAGE_TAG}
                 imagePullPolicy: Always
+                securityContext:
+                  runAsNonRoot: true
+                  allowPrivilegeEscalation: false
+                  readOnlyRootFilesystem: true
+                  capabilities:
+                    drop:
+                      - ALL
+                resources:
+                  requests:
+                    cpu: 100m
+                    memory: 256Mi
+                  limits:
+                    cpu: 500m
+                    memory: 1Gi
                 command: ["inventory-api"]
                 args: ["migrate"]
                 inheritEnv: true
             image: ${INVENTORY_IMAGE}:${IMAGE_TAG}
             imagePullPolicy: Always
+            containerSecurityContext:
+              allowPrivilegeEscalation: false
+              readOnlyRootFilesystem: true
+              capabilities:
+                drop:
+                  - ALL
+            resources:
+              requests:
+                cpu: 250m
+                memory: 512Mi
+              limits:
+                cpu: 500m
+                memory: 1Gi
             command: ["inventory-api"]
             args: ["serve"]
             livenessProbe:

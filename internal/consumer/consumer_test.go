@@ -1056,7 +1056,9 @@ func TestInventoryConsumer_RestoreDeletedHostWithSameWorkspace(t *testing.T) {
 	require.NoError(t, testData.Resource.Update(testData.Key, testData.ApiHref, &testData.ConsoleHref,
 		nil, &testData.ReporterRepresentation, &testData.CommonRepresentation, restoreTransactionId))
 	process(model.OperationTypeUpdated, restoreTransactionId)
-	_, restored, _, _, err := testData.Resource.Serialize()
+	persistedResource, err := repo.FindResourceByKeys(nil, testData.Key)
+	require.NoError(t, err)
+	_, restored, _, _, err := persistedResource.Serialize()
 	require.NoError(t, err)
 	require.False(t, restored.Tombstone)
 	require.Equal(t, uint(1), restored.Generation)

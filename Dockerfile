@@ -16,7 +16,7 @@ COPY internal ./internal
 COPY main.go Makefile ./
 
 ARG VERSION
-RUN VERSION=${VERSION} make build
+RUN VERSION=${VERSION} GOARCH=${TARGETARCH} make build
 
 # Runtime stage — set GODEBUG so the binary runs in FIPS mode.
 FROM registry.access.redhat.com/hi/core-runtime:2.43-openssl-fips

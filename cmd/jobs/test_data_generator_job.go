@@ -89,7 +89,7 @@ func generateTestData(storageOptions *storage.Options, loggerOptions common.Logg
 			end = resourcesCount
 		}
 
-		err := generateResourceBatch(db, logHelper, i, end, versionsPerResource, oldDataDays, tombstonePercent, oldTombstonePercent,
+		err := generateResourceBatch(db, logHelper, i, end, resourcesCount, versionsPerResource, oldDataDays, tombstonePercent, oldTombstonePercent,
 			&createdResources, &createdReporterResources, &createdReporterRepresentations, &createdCommonRepresentations)
 		if err != nil {
 			return fmt.Errorf("failed to generate batch %d-%d: %w", i, end, err)
@@ -118,7 +118,7 @@ func generateTestData(storageOptions *storage.Options, loggerOptions common.Logg
 	return nil
 }
 
-func generateResourceBatch(db *gorm.DB, logHelper *log.Helper, start int, end int, versionsPerResource int, oldDataDays int,
+func generateResourceBatch(db *gorm.DB, logHelper *log.Helper, start int, end int, resourcesCount int, versionsPerResource int, oldDataDays int,
 	tombstonePercent int, oldTombstonePercent int,
 	createdResources *int, createdReporterResources *int, createdReporterRepresentations *int, createdCommonRepresentations *int) error {
 
@@ -142,10 +142,10 @@ func generateResourceBatch(db *gorm.DB, logHelper *log.Helper, start int, end in
 		resources = append(resources, resource)
 
 		// Determine tombstone state
-		isTombstoned := (i*100)/end < tombstonePercent
+		isTombstoned := (i*100)/resourcesCount < tombstonePercent
 		var tombstoneAge time.Duration
 		if isTombstoned {
-			isOldTombstone := (i*100)/(end*tombstonePercent/100) < oldTombstonePercent
+			isOldTombstone := (i*100)/(resourcesCount*tombstonePercent/100) < oldTombstonePercent
 			if isOldTombstone {
 				// Tombstoned >30 days ago (30-60 days)
 				tombstoneAge = time.Duration(30+i%30) * 24 * time.Hour

@@ -2,6 +2,7 @@ package consumer
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"testing"
 
@@ -977,4 +978,88 @@ func TestInventoryConsumer_UpdateWithSameWorkspace_NoOp(t *testing.T) {
 	assert.Equal(t, "", resp)
 	// Verify no relations operations occurred - version should still be 1 (initial)
 	assert.Equal(t, int64(1), relationsRepo.Version(), "No relations operations should occur when workspace doesn't change")
+}
+
+func TestInventoryConsumer_RestoreDeletedHostWithSameWorkspace(t *testing.T) {
+	tester := TestCase{}
+	require.Empty(t, tester.TestSetup(t))
+	ctx := context.Background()
+	testData, err := model.NewResourceFixture("test-host", "host", "hbi", "test-instance", "test-workspace-same")
+	require.NoError(t, err)
+	relationsRepo := data.NewSimpleRelationsRepository()
+	tester.inv.Relations = relationsRepo
+	repo := tester.inv.ResourceRepository
+
+	// Persist each lifecycle step before consuming its event, as the CDC pipeline does.
+	process := func(operation model.EventOperationType, transactionId model.TransactionId) {
+		t.Helper()
+		require.NoError(t, repo.Save(tester.inv.DB, *testData.Resource, operation, transactionId))
+		resourceSnapshot, reporterSnapshot, _, _, err := testData.Resource.Serialize()
+		require.NoError(t, err)
+		require.NotNil(t, resourceSnapshot.CommonVersion)
+		commonVersion := model.NewVersion(*resourceSnapshot.CommonVersion)
+		reporterVersion := model.NewVersion(reporterSnapshot.RepresentationVersion)
+		commonVersionForEvent := &commonVersion
+		if operation.OperationType() == model.OperationTypeDeleted {
+			commonVersionForEvent = nil
+		}
+		event, err := model.NewTupleEvent(testData.Key, commonVersionForEvent, &reporterVersion)
+		require.NoError(t, err)
+		payload, err := json.Marshal(map[string]interface{}{"payload": event})
+		require.NoError(t, err)
+		msg := &kafka.Message{
+			Key: []byte(testMessageKey), Value: payload,
+			Headers: []kafka.Header{
+				{Key: "operation", Value: []byte(string(operation.OperationType()))},
+				{Key: "txid", Value: []byte(transactionId.String())},
+			},
+		}
+		headers, err := ParseHeaders(msg)
+		require.NoError(t, err)
+		_, err = tester.inv.ProcessMessage(headers, true, msg)
+		require.NoError(t, err)
+	}
+
+	// 1. Create the host and verify its workspace relationship exists.
+	process(model.OperationTypeCreated, testData.InitialTransactionId)
+	current, err := repo.FindLatestRepresentations(nil, testData.Key)
+	require.NoError(t, err)
+	tuples, err := tester.inv.SchemaService.CalculateTuplesForResource(ctx, current, nil, testData.Key)
+	require.NoError(t, err)
+	require.NotNil(t, tuples.TuplesToCreate())
+	require.Len(t, *tuples.TuplesToCreate(), 1)
+	workspaceTuple := (*tuples.TuplesToCreate())[0]
+	workspaceRelationship := model.NewRelationship(workspaceTuple.Object(), workspaceTuple.Relation(), workspaceTuple.Subject())
+	assertWorkspace := func(want bool, message string) {
+		t.Helper()
+		result, err := relationsRepo.CheckForUpdate(ctx, workspaceRelationship)
+		require.NoError(t, err)
+		require.Equal(t, want, result.Allowed(), message)
+	}
+	assertWorkspace(true, "creation must establish the workspace relationship")
+
+	// 2. Tombstone the host and consume the deletion before reporting it again.
+	testData.Resource, err = repo.FindResourceByKeys(nil, testData.Key)
+	require.NoError(t, err)
+	require.NoError(t, testData.Resource.Delete(testData.Key))
+	process(model.OperationTypeDeleted, model.NewTransactionId("tx-delete"))
+	_, deleted, _, _, err := testData.Resource.Serialize()
+	require.NoError(t, err)
+	require.True(t, deleted.Tombstone)
+	assertWorkspace(false, "deletion must remove the workspace relationship")
+
+	// 3. Restore with unchanged common data, emitting an updated event.
+	// Reporter versions reset to zero; common versions continue across generations.
+	testData.Resource, err = repo.FindResourceByKeys(nil, testData.Key)
+	require.NoError(t, err)
+	restoreTransactionId := model.NewTransactionId("tx-restore")
+	require.NoError(t, testData.Resource.Update(testData.Key, testData.ApiHref, &testData.ConsoleHref,
+		nil, &testData.ReporterRepresentation, &testData.CommonRepresentation, restoreTransactionId))
+	process(model.OperationTypeUpdated, restoreTransactionId)
+	_, restored, _, _, err := testData.Resource.Serialize()
+	require.NoError(t, err)
+	require.False(t, restored.Tombstone)
+	require.Equal(t, uint(1), restored.Generation)
+	require.Equal(t, uint(0), restored.RepresentationVersion)
+	assertWorkspace(true, "restoration must rebuild the workspace relationship even when the workspace is unchanged")
 }

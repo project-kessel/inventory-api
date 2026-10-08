@@ -11,6 +11,9 @@ func ReporterRepresentationsHistoryIdxMigration() *gormigrate.Migration {
 		ID: "20261005120000",
 		Migrate: func(tx *gorm.DB) error {
 			if tx.Name() == "postgres" {
+				if err := tx.Exec(`DROP INDEX CONCURRENTLY IF EXISTS reporter_representations_history_idx`).Error; err != nil {
+					return err
+				}
 				return tx.Exec(`CREATE INDEX CONCURRENTLY reporter_representations_history_idx
 					ON reporter_representations (reporter_resource_id, generation DESC, version DESC)`).Error
 			}

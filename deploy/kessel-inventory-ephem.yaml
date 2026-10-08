@@ -109,6 +109,7 @@ objects:
           podSpec:
             securityContext:
               runAsNonRoot: true
+              fsGroup: 1001
               seccompProfile:
                 type: RuntimeDefault
             initContainers:

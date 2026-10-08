@@ -43,6 +43,14 @@ spec:
             runAsNonRoot: false
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: false
+            capabilities:
+              drop:
+                - ALL
+              add:
+                - CHOWN
+                - SETUID
+                - SETGID
+                - DAC_OVERRIDE
           resources:
             requests:
               cpu: 100m

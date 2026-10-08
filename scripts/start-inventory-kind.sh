@@ -138,12 +138,18 @@ kubectl get crd spicedbclusters.authzed.com > /dev/null 2>&1 || \
 # SpiceDB operator on the Kind node network so it can reach the API server.
 if [ "$DOCKER" = "podman" ]; then
   echo "Patching SpiceDB operator for Podman networking..."
+  SPICEDB_OPERATOR_FOUND=false
   for i in $(seq 1 60); do
     if kubectl get deployment/spicedb-operator -n spicedb-operator >/dev/null 2>&1; then
+      SPICEDB_OPERATOR_FOUND=true
       break
     fi
     sleep 2
   done
+  if [ "$SPICEDB_OPERATOR_FOUND" != true ]; then
+    echo "ERROR: Timed out waiting for deployment/spicedb-operator in namespace spicedb-operator" >&2
+    exit 1
+  fi
   kubectl patch deployment/spicedb-operator -n spicedb-operator --type=merge \
     -p '{"spec":{"template":{"spec":{"hostNetwork":true,"dnsPolicy":"ClusterFirstWithHostNet"}}}}'
   kubectl rollout status deployment/spicedb-operator -n spicedb-operator --timeout=120s

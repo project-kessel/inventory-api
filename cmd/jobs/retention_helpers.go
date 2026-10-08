@@ -224,39 +224,80 @@ func deleteOldCommonRepresentations(db *gorm.DB, logHelper *log.Helper, dryRun b
 		logHelper.Warnf("Failed to create index on temp table (non-fatal): %v", err)
 	}
 
-	// Now delete in batches using the temp table (FAST)
+	// COLLECT-THEN-DELETE OPTIMIZATION:
+	// Identify all rows to delete ONCE, then delete from static list in batches
+	logHelper.Info("Collecting rows to delete (one-time scan)...")
+
+	createRowsTable := `
+		CREATE TEMP TABLE IF NOT EXISTS rows_to_delete (
+			resource_id UUID NOT NULL,
+			version INT NOT NULL
+		)
+	`
+	if err := db.Exec(createRowsTable).Error; err != nil {
+		logHelper.Errorf("Failed to create rows_to_delete table: %v", err)
+		return 0, err
+	}
+
+	// Populate with all rows to delete (expensive scan happens ONCE here)
+	var populateRowsQuery string
+	var populateArgs []interface{}
+
+	if reporterType != "" {
+		populateRowsQuery = `
+			INSERT INTO rows_to_delete (resource_id, version)
+			SELECT cr.resource_id, cr.version
+			FROM common_representations cr
+			JOIN latest_common_timestamps lt ON cr.resource_id = lt.resource_id
+			WHERE cr.created_at < (lt.latest_created_at - (? || ' days')::INTERVAL)
+			  AND cr.reported_by_reporter_type = ?
+		`
+		populateArgs = []interface{}{fmt.Sprintf("%d", retentionDays), reporterType}
+	} else {
+		populateRowsQuery = `
+			INSERT INTO rows_to_delete (resource_id, version)
+			SELECT cr.resource_id, cr.version
+			FROM common_representations cr
+			JOIN latest_common_timestamps lt ON cr.resource_id = lt.resource_id
+			WHERE cr.created_at < (lt.latest_created_at - (? || ' days')::INTERVAL)
+		`
+		populateArgs = []interface{}{fmt.Sprintf("%d", retentionDays)}
+	}
+
+	collectStart := time.Now()
+	if err := db.Exec(populateRowsQuery, populateArgs...).Error; err != nil {
+		logHelper.Errorf("Failed to populate rows_to_delete: %v", err)
+		return 0, err
+	}
+
+	// Get count of rows to delete
+	var rowsToDeleteCount int64
+	if err := db.Raw("SELECT COUNT(*) FROM rows_to_delete").Scan(&rowsToDeleteCount).Error; err != nil {
+		logHelper.Warnf("Failed to count rows_to_delete: %v", err)
+	} else {
+		logHelper.Infof("Identified %d rows to delete in %v", rowsToDeleteCount, time.Since(collectStart))
+	}
+
+	// Create index for faster batch deletes
+	db.Exec("CREATE INDEX IF NOT EXISTS idx_rows_to_delete ON rows_to_delete(resource_id, version)")
+
+	// Now delete in batches from the static list (FAST - no table scan per batch)
 	var totalDeleted int64
 	batchCount := 0
 
-	logHelper.Info("Deleting old common_representations using temp table...")
+	logHelper.Info("Deleting in batches from collected list...")
 
 	for {
-		var deleteQuery string
-		var args []interface{}
-
-		// OPTIMIZED: Use temp table with minimal joins
-		// NOTE: This only handles retention cleanup (old versions for active resources).
-		// Orphaned common_representations (when ALL reporters deleted) are NOT handled here.
-		// That would require separate orphan cleanup job checking resource existence.
-		baseQuery := `
+		deleteQuery := `
 			DELETE FROM common_representations
 			WHERE (resource_id, version) IN (
-				SELECT cr.resource_id, cr.version
-				FROM common_representations cr
-				JOIN latest_common_timestamps lt ON cr.resource_id = lt.resource_id
-				WHERE cr.created_at < (lt.latest_created_at - (? || ' days')::INTERVAL)
+				SELECT resource_id, version
+				FROM rows_to_delete
+				LIMIT ?
+			)
 		`
 
-		if reporterType != "" {
-			// When filtering by reporter_type, we need to check reported_by column
-			deleteQuery = baseQuery + " AND cr.reported_by_reporter_type = ? LIMIT ?)"
-			args = []interface{}{fmt.Sprintf("%d", retentionDays), reporterType, batchSize}
-		} else {
-			deleteQuery = baseQuery + " LIMIT ?)"
-			args = []interface{}{fmt.Sprintf("%d", retentionDays), batchSize}
-		}
-
-		result := db.Exec(deleteQuery, args...)
+		result := db.Exec(deleteQuery, batchSize)
 		if result.Error != nil {
 			logHelper.Errorf("Failed to delete CommonRepresentation batch %d: %v", batchCount+1, result.Error)
 			return totalDeleted, result.Error
@@ -265,6 +306,14 @@ func deleteOldCommonRepresentations(db *gorm.DB, logHelper *log.Helper, dryRun b
 		if result.RowsAffected == 0 {
 			break
 		}
+
+		// Remove deleted rows from rows_to_delete list
+		db.Exec(`
+			DELETE FROM rows_to_delete
+			WHERE (resource_id, version) IN (
+				SELECT resource_id, version FROM rows_to_delete LIMIT ?
+			)
+		`, result.RowsAffected)
 
 		totalDeleted += result.RowsAffected
 		batchCount++
@@ -276,9 +325,10 @@ func deleteOldCommonRepresentations(db *gorm.DB, logHelper *log.Helper, dryRun b
 		}
 	}
 
-	// Manually drop temp table
+	// Manually drop temp tables
+	db.Exec("DROP TABLE IF EXISTS rows_to_delete")
 	db.Exec("DROP TABLE IF EXISTS latest_common_timestamps")
-	logHelper.Info("Cleanup complete, temp table dropped")
+	logHelper.Info("Cleanup complete, temp tables dropped")
 
 	return totalDeleted, nil
 }

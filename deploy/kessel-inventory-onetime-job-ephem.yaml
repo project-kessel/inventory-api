@@ -23,10 +23,22 @@ objects:
             job-type: ${JOB_NAME}
         spec:
           restartPolicy: Never
+          automountServiceAccountToken: false
+          securityContext:
+            runAsNonRoot: true
+            seccompProfile:
+              type: RuntimeDefault
           containers:
             - name: ${JOB_NAME}
               image: ${INVENTORY_IMAGE}:${IMAGE_TAG}
               imagePullPolicy: Always
+              securityContext:
+                runAsNonRoot: true
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop:
+                    - ALL
               command:
                 - inventory-api
                 - run-job

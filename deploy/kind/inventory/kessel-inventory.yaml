@@ -17,36 +17,15 @@ spec:
       labels:
         app: kessel-inventory
     spec:
-      securityContext:
-        runAsNonRoot: true
-        fsGroup: 1001
-        seccompProfile:
-          type: RuntimeDefault
       initContainers:
         - name: copy-resources
           image: registry.access.redhat.com/ubi9
-          securityContext:
-            runAsUser: 1001
-            runAsGroup: 1001
-            runAsNonRoot: true
-            allowPrivilegeEscalation: false
-            readOnlyRootFilesystem: true
-            capabilities:
-              drop:
-                - ALL
-          resources:
-            requests:
-              cpu: 10m
-              memory: 32Mi
-            limits:
-              cpu: 100m
-              memory: 128Mi
           command:
             - /bin/sh
             - "-c"
             - |
               echo "Extracting resources from tarball..."
-               tar --no-same-owner --no-same-permissions --no-overwrite-dir --touch -xzf /mnt/resources/resources.tar.gz -C /data/schema/resources
+              tar -xzf /mnt/resources/resources.tar.gz -C /data/schema/resources
               echo "Extraction complete!"
           volumeMounts:
             - name: resources-tarball
@@ -56,20 +35,6 @@ spec:
 
         - name: migration
           image: localhost/inventory-api:e2e-test
-          securityContext:
-            runAsNonRoot: true
-            allowPrivilegeEscalation: false
-            readOnlyRootFilesystem: true
-            capabilities:
-              drop:
-                - ALL
-          resources:
-            requests:
-              cpu: 100m
-              memory: 256Mi
-            limits:
-              cpu: 500m
-              memory: 1Gi
           command:
             - /bin/sh
             - "-c"
@@ -115,20 +80,6 @@ spec:
       containers:
         - name: api
           image: localhost/inventory-api:e2e-test
-          securityContext:
-            runAsNonRoot: true
-            allowPrivilegeEscalation: false
-            readOnlyRootFilesystem: true
-            capabilities:
-              drop:
-                - ALL
-          resources:
-            requests:
-              cpu: 250m
-              memory: 512Mi
-            limits:
-              cpu: 500m
-              memory: 1Gi
           command: ["inventory-api"]
           args: ["serve"]
           env:
@@ -289,7 +240,6 @@ stringData:
         host: "invdatabase"
         port: "5433"
         user: "postgres"
-        # Development-only database credential.
         password: "yPsw5e6ab4bvAGe5H"
         dbname: "spicedb"
     service:

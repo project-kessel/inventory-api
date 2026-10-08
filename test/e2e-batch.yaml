@@ -5,28 +5,9 @@ metadata:
 spec:
   template:
     spec:
-      securityContext:
-        runAsNonRoot: true
-        seccompProfile:
-          type: RuntimeDefault
-      automountServiceAccountToken: false
       containers:
         - name: inventory-e2e-tests
           image: localhost/inventory-e2e-tests:latest
-          securityContext:
-            runAsNonRoot: true
-            allowPrivilegeEscalation: false
-            readOnlyRootFilesystem: true
-            capabilities:
-              drop:
-                - ALL
-          resources:
-            requests:
-              cpu: 100m
-              memory: 128Mi
-            limits:
-              cpu: 500m
-              memory: 512Mi
           env:
             - name: INV_HTTP_URL
               value: "kessel-inventory-service.default.svc.cluster.local:8081"
@@ -35,7 +16,6 @@ spec:
             - name: POSTGRES_USER
               value: "postgres"
             - name: POSTGRES_PASSWORD
-              # Development-only database credential.
               value: "yPsw5e6ab4bvAGe5H"
             - name: POSTGRES_HOST
               value: "invdatabase.default.svc.cluster.local"

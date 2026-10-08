@@ -29,10 +29,6 @@ spec:
       labels:
         app: postgres
     spec:
-      securityContext:
-        fsGroup: 999
-        seccompProfile:
-          type: RuntimeDefault
       containers:
       - image: postgres:17.8
         name: postgres
@@ -46,19 +42,10 @@ spec:
         - containerPort: 5432
           name: postgres
         securityContext:
-          # The PostgreSQL entrypoint initializes and owns mounted data as root.
-          runAsUser: 0
-          runAsNonRoot: false
-          allowPrivilegeEscalation: false
           privileged: false
-          readOnlyRootFilesystem: false
         volumeMounts:
         - name: postgres-storage
           mountPath: /var/lib/postgresql/data
-        - name: postgres-tmp
-          mountPath: /tmp
-        - name: postgres-run
-          mountPath: /var/run/postgresql
         resources:
             limits:
               memory: 512Mi
@@ -70,7 +57,4 @@ spec:
       - name: postgres-storage
         persistentVolumeClaim:
           claimName: postgres-pvc
-      - name: postgres-tmp
-        emptyDir: {}
-      - name: postgres-run
-        emptyDir: {}
+

@@ -30,45 +30,14 @@ spec:
       labels:
         app: invdatabase
     spec:
-      securityContext:
-        fsGroup: 999
-        seccompProfile:
-          type: RuntimeDefault
       containers:
         - name: postgres
-          image: postgres:17.8
-          securityContext:
-            # The PostgreSQL entrypoint initializes and owns mounted data as root.
-            runAsUser: 0
-            runAsNonRoot: false
-            allowPrivilegeEscalation: false
-            readOnlyRootFilesystem: false
-            capabilities:
-              drop:
-                - ALL
-              add:
-                - CHOWN
-                - SETUID
-                - SETGID
-                - DAC_OVERRIDE
-          resources:
-            requests:
-              cpu: 100m
-              memory: 256Mi
-            limits:
-              cpu: 500m
-              memory: 512Mi
+          image: postgres:latest
           command: [ "docker-entrypoint.sh", "-c", "config_file=/etc/postgresql/postgresql.conf" ]
           volumeMounts:
           - name: postgres-config
             mountPath: /etc/postgresql/postgresql.conf
             subPath: postgresql.conf
-          - name: postgres-data
-            mountPath: /var/lib/postgresql/data
-          - name: postgres-tmp
-            mountPath: /tmp
-          - name: postgres-run
-            mountPath: /var/run/postgresql
           env:
             - name: POSTGRES_DB
               value: spicedb
@@ -85,12 +54,6 @@ spec:
         - name: postgres-config
           configMap:
             name: postgres-config
-        - name: postgres-data
-          emptyDir: {}
-        - name: postgres-tmp
-          emptyDir: {}
-        - name: postgres-run
-          emptyDir: {}
 
 ---
 apiVersion: v1

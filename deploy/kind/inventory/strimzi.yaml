@@ -28,60 +28,10 @@ spec:
       default.replication.factor: 1
       min.insync.replicas: 1
       advertised.listeners: PLAINTEXT://my-cluster-kafka-bootstrap.default.svc.cluster.local:9092
-    resources:
-      requests:
-        cpu: 250m
-        memory: 512Mi
-      limits:
-        cpu: "1"
-        memory: 1Gi
-    template:
-      pod:
-        securityContext:
-          runAsNonRoot: true
-          seccompProfile:
-            type: RuntimeDefault
-      kafkaContainer:
-        securityContext:
-          runAsNonRoot: true
-          allowPrivilegeEscalation: false
-          readOnlyRootFilesystem: true
-          capabilities:
-            drop:
-              - ALL
-      initContainer:
-        securityContext:
-          runAsNonRoot: true
-          allowPrivilegeEscalation: false
-          readOnlyRootFilesystem: true
-          capabilities:
-            drop:
-              - ALL
     storage:
       type: ephemeral
   zookeeper:
     replicas: 1
-    resources:
-      requests:
-        cpu: 100m
-        memory: 256Mi
-      limits:
-        cpu: 500m
-        memory: 512Mi
-    template:
-      pod:
-        securityContext:
-          runAsNonRoot: true
-          seccompProfile:
-            type: RuntimeDefault
-      zookeeperContainer:
-        securityContext:
-          runAsNonRoot: true
-          allowPrivilegeEscalation: false
-          readOnlyRootFilesystem: true
-          capabilities:
-            drop:
-              - ALL
     storage:
       type: ephemeral
 
@@ -94,27 +44,6 @@ metadata:
   name: inventory-kafka-connect
 spec:
   bootstrapServers: my-cluster-kafka-bootstrap.default.svc.cluster.local:9092
-  resources:
-    requests:
-      cpu: 100m
-      memory: 256Mi
-    limits:
-      cpu: 500m
-      memory: 512Mi
-  template:
-    pod:
-      securityContext:
-        runAsNonRoot: true
-        seccompProfile:
-          type: RuntimeDefault
-    connectContainer:
-      securityContext:
-        runAsNonRoot: true
-        allowPrivilegeEscalation: false
-        readOnlyRootFilesystem: true
-        capabilities:
-          drop:
-            - ALL
   config:
     group.id: connect-cluster
     config.storage.topic: connect-cluster-configs
@@ -149,7 +78,6 @@ spec:
     database.hostname: invdatabase
     database.port: 5433
     database.user: postgres
-    # Development-only database credential.
     database.password: "yPsw5e6ab4bvAGe5H"
     topic.prefix: kessel-inventory
     table.exclude.list: ".*"

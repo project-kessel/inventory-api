@@ -134,27 +134,6 @@ SPICEDB_OPERATOR_BUNDLE_URL="https://github.com/authzed/spicedb-operator/release
 kubectl get crd spicedbclusters.authzed.com > /dev/null 2>&1 || \
   kubectl apply --server-side -f "${SPICEDB_OPERATOR_BUNDLE_URL}"
 
-# Podman cannot route the Kubernetes service ClusterIP from a pod. Run the
-# SpiceDB operator on the Kind node network so it can reach the API server.
-if [ "$DOCKER" = "podman" ]; then
-  echo "Patching SpiceDB operator for Podman networking..."
-  SPICEDB_OPERATOR_FOUND=false
-  for i in $(seq 1 60); do
-    if kubectl get deployment/spicedb-operator -n spicedb-operator >/dev/null 2>&1; then
-      SPICEDB_OPERATOR_FOUND=true
-      break
-    fi
-    sleep 2
-  done
-  if [ "$SPICEDB_OPERATOR_FOUND" != true ]; then
-    echo "ERROR: Timed out waiting for deployment/spicedb-operator in namespace spicedb-operator" >&2
-    exit 1
-  fi
-  kubectl patch deployment/spicedb-operator -n spicedb-operator --type=merge \
-    -p '{"spec":{"template":{"spec":{"hostNetwork":true,"dnsPolicy":"ClusterFirstWithHostNet"}}}}'
-  kubectl rollout status deployment/spicedb-operator -n spicedb-operator --timeout=120s
-fi
-
 kubectl apply -f deploy/kind/relations/spicedb-kind-setup/spicedb-cr.yaml
 kubectl apply -f deploy/kind/relations/spicedb-kind-setup/svc-ingress.yaml
 kubectl apply -f deploy/kind/relations/spicedb-kind-setup/relations-api/secret.yaml
@@ -185,26 +164,9 @@ while true; do
       --image=fullstorydev/grpcurl:latest \
       --overrides="$(jq -n --arg data "$SCHEMA_JSON" '{
         "spec": {
-          "securityContext": {
-            "runAsNonRoot": true,
-            "seccompProfile": {"type": "RuntimeDefault"}
-          },
-          "automountServiceAccountToken": false,
           "containers": [{
             "name": "schema-loader",
             "image": "fullstorydev/grpcurl:latest",
-            "securityContext": {
-              "runAsUser": 65532,
-              "runAsGroup": 65532,
-              "runAsNonRoot": true,
-              "allowPrivilegeEscalation": false,
-              "readOnlyRootFilesystem": true,
-              "capabilities": {"drop": ["ALL"]}
-            },
-            "resources": {
-              "requests": {"cpu": "10m", "memory": "16Mi"},
-              "limits": {"cpu": "100m", "memory": "64Mi"}
-            },
             "command": ["grpcurl", "-plaintext",
               "-H", "Authorization: Bearer foobar",
               "-d", $data,

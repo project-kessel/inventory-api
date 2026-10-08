@@ -9,30 +9,9 @@ spec:
   backoffLimit: 0
   template:
     spec:
-      securityContext:
-        runAsNonRoot: true
-        seccompProfile:
-          type: RuntimeDefault
-      automountServiceAccountToken: false
       initContainers:
         - name: wait-for-inventory
           image: curlimages/curl:latest
-          securityContext:
-            runAsUser: 100
-            runAsGroup: 101
-            runAsNonRoot: true
-            allowPrivilegeEscalation: false
-            readOnlyRootFilesystem: true
-            capabilities:
-              drop:
-                - ALL
-          resources:
-            requests:
-              cpu: 10m
-              memory: 16Mi
-            limits:
-              cpu: 100m
-              memory: 64Mi
           command:
             - /bin/sh
             - "-c"
@@ -46,20 +25,6 @@ spec:
       containers:
         - name: e2e-http-tests
           image: localhost/inventory-e2e-tests:e2e-test
-          securityContext:
-            runAsNonRoot: true
-            allowPrivilegeEscalation: false
-            readOnlyRootFilesystem: true
-            capabilities:
-              drop:
-                - ALL
-          resources:
-            requests:
-              cpu: 100m
-              memory: 128Mi
-            limits:
-              cpu: 500m
-              memory: 512Mi
           env:
             - name: INV_HTTP_URL
               value: "kessel-inventory-service:8081"

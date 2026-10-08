@@ -16,6 +16,7 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/project-kessel/inventory-api/internal/biz/model"
+	"github.com/project-kessel/inventory-api/internal/biz/model_legacy"
 	"github.com/project-kessel/inventory-api/internal/data"
 	datamodel "github.com/project-kessel/inventory-api/internal/data/model"
 	"github.com/project-kessel/inventory-api/internal/mocks"
@@ -988,30 +989,30 @@ func TestInventoryConsumer_RestoreDeletedHostWithSameWorkspace(t *testing.T) {
 	require.NoError(t, err)
 	relationsRepo := data.NewSimpleRelationsRepository()
 	tester.inv.Relations = relationsRepo
-	repo := tester.inv.ResourceRepository
+	var tupleEvent *model_legacy.OutboxEvent
+	repo := data.NewResourceRepository(tester.inv.DB,
+		data.NewGormTransactionManager(tester.inv.MetricsCollector, 3),
+		func(_ *gorm.DB, event *model_legacy.OutboxEvent) error {
+			if event.AggregateType == model_legacy.TupleAggregateType {
+				tupleEvent = event
+			}
+			return nil
+		})
+	tester.inv.ResourceRepository = repo
 
 	// Persist each lifecycle step before consuming its event, as the CDC pipeline does.
 	process := func(operation model.EventOperationType, transactionId model.TransactionId) {
 		t.Helper()
+		tupleEvent = nil
 		require.NoError(t, repo.Save(tester.inv.DB, *testData.Resource, operation, transactionId))
-		resourceSnapshot, reporterSnapshot, _, _, err := testData.Resource.Serialize()
-		require.NoError(t, err)
-		require.NotNil(t, resourceSnapshot.CommonVersion)
-		commonVersion := model.NewVersion(*resourceSnapshot.CommonVersion)
-		reporterVersion := model.NewVersion(reporterSnapshot.RepresentationVersion)
-		commonVersionForEvent := &commonVersion
-		if operation.OperationType() == model.OperationTypeDeleted {
-			commonVersionForEvent = nil
-		}
-		event, err := model.NewTupleEvent(testData.Key, commonVersionForEvent, &reporterVersion)
-		require.NoError(t, err)
-		payload, err := json.Marshal(map[string]interface{}{"payload": event})
+		require.NotNil(t, tupleEvent)
+		payload, err := json.Marshal(MessagePayload{RelationsRequest: tupleEvent.Payload})
 		require.NoError(t, err)
 		msg := &kafka.Message{
-			Key: []byte(testMessageKey), Value: payload,
+			Value: payload,
 			Headers: []kafka.Header{
-				{Key: "operation", Value: []byte(string(operation.OperationType()))},
-				{Key: "txid", Value: []byte(transactionId.String())},
+				{Key: "operation", Value: []byte(string(tupleEvent.Operation.OperationType()))},
+				{Key: "txid", Value: []byte(tupleEvent.TxId)},
 			},
 		}
 		headers, err := ParseHeaders(msg)

@@ -123,7 +123,15 @@ func generateResourceBatch(db *gorm.DB, logHelper *log.Helper, start int, end in
 	createdResources *int, createdReporterResources *int, createdReporterRepresentations *int, createdCommonRepresentations *int) error {
 
 	now := time.Now()
+	batchSize := end - start
 
+	// Pre-allocate slices for batch inserts (using pointers to match New* return types)
+	resources := make([]model.Resource, 0, batchSize)
+	reporterResources := make([]*model.ReporterResource, 0, batchSize)
+	reporterRepresentations := make([]*model.ReporterRepresentation, 0, batchSize*versionsPerResource)
+	commonRepresentations := make([]*model.CommonRepresentation, 0, batchSize*versionsPerResource)
+
+	// Build all records in memory first
 	for i := start; i < end; i++ {
 		// Create resource
 		resourceID := uuid.New()
@@ -131,11 +139,7 @@ func generateResourceBatch(db *gorm.DB, logHelper *log.Helper, start int, end in
 			ID:   resourceID,
 			Type: "host",
 		}
-
-		if err := db.Create(&resource).Error; err != nil {
-			return fmt.Errorf("failed to create resource: %w", err)
-		}
-		*createdResources++
+		resources = append(resources, resource)
 
 		// Determine tombstone state
 		isTombstoned := (i*100)/end < tombstonePercent
@@ -172,17 +176,12 @@ func generateResourceBatch(db *gorm.DB, logHelper *log.Helper, start int, end in
 		}
 
 		// For tombstoned resources, we need to set the updated_at timestamp manually
-		// We'll insert it with raw SQL to control the timestamp
 		if isTombstoned {
 			tombstonedAt := now.Add(-tombstoneAge)
 			reporterResource.CreatedAt = tombstonedAt
 			reporterResource.UpdatedAt = tombstonedAt
 		}
-
-		if err := db.Create(&reporterResource).Error; err != nil {
-			return fmt.Errorf("failed to insert reporter_resource: %w", err)
-		}
-		*createdReporterResources++
+		reporterResources = append(reporterResources, reporterResource)
 
 		// Create multiple versions (representations) with varied ages
 		numVersions := versionsPerResource + (i % 3) - 1 // Vary 4-6 versions
@@ -226,11 +225,7 @@ func generateResourceBatch(db *gorm.DB, logHelper *log.Helper, start int, end in
 				return fmt.Errorf("failed to create reporter representation: %w", err)
 			}
 			reporterRep.CreatedAt = versionTime
-
-			if err := db.Create(&reporterRep).Error; err != nil {
-				return fmt.Errorf("failed to insert reporter_representation: %w", err)
-			}
-			*createdReporterRepresentations++
+			reporterRepresentations = append(reporterRepresentations, reporterRep)
 
 			// Create common_representation
 			commonRep, err := model.NewCommonRepresentation(
@@ -248,12 +243,40 @@ func generateResourceBatch(db *gorm.DB, logHelper *log.Helper, start int, end in
 				return fmt.Errorf("failed to create common representation: %w", err)
 			}
 			commonRep.CreatedAt = versionTime
-
-			if err := db.Create(&commonRep).Error; err != nil {
-				return fmt.Errorf("failed to insert common_representation: %w", err)
-			}
-			*createdCommonRepresentations++
+			commonRepresentations = append(commonRepresentations, commonRep)
 		}
+	}
+
+	// Perform batch inserts in dependency order
+	// 1. Insert resources first (no dependencies)
+	if len(resources) > 0 {
+		if err := db.CreateInBatches(resources, 1000).Error; err != nil {
+			return fmt.Errorf("failed to batch insert resources: %w", err)
+		}
+		*createdResources += len(resources)
+	}
+
+	// 2. Insert reporter_resources (depends on resources)
+	if len(reporterResources) > 0 {
+		if err := db.CreateInBatches(reporterResources, 1000).Error; err != nil {
+			return fmt.Errorf("failed to batch insert reporter_resources: %w", err)
+		}
+		*createdReporterResources += len(reporterResources)
+	}
+
+	// 3. Insert representations (depend on reporter_resources and resources)
+	if len(reporterRepresentations) > 0 {
+		if err := db.CreateInBatches(reporterRepresentations, 1000).Error; err != nil {
+			return fmt.Errorf("failed to batch insert reporter_representations: %w", err)
+		}
+		*createdReporterRepresentations += len(reporterRepresentations)
+	}
+
+	if len(commonRepresentations) > 0 {
+		if err := db.CreateInBatches(commonRepresentations, 1000).Error; err != nil {
+			return fmt.Errorf("failed to batch insert common_representations: %w", err)
+		}
+		*createdCommonRepresentations += len(commonRepresentations)
 	}
 
 	return nil

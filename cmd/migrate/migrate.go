@@ -13,12 +13,19 @@ import (
 // NewCommand creates a new cobra command for database migration.
 // It creates or migrates the database tables using the provided storage options.
 func NewCommand(options *storage.Options, loggerOptions common.LoggerOptions) *cobra.Command {
+	var enabled bool
+
 	cmd := &cobra.Command{
 		Use:   "migrate",
 		Short: "Create or migrate the database tables",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			_, logger := common.InitLogger(common.GetLogLevel(), loggerOptions)
 			logHelper := log.NewHelper(log.With(logger, "group", "storage"))
+
+			if !enabled {
+				logHelper.Info("Database migrations are disabled; skipping")
+				return nil
+			}
 
 			if errs := options.Complete(); errs != nil {
 				return errors.NewAggregate(errs)
@@ -38,6 +45,7 @@ func NewCommand(options *storage.Options, loggerOptions common.LoggerOptions) *c
 			return data.Migrate(db, logHelper)
 		},
 	}
+	cmd.Flags().BoolVar(&enabled, "enabled", true, "Apply database migrations. Set to false in namespaces that share a database with the migration-owning namespace.")
 
 	return cmd
 }

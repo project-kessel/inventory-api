@@ -43,7 +43,7 @@ objects:
             - name: migration
               image: ${INVENTORY_IMAGE}:${IMAGE_TAG}
               command: ["inventory-api"]
-              args: ["migrate"]
+              args: ["migrate", "--enabled=${MIGRATIONS_ENABLED}"]
               inheritEnv: true
             image: ${INVENTORY_IMAGE}:${IMAGE_TAG}
             command: ["inventory-api"]
@@ -313,6 +313,9 @@ parameters:
   - description: Number of replicas
     name: REPLICAS
     value: "1"
+  - description: Apply database migrations from this namespace. Set to true in exactly one namespace for deployments that share a database.
+    name: MIGRATIONS_ENABLED
+    value: "true"
   - description: Name of the Inventory API Config K8s secret
     name: INVENTORY_API_CONFIG_SECRET
     value: inventory-api-config

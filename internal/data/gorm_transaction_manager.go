@@ -4,6 +4,8 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"math/rand/v2"
+	"time"
 
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -40,6 +42,9 @@ func (tm *gormTransactionManager) HandleSerializableTransaction(operationName st
 			tx.Rollback()
 			if tm.isSerializationFailure(err, i, tm.maxSerializationRetries) {
 				metricscollector.Incr(tm.metricsCollector.SerializationFailures, operationName)
+				if i+1 < tm.maxSerializationRetries {
+					waitBeforeSerializationRetry(i)
+				}
 				continue
 			}
 			return fmt.Errorf("transaction failed: %w", err)
@@ -49,6 +54,9 @@ func (tm *gormTransactionManager) HandleSerializableTransaction(operationName st
 			tx.Rollback()
 			if tm.isSerializationFailure(err, i, tm.maxSerializationRetries) {
 				metricscollector.Incr(tm.metricsCollector.SerializationFailures, operationName)
+				if i+1 < tm.maxSerializationRetries {
+					waitBeforeSerializationRetry(i)
+				}
 				continue
 			}
 			return fmt.Errorf("committing transaction failed: %w", err)
@@ -60,11 +68,23 @@ func (tm *gormTransactionManager) HandleSerializableTransaction(operationName st
 	return fmt.Errorf("transaction failed after %d attempts: %w", tm.maxSerializationRetries, err)
 }
 
+func serializationRetryBackoff(attempt int) time.Duration {
+	if attempt >= 5 {
+		return 20 * time.Millisecond
+	}
+	return time.Millisecond << max(attempt, 0)
+}
+
+func waitBeforeSerializationRetry(attempt int) {
+	base := serializationRetryBackoff(attempt)
+	time.Sleep(base + time.Duration(rand.Int64N(int64(base))))
+}
+
 func (tm *gormTransactionManager) isSerializationFailure(err error, attempt, maxRetries int) bool {
 	var pgErr *pgconn.PgError
 	if errors.As(err, &pgErr) {
 		if pgErr.Code == "40001" {
-			log.Errorf("transaction serialization failure (attempt %d/%d): %v", attempt+1, maxRetries, err)
+			log.Debugf("transaction serialization failure (attempt %d/%d): %v", attempt+1, maxRetries, err)
 			return true
 		}
 	}
@@ -72,7 +92,7 @@ func (tm *gormTransactionManager) isSerializationFailure(err error, attempt, max
 	var sqliteErr sqlite3.Error
 	if errors.As(err, &sqliteErr) {
 		if sqliteErr.Code == sqlite3.ErrError {
-			log.Errorf("transaction serialization failure (attempt %d/%d): %v", attempt+1, maxRetries, err)
+			log.Debugf("transaction serialization failure (attempt %d/%d): %v", attempt+1, maxRetries, err)
 			return true
 		}
 	}

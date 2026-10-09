@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/stretchr/testify/assert"
@@ -184,6 +185,14 @@ func TestGormTransactionManager_SerializationFailureRetries(t *testing.T) {
 	// Check that metrics were recorded
 	assert.Equal(t, maxRetries, metricscollector.GetSerializationFailureCount())
 	assert.Equal(t, 1, metricscollector.GetSerializationExhaustionCount())
+}
+
+func TestSerializationRetryBackoffIsBounded(t *testing.T) {
+	assert.Equal(t, time.Millisecond, serializationRetryBackoff(0))
+	assert.Equal(t, 2*time.Millisecond, serializationRetryBackoff(1))
+	assert.Equal(t, 16*time.Millisecond, serializationRetryBackoff(4))
+	assert.Equal(t, 20*time.Millisecond, serializationRetryBackoff(10))
+	assert.Equal(t, 20*time.Millisecond, serializationRetryBackoff(100))
 }
 
 func TestGormTransactionManager_SerializationFailureRecovery(t *testing.T) {

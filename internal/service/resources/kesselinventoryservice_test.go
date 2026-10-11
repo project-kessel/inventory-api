@@ -11,17 +11,23 @@ import (
 
 	krlog "github.com/go-kratos/kratos/v2/log"
 	kratosTransport "github.com/go-kratos/kratos/v2/transport"
-	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2"
-	"github.com/project-kessel/inventory-api/internal/biz/model_legacy"
 	"google.golang.org/protobuf/types/known/structpb"
 
-	"github.com/project-kessel/inventory-api/internal/data"
-	"github.com/project-kessel/inventory-api/internal/metricscollector"
-	"github.com/project-kessel/inventory-api/internal/testutil"
+	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2"
+	"github.com/project-kessel/inventory-api/internal/storage"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"gorm.io/gorm"
+
+	"github.com/project-kessel/inventory-api/internal/data"
+	"github.com/project-kessel/inventory-api/internal/metricscollector"
+	"github.com/project-kessel/inventory-api/internal/testutil"
+
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/proto"
 
 	authnapi "github.com/project-kessel/inventory-api/internal/authn/api"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
@@ -29,9 +35,6 @@ import (
 	usecase "github.com/project-kessel/inventory-api/internal/biz/usecase/resources"
 	"github.com/project-kessel/inventory-api/internal/mocks"
 	svc "github.com/project-kessel/inventory-api/internal/service/resources"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
-	"google.golang.org/protobuf/proto"
 )
 
 func testTupleFilterForHelper(namespace, resourceType, resourceID, relation, subjectNamespace, subjectType, subjectID string) model.TupleFilter {
@@ -223,13 +226,13 @@ func TestInventoryService_ReportResource_MissingReporterType(t *testing.T) {
 
 	runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
 		return TestServerConfig{
-			Usecase:       newTestUsecase(t, testUsecaseConfig{}),
-			Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
-		}, func(t *testing.T, tr *Transport) {
-			ctx := context.Background()
-			res := tr.Invoke(ctx, withBody(protoReq, ReportResource, httpEndpoint("POST /api/kessel/v1beta2/resources")))
-			Assert(t, res, requireErrorContaining(codes.InvalidArgument, "reporter_type"))
-		}
+				Usecase:       newTestUsecase(t, testUsecaseConfig{}),
+				Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+			}, func(t *testing.T, tr *Transport) {
+				ctx := context.Background()
+				res := tr.Invoke(ctx, withBody(protoReq, ReportResource, httpEndpoint("POST /api/kessel/v1beta2/resources")))
+				Assert(t, res, requireErrorContaining(codes.InvalidArgument, "reporter_type"))
+			}
 	})
 }
 
@@ -256,13 +259,13 @@ func TestInventoryService_ReportResource_MissingReporterInstanceId(t *testing.T)
 
 	runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
 		return TestServerConfig{
-			Usecase:       newTestUsecase(t, testUsecaseConfig{}),
-			Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
-		}, func(t *testing.T, tr *Transport) {
-			ctx := context.Background()
-			res := tr.Invoke(ctx, withBody(protoReq, ReportResource, httpEndpoint("POST /api/kessel/v1beta2/resources")))
-			Assert(t, res, requireErrorContaining(codes.InvalidArgument, "reporter_instance_id"))
-		}
+				Usecase:       newTestUsecase(t, testUsecaseConfig{}),
+				Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+			}, func(t *testing.T, tr *Transport) {
+				ctx := context.Background()
+				res := tr.Invoke(ctx, withBody(protoReq, ReportResource, httpEndpoint("POST /api/kessel/v1beta2/resources")))
+				Assert(t, res, requireErrorContaining(codes.InvalidArgument, "reporter_instance_id"))
+			}
 	})
 }
 
@@ -289,13 +292,13 @@ func TestInventoryService_DeleteResource_NoIdentity(t *testing.T) {
 
 	runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
 		return TestServerConfig{
-			Usecase:       newTestUsecase(t, testUsecaseConfig{}),
-			Authenticator: &DenyAuthenticator{},
-		}, func(t *testing.T, tr *Transport) {
-			ctx := context.Background()
-			res := tr.Invoke(ctx, withBody(protoReq, DeleteResource, httpEndpoint("DELETE /api/kessel/v1beta2/resources")))
-			Assert(t, res, requireError(codes.Unauthenticated))
-		}
+				Usecase:       newTestUsecase(t, testUsecaseConfig{}),
+				Authenticator: &DenyAuthenticator{},
+			}, func(t *testing.T, tr *Transport) {
+				ctx := context.Background()
+				res := tr.Invoke(ctx, withBody(protoReq, DeleteResource, httpEndpoint("DELETE /api/kessel/v1beta2/resources")))
+				Assert(t, res, requireError(codes.Unauthenticated))
+			}
 	})
 }
 
@@ -529,15 +532,15 @@ func TestInventoryService_CheckSelf_AuthzDecisions(t *testing.T) {
 					simpleAuthz.Grant(tc.grantSubjectID, "view", "hbi", "host", "dd1b73b9-3e33-4264-968c-e3ce55b9afec")
 				}
 				return TestServerConfig{
-					Usecase:       newTestUsecase(t, testUsecaseConfig{Relations: simpleAuthz}),
-					Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
-				}, func(t *testing.T, tr *Transport) {
-					ctx := context.Background()
-					res := tr.Invoke(ctx, withBody(protoReq, CheckSelf, httpEndpoint("POST /api/kessel/v1beta2/checkself")))
-					resp := Extract(t, res, expectSuccess(func() *pb.CheckSelfResponse { return &pb.CheckSelfResponse{} }))
-					assert.Equal(t, tc.wantAllowed, resp.Allowed)
-					assert.NotEmpty(t, resp.ConsistencyToken.GetToken())
-				}
+						Usecase:       newTestUsecase(t, testUsecaseConfig{Relations: simpleAuthz}),
+						Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+					}, func(t *testing.T, tr *Transport) {
+						ctx := context.Background()
+						res := tr.Invoke(ctx, withBody(protoReq, CheckSelf, httpEndpoint("POST /api/kessel/v1beta2/checkself")))
+						resp := Extract(t, res, expectSuccess(func() *pb.CheckSelfResponse { return &pb.CheckSelfResponse{} }))
+						assert.Equal(t, tc.wantAllowed, resp.Allowed)
+						assert.NotEmpty(t, resp.ConsistencyToken.GetToken())
+					}
 			})
 		})
 	}
@@ -555,13 +558,13 @@ func TestInventoryService_CheckSelf_NoIdentity(t *testing.T) {
 
 	runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
 		return TestServerConfig{
-			Usecase:       newTestUsecase(t, testUsecaseConfig{}),
-			Authenticator: &DenyAuthenticator{},
-		}, func(t *testing.T, tr *Transport) {
-			ctx := context.Background()
-			res := tr.Invoke(ctx, withBody(protoReq, CheckSelf, httpEndpoint("POST /api/kessel/v1beta2/checkself")))
-			Assert(t, res, requireError(codes.Unauthenticated))
-		}
+				Usecase:       newTestUsecase(t, testUsecaseConfig{}),
+				Authenticator: &DenyAuthenticator{},
+			}, func(t *testing.T, tr *Transport) {
+				ctx := context.Background()
+				res := tr.Invoke(ctx, withBody(protoReq, CheckSelf, httpEndpoint("POST /api/kessel/v1beta2/checkself")))
+				Assert(t, res, requireError(codes.Unauthenticated))
+			}
 	})
 }
 
@@ -636,20 +639,20 @@ func TestInventoryService_CheckSelfBulk_AuthzDecisions(t *testing.T) {
 					simpleAuthz.Grant(g.subjectID, g.relation, "hbi", "host", g.resourceID)
 				}
 				return TestServerConfig{
-					Usecase:       newTestUsecase(t, testUsecaseConfig{Relations: simpleAuthz}),
-					Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
-				}, func(t *testing.T, tr *Transport) {
-					ctx := context.Background()
-					res := tr.Invoke(ctx, withBody(protoReq, CheckSelfBulk, httpEndpoint("POST /api/kessel/v1beta2/checkselfbulk")))
-					resp := Extract(t, res, expectSuccess(func() *pb.CheckSelfBulkResponse { return &pb.CheckSelfBulkResponse{} }))
-					require.Len(t, resp.Pairs, len(tc.wantPairs))
-					for i, want := range tc.wantPairs {
-						assert.Equal(t, want.allowed, resp.Pairs[i].GetItem().Allowed, "pair %d allowed", i)
-						assert.Equal(t, want.resourceID, resp.Pairs[i].Request.Object.ResourceId, "pair %d resourceID", i)
-						assert.Equal(t, want.relation, resp.Pairs[i].Request.Relation, "pair %d relation", i)
+						Usecase:       newTestUsecase(t, testUsecaseConfig{Relations: simpleAuthz}),
+						Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+					}, func(t *testing.T, tr *Transport) {
+						ctx := context.Background()
+						res := tr.Invoke(ctx, withBody(protoReq, CheckSelfBulk, httpEndpoint("POST /api/kessel/v1beta2/checkselfbulk")))
+						resp := Extract(t, res, expectSuccess(func() *pb.CheckSelfBulkResponse { return &pb.CheckSelfBulkResponse{} }))
+						require.Len(t, resp.Pairs, len(tc.wantPairs))
+						for i, want := range tc.wantPairs {
+							assert.Equal(t, want.allowed, resp.Pairs[i].GetItem().Allowed, "pair %d allowed", i)
+							assert.Equal(t, want.resourceID, resp.Pairs[i].Request.Object.ResourceId, "pair %d resourceID", i)
+							assert.Equal(t, want.relation, resp.Pairs[i].Request.Relation, "pair %d relation", i)
+						}
+						assert.NotEmpty(t, resp.ConsistencyToken.GetToken())
 					}
-					assert.NotEmpty(t, resp.ConsistencyToken.GetToken())
-				}
 			})
 		})
 	}
@@ -706,13 +709,13 @@ func TestInventoryService_CheckSelfBulk_ResponseLengthMismatch(t *testing.T) {
 			Once()
 
 		return TestServerConfig{
-			Usecase:       newTestUsecase(t, testUsecaseConfig{Relations: mockRelations}),
-			Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
-		}, func(t *testing.T, tr *Transport) {
-			ctx := context.Background()
-			res := tr.Invoke(ctx, withBody(protoReq, CheckSelfBulk, httpEndpoint("POST /api/kessel/v1beta2/checkselfbulk")))
-			Assert(t, res, requireError(codes.Internal).And(func(t *testing.T) { mockRelations.AssertExpectations(t) }))
-		}
+				Usecase:       newTestUsecase(t, testUsecaseConfig{Relations: mockRelations}),
+				Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+			}, func(t *testing.T, tr *Transport) {
+				ctx := context.Background()
+				res := tr.Invoke(ctx, withBody(protoReq, CheckSelfBulk, httpEndpoint("POST /api/kessel/v1beta2/checkselfbulk")))
+				Assert(t, res, requireError(codes.Internal).And(func(t *testing.T) { mockRelations.AssertExpectations(t) }))
+			}
 	})
 }
 
@@ -732,13 +735,13 @@ func TestInventoryService_CheckSelfBulk_NoIdentity(t *testing.T) {
 
 	runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
 		return TestServerConfig{
-			Usecase:       newTestUsecase(t, testUsecaseConfig{}),
-			Authenticator: &DenyAuthenticator{},
-		}, func(t *testing.T, tr *Transport) {
-			ctx := context.Background()
-			res := tr.Invoke(ctx, withBody(protoReq, CheckSelfBulk, httpEndpoint("POST /api/kessel/v1beta2/checkselfbulk")))
-			Assert(t, res, requireError(codes.Unauthenticated))
-		}
+				Usecase:       newTestUsecase(t, testUsecaseConfig{}),
+				Authenticator: &DenyAuthenticator{},
+			}, func(t *testing.T, tr *Transport) {
+				ctx := context.Background()
+				res := tr.Invoke(ctx, withBody(protoReq, CheckSelfBulk, httpEndpoint("POST /api/kessel/v1beta2/checkselfbulk")))
+				Assert(t, res, requireError(codes.Unauthenticated))
+			}
 	})
 }
 
@@ -761,13 +764,13 @@ func TestInventoryService_Check_NoIdentity(t *testing.T) {
 
 	runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
 		return TestServerConfig{
-			Usecase:       newTestUsecase(t, testUsecaseConfig{}),
-			Authenticator: &DenyAuthenticator{},
-		}, func(t *testing.T, tr *Transport) {
-			ctx := context.Background()
-			res := tr.Invoke(ctx, withBody(protoReq, Check, httpEndpoint("POST /api/kessel/v1beta2/check")))
-			Assert(t, res, requireError(codes.Unauthenticated))
-		}
+				Usecase:       newTestUsecase(t, testUsecaseConfig{}),
+				Authenticator: &DenyAuthenticator{},
+			}, func(t *testing.T, tr *Transport) {
+				ctx := context.Background()
+				res := tr.Invoke(ctx, withBody(protoReq, Check, httpEndpoint("POST /api/kessel/v1beta2/check")))
+				Assert(t, res, requireError(codes.Unauthenticated))
+			}
 	})
 }
 
@@ -790,15 +793,15 @@ func TestInventoryService_CheckSelf_OIDC_Identity(t *testing.T) {
 
 	runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
 		return TestServerConfig{
-			Usecase: newTestUsecase(t, testUsecaseConfig{
-				MetaAuthorizer: metaauthorizer.NewSimpleMetaAuthorizer(),
-			}),
-			Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
-		}, func(t *testing.T, tr *Transport) {
-			ctx := context.Background()
-			res := tr.Invoke(ctx, withBody(protoReq, CheckSelf, httpEndpoint("POST /api/kessel/v1beta2/checkself")))
-			Assert(t, res, requireError(codes.PermissionDenied))
-		}
+				Usecase: newTestUsecase(t, testUsecaseConfig{
+					MetaAuthorizer: metaauthorizer.NewSimpleMetaAuthorizer(),
+				}),
+				Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+			}, func(t *testing.T, tr *Transport) {
+				ctx := context.Background()
+				res := tr.Invoke(ctx, withBody(protoReq, CheckSelf, httpEndpoint("POST /api/kessel/v1beta2/checkself")))
+				Assert(t, res, requireError(codes.PermissionDenied))
+			}
 	})
 }
 
@@ -830,16 +833,16 @@ func TestInventoryService_Check_Allowed(t *testing.T) {
 		simpleAuthz := data.NewSimpleRelationsRepository()
 		simpleAuthz.Grant("subject-456", "view", "hbi", "host", "resource-abc")
 		return TestServerConfig{
-			Usecase:       newTestUsecase(t, testUsecaseConfig{Relations: simpleAuthz}),
-			Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
-		}, func(t *testing.T, tr *Transport) {
-			ctx := context.Background()
-			res := tr.Invoke(ctx, withBody(protoReq, Check, httpEndpoint("POST /api/kessel/v1beta2/check")))
-			resp := Extract(t, res, expectSuccess(func() *pb.CheckResponse { return &pb.CheckResponse{} }))
-			assert.Equal(t, pb.Allowed_ALLOWED_TRUE, resp.Allowed)
-			assert.NotNil(t, resp.ConsistencyToken)
-			assert.NotEmpty(t, resp.ConsistencyToken.GetToken())
-		}
+				Usecase:       newTestUsecase(t, testUsecaseConfig{Relations: simpleAuthz}),
+				Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+			}, func(t *testing.T, tr *Transport) {
+				ctx := context.Background()
+				res := tr.Invoke(ctx, withBody(protoReq, Check, httpEndpoint("POST /api/kessel/v1beta2/check")))
+				resp := Extract(t, res, expectSuccess(func() *pb.CheckResponse { return &pb.CheckResponse{} }))
+				assert.Equal(t, pb.Allowed_ALLOWED_TRUE, resp.Allowed)
+				assert.NotNil(t, resp.ConsistencyToken)
+				assert.NotEmpty(t, resp.ConsistencyToken.GetToken())
+			}
 	})
 }
 
@@ -867,16 +870,16 @@ func TestInventoryService_Check_Denied(t *testing.T) {
 
 	runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
 		return TestServerConfig{
-			Usecase:       newTestUsecase(t, testUsecaseConfig{}),
-			Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
-		}, func(t *testing.T, tr *Transport) {
-			ctx := context.Background()
-			res := tr.Invoke(ctx, withBody(protoReq, Check, httpEndpoint("POST /api/kessel/v1beta2/check")))
-			resp := Extract(t, res, expectSuccess(func() *pb.CheckResponse { return &pb.CheckResponse{} }))
-			assert.Equal(t, pb.Allowed_ALLOWED_FALSE, resp.Allowed)
-			assert.NotNil(t, resp.ConsistencyToken)
-			assert.NotEmpty(t, resp.ConsistencyToken.GetToken())
-		}
+				Usecase:       newTestUsecase(t, testUsecaseConfig{}),
+				Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+			}, func(t *testing.T, tr *Transport) {
+				ctx := context.Background()
+				res := tr.Invoke(ctx, withBody(protoReq, Check, httpEndpoint("POST /api/kessel/v1beta2/check")))
+				resp := Extract(t, res, expectSuccess(func() *pb.CheckResponse { return &pb.CheckResponse{} }))
+				assert.Equal(t, pb.Allowed_ALLOWED_FALSE, resp.Allowed)
+				assert.NotNil(t, resp.ConsistencyToken)
+				assert.NotEmpty(t, resp.ConsistencyToken.GetToken())
+			}
 	})
 }
 
@@ -904,13 +907,13 @@ func TestInventoryService_Check_MetaAuthzDenied(t *testing.T) {
 
 	runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
 		return TestServerConfig{
-			Usecase:       newTestUsecase(t, testUsecaseConfig{MetaAuthorizer: &DenyingMetaAuthorizer{}}),
-			Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
-		}, func(t *testing.T, tr *Transport) {
-			ctx := context.Background()
-			res := tr.Invoke(ctx, withBody(protoReq, Check, httpEndpoint("POST /api/kessel/v1beta2/check")))
-			Assert(t, res, requireError(codes.PermissionDenied))
-		}
+				Usecase:       newTestUsecase(t, testUsecaseConfig{MetaAuthorizer: &DenyingMetaAuthorizer{}}),
+				Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+			}, func(t *testing.T, tr *Transport) {
+				ctx := context.Background()
+				res := tr.Invoke(ctx, withBody(protoReq, Check, httpEndpoint("POST /api/kessel/v1beta2/check")))
+				Assert(t, res, requireError(codes.PermissionDenied))
+			}
 	})
 }
 
@@ -940,14 +943,14 @@ func TestInventoryService_CheckForUpdate_Allowed(t *testing.T) {
 		simpleAuthz := data.NewSimpleRelationsRepository()
 		simpleAuthz.Grant("subject-789", "edit", "hbi", "host", "resource-xyz")
 		return TestServerConfig{
-			Usecase:       newTestUsecase(t, testUsecaseConfig{Relations: simpleAuthz}),
-			Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
-		}, func(t *testing.T, tr *Transport) {
-			ctx := context.Background()
-			res := tr.Invoke(ctx, withBody(protoReq, CheckForUpdate, httpEndpoint("POST /api/kessel/v1beta2/checkforupdate")))
-			resp := Extract(t, res, expectSuccess(func() *pb.CheckForUpdateResponse { return &pb.CheckForUpdateResponse{} }))
-			assert.Equal(t, pb.Allowed_ALLOWED_TRUE, resp.Allowed)
-		}
+				Usecase:       newTestUsecase(t, testUsecaseConfig{Relations: simpleAuthz}),
+				Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+			}, func(t *testing.T, tr *Transport) {
+				ctx := context.Background()
+				res := tr.Invoke(ctx, withBody(protoReq, CheckForUpdate, httpEndpoint("POST /api/kessel/v1beta2/checkforupdate")))
+				resp := Extract(t, res, expectSuccess(func() *pb.CheckForUpdateResponse { return &pb.CheckForUpdateResponse{} }))
+				assert.Equal(t, pb.Allowed_ALLOWED_TRUE, resp.Allowed)
+			}
 	})
 }
 
@@ -975,14 +978,14 @@ func TestInventoryService_CheckForUpdate_Denied(t *testing.T) {
 
 	runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
 		return TestServerConfig{
-			Usecase:       newTestUsecase(t, testUsecaseConfig{}),
-			Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
-		}, func(t *testing.T, tr *Transport) {
-			ctx := context.Background()
-			res := tr.Invoke(ctx, withBody(protoReq, CheckForUpdate, httpEndpoint("POST /api/kessel/v1beta2/checkforupdate")))
-			resp := Extract(t, res, expectSuccess(func() *pb.CheckForUpdateResponse { return &pb.CheckForUpdateResponse{} }))
-			assert.Equal(t, pb.Allowed_ALLOWED_FALSE, resp.Allowed)
-		}
+				Usecase:       newTestUsecase(t, testUsecaseConfig{}),
+				Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+			}, func(t *testing.T, tr *Transport) {
+				ctx := context.Background()
+				res := tr.Invoke(ctx, withBody(protoReq, CheckForUpdate, httpEndpoint("POST /api/kessel/v1beta2/checkforupdate")))
+				resp := Extract(t, res, expectSuccess(func() *pb.CheckForUpdateResponse { return &pb.CheckForUpdateResponse{} }))
+				assert.Equal(t, pb.Allowed_ALLOWED_FALSE, resp.Allowed)
+			}
 	})
 }
 
@@ -1010,13 +1013,13 @@ func TestInventoryService_CheckForUpdate_MetaAuthzDenied(t *testing.T) {
 
 	runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
 		return TestServerConfig{
-			Usecase:       newTestUsecase(t, testUsecaseConfig{MetaAuthorizer: &DenyingMetaAuthorizer{}}),
-			Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
-		}, func(t *testing.T, tr *Transport) {
-			ctx := context.Background()
-			res := tr.Invoke(ctx, withBody(protoReq, CheckForUpdate, httpEndpoint("POST /api/kessel/v1beta2/checkforupdate")))
-			Assert(t, res, requireError(codes.PermissionDenied))
-		}
+				Usecase:       newTestUsecase(t, testUsecaseConfig{MetaAuthorizer: &DenyingMetaAuthorizer{}}),
+				Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+			}, func(t *testing.T, tr *Transport) {
+				ctx := context.Background()
+				res := tr.Invoke(ctx, withBody(protoReq, CheckForUpdate, httpEndpoint("POST /api/kessel/v1beta2/checkforupdate")))
+				Assert(t, res, requireError(codes.PermissionDenied))
+			}
 	})
 }
 
@@ -1065,21 +1068,21 @@ func TestInventoryService_CheckBulk_MixedResults(t *testing.T) {
 		simpleAuthz := data.NewSimpleRelationsRepository()
 		simpleAuthz.Grant("subject-a", "view", "hbi", "host", "resource-1")
 		return TestServerConfig{
-			Usecase:       newTestUsecase(t, testUsecaseConfig{Relations: simpleAuthz}),
-			Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
-		}, func(t *testing.T, tr *Transport) {
-			ctx := context.Background()
-			res := tr.Invoke(ctx, withBody(protoReq, CheckBulk, httpEndpoint("POST /api/kessel/v1beta2/checkbulk")))
-			resp := Extract(t, res, expectSuccess(func() *pb.CheckBulkResponse { return &pb.CheckBulkResponse{} }))
-			require.Len(t, resp.Pairs, 2)
-			assert.Equal(t, pb.Allowed_ALLOWED_TRUE, resp.Pairs[0].GetItem().Allowed)
-			assert.Equal(t, "resource-1", resp.Pairs[0].Request.Object.ResourceId)
-			assert.Equal(t, "view", resp.Pairs[0].Request.Relation)
-			assert.Equal(t, pb.Allowed_ALLOWED_FALSE, resp.Pairs[1].GetItem().Allowed)
-			assert.Equal(t, "resource-2", resp.Pairs[1].Request.Object.ResourceId)
-			assert.Equal(t, "edit", resp.Pairs[1].Request.Relation)
-			assert.NotNil(t, resp.ConsistencyToken)
-		}
+				Usecase:       newTestUsecase(t, testUsecaseConfig{Relations: simpleAuthz}),
+				Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+			}, func(t *testing.T, tr *Transport) {
+				ctx := context.Background()
+				res := tr.Invoke(ctx, withBody(protoReq, CheckBulk, httpEndpoint("POST /api/kessel/v1beta2/checkbulk")))
+				resp := Extract(t, res, expectSuccess(func() *pb.CheckBulkResponse { return &pb.CheckBulkResponse{} }))
+				require.Len(t, resp.Pairs, 2)
+				assert.Equal(t, pb.Allowed_ALLOWED_TRUE, resp.Pairs[0].GetItem().Allowed)
+				assert.Equal(t, "resource-1", resp.Pairs[0].Request.Object.ResourceId)
+				assert.Equal(t, "view", resp.Pairs[0].Request.Relation)
+				assert.Equal(t, pb.Allowed_ALLOWED_FALSE, resp.Pairs[1].GetItem().Allowed)
+				assert.Equal(t, "resource-2", resp.Pairs[1].Request.Object.ResourceId)
+				assert.Equal(t, "edit", resp.Pairs[1].Request.Relation)
+				assert.NotNil(t, resp.ConsistencyToken)
+			}
 	})
 }
 
@@ -1113,14 +1116,14 @@ func TestInventoryService_ReportResource_Success(t *testing.T) {
 
 	runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
 		return TestServerConfig{
-			Usecase:       newTestUsecase(t, testUsecaseConfig{}),
-			Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
-		}, func(t *testing.T, tr *Transport) {
-			ctx := context.Background()
-			res := tr.Invoke(ctx, withBody(protoReq, ReportResource, httpEndpoint("POST /api/kessel/v1beta2/resources")))
-			resp := Extract(t, res, expectSuccess(func() *pb.ReportResourceResponse { return &pb.ReportResourceResponse{} }))
-			assert.NotNil(t, resp)
-		}
+				Usecase:       newTestUsecase(t, testUsecaseConfig{}),
+				Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+			}, func(t *testing.T, tr *Transport) {
+				ctx := context.Background()
+				res := tr.Invoke(ctx, withBody(protoReq, ReportResource, httpEndpoint("POST /api/kessel/v1beta2/resources")))
+				resp := Extract(t, res, expectSuccess(func() *pb.ReportResourceResponse { return &pb.ReportResourceResponse{} }))
+				assert.NotNil(t, resp)
+			}
 	})
 }
 
@@ -1141,13 +1144,13 @@ func TestInventoryService_ReportResource_NoIdentity(t *testing.T) {
 
 	runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
 		return TestServerConfig{
-			Usecase:       newTestUsecase(t, testUsecaseConfig{}),
-			Authenticator: &DenyAuthenticator{},
-		}, func(t *testing.T, tr *Transport) {
-			ctx := context.Background()
-			res := tr.Invoke(ctx, withBody(protoReq, ReportResource, httpEndpoint("POST /api/kessel/v1beta2/resources")))
-			Assert(t, res, requireError(codes.Unauthenticated))
-		}
+				Usecase:       newTestUsecase(t, testUsecaseConfig{}),
+				Authenticator: &DenyAuthenticator{},
+			}, func(t *testing.T, tr *Transport) {
+				ctx := context.Background()
+				res := tr.Invoke(ctx, withBody(protoReq, ReportResource, httpEndpoint("POST /api/kessel/v1beta2/resources")))
+				Assert(t, res, requireError(codes.Unauthenticated))
+			}
 	})
 }
 
@@ -1192,15 +1195,15 @@ func TestInventoryService_DeleteResource_Success(t *testing.T) {
 
 	runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
 		return TestServerConfig{
-			Usecase:       uc,
-			Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
-		}, func(t *testing.T, tr *Transport) {
-			ctx := context.Background()
-			res1 := tr.Invoke(ctx, withBody(reportReq, ReportResource, httpEndpoint("POST /api/kessel/v1beta2/resources")))
-			Assert(t, res1, requireSuccess())
-			res2 := tr.Invoke(ctx, withBody(deleteReq, DeleteResource, httpEndpoint("DELETE /api/kessel/v1beta2/resources")))
-			Assert(t, res2, requireSuccess())
-		}
+				Usecase:       uc,
+				Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+			}, func(t *testing.T, tr *Transport) {
+				ctx := context.Background()
+				res1 := tr.Invoke(ctx, withBody(reportReq, ReportResource, httpEndpoint("POST /api/kessel/v1beta2/resources")))
+				Assert(t, res1, requireSuccess())
+				res2 := tr.Invoke(ctx, withBody(deleteReq, DeleteResource, httpEndpoint("DELETE /api/kessel/v1beta2/resources")))
+				Assert(t, res2, requireSuccess())
+			}
 	})
 }
 
@@ -1334,15 +1337,15 @@ func TestInventoryService_ReportResource_Update(t *testing.T) {
 
 	runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
 		return TestServerConfig{
-			Usecase:       uc,
-			Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
-		}, func(t *testing.T, tr *Transport) {
-			ctx := context.Background()
-			res1 := tr.Invoke(ctx, withBody(createReq, ReportResource, httpEndpoint("POST /api/kessel/v1beta2/resources")))
-			Assert(t, res1, requireSuccess())
-			res2 := tr.Invoke(ctx, withBody(updateReq, ReportResource, httpEndpoint("POST /api/kessel/v1beta2/resources")))
-			Assert(t, res2, requireSuccess())
-		}
+				Usecase:       uc,
+				Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+			}, func(t *testing.T, tr *Transport) {
+				ctx := context.Background()
+				res1 := tr.Invoke(ctx, withBody(createReq, ReportResource, httpEndpoint("POST /api/kessel/v1beta2/resources")))
+				Assert(t, res1, requireSuccess())
+				res2 := tr.Invoke(ctx, withBody(updateReq, ReportResource, httpEndpoint("POST /api/kessel/v1beta2/resources")))
+				Assert(t, res2, requireSuccess())
+			}
 	})
 }
 
@@ -1401,43 +1404,43 @@ func TestInventoryService_ReportResource_Update_FieldsEffective(t *testing.T) {
 	}
 
 	runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
-		repo, db := newSQLiteTestRepo(t)
+		repo := newSQLiteTestRepo(t)
 		uc := newTestUsecase(t, testUsecaseConfig{Repo: repo})
 		key := buildReporterResourceKey(t, "update-effective-host", "host", "hbi", "instance-001")
 		return TestServerConfig{
-			Usecase:       uc,
-			Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
-		}, func(t *testing.T, tr *Transport) {
-			ctx := context.Background()
-			res1 := tr.Invoke(ctx, withBody(createReq, ReportResource, httpEndpoint("POST /api/kessel/v1beta2/resources")))
-			Assert(t, res1, requireSuccess())
+				Usecase:       uc,
+				Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+			}, func(t *testing.T, tr *Transport) {
+				ctx := context.Background()
+				res1 := tr.Invoke(ctx, withBody(createReq, ReportResource, httpEndpoint("POST /api/kessel/v1beta2/resources")))
+				Assert(t, res1, requireSuccess())
 
-			resource1, err := repo.FindResourceByKeys(db, key)
-			require.NoError(t, err)
-			require.NotNil(t, resource1)
-			assert.Equal(t, "https://api.example.com/v1/hosts/original", resource1.ReporterResources()[0].ApiHref().String())
-			assert.Equal(t, originalConsoleHref, resource1.ReporterResources()[0].ConsoleHref().String())
+				resource1, err := repoFindResourceByKeys(repo, key)
+				require.NoError(t, err)
+				require.NotNil(t, resource1)
+				assert.Equal(t, "https://api.example.com/v1/hosts/original", resource1.ReporterResources()[0].ApiHref().String())
+				assert.Equal(t, originalConsoleHref, resource1.ReporterResources()[0].ConsoleHref().String())
 
-			reps1, err := repo.FindLatestRepresentations(db, key)
-			require.NoError(t, err)
-			assert.Equal(t, "ws-original", reps1.CommonData()["workspace_id"])
+				reps1, err := repoFindLatestRepresentations(repo, key)
+				require.NoError(t, err)
+				assert.Equal(t, "ws-original", reps1.CommonData()["workspace_id"])
 
-			res2 := tr.Invoke(ctx, withBody(updateReq, ReportResource, httpEndpoint("POST /api/kessel/v1beta2/resources")))
-			Assert(t, res2, requireSuccess())
+				res2 := tr.Invoke(ctx, withBody(updateReq, ReportResource, httpEndpoint("POST /api/kessel/v1beta2/resources")))
+				Assert(t, res2, requireSuccess())
 
-			resource2, err := repo.FindResourceByKeys(db, key)
-			require.NoError(t, err)
-			require.NotNil(t, resource2)
-			rr := resource2.ReporterResources()[0]
-			assert.Equal(t, "https://api.example.com/v2/hosts/updated", rr.ApiHref().String(),
-				"api_href should reflect the updated value")
-			assert.Equal(t, updatedConsoleHref, rr.ConsoleHref().String(),
-				"console_href should reflect the updated value")
-			reps2, err := repo.FindLatestRepresentations(db, key)
-			require.NoError(t, err)
-			assert.Equal(t, "ws-updated", reps2.CommonData()["workspace_id"],
-				"common data should reflect the updated value")
-		}
+				resource2, err := repoFindResourceByKeys(repo, key)
+				require.NoError(t, err)
+				require.NotNil(t, resource2)
+				rr := resource2.ReporterResources()[0]
+				assert.Equal(t, "https://api.example.com/v2/hosts/updated", rr.ApiHref().String(),
+					"api_href should reflect the updated value")
+				assert.Equal(t, updatedConsoleHref, rr.ConsoleHref().String(),
+					"console_href should reflect the updated value")
+				reps2, err := repoFindLatestRepresentations(repo, key)
+				require.NoError(t, err)
+				assert.Equal(t, "ws-updated", reps2.CommonData()["workspace_id"],
+					"common data should reflect the updated value")
+			}
 	})
 }
 
@@ -1494,15 +1497,15 @@ func TestInventoryService_ReportResource_Update_DifferentReporterInstance(t *tes
 
 	runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
 		return TestServerConfig{
-			Usecase:       uc,
-			Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
-		}, func(t *testing.T, tr *Transport) {
-			ctx := context.Background()
-			res1 := tr.Invoke(ctx, withBody(req1, ReportResource, httpEndpoint("POST /api/kessel/v1beta2/resources")))
-			Assert(t, res1, requireSuccess())
-			res2 := tr.Invoke(ctx, withBody(req2, ReportResource, httpEndpoint("POST /api/kessel/v1beta2/resources")))
-			Assert(t, res2, requireSuccess())
-		}
+				Usecase:       uc,
+				Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+			}, func(t *testing.T, tr *Transport) {
+				ctx := context.Background()
+				res1 := tr.Invoke(ctx, withBody(req1, ReportResource, httpEndpoint("POST /api/kessel/v1beta2/resources")))
+				Assert(t, res1, requireSuccess())
+				res2 := tr.Invoke(ctx, withBody(req2, ReportResource, httpEndpoint("POST /api/kessel/v1beta2/resources")))
+				Assert(t, res2, requireSuccess())
+			}
 	})
 }
 
@@ -1850,15 +1853,15 @@ func TestInventoryService_DeleteResource_WithReporterInstanceId(t *testing.T) {
 		}
 
 		return TestServerConfig{
-			Usecase:       uc,
-			Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
-		}, func(t *testing.T, tr *Transport) {
-			ctx := context.Background()
-			res1 := tr.Invoke(ctx, withBody(reportReq, ReportResource, httpEndpoint("POST /api/kessel/v1beta2/resources")))
-			Assert(t, res1, requireSuccess())
-			res2 := tr.Invoke(ctx, withBody(deleteReq, DeleteResource, httpEndpoint("DELETE /api/kessel/v1beta2/resources")))
-			Assert(t, res2, requireSuccess())
-		}
+				Usecase:       uc,
+				Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+			}, func(t *testing.T, tr *Transport) {
+				ctx := context.Background()
+				res1 := tr.Invoke(ctx, withBody(reportReq, ReportResource, httpEndpoint("POST /api/kessel/v1beta2/resources")))
+				Assert(t, res1, requireSuccess())
+				res2 := tr.Invoke(ctx, withBody(deleteReq, DeleteResource, httpEndpoint("DELETE /api/kessel/v1beta2/resources")))
+				Assert(t, res2, requireSuccess())
+			}
 	})
 }
 
@@ -1913,16 +1916,16 @@ func TestInventoryService_DeleteResource_WithoutReporterInstanceId(t *testing.T)
 		}
 
 		return TestServerConfig{
-			Usecase:       uc,
-			Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
-		}, func(t *testing.T, tr *Transport) {
-			ctx := context.Background()
-			res1 := tr.Invoke(ctx, withBody(reportReq, ReportResource, httpEndpoint("POST /api/kessel/v1beta2/resources")))
-			Assert(t, res1, requireSuccess())
-			res2 := tr.Invoke(ctx, withBody(deleteReq, DeleteResource, httpEndpoint("DELETE /api/kessel/v1beta2/resources")))
-			// The delete succeeds with the FakeResourceRepository, which matches on local_resource_id
-			Assert(t, res2, requireSuccess())
-		}
+				Usecase:       uc,
+				Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+			}, func(t *testing.T, tr *Transport) {
+				ctx := context.Background()
+				res1 := tr.Invoke(ctx, withBody(reportReq, ReportResource, httpEndpoint("POST /api/kessel/v1beta2/resources")))
+				Assert(t, res1, requireSuccess())
+				res2 := tr.Invoke(ctx, withBody(deleteReq, DeleteResource, httpEndpoint("DELETE /api/kessel/v1beta2/resources")))
+				// The delete succeeds with the FakeResourceRepository, which matches on local_resource_id
+				Assert(t, res2, requireSuccess())
+			}
 	})
 }
 
@@ -1956,14 +1959,14 @@ func TestInventoryService_Check_ReporterWithInstanceId(t *testing.T) {
 		simpleAuthz := data.NewSimpleRelationsRepository()
 		simpleAuthz.Grant("subject-456", "view", "hbi", "host", "resource-with-instance")
 		return TestServerConfig{
-			Usecase:       newTestUsecase(t, testUsecaseConfig{Relations: simpleAuthz}),
-			Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
-		}, func(t *testing.T, tr *Transport) {
-			ctx := context.Background()
-			res := tr.Invoke(ctx, withBody(protoReq, Check, httpEndpoint("POST /api/kessel/v1beta2/check")))
-			resp := Extract(t, res, expectSuccess(func() *pb.CheckResponse { return &pb.CheckResponse{} }))
-			assert.Equal(t, pb.Allowed_ALLOWED_TRUE, resp.Allowed)
-		}
+				Usecase:       newTestUsecase(t, testUsecaseConfig{Relations: simpleAuthz}),
+				Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+			}, func(t *testing.T, tr *Transport) {
+				ctx := context.Background()
+				res := tr.Invoke(ctx, withBody(protoReq, Check, httpEndpoint("POST /api/kessel/v1beta2/check")))
+				resp := Extract(t, res, expectSuccess(func() *pb.CheckResponse { return &pb.CheckResponse{} }))
+				assert.Equal(t, pb.Allowed_ALLOWED_TRUE, resp.Allowed)
+			}
 	})
 }
 
@@ -2260,13 +2263,13 @@ func TestInventoryService_CheckForUpdate_NoIdentity(t *testing.T) {
 
 	runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
 		return TestServerConfig{
-			Usecase:       newTestUsecase(t, testUsecaseConfig{}),
-			Authenticator: &DenyAuthenticator{},
-		}, func(t *testing.T, tr *Transport) {
-			ctx := context.Background()
-			res := tr.Invoke(ctx, withBody(protoReq, CheckForUpdate, httpEndpoint("POST /api/kessel/v1beta2/checkforupdate")))
-			Assert(t, res, requireError(codes.Unauthenticated))
-		}
+				Usecase:       newTestUsecase(t, testUsecaseConfig{}),
+				Authenticator: &DenyAuthenticator{},
+			}, func(t *testing.T, tr *Transport) {
+				ctx := context.Background()
+				res := tr.Invoke(ctx, withBody(protoReq, CheckForUpdate, httpEndpoint("POST /api/kessel/v1beta2/checkforupdate")))
+				Assert(t, res, requireError(codes.Unauthenticated))
+			}
 	})
 }
 
@@ -2295,13 +2298,13 @@ func TestInventoryService_CheckBulk_NoIdentity(t *testing.T) {
 
 	runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
 		return TestServerConfig{
-			Usecase:       newTestUsecase(t, testUsecaseConfig{}),
-			Authenticator: &DenyAuthenticator{},
-		}, func(t *testing.T, tr *Transport) {
-			ctx := context.Background()
-			res := tr.Invoke(ctx, withBody(protoReq, CheckBulk, httpEndpoint("POST /api/kessel/v1beta2/checkbulk")))
-			Assert(t, res, requireError(codes.Unauthenticated))
-		}
+				Usecase:       newTestUsecase(t, testUsecaseConfig{}),
+				Authenticator: &DenyAuthenticator{},
+			}, func(t *testing.T, tr *Transport) {
+				ctx := context.Background()
+				res := tr.Invoke(ctx, withBody(protoReq, CheckBulk, httpEndpoint("POST /api/kessel/v1beta2/checkbulk")))
+				Assert(t, res, requireError(codes.Unauthenticated))
+			}
 	})
 }
 
@@ -2332,13 +2335,13 @@ func TestInventoryService_DeleteResource_ResourceNotFound(t *testing.T) {
 
 	runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
 		return TestServerConfig{
-			Usecase:       newTestUsecase(t, testUsecaseConfig{}),
-			Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
-		}, func(t *testing.T, tr *Transport) {
-			ctx := context.Background()
-			res := tr.Invoke(ctx, withBody(protoReq, DeleteResource, httpEndpoint("DELETE /api/kessel/v1beta2/resources")))
-			Assert(t, res, requireError(codes.NotFound))
-		}
+				Usecase:       newTestUsecase(t, testUsecaseConfig{}),
+				Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+			}, func(t *testing.T, tr *Transport) {
+				ctx := context.Background()
+				res := tr.Invoke(ctx, withBody(protoReq, DeleteResource, httpEndpoint("DELETE /api/kessel/v1beta2/resources")))
+				Assert(t, res, requireError(codes.NotFound))
+			}
 	})
 }
 
@@ -2362,13 +2365,13 @@ func TestInventoryService_DeleteResource_InvalidReference_EmptyResourceId(t *tes
 
 	runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
 		return TestServerConfig{
-			Usecase:       newTestUsecase(t, testUsecaseConfig{}),
-			Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
-		}, func(t *testing.T, tr *Transport) {
-			ctx := context.Background()
-			res := tr.Invoke(ctx, withBody(protoReq, DeleteResource, httpEndpoint("DELETE /api/kessel/v1beta2/resources")))
-			Assert(t, res, requireError(codes.InvalidArgument))
-		}
+				Usecase:       newTestUsecase(t, testUsecaseConfig{}),
+				Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+			}, func(t *testing.T, tr *Transport) {
+				ctx := context.Background()
+				res := tr.Invoke(ctx, withBody(protoReq, DeleteResource, httpEndpoint("DELETE /api/kessel/v1beta2/resources")))
+				Assert(t, res, requireError(codes.InvalidArgument))
+			}
 	})
 }
 
@@ -2392,13 +2395,13 @@ func TestInventoryService_DeleteResource_InvalidReference_EmptyResourceType(t *t
 
 	runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
 		return TestServerConfig{
-			Usecase:       newTestUsecase(t, testUsecaseConfig{}),
-			Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
-		}, func(t *testing.T, tr *Transport) {
-			ctx := context.Background()
-			res := tr.Invoke(ctx, withBody(protoReq, DeleteResource, httpEndpoint("DELETE /api/kessel/v1beta2/resources")))
-			Assert(t, res, requireError(codes.InvalidArgument))
-		}
+				Usecase:       newTestUsecase(t, testUsecaseConfig{}),
+				Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+			}, func(t *testing.T, tr *Transport) {
+				ctx := context.Background()
+				res := tr.Invoke(ctx, withBody(protoReq, DeleteResource, httpEndpoint("DELETE /api/kessel/v1beta2/resources")))
+				Assert(t, res, requireError(codes.InvalidArgument))
+			}
 	})
 }
 
@@ -2422,13 +2425,13 @@ func TestInventoryService_DeleteResource_InvalidReference_EmptyReporterType(t *t
 
 	runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
 		return TestServerConfig{
-			Usecase:       newTestUsecase(t, testUsecaseConfig{}),
-			Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
-		}, func(t *testing.T, tr *Transport) {
-			ctx := context.Background()
-			res := tr.Invoke(ctx, withBody(protoReq, DeleteResource, httpEndpoint("DELETE /api/kessel/v1beta2/resources")))
-			Assert(t, res, requireError(codes.InvalidArgument))
-		}
+				Usecase:       newTestUsecase(t, testUsecaseConfig{}),
+				Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+			}, func(t *testing.T, tr *Transport) {
+				ctx := context.Background()
+				res := tr.Invoke(ctx, withBody(protoReq, DeleteResource, httpEndpoint("DELETE /api/kessel/v1beta2/resources")))
+				Assert(t, res, requireError(codes.InvalidArgument))
+			}
 	})
 }
 
@@ -2458,13 +2461,13 @@ func TestInventoryService_Check_InvalidReference_EmptyResourceId(t *testing.T) {
 
 	runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
 		return TestServerConfig{
-			Usecase:       newTestUsecase(t, testUsecaseConfig{}),
-			Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
-		}, func(t *testing.T, tr *Transport) {
-			ctx := context.Background()
-			res := tr.Invoke(ctx, withBody(protoReq, Check, httpEndpoint("POST /api/kessel/v1beta2/check")))
-			Assert(t, res, requireError(codes.InvalidArgument))
-		}
+				Usecase:       newTestUsecase(t, testUsecaseConfig{}),
+				Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+			}, func(t *testing.T, tr *Transport) {
+				ctx := context.Background()
+				res := tr.Invoke(ctx, withBody(protoReq, Check, httpEndpoint("POST /api/kessel/v1beta2/check")))
+				Assert(t, res, requireError(codes.InvalidArgument))
+			}
 	})
 }
 
@@ -2494,13 +2497,13 @@ func TestInventoryService_CheckForUpdate_InvalidReference_EmptyResourceId(t *tes
 
 	runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
 		return TestServerConfig{
-			Usecase:       newTestUsecase(t, testUsecaseConfig{}),
-			Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
-		}, func(t *testing.T, tr *Transport) {
-			ctx := context.Background()
-			res := tr.Invoke(ctx, withBody(protoReq, CheckForUpdate, httpEndpoint("POST /api/kessel/v1beta2/checkforupdate")))
-			Assert(t, res, requireError(codes.InvalidArgument))
-		}
+				Usecase:       newTestUsecase(t, testUsecaseConfig{}),
+				Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+			}, func(t *testing.T, tr *Transport) {
+				ctx := context.Background()
+				res := tr.Invoke(ctx, withBody(protoReq, CheckForUpdate, httpEndpoint("POST /api/kessel/v1beta2/checkforupdate")))
+				Assert(t, res, requireError(codes.InvalidArgument))
+			}
 	})
 }
 
@@ -2523,13 +2526,13 @@ func TestInventoryService_CheckSelf_InvalidReference_EmptyResourceId(t *testing.
 
 	runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
 		return TestServerConfig{
-			Usecase:       newTestUsecase(t, testUsecaseConfig{}),
-			Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
-		}, func(t *testing.T, tr *Transport) {
-			ctx := context.Background()
-			res := tr.Invoke(ctx, withBody(protoReq, CheckSelf, httpEndpoint("POST /api/kessel/v1beta2/checkself")))
-			Assert(t, res, requireError(codes.InvalidArgument))
-		}
+				Usecase:       newTestUsecase(t, testUsecaseConfig{}),
+				Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+			}, func(t *testing.T, tr *Transport) {
+				ctx := context.Background()
+				res := tr.Invoke(ctx, withBody(protoReq, CheckSelf, httpEndpoint("POST /api/kessel/v1beta2/checkself")))
+				Assert(t, res, requireError(codes.InvalidArgument))
+			}
 	})
 }
 
@@ -2552,13 +2555,13 @@ func TestInventoryService_CheckSelf_MetaAuthzDenied(t *testing.T) {
 
 	runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
 		return TestServerConfig{
-			Usecase:       newTestUsecase(t, testUsecaseConfig{MetaAuthorizer: metaauthorizer.NewSimpleMetaAuthorizer()}),
-			Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
-		}, func(t *testing.T, tr *Transport) {
-			ctx := context.Background()
-			res := tr.Invoke(ctx, withBody(protoReq, CheckSelf, httpEndpoint("POST /api/kessel/v1beta2/checkself")))
-			Assert(t, res, requireError(codes.PermissionDenied))
-		}
+				Usecase:       newTestUsecase(t, testUsecaseConfig{MetaAuthorizer: metaauthorizer.NewSimpleMetaAuthorizer()}),
+				Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+			}, func(t *testing.T, tr *Transport) {
+				ctx := context.Background()
+				res := tr.Invoke(ctx, withBody(protoReq, CheckSelf, httpEndpoint("POST /api/kessel/v1beta2/checkself")))
+				Assert(t, res, requireError(codes.PermissionDenied))
+			}
 	})
 }
 
@@ -2576,13 +2579,13 @@ func TestInventoryService_CheckSelfBulk_EmptyItems(t *testing.T) {
 
 	runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
 		return TestServerConfig{
-			Usecase:       newTestUsecase(t, testUsecaseConfig{}),
-			Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
-		}, func(t *testing.T, tr *Transport) {
-			ctx := context.Background()
-			res := tr.Invoke(ctx, withBody(protoReq, CheckSelfBulk, httpEndpoint("POST /api/kessel/v1beta2/checkselfbulk")))
-			Assert(t, res, requireErrorContaining(codes.InvalidArgument, "items"))
-		}
+				Usecase:       newTestUsecase(t, testUsecaseConfig{}),
+				Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+			}, func(t *testing.T, tr *Transport) {
+				ctx := context.Background()
+				res := tr.Invoke(ctx, withBody(protoReq, CheckSelfBulk, httpEndpoint("POST /api/kessel/v1beta2/checkselfbulk")))
+				Assert(t, res, requireErrorContaining(codes.InvalidArgument, "items"))
+			}
 	})
 }
 
@@ -2609,13 +2612,13 @@ func TestInventoryService_CheckSelfBulk_MetaAuthzDenied(t *testing.T) {
 
 	runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
 		return TestServerConfig{
-			Usecase:       newTestUsecase(t, testUsecaseConfig{MetaAuthorizer: metaauthorizer.NewSimpleMetaAuthorizer()}),
-			Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
-		}, func(t *testing.T, tr *Transport) {
-			ctx := context.Background()
-			res := tr.Invoke(ctx, withBody(protoReq, CheckSelfBulk, httpEndpoint("POST /api/kessel/v1beta2/checkselfbulk")))
-			Assert(t, res, requireError(codes.PermissionDenied))
-		}
+				Usecase:       newTestUsecase(t, testUsecaseConfig{MetaAuthorizer: metaauthorizer.NewSimpleMetaAuthorizer()}),
+				Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+			}, func(t *testing.T, tr *Transport) {
+				ctx := context.Background()
+				res := tr.Invoke(ctx, withBody(protoReq, CheckSelfBulk, httpEndpoint("POST /api/kessel/v1beta2/checkselfbulk")))
+				Assert(t, res, requireError(codes.PermissionDenied))
+			}
 	})
 }
 
@@ -2654,25 +2657,25 @@ func TestInventoryService_CheckBulk_MetaAuthzProtocolBehavior(t *testing.T) {
 		simpleAuthz := data.NewSimpleRelationsRepository()
 		simpleAuthz.Grant("subject-a", "view", "hbi", "host", "resource-1")
 		return TestServerConfig{
-			Usecase: newTestUsecase(t, testUsecaseConfig{
-				Relations:      simpleAuthz,
-				MetaAuthorizer: metaauthorizer.NewSimpleMetaAuthorizer(),
-			}),
-			Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
-		}, func(t *testing.T, tr *Transport) {
-			ctx := context.Background()
-			res := tr.Invoke(ctx, withBody(protoReq, CheckBulk, httpEndpoint("POST /api/kessel/v1beta2/checkbulk")))
-			Assert(t, res, Expectation{
-				GRPC: func(t *testing.T, resp proto.Message, err error) {
-					require.NoError(t, err)
-					r := resp.(*pb.CheckBulkResponse)
-					assert.Equal(t, pb.Allowed_ALLOWED_TRUE, r.Pairs[0].GetItem().Allowed)
-				},
-				HTTP: func(t *testing.T, statusCode int, _ []byte) {
-					assert.Equal(t, 403, statusCode)
-				},
-			})
-		}
+				Usecase: newTestUsecase(t, testUsecaseConfig{
+					Relations:      simpleAuthz,
+					MetaAuthorizer: metaauthorizer.NewSimpleMetaAuthorizer(),
+				}),
+				Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+			}, func(t *testing.T, tr *Transport) {
+				ctx := context.Background()
+				res := tr.Invoke(ctx, withBody(protoReq, CheckBulk, httpEndpoint("POST /api/kessel/v1beta2/checkbulk")))
+				Assert(t, res, Expectation{
+					GRPC: func(t *testing.T, resp proto.Message, err error) {
+						require.NoError(t, err)
+						r := resp.(*pb.CheckBulkResponse)
+						assert.Equal(t, pb.Allowed_ALLOWED_TRUE, r.Pairs[0].GetItem().Allowed)
+					},
+					HTTP: func(t *testing.T, statusCode int, _ []byte) {
+						assert.Equal(t, 403, statusCode)
+					},
+				})
+			}
 	})
 }
 
@@ -2704,13 +2707,13 @@ func TestInventoryService_CheckBulk_MetaAuthzDenied(t *testing.T) {
 
 	runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
 		return TestServerConfig{
-			Usecase:       newTestUsecase(t, testUsecaseConfig{MetaAuthorizer: &DenyingMetaAuthorizer{}}),
-			Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
-		}, func(t *testing.T, tr *Transport) {
-			ctx := context.Background()
-			res := tr.Invoke(ctx, withBody(protoReq, CheckBulk, httpEndpoint("POST /api/kessel/v1beta2/checkbulk")))
-			Assert(t, res, requireError(codes.PermissionDenied))
-		}
+				Usecase:       newTestUsecase(t, testUsecaseConfig{MetaAuthorizer: &DenyingMetaAuthorizer{}}),
+				Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+			}, func(t *testing.T, tr *Transport) {
+				ctx := context.Background()
+				res := tr.Invoke(ctx, withBody(protoReq, CheckBulk, httpEndpoint("POST /api/kessel/v1beta2/checkbulk")))
+				Assert(t, res, requireError(codes.PermissionDenied))
+			}
 	})
 }
 
@@ -2803,19 +2806,19 @@ func TestInventoryService_CheckForUpdateBulk_AllAllowed(t *testing.T) {
 			Once()
 
 		return TestServerConfig{
-			Usecase:       newTestUsecase(t, testUsecaseConfig{Relations: mockRelations}),
-			Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
-		}, func(t *testing.T, tr *Transport) {
-			ctx := context.Background()
-			res := tr.Invoke(ctx, withBody(protoReq, CheckForUpdateBulk, httpEndpoint("POST /api/kessel/v1beta2/checkforupdatebulk")))
-			resp := Extract(t, res, expectSuccess(func() *pb.CheckForUpdateBulkResponse { return &pb.CheckForUpdateBulkResponse{} }))
-			require.Len(t, resp.Pairs, 2)
-			assert.Equal(t, pb.Allowed_ALLOWED_TRUE, resp.Pairs[0].GetItem().Allowed)
-			assert.Equal(t, pb.Allowed_ALLOWED_TRUE, resp.Pairs[1].GetItem().Allowed)
-			assert.NotNil(t, resp.ConsistencyToken)
-			assert.Equal(t, "update-bulk-token", resp.ConsistencyToken.GetToken())
-			mockRelations.AssertExpectations(t)
-		}
+				Usecase:       newTestUsecase(t, testUsecaseConfig{Relations: mockRelations}),
+				Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+			}, func(t *testing.T, tr *Transport) {
+				ctx := context.Background()
+				res := tr.Invoke(ctx, withBody(protoReq, CheckForUpdateBulk, httpEndpoint("POST /api/kessel/v1beta2/checkforupdatebulk")))
+				resp := Extract(t, res, expectSuccess(func() *pb.CheckForUpdateBulkResponse { return &pb.CheckForUpdateBulkResponse{} }))
+				require.Len(t, resp.Pairs, 2)
+				assert.Equal(t, pb.Allowed_ALLOWED_TRUE, resp.Pairs[0].GetItem().Allowed)
+				assert.Equal(t, pb.Allowed_ALLOWED_TRUE, resp.Pairs[1].GetItem().Allowed)
+				assert.NotNil(t, resp.ConsistencyToken)
+				assert.Equal(t, "update-bulk-token", resp.ConsistencyToken.GetToken())
+				mockRelations.AssertExpectations(t)
+			}
 	})
 }
 
@@ -2864,21 +2867,21 @@ func TestInventoryService_CheckForUpdateBulk_MixedResults(t *testing.T) {
 		simpleAuthz := data.NewSimpleRelationsRepository()
 		simpleAuthz.Grant("subject-a", "update", "hbi", "host", "resource-1")
 		return TestServerConfig{
-			Usecase:       newTestUsecase(t, testUsecaseConfig{Relations: simpleAuthz}),
-			Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
-		}, func(t *testing.T, tr *Transport) {
-			ctx := context.Background()
-			res := tr.Invoke(ctx, withBody(protoReq, CheckForUpdateBulk, httpEndpoint("POST /api/kessel/v1beta2/checkforupdatebulk")))
-			resp := Extract(t, res, expectSuccess(func() *pb.CheckForUpdateBulkResponse { return &pb.CheckForUpdateBulkResponse{} }))
-			require.Len(t, resp.Pairs, 2)
-			assert.Equal(t, pb.Allowed_ALLOWED_TRUE, resp.Pairs[0].GetItem().Allowed)
-			assert.Equal(t, "resource-1", resp.Pairs[0].Request.Object.ResourceId)
-			assert.Equal(t, "update", resp.Pairs[0].Request.Relation)
-			assert.Equal(t, pb.Allowed_ALLOWED_FALSE, resp.Pairs[1].GetItem().Allowed)
-			assert.Equal(t, "resource-2", resp.Pairs[1].Request.Object.ResourceId)
-			assert.Equal(t, "update", resp.Pairs[1].Request.Relation)
-			assert.NotNil(t, resp.ConsistencyToken)
-		}
+				Usecase:       newTestUsecase(t, testUsecaseConfig{Relations: simpleAuthz}),
+				Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+			}, func(t *testing.T, tr *Transport) {
+				ctx := context.Background()
+				res := tr.Invoke(ctx, withBody(protoReq, CheckForUpdateBulk, httpEndpoint("POST /api/kessel/v1beta2/checkforupdatebulk")))
+				resp := Extract(t, res, expectSuccess(func() *pb.CheckForUpdateBulkResponse { return &pb.CheckForUpdateBulkResponse{} }))
+				require.Len(t, resp.Pairs, 2)
+				assert.Equal(t, pb.Allowed_ALLOWED_TRUE, resp.Pairs[0].GetItem().Allowed)
+				assert.Equal(t, "resource-1", resp.Pairs[0].Request.Object.ResourceId)
+				assert.Equal(t, "update", resp.Pairs[0].Request.Relation)
+				assert.Equal(t, pb.Allowed_ALLOWED_FALSE, resp.Pairs[1].GetItem().Allowed)
+				assert.Equal(t, "resource-2", resp.Pairs[1].Request.Object.ResourceId)
+				assert.Equal(t, "update", resp.Pairs[1].Request.Relation)
+				assert.NotNil(t, resp.ConsistencyToken)
+			}
 	})
 }
 
@@ -2907,13 +2910,13 @@ func TestInventoryService_CheckForUpdateBulk_NoIdentity(t *testing.T) {
 
 	runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
 		return TestServerConfig{
-			Usecase:       newTestUsecase(t, testUsecaseConfig{}),
-			Authenticator: &DenyAuthenticator{},
-		}, func(t *testing.T, tr *Transport) {
-			ctx := context.Background()
-			res := tr.Invoke(ctx, withBody(protoReq, CheckForUpdateBulk, httpEndpoint("POST /api/kessel/v1beta2/checkforupdatebulk")))
-			Assert(t, res, requireError(codes.Unauthenticated))
-		}
+				Usecase:       newTestUsecase(t, testUsecaseConfig{}),
+				Authenticator: &DenyAuthenticator{},
+			}, func(t *testing.T, tr *Transport) {
+				ctx := context.Background()
+				res := tr.Invoke(ctx, withBody(protoReq, CheckForUpdateBulk, httpEndpoint("POST /api/kessel/v1beta2/checkforupdatebulk")))
+				Assert(t, res, requireError(codes.Unauthenticated))
+			}
 	})
 }
 
@@ -2952,25 +2955,25 @@ func TestInventoryService_CheckForUpdateBulk_MetaAuthzProtocolBehavior(t *testin
 		simpleAuthz := data.NewSimpleRelationsRepository()
 		simpleAuthz.Grant("subject-a", "update", "hbi", "host", "resource-1")
 		return TestServerConfig{
-			Usecase: newTestUsecase(t, testUsecaseConfig{
-				Relations:      simpleAuthz,
-				MetaAuthorizer: metaauthorizer.NewSimpleMetaAuthorizer(),
-			}),
-			Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
-		}, func(t *testing.T, tr *Transport) {
-			ctx := context.Background()
-			res := tr.Invoke(ctx, withBody(protoReq, CheckForUpdateBulk, httpEndpoint("POST /api/kessel/v1beta2/checkforupdatebulk")))
-			Assert(t, res, Expectation{
-				GRPC: func(t *testing.T, resp proto.Message, err error) {
-					require.NoError(t, err)
-					r := resp.(*pb.CheckForUpdateBulkResponse)
-					assert.Equal(t, pb.Allowed_ALLOWED_TRUE, r.Pairs[0].GetItem().Allowed)
-				},
-				HTTP: func(t *testing.T, statusCode int, _ []byte) {
-					assert.Equal(t, 403, statusCode)
-				},
-			})
-		}
+				Usecase: newTestUsecase(t, testUsecaseConfig{
+					Relations:      simpleAuthz,
+					MetaAuthorizer: metaauthorizer.NewSimpleMetaAuthorizer(),
+				}),
+				Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+			}, func(t *testing.T, tr *Transport) {
+				ctx := context.Background()
+				res := tr.Invoke(ctx, withBody(protoReq, CheckForUpdateBulk, httpEndpoint("POST /api/kessel/v1beta2/checkforupdatebulk")))
+				Assert(t, res, Expectation{
+					GRPC: func(t *testing.T, resp proto.Message, err error) {
+						require.NoError(t, err)
+						r := resp.(*pb.CheckForUpdateBulkResponse)
+						assert.Equal(t, pb.Allowed_ALLOWED_TRUE, r.Pairs[0].GetItem().Allowed)
+					},
+					HTTP: func(t *testing.T, statusCode int, _ []byte) {
+						assert.Equal(t, 403, statusCode)
+					},
+				})
+			}
 	})
 }
 
@@ -3002,13 +3005,13 @@ func TestInventoryService_CheckForUpdateBulk_MetaAuthzDenied(t *testing.T) {
 
 	runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
 		return TestServerConfig{
-			Usecase:       newTestUsecase(t, testUsecaseConfig{MetaAuthorizer: &DenyingMetaAuthorizer{}}),
-			Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
-		}, func(t *testing.T, tr *Transport) {
-			ctx := context.Background()
-			res := tr.Invoke(ctx, withBody(protoReq, CheckForUpdateBulk, httpEndpoint("POST /api/kessel/v1beta2/checkforupdatebulk")))
-			Assert(t, res, requireError(codes.PermissionDenied))
-		}
+				Usecase:       newTestUsecase(t, testUsecaseConfig{MetaAuthorizer: &DenyingMetaAuthorizer{}}),
+				Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+			}, func(t *testing.T, tr *Transport) {
+				ctx := context.Background()
+				res := tr.Invoke(ctx, withBody(protoReq, CheckForUpdateBulk, httpEndpoint("POST /api/kessel/v1beta2/checkforupdatebulk")))
+				Assert(t, res, requireError(codes.PermissionDenied))
+			}
 	})
 }
 
@@ -3040,13 +3043,13 @@ func TestInventoryService_CheckForUpdateBulk_InvalidReference_EmptyResourceId(t 
 
 	runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
 		return TestServerConfig{
-			Usecase:       newTestUsecase(t, testUsecaseConfig{}),
-			Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
-		}, func(t *testing.T, tr *Transport) {
-			ctx := context.Background()
-			res := tr.Invoke(ctx, withBody(protoReq, CheckForUpdateBulk, httpEndpoint("POST /api/kessel/v1beta2/checkforupdatebulk")))
-			Assert(t, res, requireError(codes.InvalidArgument))
-		}
+				Usecase:       newTestUsecase(t, testUsecaseConfig{}),
+				Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+			}, func(t *testing.T, tr *Transport) {
+				ctx := context.Background()
+				res := tr.Invoke(ctx, withBody(protoReq, CheckForUpdateBulk, httpEndpoint("POST /api/kessel/v1beta2/checkforupdatebulk")))
+				Assert(t, res, requireError(codes.InvalidArgument))
+			}
 	})
 }
 
@@ -3097,22 +3100,22 @@ func TestInventoryService_CheckForUpdateBulk_PairError(t *testing.T) {
 			), nil).
 			Once()
 		return TestServerConfig{
-			Usecase:       newTestUsecase(t, testUsecaseConfig{Relations: mockRelations}),
-			Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
-		}, func(t *testing.T, tr *Transport) {
-			ctx := context.Background()
-			res := tr.Invoke(ctx, withBody(protoReq, CheckForUpdateBulk, httpEndpoint("POST /api/kessel/v1beta2/checkforupdatebulk")))
-			resp := Extract(t, res, expectSuccess(func() *pb.CheckForUpdateBulkResponse { return &pb.CheckForUpdateBulkResponse{} }))
-			require.Len(t, resp.Pairs, 1)
-			assert.Nil(t, resp.Pairs[0].GetItem())
-			pairErr := resp.Pairs[0].GetError()
-			require.NotNil(t, pairErr, "expected per-pair error but got nil")
-			assert.Equal(t, int32(codes.PermissionDenied), pairErr.GetCode())
-			assert.Contains(t, pairErr.GetMessage(), "denied by policy")
-			require.NotNil(t, resp.ConsistencyToken)
-			assert.Equal(t, "error-token", resp.ConsistencyToken.GetToken())
-			mockRelations.AssertExpectations(t)
-		}
+				Usecase:       newTestUsecase(t, testUsecaseConfig{Relations: mockRelations}),
+				Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+			}, func(t *testing.T, tr *Transport) {
+				ctx := context.Background()
+				res := tr.Invoke(ctx, withBody(protoReq, CheckForUpdateBulk, httpEndpoint("POST /api/kessel/v1beta2/checkforupdatebulk")))
+				resp := Extract(t, res, expectSuccess(func() *pb.CheckForUpdateBulkResponse { return &pb.CheckForUpdateBulkResponse{} }))
+				require.Len(t, resp.Pairs, 1)
+				assert.Nil(t, resp.Pairs[0].GetItem())
+				pairErr := resp.Pairs[0].GetError()
+				require.NotNil(t, pairErr, "expected per-pair error but got nil")
+				assert.Equal(t, int32(codes.PermissionDenied), pairErr.GetCode())
+				assert.Contains(t, pairErr.GetMessage(), "denied by policy")
+				require.NotNil(t, resp.ConsistencyToken)
+				assert.Equal(t, "error-token", resp.ConsistencyToken.GetToken())
+				mockRelations.AssertExpectations(t)
+			}
 	})
 }
 
@@ -3128,13 +3131,13 @@ func TestInventoryService_CheckForUpdateBulk_EmptyItems(t *testing.T) {
 
 	runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
 		return TestServerConfig{
-			Usecase:       newTestUsecase(t, testUsecaseConfig{}),
-			Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
-		}, func(t *testing.T, tr *Transport) {
-			ctx := context.Background()
-			res := tr.Invoke(ctx, withBody(protoReq, CheckForUpdateBulk, httpEndpoint("POST /api/kessel/v1beta2/checkforupdatebulk")))
-			Assert(t, res, requireErrorContaining(codes.InvalidArgument, "items"))
-		}
+				Usecase:       newTestUsecase(t, testUsecaseConfig{}),
+				Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+			}, func(t *testing.T, tr *Transport) {
+				ctx := context.Background()
+				res := tr.Invoke(ctx, withBody(protoReq, CheckForUpdateBulk, httpEndpoint("POST /api/kessel/v1beta2/checkforupdatebulk")))
+				Assert(t, res, requireErrorContaining(codes.InvalidArgument, "items"))
+			}
 	})
 }
 
@@ -3171,23 +3174,23 @@ func TestInventoryService_ReportResource_MetaAuthzProtocolBehavior(t *testing.T)
 
 	runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
 		return TestServerConfig{
-			Usecase: newTestUsecase(t, testUsecaseConfig{
-				MetaAuthorizer: metaauthorizer.NewSimpleMetaAuthorizer(),
-			}),
-			Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
-		}, func(t *testing.T, tr *Transport) {
-			ctx := context.Background()
-			res := tr.Invoke(ctx, withBody(protoReq, ReportResource, httpEndpoint("POST /api/kessel/v1beta2/resources")))
-			Assert(t, res, Expectation{
-				GRPC: func(t *testing.T, resp proto.Message, err error) {
-					require.NoError(t, err)
-					assert.NotNil(t, resp)
-				},
-				HTTP: func(t *testing.T, statusCode int, _ []byte) {
-					assert.Equal(t, 403, statusCode)
-				},
-			})
-		}
+				Usecase: newTestUsecase(t, testUsecaseConfig{
+					MetaAuthorizer: metaauthorizer.NewSimpleMetaAuthorizer(),
+				}),
+				Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+			}, func(t *testing.T, tr *Transport) {
+				ctx := context.Background()
+				res := tr.Invoke(ctx, withBody(protoReq, ReportResource, httpEndpoint("POST /api/kessel/v1beta2/resources")))
+				Assert(t, res, Expectation{
+					GRPC: func(t *testing.T, resp proto.Message, err error) {
+						require.NoError(t, err)
+						assert.NotNil(t, resp)
+					},
+					HTTP: func(t *testing.T, statusCode int, _ []byte) {
+						assert.Equal(t, 403, statusCode)
+					},
+				})
+			}
 	})
 }
 
@@ -3201,18 +3204,62 @@ func TestInventoryService_StreamedListObjects_NilRequest(t *testing.T) {
 }
 
 // newSQLiteTestRepo creates a real GORM repository backed by an in-memory SQLite
-// database with all migrations applied. Returns the repository and the underlying
-// *gorm.DB for use in assertions.
-func newSQLiteTestRepo(t *testing.T) (model.ResourceRepository, *gorm.DB) {
+// database with all migrations applied.
+func newSQLiteTestRepo(t *testing.T) model.ResourceRepository {
 	t.Helper()
 	db := testutil.NewSQLiteTestDB(t, &gorm.Config{TranslateError: true})
 	err := data.Migrate(db, nil)
 	require.NoError(t, err)
 	mc := metricscollector.NewFakeMetricsCollector()
-	tm := data.NewGormTransactionManager(mc, 3)
-	noopPublisher := func(_ *gorm.DB, _ *model_legacy.OutboxEvent) error { return nil }
-	repo := data.NewResourceRepository(db, tm, noopPublisher)
-	return repo, db
+	noopPublisher := data.SetOutboxPublisher(storage.OutboxModeNone)
+	return data.NewResourceRepository(data.GormResourceRepositoryConfig{
+		DB:                      db,
+		OutboxPublisher:         noopPublisher,
+		MetricsCollector:        mc,
+		MaxSerializationRetries: 3,
+	})
+}
+
+func repoFindResourceByKeys(repo model.ResourceRepository, key model.ReporterResourceKey) (*model.Resource, error) {
+	tx, err := repo.Begin("")
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = tx.Rollback() }()
+	resource, err := tx.FindResourceByKeys(key)
+	if err != nil {
+		return nil, err
+	}
+	_ = tx.Commit()
+	return resource, nil
+}
+
+func repoFindLatestRepresentations(repo model.ResourceRepository, key model.ReporterResourceKey) (*model.Representations, error) {
+	tx, err := repo.Begin("")
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = tx.Rollback() }()
+	reps, err := tx.FindLatestRepresentations(key)
+	if err != nil {
+		return nil, err
+	}
+	_ = tx.Commit()
+	return reps, nil
+}
+
+func repoHasTransactionIdBeenProcessed(repo model.ResourceRepository, transactionId model.TransactionId) (bool, error) {
+	tx, err := repo.Begin("")
+	if err != nil {
+		return false, err
+	}
+	defer func() { _ = tx.Rollback() }()
+	processed, err := tx.HasTransactionIdBeenProcessed(transactionId)
+	if err != nil {
+		return false, err
+	}
+	_ = tx.Commit()
+	return processed, nil
 }
 
 // buildReporterResourceKey is a test helper that constructs a model.ReporterResourceKey
@@ -3272,58 +3319,57 @@ func TestInventoryService_ReportResource_AllOptionalMetadataFields(t *testing.T)
 	}
 
 	runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
-		repo, db := newSQLiteTestRepo(t)
+		repo := newSQLiteTestRepo(t)
 		uc := newTestUsecase(t, testUsecaseConfig{Repo: repo})
 		return TestServerConfig{
-			Usecase:       uc,
-			Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
-		}, func(t *testing.T, tr *Transport) {
-			ctx := context.Background()
-			res := tr.Invoke(ctx, withBody(req, ReportResource, httpEndpoint("POST /api/kessel/v1beta2/resources")))
-			Assert(t, res, requireSuccess())
+				Usecase:       uc,
+				Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+			}, func(t *testing.T, tr *Transport) {
+				ctx := context.Background()
+				res := tr.Invoke(ctx, withBody(req, ReportResource, httpEndpoint("POST /api/kessel/v1beta2/resources")))
+				Assert(t, res, requireSuccess())
 
-			key := buildReporterResourceKey(t, "host-all-optional", "host", "hbi", "instance-001")
-			resource, err := repo.FindResourceByKeys(db, key)
-			require.NoError(t, err)
-			require.NotNil(t, resource)
+				key := buildReporterResourceKey(t, "host-all-optional", "host", "hbi", "instance-001")
+				resource, err := repoFindResourceByKeys(repo, key)
+				require.NoError(t, err)
+				require.NotNil(t, resource)
 
-			rr := resource.ReporterResources()[0]
-			assert.Equal(t, "host-all-optional", rr.Key().LocalResourceId().String())
-			assert.Equal(t, "host", rr.Key().ResourceType().String())
-			assert.Equal(t, "hbi", rr.Key().ReporterType().String())
-			assert.Equal(t, "instance-001", rr.Key().ReporterInstanceId().String())
-			assert.Equal(t, "https://api.example.com/hosts/host-all-optional", rr.ApiHref().String())
-			assert.Equal(t, consoleHref, rr.ConsoleHref().String())
+				rr := resource.ReporterResources()[0]
+				assert.Equal(t, "host-all-optional", rr.Key().LocalResourceId().String())
+				assert.Equal(t, "host", rr.Key().ResourceType().String())
+				assert.Equal(t, "hbi", rr.Key().ReporterType().String())
+				assert.Equal(t, "instance-001", rr.Key().ReporterInstanceId().String())
+				assert.Equal(t, "https://api.example.com/hosts/host-all-optional", rr.ApiHref().String())
+				assert.Equal(t, consoleHref, rr.ConsoleHref().String())
 
-			reps, err := repo.FindLatestRepresentations(db, key)
-			require.NoError(t, err)
-			require.NotNil(t, reps)
-			assert.Equal(t, "ws-all-optional", string(reps.CommonData()["workspace_id"].(string)))
+				reps, err := repoFindLatestRepresentations(repo, key)
+				require.NoError(t, err)
+				require.NotNil(t, reps)
+				assert.Equal(t, "ws-all-optional", string(reps.CommonData()["workspace_id"].(string)))
 
-			processed, err := repo.HasTransactionIdBeenProcessed(db, model.NewTransactionId(txId))
-			require.NoError(t, err)
-			assert.True(t, processed, "transaction_id should be recorded as processed")
-		}
+				processed, err := repoHasTransactionIdBeenProcessed(repo, model.NewTransactionId(txId))
+				require.NoError(t, err)
+				assert.True(t, processed, "transaction_id should be recorded as processed")
+			}
 	})
 }
 
 // --- ReportResource: Nil/Empty Optional Struct Combinations ---
 
-// Representation validation: at least one of common or reporter must contain data.
-// Both nil, both empty, or one nil and the other empty all produce the same domain error.
-// Empty reporter with valid common (or vice versa) succeeds.
+// Representation validation: both common and reporter must be non-nil and non-empty.
+// Both nil, reporter-only, common-only, or both-empty return an error.
 func TestInventoryService_ReportResource_NilOrEmptyRepresentationStructs(t *testing.T) {
 	claims := &authnapi.Claims{
 		SubjectId: authnapi.SubjectId("reporter-service"),
 		AuthType:  authnapi.AuthTypeXRhIdentity,
 	}
 
-	errorCases := []struct {
+	cases := []struct {
 		name            string
 		localResourceId string
 		common          *structpb.Struct
 		reporter        *structpb.Struct
-		expectMsg       string
+		expectMsg       string // empty string means the request is expected to succeed
 	}{
 		{
 			name:            "both nil",
@@ -3339,27 +3385,13 @@ func TestInventoryService_ReportResource_NilOrEmptyRepresentationStructs(t *test
 			reporter:        &structpb.Struct{},
 			expectMsg:       "at least one of reporterRepresentation or commonRepresentation must be provided",
 		},
-		{
-			name:            "reporter nil common empty",
-			localResourceId: "host-reporter-nil-common-empty",
-			common:          &structpb.Struct{},
-			reporter:        nil,
-			expectMsg:       "at least one of reporterRepresentation or commonRepresentation must be provided",
-		},
-		{
-			name:            "reporter empty common nil",
-			localResourceId: "host-reporter-empty-common-nil",
-			common:          nil,
-			reporter:        &structpb.Struct{},
-			expectMsg:       "at least one of reporterRepresentation or commonRepresentation must be provided",
-		},
 	}
 
-	for _, tc := range errorCases {
+	for _, tc := range cases {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
-				repo, _ := newSQLiteTestRepo(t)
+				repo := newSQLiteTestRepo(t)
 				uc := newTestUsecase(t, testUsecaseConfig{Repo: repo})
 				req := &pb.ReportResourceRequest{
 					Type:               "host",
@@ -3376,92 +3408,13 @@ func TestInventoryService_ReportResource_NilOrEmptyRepresentationStructs(t *test
 				}
 				expectation := requireErrorContaining(codes.InvalidArgument, tc.expectMsg)
 				return TestServerConfig{
-					Usecase:       uc,
-					Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
-				}, func(t *testing.T, tr *Transport) {
-					ctx := context.Background()
-					res := tr.Invoke(ctx, withBody(req, ReportResource, httpEndpoint("POST /api/kessel/v1beta2/resources")))
-					Assert(t, res, expectation)
-				}
-			})
-		})
-	}
-
-	successCases := []struct {
-		name            string
-		localResourceId string
-		common          *structpb.Struct
-		reporter        *structpb.Struct
-	}{
-		{
-			name:            "empty reporter with valid common",
-			localResourceId: "host-empty-reporter-valid-common",
-			common: &structpb.Struct{
-				Fields: map[string]*structpb.Value{
-					"workspace_id": structpb.NewStringValue("ws-empty-reporter"),
-				},
-			},
-			reporter: &structpb.Struct{},
-		},
-		{
-			name:            "nil reporter with valid common",
-			localResourceId: "host-nil-reporter-valid-common",
-			common: &structpb.Struct{
-				Fields: map[string]*structpb.Value{
-					"workspace_id": structpb.NewStringValue("ws-nil-reporter"),
-				},
-			},
-			reporter: nil,
-		},
-		{
-			name:            "valid reporter with empty common",
-			localResourceId: "host-valid-reporter-empty-common",
-			common:          &structpb.Struct{},
-			reporter: &structpb.Struct{
-				Fields: map[string]*structpb.Value{
-					"reporter_field": structpb.NewStringValue("value"),
-				},
-			},
-		},
-		{
-			name:            "valid reporter with nil common",
-			localResourceId: "host-valid-reporter-nil-common",
-			common:          nil,
-			reporter: &structpb.Struct{
-				Fields: map[string]*structpb.Value{
-					"reporter_field": structpb.NewStringValue("value"),
-				},
-			},
-		},
-	}
-
-	for _, tc := range successCases {
-		tc := tc
-		t.Run(tc.name, func(t *testing.T) {
-			runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
-				repo, _ := newSQLiteTestRepo(t)
-				uc := newTestUsecase(t, testUsecaseConfig{Repo: repo})
-				req := &pb.ReportResourceRequest{
-					Type:               "host",
-					ReporterType:       "hbi",
-					ReporterInstanceId: "instance-001",
-					Representations: &pb.ResourceRepresentations{
-						Metadata: &pb.RepresentationMetadata{
-							LocalResourceId: tc.localResourceId,
-							ApiHref:         "https://api.example.com/hosts/" + tc.localResourceId,
-						},
-						Common:   tc.common,
-						Reporter: tc.reporter,
-					},
-				}
-				return TestServerConfig{
-					Usecase:       uc,
-					Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
-				}, func(t *testing.T, tr *Transport) {
-					ctx := context.Background()
-					res := tr.Invoke(ctx, withBody(req, ReportResource, httpEndpoint("POST /api/kessel/v1beta2/resources")))
-					Assert(t, res, requireSuccess())
-				}
+						Usecase:       uc,
+						Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+					}, func(t *testing.T, tr *Transport) {
+						ctx := context.Background()
+						res := tr.Invoke(ctx, withBody(req, ReportResource, httpEndpoint("POST /api/kessel/v1beta2/resources")))
+						Assert(t, res, expectation)
+					}
 			})
 		})
 	}
@@ -3562,13 +3515,13 @@ func TestInventoryService_ReportResource_ErrorFormats(t *testing.T) {
 					},
 				}
 				return TestServerConfig{
-					Usecase:       uc,
-					Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
-				}, func(t *testing.T, tr *Transport) {
-					ctx := context.Background()
-					res := tr.Invoke(ctx, withBody(req, ReportResource, httpEndpoint("POST /api/kessel/v1beta2/resources")))
-					Assert(t, res, requireErrorContaining(tc.expectCode, tc.expectMsgContains))
-				}
+						Usecase:       uc,
+						Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+					}, func(t *testing.T, tr *Transport) {
+						ctx := context.Background()
+						res := tr.Invoke(ctx, withBody(req, ReportResource, httpEndpoint("POST /api/kessel/v1beta2/resources")))
+						Assert(t, res, requireErrorContaining(tc.expectCode, tc.expectMsgContains))
+					}
 			})
 		})
 	}
@@ -3612,7 +3565,7 @@ func TestInventoryService_ReportResource_ValidationErrorFormats(t *testing.T) {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
-				repo, _ := newSQLiteTestRepo(t)
+				repo := newSQLiteTestRepo(t)
 				uc := newTestUsecase(t, testUsecaseConfig{Repo: repo})
 				req := &pb.ReportResourceRequest{
 					Type:               tc.resourceType,
@@ -3629,13 +3582,13 @@ func TestInventoryService_ReportResource_ValidationErrorFormats(t *testing.T) {
 				}
 				expectation := requireErrorContaining(tc.expectCode, tc.expectMsgContains)
 				return TestServerConfig{
-					Usecase:       uc,
-					Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
-				}, func(t *testing.T, tr *Transport) {
-					ctx := context.Background()
-					res := tr.Invoke(ctx, withBody(req, ReportResource, httpEndpoint("POST /api/kessel/v1beta2/resources")))
-					Assert(t, res, expectation)
-				}
+						Usecase:       uc,
+						Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+					}, func(t *testing.T, tr *Transport) {
+						ctx := context.Background()
+						res := tr.Invoke(ctx, withBody(req, ReportResource, httpEndpoint("POST /api/kessel/v1beta2/resources")))
+						Assert(t, res, expectation)
+					}
 			})
 		})
 	}
@@ -3675,7 +3628,7 @@ func TestInventoryService_ReportResource_WriteVisibility(t *testing.T) {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
-				repo, db := newSQLiteTestRepo(t)
+				repo := newSQLiteTestRepo(t)
 				uc := newTestUsecase(t, testUsecaseConfig{Repo: repo})
 				req := &pb.ReportResourceRequest{
 					Type:               "host",
@@ -3700,18 +3653,18 @@ func TestInventoryService_ReportResource_WriteVisibility(t *testing.T) {
 					},
 				}
 				return TestServerConfig{
-					Usecase:       uc,
-					Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
-				}, func(t *testing.T, tr *Transport) {
-					ctx := context.Background()
-					res := tr.Invoke(ctx, withBody(req, ReportResource, httpEndpoint("POST /api/kessel/v1beta2/resources")))
-					Assert(t, res, requireSuccess())
+						Usecase:       uc,
+						Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+					}, func(t *testing.T, tr *Transport) {
+						ctx := context.Background()
+						res := tr.Invoke(ctx, withBody(req, ReportResource, httpEndpoint("POST /api/kessel/v1beta2/resources")))
+						Assert(t, res, requireSuccess())
 
-					key := buildReporterResourceKey(t, tc.localResourceId, "host", "hbi", "instance-001")
-					resource, err := repo.FindResourceByKeys(db, key)
-					require.NoError(t, err)
-					require.NotNil(t, resource, "resource should be persisted regardless of write_visibility")
-				}
+						key := buildReporterResourceKey(t, tc.localResourceId, "host", "hbi", "instance-001")
+						resource, err := repoFindResourceByKeys(repo, key)
+						require.NoError(t, err)
+						require.NotNil(t, resource, "resource should be persisted regardless of write_visibility")
+					}
 			})
 		})
 	}
@@ -3750,21 +3703,21 @@ func TestInventoryService_ReportResource_InventoryIdSet(t *testing.T) {
 	}
 
 	runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
-		repo, db := newSQLiteTestRepo(t)
+		repo := newSQLiteTestRepo(t)
 		uc := newTestUsecase(t, testUsecaseConfig{Repo: repo})
 		return TestServerConfig{
-			Usecase:       uc,
-			Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
-		}, func(t *testing.T, tr *Transport) {
-			ctx := context.Background()
-			res := tr.Invoke(ctx, withBody(req, ReportResource, httpEndpoint("POST /api/kessel/v1beta2/resources")))
-			Assert(t, res, requireSuccess())
+				Usecase:       uc,
+				Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+			}, func(t *testing.T, tr *Transport) {
+				ctx := context.Background()
+				res := tr.Invoke(ctx, withBody(req, ReportResource, httpEndpoint("POST /api/kessel/v1beta2/resources")))
+				Assert(t, res, requireSuccess())
 
-			key := buildReporterResourceKey(t, "host-with-inventory-id", "host", "hbi", "instance-001")
-			resource, err := repo.FindResourceByKeys(db, key)
-			require.NoError(t, err)
-			require.NotNil(t, resource, "inventory_id should not interfere with persistence")
-		}
+				key := buildReporterResourceKey(t, "host-with-inventory-id", "host", "hbi", "instance-001")
+				resource, err := repoFindResourceByKeys(repo, key)
+				require.NoError(t, err)
+				require.NotNil(t, resource, "inventory_id should not interfere with persistence")
+			}
 	})
 }
 
@@ -3849,13 +3802,13 @@ func TestInventoryService_ReportResource_MissingRequiredFields(t *testing.T) {
 				req := validReq()
 				tc.mutate(req)
 				return TestServerConfig{
-					Usecase:       uc,
-					Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
-				}, func(t *testing.T, tr *Transport) {
-					ctx := context.Background()
-					res := tr.Invoke(ctx, withBody(req, ReportResource, httpEndpoint("POST /api/kessel/v1beta2/resources")))
-					Assert(t, res, requireErrorContaining(codes.InvalidArgument, tc.expectMsg))
-				}
+						Usecase:       uc,
+						Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+					}, func(t *testing.T, tr *Transport) {
+						ctx := context.Background()
+						res := tr.Invoke(ctx, withBody(req, ReportResource, httpEndpoint("POST /api/kessel/v1beta2/resources")))
+						Assert(t, res, requireErrorContaining(codes.InvalidArgument, tc.expectMsg))
+					}
 			})
 		})
 	}
@@ -3898,40 +3851,40 @@ func TestInventoryService_ReportResource_TransactionIdIdempotency(t *testing.T) 
 	}
 
 	runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
-		repo, db := newSQLiteTestRepo(t)
+		repo := newSQLiteTestRepo(t)
 		uc := newTestUsecase(t, testUsecaseConfig{Repo: repo})
 		return TestServerConfig{
-			Usecase:       uc,
-			Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
-		}, func(t *testing.T, tr *Transport) {
-			ctx := context.Background()
-			key := buildReporterResourceKey(t, "host-idempotent", "host", "hbi", "instance-001")
+				Usecase:       uc,
+				Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+			}, func(t *testing.T, tr *Transport) {
+				ctx := context.Background()
+				key := buildReporterResourceKey(t, "host-idempotent", "host", "hbi", "instance-001")
 
-			// First report
-			res1 := tr.Invoke(ctx, withBody(makeReq("https://api.example.com/v1"), ReportResource, httpEndpoint("POST /api/kessel/v1beta2/resources")))
-			Assert(t, res1, requireSuccess())
+				// First report
+				res1 := tr.Invoke(ctx, withBody(makeReq("https://api.example.com/v1"), ReportResource, httpEndpoint("POST /api/kessel/v1beta2/resources")))
+				Assert(t, res1, requireSuccess())
 
-			processed, err := repo.HasTransactionIdBeenProcessed(db, model.NewTransactionId(txId))
-			require.NoError(t, err)
-			assert.True(t, processed, "transaction_id should be recorded after first report")
+				processed, err := repoHasTransactionIdBeenProcessed(repo, model.NewTransactionId(txId))
+				require.NoError(t, err)
+				assert.True(t, processed, "transaction_id should be recorded after first report")
 
-			resource1, err := repo.FindResourceByKeys(db, key)
-			require.NoError(t, err)
-			require.NotNil(t, resource1)
-			apiHrefAfterFirst := resource1.ReporterResources()[0].ApiHref().String()
+				resource1, err := repoFindResourceByKeys(repo, key)
+				require.NoError(t, err)
+				require.NotNil(t, resource1)
+				apiHrefAfterFirst := resource1.ReporterResources()[0].ApiHref().String()
 
-			// Second report with same transaction_id but different api_href
-			res2 := tr.Invoke(ctx, withBody(makeReq("https://api.example.com/v2-should-be-ignored"), ReportResource, httpEndpoint("POST /api/kessel/v1beta2/resources")))
-			Assert(t, res2, requireSuccess())
+				// Second report with same transaction_id but different api_href
+				res2 := tr.Invoke(ctx, withBody(makeReq("https://api.example.com/v2-should-be-ignored"), ReportResource, httpEndpoint("POST /api/kessel/v1beta2/resources")))
+				Assert(t, res2, requireSuccess())
 
-			resource2, err := repo.FindResourceByKeys(db, key)
-			require.NoError(t, err)
-			require.NotNil(t, resource2)
-			apiHrefAfterSecond := resource2.ReporterResources()[0].ApiHref().String()
+				resource2, err := repoFindResourceByKeys(repo, key)
+				require.NoError(t, err)
+				require.NotNil(t, resource2)
+				apiHrefAfterSecond := resource2.ReporterResources()[0].ApiHref().String()
 
-			assert.Equal(t, apiHrefAfterFirst, apiHrefAfterSecond,
-				"second report with same transaction_id should be a no-op; api_href should not change")
-		}
+				assert.Equal(t, apiHrefAfterFirst, apiHrefAfterSecond,
+					"second report with same transaction_id should be a no-op; api_href should not change")
+			}
 	})
 }
 
@@ -3970,7 +3923,7 @@ func TestInventoryService_ReportResource_IdempotencyDisabled(t *testing.T) {
 	}
 
 	runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
-		repo, _ := newSQLiteTestRepo(t)
+		repo := newSQLiteTestRepo(t)
 		idempotencyOff := usecase.NewUsecaseConfig()
 		idempotencyOff.IdempotencyCheckEnabled = false
 		uc := newTestUsecase(t, testUsecaseConfig{
@@ -3978,34 +3931,34 @@ func TestInventoryService_ReportResource_IdempotencyDisabled(t *testing.T) {
 			Config: idempotencyOff,
 		})
 		return TestServerConfig{
-			Usecase:       uc,
-			Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
-		}, func(t *testing.T, tr *Transport) {
-			ctx := context.Background()
-			key := buildReporterResourceKey(t, "host-replay", "host", "hbi", "instance-001")
+				Usecase:       uc,
+				Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+			}, func(t *testing.T, tr *Transport) {
+				ctx := context.Background()
+				key := buildReporterResourceKey(t, "host-replay", "host", "hbi", "instance-001")
 
-			// First report
-			res1 := tr.Invoke(ctx, withBody(makeReq("https://api.example.com/v1"), ReportResource, httpEndpoint("POST /api/kessel/v1beta2/resources")))
-			Assert(t, res1, requireSuccess())
+				// First report
+				res1 := tr.Invoke(ctx, withBody(makeReq("https://api.example.com/v1"), ReportResource, httpEndpoint("POST /api/kessel/v1beta2/resources")))
+				Assert(t, res1, requireSuccess())
 
-			resource1, err := repo.FindResourceByKeys(repo.GetDB(), key)
-			require.NoError(t, err)
-			require.NotNil(t, resource1)
-			apiHrefAfterFirst := resource1.ReporterResources()[0].ApiHref().String()
-			assert.Equal(t, "https://api.example.com/v1", apiHrefAfterFirst)
+				resource1, err := repoFindResourceByKeys(repo, key)
+				require.NoError(t, err)
+				require.NotNil(t, resource1)
+				apiHrefAfterFirst := resource1.ReporterResources()[0].ApiHref().String()
+				assert.Equal(t, "https://api.example.com/v1", apiHrefAfterFirst)
 
-			// Second report with same transaction_id but different api_href — should NOT be skipped
-			res2 := tr.Invoke(ctx, withBody(makeReq("https://api.example.com/v2-replayed"), ReportResource, httpEndpoint("POST /api/kessel/v1beta2/resources")))
-			Assert(t, res2, requireSuccess())
+				// Second report with same transaction_id but different api_href — should NOT be skipped
+				res2 := tr.Invoke(ctx, withBody(makeReq("https://api.example.com/v2-replayed"), ReportResource, httpEndpoint("POST /api/kessel/v1beta2/resources")))
+				Assert(t, res2, requireSuccess())
 
-			resource2, err := repo.FindResourceByKeys(repo.GetDB(), key)
-			require.NoError(t, err)
-			require.NotNil(t, resource2)
-			apiHrefAfterSecond := resource2.ReporterResources()[0].ApiHref().String()
+				resource2, err := repoFindResourceByKeys(repo, key)
+				require.NoError(t, err)
+				require.NotNil(t, resource2)
+				apiHrefAfterSecond := resource2.ReporterResources()[0].ApiHref().String()
 
-			assert.Equal(t, "https://api.example.com/v2-replayed", apiHrefAfterSecond,
-				"with idempotency disabled, replayed event should update the resource")
-		}
+				assert.Equal(t, "https://api.example.com/v2-replayed", apiHrefAfterSecond,
+					"with idempotency disabled, replayed event should update the resource")
+			}
 	})
 }
 
@@ -4031,13 +3984,13 @@ func TestInventoryService_ReportResource_MetaAuthzDenied(t *testing.T) {
 
 	runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
 		return TestServerConfig{
-			Usecase:       newTestUsecase(t, testUsecaseConfig{MetaAuthorizer: &DenyingMetaAuthorizer{}}),
-			Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
-		}, func(t *testing.T, tr *Transport) {
-			ctx := context.Background()
-			res := tr.Invoke(ctx, withBody(protoReq, ReportResource, httpEndpoint("POST /api/kessel/v1beta2/resources")))
-			Assert(t, res, requireError(codes.PermissionDenied))
-		}
+				Usecase:       newTestUsecase(t, testUsecaseConfig{MetaAuthorizer: &DenyingMetaAuthorizer{}}),
+				Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+			}, func(t *testing.T, tr *Transport) {
+				ctx := context.Background()
+				res := tr.Invoke(ctx, withBody(protoReq, ReportResource, httpEndpoint("POST /api/kessel/v1beta2/resources")))
+				Assert(t, res, requireError(codes.PermissionDenied))
+			}
 	})
 }
 

@@ -1,0 +1,123 @@
+syntax = "proto3";
+
+package kessel.relations.v1beta1;
+
+import "google/api/annotations.proto";
+import "kessel/relations/v1beta1/common.proto";
+import "buf/validate/validate.proto";
+import "google/rpc/status.proto";
+
+
+option go_package = "github.com/project-kessel/relations-api/api/kessel/relations/v1beta1";
+option java_multiple_files = true;
+option java_package = "org.project_kessel.api.relations.v1beta1";
+
+service KesselCheckService {
+	// Checks for the existence of a single Relationship 
+	// (a Relation between a Resource and a Subject or Subject Set).
+	rpc Check (CheckRequest) returns (CheckResponse) {
+		option (google.api.http) = {
+			post: "/v1beta1/check"
+			body: "*"
+		};
+	};
+	
+	rpc CheckForUpdate (CheckForUpdateRequest) returns (CheckForUpdateResponse) {
+		option (google.api.http) = {
+			post: "/v1beta1/checkforupdate"
+			body: "*"
+		};
+	};
+
+	rpc CheckBulk (CheckBulkRequest) returns (CheckBulkResponse) {
+		option (google.api.http) = {
+			post: "/v1beta1/checkbulk"
+			body: "*"
+		};
+	};
+
+	rpc CheckForUpdateBulk (CheckForUpdateBulkRequest) returns (CheckForUpdateBulkResponse) {
+		option (google.api.http) = {
+			post: "/v1beta1/checkforupdatebulk"
+			body: "*"
+		};
+	};
+}
+
+message CheckRequest {
+	ObjectReference resource = 1 [(buf.validate.field).required = true];
+	string relation = 2 [(buf.validate.field).string.min_len = 1];
+	SubjectReference subject = 3 [(buf.validate.field).required = true];
+	Consistency consistency = 4;
+}
+
+message CheckResponse {
+	enum Allowed {
+		ALLOWED_UNSPECIFIED = 0;
+		ALLOWED_TRUE = 1;
+		ALLOWED_FALSE = 2;
+		// e.g.  ALLOWED_CONDITIONAL = 3;
+	}
+	Allowed allowed = 1;
+	ConsistencyToken consistency_token = 2;
+}
+
+message CheckForUpdateRequest { // fully consistent
+	ObjectReference resource = 1 [(buf.validate.field).required = true];
+	string relation = 2 [(buf.validate.field).string.min_len = 1];
+	SubjectReference subject = 3 [(buf.validate.field).required = true];
+}
+
+message CheckForUpdateResponse {
+	enum Allowed {
+		ALLOWED_UNSPECIFIED = 0;
+		ALLOWED_TRUE = 1;
+		ALLOWED_FALSE = 2;
+		// e.g.  ALLOWED_CONDITIONAL = 3;
+	}
+	Allowed allowed = 1;
+	ConsistencyToken consistency_token = 2;
+}
+
+message CheckBulkRequestItem {
+	ObjectReference resource = 1 [(buf.validate.field).required = true];
+	string relation = 2 [(buf.validate.field).string.min_len = 1];
+	SubjectReference subject = 3 [(buf.validate.field).required = true];
+}
+
+message CheckBulkResponseItem {
+	enum Allowed {
+		ALLOWED_UNSPECIFIED = 0;
+		ALLOWED_TRUE = 1;
+		ALLOWED_FALSE = 2;
+		// e.g.  ALLOWED_CONDITIONAL = 3;
+	}
+	Allowed allowed = 1;
+}
+
+message CheckBulkResponsePair {
+	CheckBulkRequestItem request = 1;
+	oneof response {
+		CheckBulkResponseItem item = 2;
+		google.rpc.Status error = 3;
+	};
+}
+
+message CheckBulkRequest {
+	repeated CheckBulkRequestItem items = 1 [(buf.validate.field).repeated.min_items = 1];
+	Consistency consistency = 2;
+}
+
+message CheckBulkResponse {
+	repeated CheckBulkResponsePair pairs = 1 [(buf.validate.field).repeated.min_items = 1];
+	ConsistencyToken consistency_token = 2;
+}
+
+message CheckForUpdateBulkRequest {
+	repeated CheckBulkRequestItem items = 1 [(buf.validate.field).repeated.min_items = 1];
+}
+
+message CheckForUpdateBulkResponse {
+	repeated CheckBulkResponsePair pairs = 1 [(buf.validate.field).repeated.min_items = 1];
+	ConsistencyToken consistency_token = 2;
+}

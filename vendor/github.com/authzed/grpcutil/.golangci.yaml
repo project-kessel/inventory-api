@@ -1,0 +1,45 @@
+version: "2"
+linters:
+  enable:
+    - "bidichk"
+    - "bodyclose"
+    - "errname"
+    - "errorlint"
+    - "goprintffuncname"
+    - "gosec"
+    - "importas"
+    - "makezero"
+    - "prealloc"
+    - "predeclared"
+    - "promlinter"
+    - "revive"
+    - "rowserrcheck"
+    - "staticcheck"
+    - "unconvert"
+    - "wastedassign"
+    - "whitespace"
+  exclusions:
+    generated: "lax"
+    presets:
+      - "comments"
+      - "common-false-positives"
+      - "legacy"
+      - "std-error-handling"
+    paths:
+      - "third_party$"
+      - "builtin$"
+      - "examples$"
+formatters:
+  enable:
+    - "gofumpt"
+    - "goimports"
+  settings:
+    goimports:
+      local-prefixes:
+        - "github.com/authzed/grpcutil"
+  exclusions:
+    generated: "lax"
+    paths:
+      - "third_party$"
+      - "builtin$"
+      - "examples$"

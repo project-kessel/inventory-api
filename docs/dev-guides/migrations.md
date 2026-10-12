@@ -9,6 +9,17 @@ make migrate
 ./bin/inventory-api migrate --config .inventory-api.yaml
 ```
 
+OpenShift deployments expose the `MIGRATIONS_ENABLED` template parameter. When
+multiple namespaces share one database, set it to `true` in exactly one
+namespace and `false` in the others. A disabled migration init container exits
+successfully without connecting to the database, allowing the application
+container to start without competing for the migration advisory lock.
+
+This parameter controls migration ownership but does not coordinate deployment
+ordering. Deploy the migration-owning namespace first and wait for its migration
+init container to complete before deploying namespaces where migrations are
+disabled.
+
 ### Adding a new migration
 *  Create a file under `internal/data/migrations/schema/` named `YYYYMMDDHHMMSS_<short_name>.go`.
   * Example: `Oct 23 2025 at 3:00pm` would be `20251023150000`

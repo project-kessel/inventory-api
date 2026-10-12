@@ -188,7 +188,7 @@ objects:
                     cpu: 500m
                     memory: 1Gi
                 command: ["inventory-api"]
-                args: ["migrate"]
+                args: ["migrate", "--enabled=${MIGRATIONS_ENABLED}"]
                 inheritEnv: true
             image: ${INVENTORY_IMAGE}:${IMAGE_TAG}
             imagePullPolicy: Always
@@ -373,6 +373,9 @@ parameters:
   - description: Number of replicas
     name: REPLICAS
     value: "1"
+  - description: Apply database migrations from this namespace. Set to true in exactly one namespace for deployments that share a database.
+    name: MIGRATIONS_ENABLED
+    value: "true"
   - name: TOPIC_HEARTBEAT_PREFIX
     value: debezium-heartbeat
     description: Prefix for the connector heartbeat topic

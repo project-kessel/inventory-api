@@ -17,6 +17,8 @@ func NewCommonRepresentationsCleanupJobCommand(storageOptions *storage.Options, 
 	var batchDelayMs int
 	var reporterType string
 	var timeout time.Duration
+	var maxBatches int
+	var vacuumEveryBatches int
 
 	cmd := &cobra.Command{
 		Use:   "common-representations-cleanup-job",
@@ -26,26 +28,32 @@ This is Phase 3 of the retention cleanup process with the HIGHEST production imp
 Consumer queries read from this table, so deletions may affect query performance during execution.
 
 Retention policy:
-  - Active resources: Delete representations older than N days from latest
-  - Tombstoned ≤M days: Delete representations older than N days from latest
-  - Tombstoned >M days: Excluded (already deleted by tombstoned-resources-cleanup-job)`,
+  - All resources: Delete representations older than N days from latest per resource
+
+KNOWN LIMITATION: --tombstone-days is accepted for interface symmetry with the
+other cleanup jobs but is NOT applied by this job's SQL — it does not exclude
+old-tombstoned resources here. Old-tombstone common representations are handled
+by tombstoned-resources-cleanup-job (which orphans them) followed by
+orphaned-common-representations-cleanup-job (which deletes the orphans).`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return cleanupCommonRepresentations(storageOptions, loggerOptions, dryRun, retentionDays, tombstoneDays, reporterType, batchSize, batchDelayMs, timeout)
+			return cleanupCommonRepresentations(storageOptions, loggerOptions, dryRun, retentionDays, tombstoneDays, reporterType, batchSize, batchDelayMs, timeout, maxBatches, vacuumEveryBatches)
 		},
 	}
 
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "Preview deletion counts without executing any deletes")
 	cmd.Flags().IntVar(&retentionDays, "retention-days", DefaultRetentionCleanupDays, "Delete representations older than this many days from latest")
-	cmd.Flags().IntVar(&tombstoneDays, "tombstone-days", DefaultRetentionCleanupTombstoneDays, "Exclude tombstoned resources older than this many days (already deleted)")
+	cmd.Flags().IntVar(&tombstoneDays, "tombstone-days", DefaultRetentionCleanupTombstoneDays, "NOT APPLIED by this job (kept for interface symmetry); old tombstones are handled by the tombstoned+orphan cleanup jobs")
 	cmd.Flags().StringVar(&reporterType, "reporter-type", "", "Optional: Only delete for specific reporter type (e.g., 'hbi')")
 	cmd.Flags().IntVar(&batchSize, "batch-size", DefaultRetentionCleanupBatchSize, "Number of records to delete per batch")
 	cmd.Flags().IntVar(&batchDelayMs, "batch-delay-ms", DefaultRetentionCleanupBatchDelay, "Delay between batches in milliseconds")
 	cmd.Flags().DurationVar(&timeout, "timeout", 0, "Gracefully stop after this duration (e.g. '48h'); 0 = no timeout. Stops between batches and exits successfully — resumable, the next run deletes the remainder")
+	cmd.Flags().IntVar(&maxBatches, "max-batches", 0, "Stop gracefully after this many delete batches (0 = no limit). Resumable: the next run deletes the remainder")
+	cmd.Flags().IntVar(&vacuumEveryBatches, "vacuum-every-batches", 0, "Run VACUUM (ANALYZE) on this job's target tables every N batches (0 = off). Online; reclaims reuse-space only — disk is returned by the final pg_repack step")
 
 	return cmd
 }
 
-func cleanupCommonRepresentations(storageOptions *storage.Options, loggerOptions common.LoggerOptions, dryRun bool, retentionDays int, tombstoneDays int, reporterType string, batchSize int, batchDelayMs int, timeout time.Duration) error {
+func cleanupCommonRepresentations(storageOptions *storage.Options, loggerOptions common.LoggerOptions, dryRun bool, retentionDays int, tombstoneDays int, reporterType string, batchSize int, batchDelayMs int, timeout time.Duration, maxBatches int, vacuumEveryBatches int) error {
 	_, logger := common.InitLogger(common.GetLogLevel(), loggerOptions)
 	logHelper := log.NewHelper(log.With(logger, "job", "common_representations_cleanup"))
 
@@ -72,7 +80,9 @@ func cleanupCommonRepresentations(storageOptions *storage.Options, loggerOptions
 		logHelper.Warn("⚠️  High production impact: Consumer queries read from this table")
 	}
 
-	totalDeleted, timedOut, err := deleteOldCommonRepresentations(db, logHelper, dryRun, retentionDays, tombstoneDays, reporterType, batchSize, batchDelayMs, timeout)
+	opts := newRetentionRunOptions("common_representations_cleanup", maxBatches, vacuumEveryBatches, []string{"common_representations"}, dryRun)
+
+	totalDeleted, stopReason, err := deleteOldCommonRepresentations(db, logHelper, dryRun, retentionDays, tombstoneDays, reporterType, batchSize, batchDelayMs, timeout, opts)
 	if err != nil {
 		logHelper.Warnw("msg", "Common representations cleanup failed",
 			"action", "COMMON_REPRESENTATIONS_CLEANUP",
@@ -92,9 +102,18 @@ func cleanupCommonRepresentations(storageOptions *storage.Options, loggerOptions
 		logHelper.Infof("Common representations cleanup completed: Deleted %d records", totalDeleted)
 
 		outcome := "success"
-		if timedOut {
-			outcome = "partial_timeout"
-			logHelper.Warnf("Run stopped at --timeout=%s after deleting %d records; rerun the job to delete the remainder", timeout, totalDeleted)
+		if stopReason != "" {
+			switch stopReason {
+			case stopReasonTimeout:
+				outcome = "partial_timeout"
+			case stopReasonControlStop:
+				outcome = "partial_stopped"
+			case stopReasonSignal:
+				outcome = "partial_signal"
+			case stopReasonMaxBatches:
+				outcome = "partial_max_batches"
+			}
+			logHelper.Warnf("Run stopped early (reason: %s) after deleting %d records; rerun the job to delete the remainder", stopReason, totalDeleted)
 		}
 
 		logHelper.Infow("msg", "Common representations cleanup completed",
@@ -104,6 +123,7 @@ func cleanupCommonRepresentations(storageOptions *storage.Options, loggerOptions
 			"reporter_type", reporterType,
 			"deleted_count", totalDeleted,
 			"outcome", outcome,
+			"stopped_reason", stopReason,
 		)
 	}
 

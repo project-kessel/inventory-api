@@ -124,6 +124,11 @@ VACUUM ANALYZE reporter_representations;
 VACUUM ANALYZE common_representations;
 ```
 
+Alternatively, run it incrementally DURING deletion with
+`--vacuum-every-batches N` (online; see "Incremental vacuum" below). Either
+way, disk is only returned to the OS by a later table rewrite (`pg_repack` /
+`VACUUM FULL`) — see the production runbook.
+
 ## Configuration Options
 
 | Flag | Default | Description |
@@ -134,8 +139,77 @@ VACUUM ANALYZE common_representations;
 | `--batch-delay-ms` | 500 | Milliseconds to wait between batches |
 | `--dry-run` | false | Preview counts without deleting |
 | `--timeout` | 0 (off) | Gracefully stop after this duration (e.g. `48h`). Stops between batches, exits successfully, and is resumable — the next run deletes the remainder |
+| `--max-batches` | 0 (off) | Stop gracefully after this many delete batches. Resumable — the next run deletes the remainder |
+| `--vacuum-every-batches` | 0 (off) | Run `VACUUM (ANALYZE)` on the job's target tables every N batches. Online; see "Incremental vacuum" below |
 
-### Tuning Parameters
+## Runtime Controls (pause / resume / stop)
+
+Every cleanup job checks a small control table at each batch boundary, so a
+running production job can be paused, resumed, or stopped with a single SQL
+statement — no pod access or restart needed:
+
+```sql
+-- Pause: the job parks between batches (worklist preserved), polling every 5s
+UPDATE job_runtime_controls SET desired_state = 'paused', updated_by = 'you',
+  updated_at = NOW(), note = 'investigating consumer p99'
+  WHERE job_name = 'common_representations_cleanup';
+
+-- Resume
+UPDATE job_runtime_controls SET desired_state = 'running', updated_by = 'you',
+  updated_at = NOW() WHERE job_name = 'common_representations_cleanup';
+
+-- Graceful stop: exits at the next batch boundary, drops temp tables, exit 0,
+-- outcome `partial_stopped`. Resumable — rerun the job to delete the remainder.
+UPDATE job_runtime_controls SET desired_state = 'stop', updated_by = 'you',
+  updated_at = NOW() WHERE job_name = 'common_representations_cleanup';
+```
+
+Job names: `reporter_representations_cleanup`, `common_representations_cleanup`,
+`orphaned_common_representations_cleanup`, `tombstoned_resources_cleanup`.
+The table (`job_runtime_controls`, migration `20261013120000`) is created by a
+normal deploy; if it is missing, jobs log one warning and run with controls
+disabled — deploy ordering is never a hard dependency. Any OTHER error reading
+the table (e.g. schema corruption) stops the run gracefully instead of
+continuing uncontrolled, and a paused job whose control table becomes
+unreadable stays paused for a few polls and then stops gracefully — deletion
+never resumes on its own (fail-closed). The job registers its row at startup
+with `ON CONFLICT DO NOTHING`, so you can pre-set `paused`/`stop` BEFORE
+starting a run to hold or block it from the first batch.
+
+SIGTERM/SIGINT (e.g. k8s pod deletion, Ctrl-C) also stop the run gracefully at
+the next batch boundary (`outcome: partial_signal`) instead of killing it
+mid-batch.
+
+Audit `outcome` values: `success`, `partial_timeout`, `partial_stopped`
+(control table), `partial_signal`, `partial_max_batches`, `failure` — plus a
+`stopped_reason` field naming the trigger.
+
+**Known limitation**: there are no control checks during the one-time collect
+phase at the start of a run (read-only, idempotent, minutes at prod scale). A
+k8s termination grace period shorter than the collect phase results in
+SIGKILL mid-collect — harmless, the rerun recollects.
+
+## Deletion order
+
+All four jobs delete **oldest data first**, with deterministic full-key
+tiebreakers: `ORDER BY created_at, resource_id, version` for the two
+common-representations jobs, `created_at, reporter_resource_id, version,
+generation` for reporter-representations, and `updated_at, id` for the
+tombstone job. A partial run — stopped by timeout, control stop, signal, or
+batch limit — therefore always leaves the NEWEST deletable rows in place, and
+the common-reps/orphan jobs' delete and worklist-drain statements use
+byte-identical ordered subselects so both provably target the same rows.
+
+## Incremental vacuum
+
+`--vacuum-every-batches N` runs `VACUUM (ANALYZE)` on the job's target tables
+every N batches. This is ONLINE (SHARE UPDATE EXCLUSIVE — never blocks
+consumer reads/writes) and keeps reclaiming reuse-space + refreshing planner
+statistics mid-run. It does **not** return disk to the OS — only a table
+rewrite (`pg_repack`, or `VACUUM FULL` in a maintenance window) shrinks the
+physical files. See the production runbook for the compaction stage.
+
+## Tuning Parameters
 
 **For faster deletion** (higher database load):
 ```bash
@@ -155,6 +229,9 @@ VACUUM ANALYZE common_representations;
 ✅ **Throttled**: Configurable delay between batches prevents DB overload  
 ✅ **Resumable**: Can stop and restart safely
 ✅ **Graceful timeout**: `--timeout` stops between batches; partial runs exit successfully (`outcome: partial_timeout`) and are resumable
+✅ **Runtime controls**: Pause/resume/stop a running job with one SQL UPDATE (see above)
+✅ **Graceful signal handling**: SIGTERM/SIGINT stop at the next batch boundary, not mid-batch
+✅ **Oldest-first deletion**: Partial runs always leave the newest deletable rows (see "Deletion order")
 ✅ **Dry-run mode**: Preview before executing
 ✅ **Progress logging**: Reports progress every batch
 ✅ **Idempotent**: Safe to run multiple times

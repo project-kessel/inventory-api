@@ -127,14 +127,58 @@ Every job: dry-run first, then execute with a graceful `--timeout`.
 ```
 
 Flags common to all four jobs: `--dry-run`, `--reporter-type`, `--batch-size`,
-`--batch-delay-ms`, `--timeout`. Phases 2 and 5 additionally take
-`--retention-days` and `--tombstone-days`; phase 3 (tombstones) takes only
-`--tombstone-days`; phase 4 (orphans) takes neither.
+`--batch-delay-ms`, `--timeout`, `--max-batches` (stop gracefully after N
+batches), `--vacuum-every-batches` (online incremental VACUUM, see below).
+Phases 2 and 5 additionally take `--retention-days` and `--tombstone-days`;
+phase 3 (tombstones) takes only `--tombstone-days`; phase 4 (orphans) takes
+neither.
+
+All four jobs delete **oldest data first** (deterministic full-key ordering),
+so any partial run leaves the newest deletable rows in place and is resumable.
 
 `--timeout` semantics: the job stops **between batches** once the deadline passes, drops
 its temp tables, exits 0, and logs `outcome: partial_timeout` with the deleted-so-far
-count. The next run continues from where it stopped. Set the k8s-level
-`activeDeadlineSeconds` slightly above `--timeout` as a hard backstop.
+count. The next run continues from where it stopped. The same graceful exit applies to
+`--max-batches` (`partial_max_batches`), a control-table stop (`partial_stopped`), and
+SIGTERM/SIGINT (`partial_signal`) — the audit row carries a `stopped_reason` field
+naming the trigger. Set the k8s-level `activeDeadlineSeconds` slightly above
+`--timeout` as a hard backstop.
+
+### Runtime controls (pause / resume / stop a running job)
+
+Each job checks the `job_runtime_controls` table at every batch boundary. One SQL
+statement controls a running job — no pod access or restart needed:
+
+```sql
+-- Pause: job parks between batches (worklist preserved), polling every 5s
+UPDATE job_runtime_controls SET desired_state = 'paused', updated_by = 'you',
+  updated_at = NOW(),
+  note = 'investigating consumer p99' WHERE job_name = 'common_representations_cleanup';
+
+-- Resume
+UPDATE job_runtime_controls SET desired_state = 'running', updated_by = 'you',
+  updated_at = NOW() WHERE job_name = 'common_representations_cleanup';
+
+-- Graceful stop: exits at the next batch boundary (outcome partial_stopped, resumable)
+UPDATE job_runtime_controls SET desired_state = 'stop', updated_by = 'you',
+  updated_at = NOW() WHERE job_name = 'common_representations_cleanup';
+```
+
+Job names: `reporter_representations_cleanup`, `common_representations_cleanup`,
+`orphaned_common_representations_cleanup`, `tombstoned_resources_cleanup`. The table
+ships as migration `20261013120000`; if absent (older schema), jobs warn once and run
+with controls disabled — deploy ordering is never a blocker. Any other read error
+stops the run gracefully, and a paused job with an unreadable control table stops
+after a few failed polls — deletion never resumes on its own (fail-closed: a spurious
+stop costs a rerun, an ignored stop costs unwanted deletions). Pre-setting `paused` or
+`stop` before a run starts holds/blocks it from the first batch. Note the pause
+interval does not count against `--timeout` — keep the k8s
+`activeDeadlineSeconds` backstop above your worst-case pause + run time.
+
+Known limitation: no control checks during the one-time collect phase at job start
+(read-only, minutes at prod scale). Ensure the k8s termination grace period exceeds
+the collect duration, or a pod deletion SIGKILLs mid-collect (harmless — idempotent
+rerun recollects).
 
 ### Expected durations (extrapolated from v1.3 measurements at 2M scale)
 
@@ -161,9 +205,23 @@ FROM pg_stat_replication;
   - replication lag sustained above ~10MB and climbing
   - DB CPU saturated / consumer p99 visibly degrading
   - disk filling toward the temp-space requirement
-- To slow down: kill the job, restart with `--batch-size=5000 --batch-delay-ms=1000`.
+- To slow down or hold the job: prefer the runtime controls above —
+  `desired_state = 'paused'` parks it between batches while you investigate, and
+  `desired_state = 'stop'` ends the run gracefully. Restarting with
+  `--batch-size=5000 --batch-delay-ms=1000` remains the way to change the throttle
+  itself.
 - Progress is in the job logs (`Batch N: ... total so far: X`); audit log carries
-  `action`, `deleted_count`, `outcome` (`success` / `partial_timeout` / `failure`).
+  `action`, `deleted_count`, `outcome` (`success` / `partial_timeout` /
+  `partial_stopped` / `partial_signal` / `partial_max_batches` / `failure`) and
+  `stopped_reason`.
+
+### Incremental vacuum (optional)
+
+`--vacuum-every-batches N` runs `VACUUM (ANALYZE)` on the job's target tables
+every N batches — online (SHARE UPDATE EXCLUSIVE), reclaims reuse-space and refreshes
+planner statistics mid-run. It does NOT return disk to the OS; the pg_repack step
+below remains required for that. Useful on long runs where dead-tuple accumulation
+degrades planner choices; leave off by default.
 
 ## 6. Compaction (pg_repack) — where the speedup materializes
 
@@ -264,7 +322,8 @@ the jobs never overlap.
 
 - The orphan job deletes representations but leaves parent `resource` rows with no
   reporter_resources reference (acknowledged TODO in `retention_helpers.go`).
-- `--tombstone-days` on the common-representations job is logged but not applied in its
-  SQL — the "excluded, already deleted" promise is not implemented there.
+- `--tombstone-days` on the common-representations job is accepted for interface
+  symmetry but NOT applied by its SQL (now documented in the job's `--help` and
+  pinned by a test); old-tombstone common reps are instead handled by jobs 3+4.
 - Single-iteration perf numbers: repeat runs before quoting exact percentages in reviews
   (v1.3 caveats section).

@@ -69,7 +69,7 @@ func TestDeleteOrphanedCommonRepresentations_DryRun(t *testing.T) {
 		createTestRepresentationSet(t, db, "hbi", 2, "hbi")
 	}
 
-	count, _, err := deleteOrphanedCommonRepresentations(db, logger, true, "", 100, 0, 0)
+	count, _, err := deleteOrphanedCommonRepresentations(db, logger, true, "", 100, 0, 0, nil)
 
 	assert.NoError(t, err)
 	assert.Equal(t, int64(6), count)
@@ -91,10 +91,10 @@ func TestDeleteOrphanedCommonRepresentations_ActualDeletion(t *testing.T) {
 		liveIDs = append(liveIDs, createTestRepresentationSet(t, db, "hbi", 2, "hbi"))
 	}
 
-	deleted, timedOut, err := deleteOrphanedCommonRepresentations(db, logger, false, "", 100, 0, 0)
+	deleted, stopReason, err := deleteOrphanedCommonRepresentations(db, logger, false, "", 100, 0, 0, nil)
 
 	assert.NoError(t, err)
-	assert.False(t, timedOut, "a run that deletes everything must not report a timeout")
+	assert.Empty(t, stopReason, "a run that deletes everything must not report a stop reason")
 	assert.Equal(t, int64(6), deleted)
 
 	for _, id := range orphanIDs {
@@ -121,7 +121,7 @@ func TestDeleteOrphanedCommonRepresentations_MultiReporterResourceSurvives(t *te
 	require.NoError(t, db.Where("reporter_type = ?", "ocm").First(&removed).Error)
 	require.NoError(t, db.Delete(&removed).Error)
 
-	deleted, _, err := deleteOrphanedCommonRepresentations(db, logger, false, "", 100, 0, 0)
+	deleted, _, err := deleteOrphanedCommonRepresentations(db, logger, false, "", 100, 0, 0, nil)
 
 	assert.NoError(t, err)
 	assert.Equal(t, int64(0), deleted)
@@ -138,7 +138,7 @@ func TestDeleteOrphanedCommonRepresentations_FiltersByReporterType(t *testing.T)
 	createTestRepresentationSet(t, db, "hbi", 2) // orphan, reported by hbi
 	createTestRepresentationSet(t, db, "ocm", 2) // orphan, reported by ocm
 
-	deleted, _, err := deleteOrphanedCommonRepresentations(db, logger, false, "hbi", 100, 0, 0)
+	deleted, _, err := deleteOrphanedCommonRepresentations(db, logger, false, "hbi", 100, 0, 0, nil)
 
 	assert.NoError(t, err)
 	assert.Equal(t, int64(2), deleted)
@@ -157,7 +157,7 @@ func TestDeleteOrphanedCommonRepresentations_EmptyBatchTermination(t *testing.T)
 		createTestRepresentationSet(t, db, "hbi", 2, "hbi")
 	}
 
-	deleted, _, err := deleteOrphanedCommonRepresentations(db, logger, false, "", 100, 0, 0)
+	deleted, _, err := deleteOrphanedCommonRepresentations(db, logger, false, "", 100, 0, 0, nil)
 
 	assert.NoError(t, err)
 	assert.Equal(t, int64(0), deleted)
@@ -178,7 +178,7 @@ func TestDeleteOrphanedCommonRepresentations_BatchAccounting(t *testing.T) {
 	}
 	createTestRepresentationSet(t, db, "hbi", 3)
 
-	deleted, _, err := deleteOrphanedCommonRepresentations(db, logger, false, "", 2, 0, 0)
+	deleted, _, err := deleteOrphanedCommonRepresentations(db, logger, false, "", 2, 0, 0, nil)
 
 	assert.NoError(t, err)
 	assert.Equal(t, int64(7), deleted)
@@ -201,10 +201,10 @@ func TestDeleteOrphanedCommonRepresentations_TimeoutStopsGracefully(t *testing.T
 	// batch-loop check runs (the collect phase does several DB round trips in
 	// between), so the job must stop before deleting anything and report a
 	// partial, resumable run rather than an error.
-	deleted, timedOut, err := deleteOrphanedCommonRepresentations(db, logger, false, "", 100, 0, time.Nanosecond)
+	deleted, stopReason, err := deleteOrphanedCommonRepresentations(db, logger, false, "", 100, 0, time.Nanosecond, nil)
 
 	assert.NoError(t, err, "a graceful timeout must not surface as an error")
-	assert.True(t, timedOut, "the run should be reported as partial (timed out)")
+	assert.Equal(t, stopReasonTimeout, stopReason, "the run should be reported as partial (timed out)")
 	assert.Equal(t, int64(0), deleted)
 
 	var remaining int64

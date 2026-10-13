@@ -3,7 +3,7 @@ set -euo pipefail
 
 DOCKERFILE="tools/kessel-debug-container/Dockerfile"
 
-LIBRDKAFKA_MIRROR="https://mirror.stream.centos.org/9-stream/AppStream/x86_64/os/Packages/"
+LIBRDKAFKA_MIRROR="https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/x86_64/appstream/os/Packages/l/"
 KCAT_MIRROR="https://dl.fedoraproject.org/pub/epel/9/Everything/x86_64/Packages/k/"
 
 echo "Checking for latest librdkafka x86_64 RPM..."

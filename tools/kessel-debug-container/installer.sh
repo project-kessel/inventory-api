@@ -3,7 +3,7 @@
 set -euo pipefail
 
 echo "Installing DNF available packages..."
-dnf install -y jq curl tar gzip vim-minimal bind-utils java-21-openjdk util-linux less
+dnf install -y jq curl tar bsdtar gzip vim-minimal bind-utils java-21-openjdk util-linux less
 
 echo "Installing remaining packages via RPMs from mirrors..."
 ZED_VERSION=$(curl -sSfL https://api.github.com/repos/authzed/zed/releases/latest | jq -er '.tag_name')
@@ -12,7 +12,7 @@ ZED_VERSION=${ZED_VERSION#v}
 
 RPM_URLS=(
   "https://github.com/authzed/zed/releases/download/v${ZED_VERSION}/zed_${ZED_VERSION}_linux_amd64.rpm"
-  "https://mirror.stream.centos.org/9-stream/AppStream/x86_64/os/Packages/librdkafka-${LIBRDKAFKA_VERSION}.el9.x86_64.rpm"
+  "https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/x86_64/appstream/os/Packages/l/librdkafka-${LIBRDKAFKA_VERSION}.el9.x86_64.rpm"
   "https://dl.fedoraproject.org/pub/epel/9/Everything/x86_64/Packages/k/kcat-${KCAT_VERSION}.el9.x86_64.rpm"
 )
 
@@ -23,7 +23,9 @@ done
 echo "Installing Kafka tools..."
 curl -fLo /tmp/kafka.tgz "https://dlcdn.apache.org/kafka/${KAFKA_VERSION}/kafka_${SCALA_VERSION}-${KAFKA_VERSION}.tgz"
 mkdir -pv /opt/kafka
-tar -xvf /tmp/kafka.tgz -C /opt/kafka --strip-components=1
+# GNU tar 1.35-10.1 fails to extract nested paths when an amd64 image is built
+# under emulation on arm64 hosts (macOS). bsdtar works when xattr restoration is disabled.
+bsdtar --no-xattrs -xvf /tmp/kafka.tgz -C /opt/kafka --strip-components=1
 
 # setup zed wrapper by renaming base zed cli
 mv /usr/bin/zed /usr/bin/zed.original

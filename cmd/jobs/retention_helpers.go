@@ -150,8 +150,8 @@ func deleteOldReporterRepresentations(db *gorm.DB, logHelper *log.Helper, dryRun
 //
 // SCOPE: Retention cleanup only (keep last N days for all resources).
 // Does NOT handle orphaned common_representations when resource is completely deleted.
-// Orphan cleanup should be a separate job that deletes ALL versions when resource_id
-// has no reporter_resources entries.
+// Orphan cleanup is handled by deleteOrphanedCommonRepresentations, which deletes ALL
+// versions when resource_id has no reporter_resources entries.
 //
 // OPTIMIZED: Uses temp table to materialize "latest timestamp per resource" once,
 // then reuses it for all batch deletions. This avoids recalculating the expensive
@@ -329,6 +329,154 @@ func deleteOldCommonRepresentations(db *gorm.DB, logHelper *log.Helper, dryRun b
 	db.Exec("DROP TABLE IF EXISTS rows_to_delete")
 	db.Exec("DROP TABLE IF EXISTS latest_common_timestamps")
 	logHelper.Info("Cleanup complete, temp tables dropped")
+
+	return totalDeleted, nil
+}
+
+// deleteOrphanedCommonRepresentations deletes ALL common_representations versions whose
+// resource no longer has any reporter_resources rows (e.g. after deleteOldTombstonedResources
+// completely deleted the resource's reporter entries).
+//
+// NOTE: the orphan predicate joins reporter_resources on resource_id (the canonical resource
+// ID), NOT reporter_resources.id — common_representations.resource_id and
+// reporter_resources.resource_id both reference the resource table. A resource reported by
+// multiple reporters only becomes orphaned once ALL of its reporter_resources rows are gone.
+//
+// OPTIMIZED: collect-then-delete, same strategy as deleteOldCommonRepresentations — the
+// anti-join scan happens once into a temp table, then batches delete from the static list.
+func deleteOrphanedCommonRepresentations(db *gorm.DB, logHelper *log.Helper, dryRun bool, reporterType string, batchSize int, batchDelayMs int) (int64, error) {
+	if dryRun {
+		var count int64
+		query := `
+			SELECT COUNT(*)
+			FROM common_representations cr
+			WHERE NOT EXISTS (
+				SELECT 1 FROM reporter_resources rr WHERE rr.resource_id = cr.resource_id
+			)
+		`
+
+		if reporterType != "" {
+			query += " AND cr.reported_by_reporter_type = ?"
+			err := db.Raw(query, reporterType).Scan(&count).Error
+			if err != nil {
+				return 0, err
+			}
+		} else {
+			err := db.Raw(query).Scan(&count).Error
+			if err != nil {
+				return 0, err
+			}
+		}
+
+		logDryRunEstimate(logHelper, "CommonRepresentation (orphaned, resource fully deleted)", count, batchSize, batchDelayMs)
+		return count, nil
+	}
+
+	// COLLECT-THEN-DELETE OPTIMIZATION:
+	// Identify all orphaned rows ONCE, then delete from the static list in batches
+	logHelper.Info("Collecting orphaned rows to delete (one-time scan)...")
+
+	createOrphansTable := `
+		CREATE TEMP TABLE IF NOT EXISTS orphaned_reps (
+			resource_id UUID NOT NULL,
+			version INT NOT NULL
+		)
+	`
+	if err := db.Exec(createOrphansTable).Error; err != nil {
+		logHelper.Errorf("Failed to create orphaned_reps table: %v", err)
+		return 0, err
+	}
+
+	var populateQuery string
+	var populateArgs []interface{}
+
+	if reporterType != "" {
+		populateQuery = `
+			INSERT INTO orphaned_reps (resource_id, version)
+			SELECT cr.resource_id, cr.version
+			FROM common_representations cr
+			WHERE NOT EXISTS (
+				SELECT 1 FROM reporter_resources rr WHERE rr.resource_id = cr.resource_id
+			)
+			  AND cr.reported_by_reporter_type = ?
+		`
+		populateArgs = []interface{}{reporterType}
+	} else {
+		populateQuery = `
+			INSERT INTO orphaned_reps (resource_id, version)
+			SELECT cr.resource_id, cr.version
+			FROM common_representations cr
+			WHERE NOT EXISTS (
+				SELECT 1 FROM reporter_resources rr WHERE rr.resource_id = cr.resource_id
+			)
+		`
+		populateArgs = nil
+	}
+
+	collectStart := time.Now()
+	if err := db.Exec(populateQuery, populateArgs...).Error; err != nil {
+		logHelper.Errorf("Failed to populate orphaned_reps: %v", err)
+		return 0, err
+	}
+
+	// Get count of orphaned rows
+	var orphansCount int64
+	if err := db.Raw("SELECT COUNT(*) FROM orphaned_reps").Scan(&orphansCount).Error; err != nil {
+		logHelper.Warnf("Failed to count orphaned_reps: %v", err)
+	} else {
+		logHelper.Infof("Identified %d orphaned rows to delete in %v", orphansCount, time.Since(collectStart))
+	}
+
+	// Create index for faster batch deletes
+	db.Exec("CREATE INDEX IF NOT EXISTS idx_orphaned_reps ON orphaned_reps(resource_id, version)")
+
+	// Now delete in batches from the static list (FAST - no table scan per batch)
+	var totalDeleted int64
+	batchCount := 0
+
+	logHelper.Info("Deleting orphaned representations in batches...")
+
+	for {
+		deleteQuery := `
+			DELETE FROM common_representations
+			WHERE (resource_id, version) IN (
+				SELECT resource_id, version
+				FROM orphaned_reps
+				LIMIT ?
+			)
+		`
+
+		result := db.Exec(deleteQuery, batchSize)
+		if result.Error != nil {
+			logHelper.Errorf("Failed to delete orphaned CommonRepresentation batch %d: %v", batchCount+1, result.Error)
+			return totalDeleted, result.Error
+		}
+
+		if result.RowsAffected == 0 {
+			break
+		}
+
+		// Remove deleted rows from the orphaned_reps list
+		db.Exec(`
+			DELETE FROM orphaned_reps
+			WHERE (resource_id, version) IN (
+				SELECT resource_id, version FROM orphaned_reps LIMIT ?
+			)
+		`, result.RowsAffected)
+
+		totalDeleted += result.RowsAffected
+		batchCount++
+
+		logHelper.Infof("Batch %d: Deleted %d orphaned CommonRepresentation records (total so far: %d)", batchCount, result.RowsAffected, totalDeleted)
+
+		if batchDelayMs > 0 {
+			time.Sleep(time.Duration(batchDelayMs) * time.Millisecond)
+		}
+	}
+
+	// Manually drop temp table
+	db.Exec("DROP TABLE IF EXISTS orphaned_reps")
+	logHelper.Info("Orphan cleanup complete, temp table dropped")
 
 	return totalDeleted, nil
 }

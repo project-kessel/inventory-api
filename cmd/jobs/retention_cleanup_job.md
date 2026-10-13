@@ -172,6 +172,47 @@ The job runs in two phases:
    - Uses composite primary key `(resource_id, version)` for batch deletion
    - Optionally filters by `reported_by_reporter_type` if specified
 
+## Companion Cleanup Jobs
+
+Retention cleanup keeps the last N days of history for ALL resources. Two companion jobs complete the cleanup story:
+
+### tombstoned-resources-cleanup-job
+
+Deletes tombstoned `reporter_resources` older than `--tombstone-days` (default 30) completely. The database cascade removes their `reporter_representations`, but **not** their `common_representations` — those rows become orphans handled by the next job.
+
+### orphaned-common-representations-cleanup-job
+
+Deletes ALL `common_representations` versions for resources that no longer have any `reporter_resources` rows (e.g. after the tombstone job fully deleted the resource). Consumer queries read from this table, so expect query impact during execution.
+
+```bash
+# Always dry-run first
+./inventory-api run-job orphaned-common-representations-cleanup-job \
+  --dry-run \
+  --config .inventory-api.yaml
+
+# Execute (same batching/throttling flags as retention cleanup)
+./inventory-api run-job orphaned-common-representations-cleanup-job \
+  --batch-size=10000 \
+  --batch-delay-ms=500 \
+  --config .inventory-api.yaml
+```
+
+**Orphan rule**: a representation is orphaned when no `reporter_resources` row references its resource, matched on `reporter_resources.resource_id` (the canonical resource ID — NOT `reporter_resources.id`, which is the per-reporter surrogate key). A resource reported by multiple reporters only becomes orphaned once ALL of its reporter rows are gone.
+
+**Verify orphan count before/after**:
+
+```sql
+SELECT COUNT(*)
+FROM common_representations cr
+WHERE NOT EXISTS (
+  SELECT 1 FROM reporter_resources rr WHERE rr.resource_id = cr.resource_id
+);
+```
+
+The anti-join is index-backed on both sides (`common_representations` primary key leading column `resource_id`; `reporter_resource_resource_id_idx`), and the job uses the same collect-then-delete batching as retention cleanup, so no additional indexes are required.
+
+**Run order**: run this AFTER `tombstoned-resources-cleanup-job` — the orphan population it cleans up is created by that job.
+
 ## If the Job Fails
 
 **Safe to re-run**: The job is idempotent. If it fails midway:

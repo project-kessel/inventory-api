@@ -15,7 +15,7 @@ import (
 )
 
 const (
-	DefaultTestDataResourcesCount     = 1000000 // 1M resources
+	DefaultTestDataResourcesCount      = 1000000 // 1M resources
 	DefaultTestDataVersionsPerResource = 5       // 5 versions per resource
 	DefaultTestDataBatchSize           = 1000    // Insert 1000 at a time
 )
@@ -155,21 +155,27 @@ func generateResourceBatch(db *gorm.DB, logHelper *log.Helper, start int, end in
 			}
 		}
 
+		// Create multiple versions (representations) with varied ages
+		numVersions := versionsPerResource + (i % 3) - 1 // Vary 4-6 versions
+		if numVersions < 1 {
+			numVersions = 1
+		}
+
 		// Create reporter_resource
 		reporterResourceID := uuid.New()
 		consoleHref := fmt.Sprintf("https://console.example.com/hosts/%d", i)
 		reporterResource, err := model.NewReporterResource(
 			reporterResourceID,
 			fmt.Sprintf("test-resource-%d", i), // localResourceID
-			"hbi",                                // reporterType
-			"host",                               // resourceType
-			"test-instance",                      // reporterInstanceID
-			resourceID,                           // resourceID
+			"hbi",                              // reporterType
+			"host",                             // resourceType
+			"test-instance",                    // reporterInstanceID
+			resourceID,                         // resourceID
 			fmt.Sprintf("https://api.example.com/hosts/%d", i), // apiHref
-			&consoleHref, // consoleHref
-			0,            // representationVersion
-			0,            // generation
-			isTombstoned, // tombstone
+			&consoleHref,        // consoleHref
+			uint(numVersions-1), // representationVersion — the latest version, so the current+previous consumer query (Q2) is genuinely exercised
+			0,                   // generation
+			isTombstoned,        // tombstone
 		)
 		if err != nil {
 			return fmt.Errorf("failed to create reporter_resource: %w", err)
@@ -182,12 +188,6 @@ func generateResourceBatch(db *gorm.DB, logHelper *log.Helper, start int, end in
 			reporterResource.UpdatedAt = tombstonedAt
 		}
 		reporterResources = append(reporterResources, reporterResource)
-
-		// Create multiple versions (representations) with varied ages
-		numVersions := versionsPerResource + (i % 3) - 1 // Vary 4-6 versions
-		if numVersions < 1 {
-			numVersions = 1
-		}
 
 		for v := 0; v < numVersions; v++ {
 			// Calculate age for this version
@@ -208,10 +208,10 @@ func generateResourceBatch(db *gorm.DB, logHelper *log.Helper, start int, end in
 			// Create reporter_representation
 			reporterRep, err := model.NewReporterRepresentation(
 				internal.JsonObject{
-					"satellite_id":           fmt.Sprintf("sat-%d", i),
+					"satellite_id":            fmt.Sprintf("sat-%d", i),
 					"subscription_manager_id": fmt.Sprintf("sub-%d", i),
-					"insights_id":            fmt.Sprintf("insights-%d", i),
-					"ansible_host":           fmt.Sprintf("host-%d", i),
+					"insights_id":             fmt.Sprintf("insights-%d", i),
+					"ansible_host":            fmt.Sprintf("host-%d", i),
 				},
 				reporterResourceID,
 				uint(v),

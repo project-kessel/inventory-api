@@ -1,6 +1,8 @@
 package jobs
 
 import (
+	"time"
+
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/project-kessel/inventory-api/cmd/common"
 	"github.com/project-kessel/inventory-api/internal/storage"
@@ -12,6 +14,7 @@ func NewOrphanedCommonRepresentationsCleanupJobCommand(storageOptions *storage.O
 	var reporterType string
 	var batchSize int
 	var batchDelayMs int
+	var timeout time.Duration
 
 	cmd := &cobra.Command{
 		Use:   "orphaned-common-representations-cleanup-job",
@@ -28,7 +31,7 @@ Orphan rule:
   - The retention policy (keep last N days) is NOT applied here; every version of an
     orphaned resource is deleted. Use common-representations-cleanup-job for retention.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return cleanupOrphanedCommonRepresentations(storageOptions, loggerOptions, dryRun, reporterType, batchSize, batchDelayMs)
+			return cleanupOrphanedCommonRepresentations(storageOptions, loggerOptions, dryRun, reporterType, batchSize, batchDelayMs, timeout)
 		},
 	}
 
@@ -36,11 +39,12 @@ Orphan rule:
 	cmd.Flags().StringVar(&reporterType, "reporter-type", "", "Optional: Only delete for specific reporter type (e.g., 'hbi')")
 	cmd.Flags().IntVar(&batchSize, "batch-size", DefaultRetentionCleanupBatchSize, "Number of records to delete per batch")
 	cmd.Flags().IntVar(&batchDelayMs, "batch-delay-ms", DefaultRetentionCleanupBatchDelay, "Delay between batches in milliseconds")
+	cmd.Flags().DurationVar(&timeout, "timeout", 0, "Gracefully stop after this duration (e.g. '48h'); 0 = no timeout. Stops between batches and exits successfully — resumable, the next run deletes the remainder")
 
 	return cmd
 }
 
-func cleanupOrphanedCommonRepresentations(storageOptions *storage.Options, loggerOptions common.LoggerOptions, dryRun bool, reporterType string, batchSize int, batchDelayMs int) error {
+func cleanupOrphanedCommonRepresentations(storageOptions *storage.Options, loggerOptions common.LoggerOptions, dryRun bool, reporterType string, batchSize int, batchDelayMs int, timeout time.Duration) error {
 	_, logger := common.InitLogger(common.GetLogLevel(), loggerOptions)
 	logHelper := log.NewHelper(log.With(logger, "job", "orphaned_common_representations_cleanup"))
 
@@ -65,7 +69,7 @@ func cleanupOrphanedCommonRepresentations(storageOptions *storage.Options, logge
 		logHelper.Warn("⚠️  High production impact: Consumer queries read from this table")
 	}
 
-	totalDeleted, err := deleteOrphanedCommonRepresentations(db, logHelper, dryRun, reporterType, batchSize, batchDelayMs)
+	totalDeleted, timedOut, err := deleteOrphanedCommonRepresentations(db, logHelper, dryRun, reporterType, batchSize, batchDelayMs, timeout)
 	if err != nil {
 		logHelper.Warnw("msg", "Orphaned common representations cleanup failed",
 			"action", "ORPHANED_COMMON_REPRESENTATIONS_CLEANUP",
@@ -82,11 +86,17 @@ func cleanupOrphanedCommonRepresentations(storageOptions *storage.Options, logge
 	} else {
 		logHelper.Infof("Orphaned common representations cleanup completed: Deleted %d records", totalDeleted)
 
+		outcome := "success"
+		if timedOut {
+			outcome = "partial_timeout"
+			logHelper.Warnf("Run stopped at --timeout=%s after deleting %d records; rerun the job to delete the remainder", timeout, totalDeleted)
+		}
+
 		logHelper.Infow("msg", "Orphaned common representations cleanup completed",
 			"action", "ORPHANED_COMMON_REPRESENTATIONS_CLEANUP",
 			"reporter_type", reporterType,
 			"deleted_count", totalDeleted,
-			"outcome", "success",
+			"outcome", outcome,
 		)
 	}
 

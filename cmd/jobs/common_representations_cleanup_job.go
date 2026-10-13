@@ -1,6 +1,8 @@
 package jobs
 
 import (
+	"time"
+
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/project-kessel/inventory-api/cmd/common"
 	"github.com/project-kessel/inventory-api/internal/storage"
@@ -14,6 +16,7 @@ func NewCommonRepresentationsCleanupJobCommand(storageOptions *storage.Options, 
 	var batchSize int
 	var batchDelayMs int
 	var reporterType string
+	var timeout time.Duration
 
 	cmd := &cobra.Command{
 		Use:   "common-representations-cleanup-job",
@@ -27,7 +30,7 @@ Retention policy:
   - Tombstoned ≤M days: Delete representations older than N days from latest
   - Tombstoned >M days: Excluded (already deleted by tombstoned-resources-cleanup-job)`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return cleanupCommonRepresentations(storageOptions, loggerOptions, dryRun, retentionDays, tombstoneDays, reporterType, batchSize, batchDelayMs)
+			return cleanupCommonRepresentations(storageOptions, loggerOptions, dryRun, retentionDays, tombstoneDays, reporterType, batchSize, batchDelayMs, timeout)
 		},
 	}
 
@@ -37,11 +40,12 @@ Retention policy:
 	cmd.Flags().StringVar(&reporterType, "reporter-type", "", "Optional: Only delete for specific reporter type (e.g., 'hbi')")
 	cmd.Flags().IntVar(&batchSize, "batch-size", DefaultRetentionCleanupBatchSize, "Number of records to delete per batch")
 	cmd.Flags().IntVar(&batchDelayMs, "batch-delay-ms", DefaultRetentionCleanupBatchDelay, "Delay between batches in milliseconds")
+	cmd.Flags().DurationVar(&timeout, "timeout", 0, "Gracefully stop after this duration (e.g. '48h'); 0 = no timeout. Stops between batches and exits successfully — resumable, the next run deletes the remainder")
 
 	return cmd
 }
 
-func cleanupCommonRepresentations(storageOptions *storage.Options, loggerOptions common.LoggerOptions, dryRun bool, retentionDays int, tombstoneDays int, reporterType string, batchSize int, batchDelayMs int) error {
+func cleanupCommonRepresentations(storageOptions *storage.Options, loggerOptions common.LoggerOptions, dryRun bool, retentionDays int, tombstoneDays int, reporterType string, batchSize int, batchDelayMs int, timeout time.Duration) error {
 	_, logger := common.InitLogger(common.GetLogLevel(), loggerOptions)
 	logHelper := log.NewHelper(log.With(logger, "job", "common_representations_cleanup"))
 
@@ -68,7 +72,7 @@ func cleanupCommonRepresentations(storageOptions *storage.Options, loggerOptions
 		logHelper.Warn("⚠️  High production impact: Consumer queries read from this table")
 	}
 
-	totalDeleted, err := deleteOldCommonRepresentations(db, logHelper, dryRun, retentionDays, tombstoneDays, reporterType, batchSize, batchDelayMs)
+	totalDeleted, timedOut, err := deleteOldCommonRepresentations(db, logHelper, dryRun, retentionDays, tombstoneDays, reporterType, batchSize, batchDelayMs, timeout)
 	if err != nil {
 		logHelper.Warnw("msg", "Common representations cleanup failed",
 			"action", "COMMON_REPRESENTATIONS_CLEANUP",
@@ -87,13 +91,19 @@ func cleanupCommonRepresentations(storageOptions *storage.Options, loggerOptions
 	} else {
 		logHelper.Infof("Common representations cleanup completed: Deleted %d records", totalDeleted)
 
+		outcome := "success"
+		if timedOut {
+			outcome = "partial_timeout"
+			logHelper.Warnf("Run stopped at --timeout=%s after deleting %d records; rerun the job to delete the remainder", timeout, totalDeleted)
+		}
+
 		logHelper.Infow("msg", "Common representations cleanup completed",
 			"action", "COMMON_REPRESENTATIONS_CLEANUP",
 			"retention_days", retentionDays,
 			"tombstone_days", tombstoneDays,
 			"reporter_type", reporterType,
 			"deleted_count", totalDeleted,
-			"outcome", "success",
+			"outcome", outcome,
 		)
 	}
 

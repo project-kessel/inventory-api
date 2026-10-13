@@ -1,6 +1,8 @@
 package jobs
 
 import (
+	"time"
+
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/project-kessel/inventory-api/cmd/common"
 	"github.com/project-kessel/inventory-api/internal/storage"
@@ -13,6 +15,7 @@ func NewTombstonedResourcesCleanupJobCommand(storageOptions *storage.Options, lo
 	var batchSize int
 	var batchDelayMs int
 	var reporterType string
+	var timeout time.Duration
 
 	cmd := &cobra.Command{
 		Use:   "tombstoned-resources-cleanup-job",
@@ -25,7 +28,7 @@ Deletion includes:
   - All associated reporter_representations (cascade delete)
   - Orphaned resource records (no reporter_resources reference them)`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return cleanupTombstonedResources(storageOptions, loggerOptions, dryRun, tombstoneDays, reporterType, batchSize, batchDelayMs)
+			return cleanupTombstonedResources(storageOptions, loggerOptions, dryRun, tombstoneDays, reporterType, batchSize, batchDelayMs, timeout)
 		},
 	}
 
@@ -34,11 +37,12 @@ Deletion includes:
 	cmd.Flags().StringVar(&reporterType, "reporter-type", "", "Optional: Only delete for specific reporter type (e.g., 'hbi')")
 	cmd.Flags().IntVar(&batchSize, "batch-size", DefaultTombstoneCleanupBatchSize, "Number of resources to delete per batch")
 	cmd.Flags().IntVar(&batchDelayMs, "batch-delay-ms", DefaultRetentionCleanupBatchDelay, "Delay between batches in milliseconds")
+	cmd.Flags().DurationVar(&timeout, "timeout", 0, "Gracefully stop after this duration (e.g. '48h'); 0 = no timeout. Stops between batches and exits successfully — resumable, the next run deletes the remainder")
 
 	return cmd
 }
 
-func cleanupTombstonedResources(storageOptions *storage.Options, loggerOptions common.LoggerOptions, dryRun bool, tombstoneDays int, reporterType string, batchSize int, batchDelayMs int) error {
+func cleanupTombstonedResources(storageOptions *storage.Options, loggerOptions common.LoggerOptions, dryRun bool, tombstoneDays int, reporterType string, batchSize int, batchDelayMs int, timeout time.Duration) error {
 	_, logger := common.InitLogger(common.GetLogLevel(), loggerOptions)
 	logHelper := log.NewHelper(log.With(logger, "job", "tombstoned_resources_cleanup"))
 
@@ -63,7 +67,7 @@ func cleanupTombstonedResources(storageOptions *storage.Options, loggerOptions c
 		logHelper.Infof("Using batch size: %d resources, delay between batches: %dms", batchSize, batchDelayMs)
 	}
 
-	totalDeleted, err := deleteOldTombstonedResources(db, logHelper, dryRun, tombstoneDays, reporterType, batchSize, batchDelayMs)
+	totalDeleted, timedOut, err := deleteOldTombstonedResources(db, logHelper, dryRun, tombstoneDays, reporterType, batchSize, batchDelayMs, timeout)
 	if err != nil {
 		logHelper.Warnw("msg", "Tombstoned resources cleanup failed",
 			"action", "TOMBSTONED_RESOURCES_CLEANUP",
@@ -81,12 +85,18 @@ func cleanupTombstonedResources(storageOptions *storage.Options, loggerOptions c
 	} else {
 		logHelper.Infof("Tombstoned resources cleanup completed: Deleted %d resources", totalDeleted)
 
+		outcome := "success"
+		if timedOut {
+			outcome = "partial_timeout"
+			logHelper.Warnf("Run stopped at --timeout=%s after deleting %d resources; rerun the job to delete the remainder", timeout, totalDeleted)
+		}
+
 		logHelper.Infow("msg", "Tombstoned resources cleanup completed",
 			"action", "TOMBSTONED_RESOURCES_CLEANUP",
 			"tombstone_days", tombstoneDays,
 			"reporter_type", reporterType,
 			"deleted_count", totalDeleted,
-			"outcome", "success",
+			"outcome", outcome,
 		)
 	}
 

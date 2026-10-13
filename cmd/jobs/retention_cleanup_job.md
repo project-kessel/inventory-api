@@ -133,6 +133,7 @@ VACUUM ANALYZE common_representations;
 | `--batch-size` | 10000 | Number of records to delete per batch |
 | `--batch-delay-ms` | 500 | Milliseconds to wait between batches |
 | `--dry-run` | false | Preview counts without deleting |
+| `--timeout` | 0 (off) | Gracefully stop after this duration (e.g. `48h`). Stops between batches, exits successfully, and is resumable — the next run deletes the remainder |
 
 ### Tuning Parameters
 
@@ -153,6 +154,7 @@ VACUUM ANALYZE common_representations;
 ✅ **Batched deletion**: Deletes in small chunks to avoid long locks
 ✅ **Throttled**: Configurable delay between batches prevents DB overload  
 ✅ **Resumable**: Can stop and restart safely
+✅ **Graceful timeout**: `--timeout` stops between batches; partial runs exit successfully (`outcome: partial_timeout`) and are resumable
 ✅ **Dry-run mode**: Preview before executing
 ✅ **Progress logging**: Reports progress every batch
 ✅ **Idempotent**: Safe to run multiple times

@@ -23,7 +23,11 @@ const (
 // OPTIMIZED: Uses temp table to materialize "latest timestamp per resource" once,
 // then reuses it for all batch deletions. This avoids recalculating the expensive
 // window function (MAX + GROUP BY on ~10M rows) for every batch.
-func deleteOldReporterRepresentations(db *gorm.DB, logHelper *log.Helper, dryRun bool, retentionDays int, tombstoneDays int, reporterType string, batchSize int, batchDelayMs int) (int64, error) {
+//
+// If timeout > 0, deletion stops gracefully between batches once the deadline
+// passes and the returned timedOut flag is true. The run is resumable: the
+// next run deletes the remaining rows.
+func deleteOldReporterRepresentations(db *gorm.DB, logHelper *log.Helper, dryRun bool, retentionDays int, tombstoneDays int, reporterType string, batchSize int, batchDelayMs int, timeout time.Duration) (int64, bool, error) {
 	if dryRun {
 		var count int64
 		query := `
@@ -43,17 +47,25 @@ func deleteOldReporterRepresentations(db *gorm.DB, logHelper *log.Helper, dryRun
 			query += " AND rr.reporter_type = ?"
 			err := db.Raw(query, fmt.Sprintf("%d", retentionDays), fmt.Sprintf("%d", tombstoneDays), reporterType).Scan(&count).Error
 			if err != nil {
-				return 0, err
+				return 0, false, err
 			}
 		} else {
 			err := db.Raw(query, fmt.Sprintf("%d", retentionDays), fmt.Sprintf("%d", tombstoneDays)).Scan(&count).Error
 			if err != nil {
-				return 0, err
+				return 0, false, err
 			}
 		}
 
 		logDryRunEstimate(logHelper, "ReporterRepresentation (old representations)", count, batchSize, batchDelayMs)
-		return count, nil
+		return count, false, nil
+	}
+
+	// Graceful timeout: stop between batches once the deadline passes. The job
+	// is idempotent, so a partial run is a successful exit; rerun to continue.
+	var deadline time.Time
+	if timeout > 0 {
+		deadline = time.Now().Add(timeout)
+		logHelper.Infof("Timeout: will stop gracefully after %s (resumable)", timeout)
 	}
 
 	// OPTIMIZATION: Create temp table with latest timestamps (calculated ONCE)
@@ -66,7 +78,7 @@ func deleteOldReporterRepresentations(db *gorm.DB, logHelper *log.Helper, dryRun
 	`
 	if err := db.Exec(createTempTable).Error; err != nil {
 		logHelper.Errorf("Failed to create temp table: %v", err)
-		return 0, err
+		return 0, false, err
 	}
 
 	// Populate temp table with latest timestamps per resource
@@ -79,7 +91,7 @@ func deleteOldReporterRepresentations(db *gorm.DB, logHelper *log.Helper, dryRun
 	startTime := time.Now()
 	if err := db.Exec(populateTemp).Error; err != nil {
 		logHelper.Errorf("Failed to populate temp table: %v", err)
-		return 0, err
+		return 0, false, err
 	}
 	logHelper.Infof("Temp table populated in %v", time.Since(startTime))
 
@@ -96,6 +108,13 @@ func deleteOldReporterRepresentations(db *gorm.DB, logHelper *log.Helper, dryRun
 	logHelper.Info("Deleting old reporter_representations using temp table...")
 
 	for {
+		if !deadline.IsZero() && time.Now().After(deadline) {
+			logHelper.Infof("Timeout reached after %d batches: %d records deleted so far — stopping gracefully, rerun to continue", batchCount, totalDeleted)
+			db.Exec("DROP TABLE IF EXISTS latest_reporter_timestamps")
+			logHelper.Info("Cleanup stopped at timeout, temp table dropped")
+			return totalDeleted, true, nil
+		}
+
 		var deleteQuery string
 		var args []interface{}
 
@@ -122,7 +141,7 @@ func deleteOldReporterRepresentations(db *gorm.DB, logHelper *log.Helper, dryRun
 		result := db.Exec(deleteQuery, args...)
 		if result.Error != nil {
 			logHelper.Errorf("Failed to delete ReporterRepresentation batch %d: %v", batchCount+1, result.Error)
-			return totalDeleted, result.Error
+			return totalDeleted, false, result.Error
 		}
 
 		if result.RowsAffected == 0 {
@@ -143,7 +162,7 @@ func deleteOldReporterRepresentations(db *gorm.DB, logHelper *log.Helper, dryRun
 	db.Exec("DROP TABLE IF EXISTS latest_reporter_timestamps")
 	logHelper.Info("Cleanup complete, temp table dropped")
 
-	return totalDeleted, nil
+	return totalDeleted, false, nil
 }
 
 // deleteOldCommonRepresentations deletes common_representations older than N days from latest per resource.
@@ -159,7 +178,11 @@ func deleteOldReporterRepresentations(db *gorm.DB, logHelper *log.Helper, dryRun
 //
 // NOTE: tombstoneDays parameter is ignored in this implementation since we don't
 // check reporter_resources table. This simplifies the query and improves performance.
-func deleteOldCommonRepresentations(db *gorm.DB, logHelper *log.Helper, dryRun bool, retentionDays int, tombstoneDays int, reporterType string, batchSize int, batchDelayMs int) (int64, error) {
+//
+// If timeout > 0, deletion stops gracefully between batches once the deadline
+// passes and the returned timedOut flag is true. The run is resumable: the
+// next run deletes the remaining rows.
+func deleteOldCommonRepresentations(db *gorm.DB, logHelper *log.Helper, dryRun bool, retentionDays int, tombstoneDays int, reporterType string, batchSize int, batchDelayMs int, timeout time.Duration) (int64, bool, error) {
 	if dryRun {
 		var count int64
 		// Simplified query - no joins to resource or reporter_resources tables
@@ -178,17 +201,25 @@ func deleteOldCommonRepresentations(db *gorm.DB, logHelper *log.Helper, dryRun b
 			query += " AND cr.reported_by_reporter_type = ?"
 			err := db.Raw(query, fmt.Sprintf("%d", retentionDays), reporterType).Scan(&count).Error
 			if err != nil {
-				return 0, err
+				return 0, false, err
 			}
 		} else {
 			err := db.Raw(query, fmt.Sprintf("%d", retentionDays)).Scan(&count).Error
 			if err != nil {
-				return 0, err
+				return 0, false, err
 			}
 		}
 
 		logDryRunEstimate(logHelper, "CommonRepresentation (old representations, retention only)", count, batchSize, batchDelayMs)
-		return count, nil
+		return count, false, nil
+	}
+
+	// Graceful timeout: stop between batches once the deadline passes. The job
+	// is idempotent, so a partial run is a successful exit; rerun to continue.
+	var deadline time.Time
+	if timeout > 0 {
+		deadline = time.Now().Add(timeout)
+		logHelper.Infof("Timeout: will stop gracefully after %s (resumable)", timeout)
 	}
 
 	// OPTIMIZATION: Create temp table with latest timestamps (calculated ONCE)
@@ -201,7 +232,7 @@ func deleteOldCommonRepresentations(db *gorm.DB, logHelper *log.Helper, dryRun b
 	`
 	if err := db.Exec(createTempTable).Error; err != nil {
 		logHelper.Errorf("Failed to create temp table: %v", err)
-		return 0, err
+		return 0, false, err
 	}
 
 	// Populate temp table with latest timestamps per resource
@@ -214,7 +245,7 @@ func deleteOldCommonRepresentations(db *gorm.DB, logHelper *log.Helper, dryRun b
 	startTime := time.Now()
 	if err := db.Exec(populateTemp).Error; err != nil {
 		logHelper.Errorf("Failed to populate temp table: %v", err)
-		return 0, err
+		return 0, false, err
 	}
 	logHelper.Infof("Temp table populated in %v", time.Since(startTime))
 
@@ -236,7 +267,7 @@ func deleteOldCommonRepresentations(db *gorm.DB, logHelper *log.Helper, dryRun b
 	`
 	if err := db.Exec(createRowsTable).Error; err != nil {
 		logHelper.Errorf("Failed to create rows_to_delete table: %v", err)
-		return 0, err
+		return 0, false, err
 	}
 
 	// Populate with all rows to delete (expensive scan happens ONCE here)
@@ -267,7 +298,7 @@ func deleteOldCommonRepresentations(db *gorm.DB, logHelper *log.Helper, dryRun b
 	collectStart := time.Now()
 	if err := db.Exec(populateRowsQuery, populateArgs...).Error; err != nil {
 		logHelper.Errorf("Failed to populate rows_to_delete: %v", err)
-		return 0, err
+		return 0, false, err
 	}
 
 	// Get count of rows to delete
@@ -288,6 +319,14 @@ func deleteOldCommonRepresentations(db *gorm.DB, logHelper *log.Helper, dryRun b
 	logHelper.Info("Deleting in batches from collected list...")
 
 	for {
+		if !deadline.IsZero() && time.Now().After(deadline) {
+			logHelper.Infof("Timeout reached after %d batches: %d records deleted so far — stopping gracefully, rerun to continue", batchCount, totalDeleted)
+			db.Exec("DROP TABLE IF EXISTS rows_to_delete")
+			db.Exec("DROP TABLE IF EXISTS latest_common_timestamps")
+			logHelper.Info("Cleanup stopped at timeout, temp tables dropped")
+			return totalDeleted, true, nil
+		}
+
 		deleteQuery := `
 			DELETE FROM common_representations
 			WHERE (resource_id, version) IN (
@@ -300,7 +339,7 @@ func deleteOldCommonRepresentations(db *gorm.DB, logHelper *log.Helper, dryRun b
 		result := db.Exec(deleteQuery, batchSize)
 		if result.Error != nil {
 			logHelper.Errorf("Failed to delete CommonRepresentation batch %d: %v", batchCount+1, result.Error)
-			return totalDeleted, result.Error
+			return totalDeleted, false, result.Error
 		}
 
 		if result.RowsAffected == 0 {
@@ -330,7 +369,7 @@ func deleteOldCommonRepresentations(db *gorm.DB, logHelper *log.Helper, dryRun b
 	db.Exec("DROP TABLE IF EXISTS latest_common_timestamps")
 	logHelper.Info("Cleanup complete, temp tables dropped")
 
-	return totalDeleted, nil
+	return totalDeleted, false, nil
 }
 
 // deleteOrphanedCommonRepresentations deletes ALL common_representations versions whose
@@ -344,7 +383,11 @@ func deleteOldCommonRepresentations(db *gorm.DB, logHelper *log.Helper, dryRun b
 //
 // OPTIMIZED: collect-then-delete, same strategy as deleteOldCommonRepresentations — the
 // anti-join scan happens once into a temp table, then batches delete from the static list.
-func deleteOrphanedCommonRepresentations(db *gorm.DB, logHelper *log.Helper, dryRun bool, reporterType string, batchSize int, batchDelayMs int) (int64, error) {
+//
+// If timeout > 0, deletion stops gracefully between batches once the deadline
+// passes and the returned timedOut flag is true. The run is resumable: the
+// next run deletes the remaining rows.
+func deleteOrphanedCommonRepresentations(db *gorm.DB, logHelper *log.Helper, dryRun bool, reporterType string, batchSize int, batchDelayMs int, timeout time.Duration) (int64, bool, error) {
 	if dryRun {
 		var count int64
 		query := `
@@ -359,17 +402,25 @@ func deleteOrphanedCommonRepresentations(db *gorm.DB, logHelper *log.Helper, dry
 			query += " AND cr.reported_by_reporter_type = ?"
 			err := db.Raw(query, reporterType).Scan(&count).Error
 			if err != nil {
-				return 0, err
+				return 0, false, err
 			}
 		} else {
 			err := db.Raw(query).Scan(&count).Error
 			if err != nil {
-				return 0, err
+				return 0, false, err
 			}
 		}
 
 		logDryRunEstimate(logHelper, "CommonRepresentation (orphaned, resource fully deleted)", count, batchSize, batchDelayMs)
-		return count, nil
+		return count, false, nil
+	}
+
+	// Graceful timeout: stop between batches once the deadline passes. The job
+	// is idempotent, so a partial run is a successful exit; rerun to continue.
+	var deadline time.Time
+	if timeout > 0 {
+		deadline = time.Now().Add(timeout)
+		logHelper.Infof("Timeout: will stop gracefully after %s (resumable)", timeout)
 	}
 
 	// COLLECT-THEN-DELETE OPTIMIZATION:
@@ -384,7 +435,7 @@ func deleteOrphanedCommonRepresentations(db *gorm.DB, logHelper *log.Helper, dry
 	`
 	if err := db.Exec(createOrphansTable).Error; err != nil {
 		logHelper.Errorf("Failed to create orphaned_reps table: %v", err)
-		return 0, err
+		return 0, false, err
 	}
 
 	var populateQuery string
@@ -416,7 +467,7 @@ func deleteOrphanedCommonRepresentations(db *gorm.DB, logHelper *log.Helper, dry
 	collectStart := time.Now()
 	if err := db.Exec(populateQuery, populateArgs...).Error; err != nil {
 		logHelper.Errorf("Failed to populate orphaned_reps: %v", err)
-		return 0, err
+		return 0, false, err
 	}
 
 	// Get count of orphaned rows
@@ -437,6 +488,13 @@ func deleteOrphanedCommonRepresentations(db *gorm.DB, logHelper *log.Helper, dry
 	logHelper.Info("Deleting orphaned representations in batches...")
 
 	for {
+		if !deadline.IsZero() && time.Now().After(deadline) {
+			logHelper.Infof("Timeout reached after %d batches: %d records deleted so far — stopping gracefully, rerun to continue", batchCount, totalDeleted)
+			db.Exec("DROP TABLE IF EXISTS orphaned_reps")
+			logHelper.Info("Orphan cleanup stopped at timeout, temp table dropped")
+			return totalDeleted, true, nil
+		}
+
 		deleteQuery := `
 			DELETE FROM common_representations
 			WHERE (resource_id, version) IN (
@@ -449,7 +507,7 @@ func deleteOrphanedCommonRepresentations(db *gorm.DB, logHelper *log.Helper, dry
 		result := db.Exec(deleteQuery, batchSize)
 		if result.Error != nil {
 			logHelper.Errorf("Failed to delete orphaned CommonRepresentation batch %d: %v", batchCount+1, result.Error)
-			return totalDeleted, result.Error
+			return totalDeleted, false, result.Error
 		}
 
 		if result.RowsAffected == 0 {
@@ -478,11 +536,15 @@ func deleteOrphanedCommonRepresentations(db *gorm.DB, logHelper *log.Helper, dry
 	db.Exec("DROP TABLE IF EXISTS orphaned_reps")
 	logHelper.Info("Orphan cleanup complete, temp table dropped")
 
-	return totalDeleted, nil
+	return totalDeleted, false, nil
 }
 
 // deleteOldTombstonedResources deletes tombstoned resources and all their representations completely.
-func deleteOldTombstonedResources(db *gorm.DB, logHelper *log.Helper, dryRun bool, tombstoneDays int, reporterType string, batchSize int, batchDelayMs int) (int64, error) {
+//
+// If timeout > 0, deletion stops gracefully between batches once the deadline
+// passes and the returned timedOut flag is true. The run is resumable: the
+// next run deletes the remaining rows.
+func deleteOldTombstonedResources(db *gorm.DB, logHelper *log.Helper, dryRun bool, tombstoneDays int, reporterType string, batchSize int, batchDelayMs int, timeout time.Duration) (int64, bool, error) {
 	if dryRun {
 		var count int64
 		query := `
@@ -496,17 +558,25 @@ func deleteOldTombstonedResources(db *gorm.DB, logHelper *log.Helper, dryRun boo
 			query += " AND rr.reporter_type = ?"
 			err := db.Raw(query, fmt.Sprintf("%d", tombstoneDays), reporterType).Scan(&count).Error
 			if err != nil {
-				return 0, err
+				return 0, false, err
 			}
 		} else {
 			err := db.Raw(query, fmt.Sprintf("%d", tombstoneDays)).Scan(&count).Error
 			if err != nil {
-				return 0, err
+				return 0, false, err
 			}
 		}
 
 		logDryRunEstimate(logHelper, "Old tombstoned resources (complete deletion)", count, batchSize, batchDelayMs)
-		return count, nil
+		return count, false, nil
+	}
+
+	// Graceful timeout: stop between batches once the deadline passes. The job
+	// is idempotent, so a partial run is a successful exit; rerun to continue.
+	var deadline time.Time
+	if timeout > 0 {
+		deadline = time.Now().Add(timeout)
+		logHelper.Infof("Timeout: will stop gracefully after %s (resumable)", timeout)
 	}
 
 	var totalDeleted int64
@@ -515,6 +585,11 @@ func deleteOldTombstonedResources(db *gorm.DB, logHelper *log.Helper, dryRun boo
 	logHelper.Info("Deleting old tombstoned resources completely...")
 
 	for {
+		if !deadline.IsZero() && time.Now().After(deadline) {
+			logHelper.Infof("Timeout reached after %d batches: %d tombstoned resources deleted so far — stopping gracefully, rerun to continue", batchCount, totalDeleted)
+			return totalDeleted, true, nil
+		}
+
 		// Delete reporter_resources (cascade will delete reporter_representations)
 		var deleteQuery string
 		var args []interface{}
@@ -547,7 +622,7 @@ func deleteOldTombstonedResources(db *gorm.DB, logHelper *log.Helper, dryRun boo
 		result := db.Exec(deleteQuery, args...)
 		if result.Error != nil {
 			logHelper.Errorf("Failed to delete tombstoned resources batch %d: %v", batchCount+1, result.Error)
-			return totalDeleted, result.Error
+			return totalDeleted, false, result.Error
 		}
 
 		if result.RowsAffected == 0 {
@@ -577,5 +652,5 @@ func deleteOldTombstonedResources(db *gorm.DB, logHelper *log.Helper, dryRun boo
 	// - Or: Track deletions and target specific resource IDs
 	// - Or: Use pg_stat to find tables with low reference counts
 
-	return totalDeleted, nil
+	return totalDeleted, false, nil
 }

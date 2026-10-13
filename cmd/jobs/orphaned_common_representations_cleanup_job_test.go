@@ -2,6 +2,7 @@ package jobs
 
 import (
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/project-kessel/inventory-api/internal/data/model"
@@ -68,7 +69,7 @@ func TestDeleteOrphanedCommonRepresentations_DryRun(t *testing.T) {
 		createTestRepresentationSet(t, db, "hbi", 2, "hbi")
 	}
 
-	count, err := deleteOrphanedCommonRepresentations(db, logger, true, "", 100, 0)
+	count, _, err := deleteOrphanedCommonRepresentations(db, logger, true, "", 100, 0, 0)
 
 	assert.NoError(t, err)
 	assert.Equal(t, int64(6), count)
@@ -90,9 +91,10 @@ func TestDeleteOrphanedCommonRepresentations_ActualDeletion(t *testing.T) {
 		liveIDs = append(liveIDs, createTestRepresentationSet(t, db, "hbi", 2, "hbi"))
 	}
 
-	deleted, err := deleteOrphanedCommonRepresentations(db, logger, false, "", 100, 0)
+	deleted, timedOut, err := deleteOrphanedCommonRepresentations(db, logger, false, "", 100, 0, 0)
 
 	assert.NoError(t, err)
+	assert.False(t, timedOut, "a run that deletes everything must not report a timeout")
 	assert.Equal(t, int64(6), deleted)
 
 	for _, id := range orphanIDs {
@@ -119,7 +121,7 @@ func TestDeleteOrphanedCommonRepresentations_MultiReporterResourceSurvives(t *te
 	require.NoError(t, db.Where("reporter_type = ?", "ocm").First(&removed).Error)
 	require.NoError(t, db.Delete(&removed).Error)
 
-	deleted, err := deleteOrphanedCommonRepresentations(db, logger, false, "", 100, 0)
+	deleted, _, err := deleteOrphanedCommonRepresentations(db, logger, false, "", 100, 0, 0)
 
 	assert.NoError(t, err)
 	assert.Equal(t, int64(0), deleted)
@@ -136,7 +138,7 @@ func TestDeleteOrphanedCommonRepresentations_FiltersByReporterType(t *testing.T)
 	createTestRepresentationSet(t, db, "hbi", 2) // orphan, reported by hbi
 	createTestRepresentationSet(t, db, "ocm", 2) // orphan, reported by ocm
 
-	deleted, err := deleteOrphanedCommonRepresentations(db, logger, false, "hbi", 100, 0)
+	deleted, _, err := deleteOrphanedCommonRepresentations(db, logger, false, "hbi", 100, 0, 0)
 
 	assert.NoError(t, err)
 	assert.Equal(t, int64(2), deleted)
@@ -155,7 +157,7 @@ func TestDeleteOrphanedCommonRepresentations_EmptyBatchTermination(t *testing.T)
 		createTestRepresentationSet(t, db, "hbi", 2, "hbi")
 	}
 
-	deleted, err := deleteOrphanedCommonRepresentations(db, logger, false, "", 100, 0)
+	deleted, _, err := deleteOrphanedCommonRepresentations(db, logger, false, "", 100, 0, 0)
 
 	assert.NoError(t, err)
 	assert.Equal(t, int64(0), deleted)
@@ -176,7 +178,7 @@ func TestDeleteOrphanedCommonRepresentations_BatchAccounting(t *testing.T) {
 	}
 	createTestRepresentationSet(t, db, "hbi", 3)
 
-	deleted, err := deleteOrphanedCommonRepresentations(db, logger, false, "", 2, 0)
+	deleted, _, err := deleteOrphanedCommonRepresentations(db, logger, false, "", 2, 0, 0)
 
 	assert.NoError(t, err)
 	assert.Equal(t, int64(7), deleted)
@@ -184,4 +186,28 @@ func TestDeleteOrphanedCommonRepresentations_BatchAccounting(t *testing.T) {
 	var remaining int64
 	db.Model(&model.CommonRepresentation{}).Count(&remaining)
 	assert.Equal(t, int64(0), remaining)
+}
+
+func TestDeleteOrphanedCommonRepresentations_TimeoutStopsGracefully(t *testing.T) {
+	db := setupTestDB(t)
+	logger := testLogger()
+
+	// 3 orphaned resources (2 versions each)
+	for i := 0; i < 3; i++ {
+		createTestRepresentationSet(t, db, "hbi", 2)
+	}
+
+	// 1ns timeout: the deadline has certainly passed by the time the first
+	// batch-loop check runs (the collect phase does several DB round trips in
+	// between), so the job must stop before deleting anything and report a
+	// partial, resumable run rather than an error.
+	deleted, timedOut, err := deleteOrphanedCommonRepresentations(db, logger, false, "", 100, 0, time.Nanosecond)
+
+	assert.NoError(t, err, "a graceful timeout must not surface as an error")
+	assert.True(t, timedOut, "the run should be reported as partial (timed out)")
+	assert.Equal(t, int64(0), deleted)
+
+	var remaining int64
+	db.Model(&model.CommonRepresentation{}).Count(&remaining)
+	assert.Equal(t, int64(6), remaining, "timeout must stop before any deletion — the run is resumable")
 }

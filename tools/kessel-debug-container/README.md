@@ -97,7 +97,7 @@ oc process --local \
 
 Packages installed via the package manager (`dnf`) are automatically updated on each build. However, some packages installed from external RPM mirrors are pinned to specific versions in the Dockerfile and must be updated manually:
 
-- **librdkafka** — installed from the CentOS 9-stream AppStream mirror
+- **librdkafka** — installed from the Red Hat Universal Base Image 9 AppStream repository
 - **kcat** — installed from the Fedora EPEL 9 mirror
 
 To check for newer versions and update the Dockerfile:

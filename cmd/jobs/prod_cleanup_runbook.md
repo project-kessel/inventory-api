@@ -50,13 +50,14 @@ Steps 2–5 each need a dry-run first. Steps 2/3/4/5 can be spread across separa
 off-peak windows — every job is resumable and order-independent except that 4 must run
 after 3 (it cleans up what 3 orphans).
 
-**Experimental alternative (v1.5)**: steps 3+4 can be replaced by a single
-`tombstone-cascade-cleanup-job` run, which deletes each old-tombstoned resource's
-reporter row and common reps together (batched, with an interleaved orphan pass and a
-final drain). It takes `--deletion-order` (`oldest-first`, the default, or
-`largest-history-first` — biggest histories die first) plus `--orphan-batch-size`.
-It is not yet in the measured evidence base (A/B testing in progress); prefer the
-split jobs until it is.
+**Experimental alternative (v1.5)**: step 3 can be replaced by a
+`tombstone-cascade-cleanup-job` run — same effect (deletes the old-tombstoned
+reporter rows, cascades their reporter_representations, orphans their common
+representations for step 4), but with a selectable `--deletion-order`
+(`oldest-first`, the default — identical to the tombstone job — or
+`largest-history-first`, biggest histories die first). It is not yet in the
+measured evidence base (A/B testing in progress); prefer the tombstone job
+until it is.
 
 ## 0. Preflight (read-only)
 
@@ -139,7 +140,8 @@ Flags common to all five jobs: `--dry-run`, `--reporter-type`, `--batch-size`,
 batches), `--vacuum-every-batches` (online incremental VACUUM, see below).
 Phases 2 and 5 additionally take `--retention-days` and `--tombstone-days`;
 phase 3 (tombstones) takes only `--tombstone-days`; phase 4 (orphans) takes
-neither.
+neither. The v1.5 cascade alternative to phase 3 additionally takes
+`--deletion-order` (see "Order of operations").
 
 Four of the five jobs delete **oldest data first** (deterministic full-key
 ordering); the cascade job's `largest-history-first` variant is the one

@@ -269,19 +269,22 @@ Deletes tombstoned `reporter_resources` older than `--tombstone-days` (default 3
 
 ### tombstone-cascade-cleanup-job
 
-**Experimental** (v1.5): the combined form of the two jobs above — deletes an
-old-tombstoned `reporter_resources` row AND its `common_representations` in
-one run, so the whole resource's data disappears together. The tombstone
-worklist (with a per-resource history-size snapshot) is collected once into a
-temp table; each batch deletes the next `--batch-size` reporter_resources rows
-(the DB cascade removes their `reporter_representations`) and then deletes the
-batch's now-orphaned common reps — re-checked against live data, so a resource
-reported by multiple reporters only loses its common reps once its LAST
-reporter row is gone. A final orphan drain (same logic as the standalone
-orphan job) cleans any per-batch backlog on normal completion.
+**Experimental** (v1.5): the order-selectable counterpart of the tombstone job
+above. It deletes old-tombstoned `reporter_resources` rows (the DB cascade
+removes their `reporter_representations`) in your choice of deletion order;
+like the tombstone job, it does **not** delete `common_representations` —
+those rows become orphans handled by the orphan job below. Run it INSTEAD of
+the tombstone job when you want a different deletion order (the tombstone job
+is oldest-first only).
+
+The worklist (with a per-resource history-size snapshot for the
+largest-history-first order) is collected once into a temp table; each batch
+deletes the next `--batch-size` reporter rows. Each reporter row is judged
+independently — a resource with one old-tombstoned and one active reporter row
+loses only the tombstoned one.
 
 ```bash
-# Always dry-run first (reports both counts)
+# Always dry-run first
 ./inventory-api run-job tombstone-cascade-cleanup-job \
   --tombstone-days=30 --dry-run --config .inventory-api.yaml
 
@@ -289,21 +292,17 @@ orphan job) cleans any per-batch backlog on normal completion.
 ./inventory-api run-job tombstone-cascade-cleanup-job \
   --tombstone-days=30 \
   --deletion-order=oldest-first \
-  --batch-size=1000 --orphan-batch-size=10000 --batch-delay-ms=500 \
+  --batch-size=1000 --batch-delay-ms=500 \
   --config .inventory-api.yaml
 ```
 
-`--deletion-order` picks the tombstone-loop ordering: `oldest-first`
-(`updated_at, id` — same as the standalone tombstone job) or
-`largest-history-first` (`history_size DESC, updated_at, id` — resources with
-the most representations die first; the history sizes are snapshotted when the
-worklist is collected). `--orphan-batch-size` sizes the interleaved
-common-reps batches; `--reporter-type` scopes only the tombstone worklist —
-orphan deletion always runs for all reporters. `--max-batches` bounds the
-tombstone loop only (the final drain runs to completion on a normal finish).
-On a partial stop the drain does NOT run — leftover orphans wait for the next
-run, matching the two-job semantics. Parent `resource` rows are left in place
-(same TODO as above).
+`--deletion-order` picks the ordering: `oldest-first` (`updated_at, id` —
+same as the standalone tombstone job) or `largest-history-first`
+(`history_size DESC, updated_at, id` — resources with the most
+representations die first; the history sizes are snapshotted when the
+worklist is collected). `--reporter-type` scopes the worklist to that
+reporter's rows. Parent `resource` rows are left in place (same TODO as
+above).
 
 ### orphaned-common-representations-cleanup-job
 

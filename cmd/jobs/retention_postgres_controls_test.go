@@ -504,10 +504,9 @@ func newControlsFixtures() []controlsFixture {
 			},
 		},
 		{
-			// The cascade helper's deleted count is its reporter_resources
-			// count; its common reps die in the interleaved orphan pass and
-			// the final drain (skipped after a partial stop, like the
-			// standalone orphan job).
+			// The cascade helper deletes reporter_resources only; the common
+			// reps its deletions orphan are the standalone orphan job's work,
+			// not this job's.
 			name: "cascade",
 			job:  "controls_test_cascade",
 			setup: func(t *testing.T, db *gorm.DB, now time.Time) {
@@ -525,7 +524,7 @@ func newControlsFixtures() []controlsFixture {
 				createPGCommonRepresentation(t, db, recentResource, 0, "hbi", daysAgo(now, 4))
 			},
 			run: func(db *gorm.DB, logger *log.Helper, opts *retentionRunOptions) (int64, string, error) {
-				result, err := deleteOldTombstonedResourcesCascade(db, logger, false, 30, DeletionOrderOldestFirst, "", 2, 10, 30, 0, opts)
+				result, err := deleteOldTombstonedResourcesCascade(db, logger, false, 30, DeletionOrderOldestFirst, "", 2, 30, 0, opts)
 				return result.ReporterResourcesDeleted, result.StopReason, err
 			},
 			remaining: func(t *testing.T, db *gorm.DB, now time.Time) int64 {

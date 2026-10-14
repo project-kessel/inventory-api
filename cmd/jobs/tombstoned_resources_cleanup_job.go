@@ -10,13 +10,13 @@ import (
 
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/project-kessel/inventory-api/cmd/common"
-	"github.com/project-kessel/inventory-api/internal/biz/model"
-	cleanupuc "github.com/project-kessel/inventory-api/internal/biz/usecase/cleanup"
 	"github.com/project-kessel/inventory-api/internal/data"
 	"github.com/project-kessel/inventory-api/internal/metricscollector"
 	"github.com/project-kessel/inventory-api/internal/storage"
 	"github.com/spf13/cobra"
 	"go.opentelemetry.io/otel"
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
 )
 
 const (
@@ -82,6 +82,30 @@ Use only after verifying the operational preconditions in the tombstone cleanup 
 	return command
 }
 
+// openTombstoneCleanupDatabase opens PostgreSQL with the invocation context so the
+// job deadline bounds connection validation and all subsequent GORM operations.
+func openTombstoneCleanupDatabase(ctx context.Context, storageConfig storage.CompletedConfig, logger *log.Helper) (*gorm.DB, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, fmt.Errorf("error opening database: %w", err)
+	}
+	db, err := gorm.Open(postgres.Open(storageConfig.DSN), &gorm.Config{
+		TranslateError:       true,
+		DisableAutomaticPing: true,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("error opening database: %w", err)
+	}
+	sqlDB, err := db.DB()
+	if err != nil {
+		return nil, fmt.Errorf("error accessing database connection: %w", err)
+	}
+	if err := sqlDB.PingContext(ctx); err != nil {
+		_ = sqlDB.Close()
+		return nil, fmt.Errorf("error pinging database: %w", err)
+	}
+	return db.WithContext(ctx), nil
+}
+
 func tombstoneCleanupSignalContext(parentContext context.Context) (context.Context, context.CancelFunc) {
 	return signal.NotifyContext(parentContext, os.Interrupt, syscall.SIGTERM)
 }
@@ -117,13 +141,13 @@ func runTombstonedResourcesCleanupJob(
 	if storageOptions.Database != storage.Postgres {
 		return fmt.Errorf("tombstone cleanup requires PostgreSQL; configured database is %q", storageOptions.Database)
 	}
-	options, err := cleanupuc.NewOptions(batchSize, batchDelay, maxBatches, maxDuration)
+	options, err := newTombstoneCleanupOptions(batchSize, batchDelay, maxBatches, maxDuration)
 	if err != nil {
 		return fmt.Errorf("invalid tombstone cleanup execution bounds: %w", err)
 	}
 	jobContext, cancel := context.WithTimeout(parentContext, options.MaxDuration())
 	defer cancel()
-	policy, err := model.NewTombstoneCleanupPolicy(time.Now().UTC(), tombstoneDays, reporterType)
+	policy, err := NewTombstoneCleanupPolicy(time.Now().UTC(), tombstoneDays, reporterType)
 	if err != nil {
 		return err
 	}
@@ -137,7 +161,7 @@ func runTombstonedResourcesCleanupJob(
 	_, logger := common.InitLogger(common.GetLogLevel(), loggerOptions)
 	logHelper := log.NewHelper(log.With(logger, "job", "tombstoned_resources_cleanup"))
 	storageConfig := storage.NewConfig(storageOptions).Complete()
-	db, err := storage.NewWithContext(jobContext, storageConfig, logHelper)
+	db, err := openTombstoneCleanupDatabase(jobContext, storageConfig, logHelper)
 	if err != nil {
 		return err
 	}
@@ -155,8 +179,8 @@ func runTombstonedResourcesCleanupJob(
 		return fmt.Errorf("initialize tombstone cleanup transaction metrics: %w", err)
 	}
 	transactionManager := data.NewGormTransactionManager(metrics, storageOptions.MaxSerializationRetries)
-	transactions := data.NewTombstoneCleanupTransaction(db, transactionManager)
-	usecase, err := cleanupuc.New(transactions)
+	transactions := newTombstoneCleanupTransaction(db, transactionManager)
+	usecase, err := newTombstoneCleanup(transactions)
 	if err != nil {
 		return err
 	}
@@ -172,7 +196,7 @@ func runTombstonedResourcesCleanupJob(
 	}
 
 	logHelper.Warn("Tombstone cleanup execution explicitly enabled; committed batches cannot be undone by cancellation")
-	result, executeErr := usecase.Execute(jobContext, policy, options, func(batchNumber int, impact model.TombstoneCleanupImpact) {
+	result, executeErr := usecase.Execute(jobContext, policy, options, func(batchNumber int, impact TombstoneCleanupImpact) {
 		logHelper.Infow("msg", "tombstone cleanup batch committed",
 			"batch", batchNumber,
 			"reporter_entities", impact.ReporterEntities(),
@@ -189,9 +213,9 @@ func runTombstonedResourcesCleanupJob(
 
 func logTombstoneCleanupPreview(
 	logHelper *log.Helper,
-	report model.TombstoneCleanupReport,
-	policy model.TombstoneCleanupPolicy,
-	options cleanupuc.Options,
+	report TombstoneCleanupReport,
+	policy TombstoneCleanupPolicy,
+	options tombstoneCleanupOptions,
 	tombstoneDays int,
 	executeRequested bool,
 ) {
@@ -237,7 +261,7 @@ func logTombstoneCleanupPreview(
 	)
 }
 
-func logTombstoneCleanupResult(logHelper *log.Helper, result cleanupuc.Result) {
+func logTombstoneCleanupResult(logHelper *log.Helper, result tombstoneCleanupResult) {
 	impact := result.Impact()
 	logHelper.Infow("msg", "tombstone cleanup execution progress",
 		"committed_batches", result.CommittedBatches(),

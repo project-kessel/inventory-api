@@ -32,44 +32,6 @@ func New(c CompletedConfig, logger *log.Helper) (*gorm.DB, error) {
 
 	return db, nil
 }
-
-// NewWithContext opens the configured database with ctx for connection validation and subsequent GORM operations.
-func NewWithContext(ctx context.Context, c CompletedConfig, logger *log.Helper) (*gorm.DB, error) {
-	if err := ctx.Err(); err != nil {
-		return nil, fmt.Errorf("error opening database: %w", err)
-	}
-
-	var opener func(string) gorm.Dialector
-	switch c.Options.Database {
-	case "postgres":
-		opener = postgres.Open
-	case "sqlite3":
-		opener = sqlite.Open
-	default:
-		return nil, fmt.Errorf("unrecognized database type: %s", c.Options.Database)
-	}
-
-	logger.Infof("Using backing storage: %s", c.Options.Database)
-	db, err := gorm.Open(opener(c.DSN), &gorm.Config{
-		TranslateError:       true,
-		DisableAutomaticPing: true,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("error opening database: %w", err)
-	}
-
-	sqlDB, err := db.DB()
-	if err != nil {
-		return nil, fmt.Errorf("error accessing database connection: %w", err)
-	}
-	if err := sqlDB.PingContext(ctx); err != nil {
-		_ = sqlDB.Close()
-		return nil, fmt.Errorf("error pinging database: %w", err)
-	}
-
-	return db.WithContext(ctx), nil
-}
-
 func NewPgx(c CompletedConfig, logger *log.Helper) (*pgxpool.Pool, error) {
 	ctx := context.Background()
 

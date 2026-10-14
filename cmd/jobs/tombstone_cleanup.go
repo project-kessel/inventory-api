@@ -1,18 +1,21 @@
-package model
+package jobs
 
 import (
+	"context"
 	"fmt"
+	"math"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
+	bizmodel "github.com/project-kessel/inventory-api/internal/biz/model"
 )
 
 // TombstoneCleanupPolicy freezes the age cutoff and optional normalized reporter filter for one invocation.
 type TombstoneCleanupPolicy struct {
 	evaluationTime time.Time
 	cutoff         time.Time
-	reporterType   ReporterType
+	reporterType   bizmodel.ReporterType
 	hasReporter    bool
 	valid          bool
 }
@@ -36,7 +39,7 @@ func NewTombstoneCleanupPolicy(evaluationTime time.Time, tombstoneDays int, repo
 		valid:          true,
 	}
 	if strings.TrimSpace(reporterType) != "" {
-		validatedReporterType, err := NewReporterType(reporterType)
+		validatedReporterType, err := bizmodel.NewReporterType(reporterType)
 		if err != nil {
 			return TombstoneCleanupPolicy{}, fmt.Errorf("invalid reporter type filter: %w", err)
 		}
@@ -72,7 +75,7 @@ func (policy TombstoneCleanupPolicy) IsTombstoneEligible(updatedAt time.Time) bo
 }
 
 // ReporterType returns the normalized reporter filter and whether a filter was selected.
-func (policy TombstoneCleanupPolicy) ReporterType() (ReporterType, bool) {
+func (policy TombstoneCleanupPolicy) ReporterType() (bizmodel.ReporterType, bool) {
 	return policy.reporterType, policy.hasReporter
 }
 
@@ -84,7 +87,7 @@ type TombstoneCleanupImpact struct {
 	commonRepresentations   int64
 	resourceRootsImpacted   int64
 	resourcesRemovable      int64
-	resourceRootIDs         map[ResourceId]struct{}
+	resourceRootIDs         map[bizmodel.ResourceId]struct{}
 	rootIDsKnown            bool
 }
 
@@ -127,10 +130,10 @@ func NewTombstoneCleanupImpactWithRootIDs(
 	reporterResources int64,
 	reporterRepresentations int64,
 	commonRepresentations int64,
-	resourceRootIDs []ResourceId,
+	resourceRootIDs []bizmodel.ResourceId,
 	resourcesRemovable int64,
 ) (TombstoneCleanupImpact, error) {
-	uniqueRootIDs := make(map[ResourceId]struct{}, len(resourceRootIDs))
+	uniqueRootIDs := make(map[bizmodel.ResourceId]struct{}, len(resourceRootIDs))
 	for _, resourceRootID := range resourceRootIDs {
 		if resourceRootID.UUID() == uuid.Nil {
 			return TombstoneCleanupImpact{}, fmt.Errorf("tombstone cleanup root identities cannot be empty")
@@ -195,7 +198,7 @@ func (impact TombstoneCleanupImpact) Add(other TombstoneCleanupImpact) (Tombston
 		(other.resourceRootsImpacted > 0 && !other.rootIDsKnown) {
 		return TombstoneCleanupImpact{}, fmt.Errorf("cannot aggregate distinct tombstone cleanup roots without root identities")
 	}
-	resourceRootIDs := make(map[ResourceId]struct{}, len(impact.resourceRootIDs)+len(other.resourceRootIDs))
+	resourceRootIDs := make(map[bizmodel.ResourceId]struct{}, len(impact.resourceRootIDs)+len(other.resourceRootIDs))
 	for resourceRootID := range impact.resourceRootIDs {
 		resourceRootIDs[resourceRootID] = struct{}{}
 	}
@@ -405,4 +408,266 @@ func safeTombstoneCountAdd(left, right int64) (int64, error) {
 		return 0, fmt.Errorf("tombstone cleanup count overflow or negative count")
 	}
 	return left + right, nil
+}
+
+// TombstoneCleanupRepository reads tombstone eligibility or deletes one bounded set of admissible tombstones.
+// Age eligibility is determined only by the frozen policy cutoff; structural admissibility is separate and
+// excludes unknown timestamps, missing or mismatched roots, invalid reporter keys, and inconsistent or newer
+// terminal history. Implementations must preserve and report these exclusions rather than repairing them.
+type TombstoneCleanupRepository interface {
+	// PreviewTombstones reports the complete age scope, structural exclusions, and the deterministic eligible
+	// prefix selected by updated_at and reporter-resource ID, without writing any Inventory rows or events.
+	PreviewTombstones(ctx context.Context, policy TombstoneCleanupPolicy, boundedReporterRowLimit int64) (TombstoneCleanupReport, error)
+	// DeleteTombstoneBatch reselects and rechecks the same frozen selector inside its transaction, deletes at most
+	// batchSize structurally admissible reporter rows, and relies on the reporter-row cascade for reporter history.
+	// It may delete common history and a root only for a root touched by this selected batch and only when no
+	// reporter row survives. It must never perform a global orphan sweep; callers may treat its impact as committed
+	// only after the enclosing transaction commits.
+	DeleteTombstoneBatch(ctx context.Context, policy TombstoneCleanupPolicy, batchSize int) (TombstoneCleanupImpact, error)
+}
+
+// TombstoneCleanupTransaction scopes cleanup repository work to one bounded PostgreSQL transaction.
+type TombstoneCleanupTransaction interface {
+	// WithinSerializableTombstoneCleanup enforces read-only mode for previews and serializable isolation for
+	// every transaction. A write transaction may retry its callback after a serialization failure, so the callback
+	// must reselect eligibility, reset attempted impact, and emit committed-progress notifications only after this
+	// method returns success. Cancellation rolls back the active transaction but does not undo earlier commits.
+	WithinSerializableTombstoneCleanup(
+		ctx context.Context,
+		operationName string,
+		readOnly bool,
+		statementTimeout time.Duration,
+		lockTimeout time.Duration,
+		work func(TombstoneCleanupRepository) error,
+	) error
+}
+
+const (
+	defaultStatementTimeout = 30 * time.Second
+	defaultLockTimeout      = 5 * time.Second
+)
+
+// tombstoneCleanupOptions bounds cleanup batch size, pacing, batch count, and total invocation time.
+type tombstoneCleanupOptions struct {
+	batchSize   int
+	batchDelay  time.Duration
+	maxBatches  int
+	maxDuration time.Duration
+}
+
+// newTombstoneCleanupOptions validates positive finite execution limits.
+func newTombstoneCleanupOptions(batchSize int, batchDelay time.Duration, maxBatches int, maxDuration time.Duration) (tombstoneCleanupOptions, error) {
+	options := tombstoneCleanupOptions{batchSize: batchSize, batchDelay: batchDelay, maxBatches: maxBatches, maxDuration: maxDuration}
+	if err := options.Validate(); err != nil {
+		return tombstoneCleanupOptions{}, err
+	}
+	return options, nil
+}
+
+// Validate rejects non-positive limits, negative delay, and overflowing row budgets.
+func (options tombstoneCleanupOptions) Validate() error {
+	if options.batchSize <= 0 {
+		return fmt.Errorf("batch size must be positive")
+	}
+	if options.batchDelay < 0 {
+		return fmt.Errorf("batch delay cannot be negative")
+	}
+	if options.maxBatches <= 0 {
+		return fmt.Errorf("maximum batches must be positive")
+	}
+	if options.maxDuration <= 0 {
+		return fmt.Errorf("maximum duration must be positive")
+	}
+	if int64(options.batchSize) > math.MaxInt64/int64(options.maxBatches) {
+		return fmt.Errorf("bounded reporter row limit overflows int64")
+	}
+	return nil
+}
+
+// BatchSize returns the maximum reporter metadata rows in one committed batch.
+func (options tombstoneCleanupOptions) BatchSize() int { return options.batchSize }
+
+// BatchDelay returns the interruptible delay between committed batches.
+func (options tombstoneCleanupOptions) BatchDelay() time.Duration { return options.batchDelay }
+
+// MaxBatches returns the maximum number of destructive batches in one invocation.
+func (options tombstoneCleanupOptions) MaxBatches() int { return options.maxBatches }
+
+// MaxDuration returns the total invocation deadline, including delays.
+func (options tombstoneCleanupOptions) MaxDuration() time.Duration { return options.maxDuration }
+
+// BoundedReporterRowLimit returns the finite upper bound used in preview projections.
+func (options tombstoneCleanupOptions) BoundedReporterRowLimit() int64 {
+	return int64(options.batchSize) * int64(options.maxBatches)
+}
+
+// tombstoneCleanupResult contains only counts from transactions that committed successfully.
+type tombstoneCleanupResult struct {
+	impact            TombstoneCleanupImpact
+	committedBatches  int
+	batchLimitReached bool
+}
+
+// Impact returns the aggregate impact of committed batches.
+func (result tombstoneCleanupResult) Impact() TombstoneCleanupImpact { return result.impact }
+
+// CommittedBatches returns the number of batches whose transactions committed.
+func (result tombstoneCleanupResult) CommittedBatches() int { return result.committedBatches }
+
+// BatchLimitReached reports whether the configured batch count stopped execution.
+func (result tombstoneCleanupResult) BatchLimitReached() bool { return result.batchLimitReached }
+
+// tombstoneCleanupUsecase orchestrates read-only preview and bounded tombstone cleanup execution.
+type tombstoneCleanupUsecase struct {
+	transactions TombstoneCleanupTransaction
+}
+
+// New constructs the cleanup use case with its transaction port.
+func newTombstoneCleanup(transactions TombstoneCleanupTransaction) (*tombstoneCleanupUsecase, error) {
+	if transactions == nil {
+		return nil, fmt.Errorf("tombstone cleanup transaction port is required")
+	}
+	return &tombstoneCleanupUsecase{transactions: transactions}, nil
+}
+
+// Preview returns full eligibility and bounded impact from one read-only snapshot.
+func (usecase *tombstoneCleanupUsecase) Preview(ctx context.Context, policy TombstoneCleanupPolicy, options tombstoneCleanupOptions) (TombstoneCleanupReport, error) {
+	if err := usecase.validate(policy, options); err != nil {
+		return TombstoneCleanupReport{}, err
+	}
+	runContext, cancel := context.WithTimeout(ctx, options.maxDuration)
+	defer cancel()
+
+	var report TombstoneCleanupReport
+	err := usecase.withSerializable(runContext, "tombstone_cleanup_preview", true, func(repository TombstoneCleanupRepository) error {
+		// The transaction adapter may invoke this callback again after a retry.
+		report = TombstoneCleanupReport{}
+		preview, err := repository.PreviewTombstones(runContext, policy, options.BoundedReporterRowLimit())
+		if err != nil {
+			return err
+		}
+		report = preview
+		return nil
+	})
+	if err != nil {
+		return TombstoneCleanupReport{}, fmt.Errorf("preview tombstoned resources: %w", err)
+	}
+	return report, nil
+}
+
+// Execute commits at most MaxBatches eligible batches and reports only committed impact.
+func (usecase *tombstoneCleanupUsecase) Execute(
+	ctx context.Context,
+	policy TombstoneCleanupPolicy,
+	options tombstoneCleanupOptions,
+	onBatchCommitted func(batchNumber int, impact TombstoneCleanupImpact),
+) (tombstoneCleanupResult, error) {
+	if err := usecase.validate(policy, options); err != nil {
+		return tombstoneCleanupResult{}, err
+	}
+	runContext, cancel := context.WithTimeout(ctx, options.maxDuration)
+	defer cancel()
+
+	var result tombstoneCleanupResult
+	for result.committedBatches < options.maxBatches {
+		if err := runContext.Err(); err != nil {
+			return result, fmt.Errorf("execute tombstone cleanup: %w", err)
+		}
+
+		var batchImpact TombstoneCleanupImpact
+		err := usecase.withSerializable(runContext, "tombstone_cleanup_batch", false, func(repository TombstoneCleanupRepository) error {
+			// Serialization retries must overwrite, not accumulate, attempted counts.
+			batchImpact = TombstoneCleanupImpact{}
+			impact, err := repository.DeleteTombstoneBatch(runContext, policy, options.batchSize)
+			if err != nil {
+				return err
+			}
+			batchImpact = impact
+			return nil
+		})
+		if err != nil {
+			return result, fmt.Errorf("execute tombstone cleanup batch: %w", err)
+		}
+		if batchImpact.ReporterResources() == 0 {
+			return result, nil
+		}
+
+		totalImpact, err := result.impact.Add(batchImpact)
+		if err != nil {
+			return result, fmt.Errorf("accumulate committed tombstone cleanup impact: %w", err)
+		}
+		result.impact = totalImpact
+		result.committedBatches++
+		if onBatchCommitted != nil {
+			onBatchCommitted(result.committedBatches, batchImpact)
+		}
+
+		if batchImpact.ReporterResources() < int64(options.batchSize) {
+			return result, nil
+		}
+		if result.committedBatches == options.maxBatches {
+			result.batchLimitReached = true
+			return result, nil
+		}
+		if options.batchDelay > 0 {
+			if err := waitForNextBatch(runContext, options.batchDelay); err != nil {
+				return result, fmt.Errorf("wait between tombstone cleanup batches: %w", err)
+			}
+		}
+	}
+	return result, nil
+}
+
+func (usecase *tombstoneCleanupUsecase) validate(policy TombstoneCleanupPolicy, options tombstoneCleanupOptions) error {
+	if usecase == nil || usecase.transactions == nil {
+		return fmt.Errorf("tombstone cleanup use case is not configured")
+	}
+	if err := policy.Validate(); err != nil {
+		return err
+	}
+	return options.Validate()
+}
+
+func (usecase *tombstoneCleanupUsecase) withSerializable(
+	ctx context.Context,
+	operationName string,
+	readOnly bool,
+	work func(TombstoneCleanupRepository) error,
+) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	remaining := defaultStatementTimeout
+	if deadline, hasDeadline := ctx.Deadline(); hasDeadline {
+		remaining = time.Until(deadline)
+		if remaining <= 0 {
+			return context.DeadlineExceeded
+		}
+	}
+	return usecase.transactions.WithinSerializableTombstoneCleanup(
+		ctx,
+		operationName,
+		readOnly,
+		minimumDuration(defaultStatementTimeout, remaining),
+		minimumDuration(defaultLockTimeout, remaining),
+		work,
+	)
+}
+
+func minimumDuration(left, right time.Duration) time.Duration {
+	if left < right {
+		return left
+	}
+	return right
+}
+
+func waitForNextBatch(ctx context.Context, delay time.Duration) error {
+	timer := time.NewTimer(delay)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-timer.C:
+		return nil
+	}
 }

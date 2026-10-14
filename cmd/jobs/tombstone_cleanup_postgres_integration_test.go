@@ -1,6 +1,6 @@
 //go:build integration
 
-package data_test
+package jobs
 
 import (
 	"context"
@@ -22,7 +22,6 @@ import (
 	"github.com/project-kessel/inventory-api/internal"
 	authnapi "github.com/project-kessel/inventory-api/internal/authn/api"
 	bizmodel "github.com/project-kessel/inventory-api/internal/biz/model"
-	cleanupuc "github.com/project-kessel/inventory-api/internal/biz/usecase/cleanup"
 	resourceuc "github.com/project-kessel/inventory-api/internal/biz/usecase/resources"
 	"github.com/project-kessel/inventory-api/internal/data"
 	datamodel "github.com/project-kessel/inventory-api/internal/data/model"
@@ -40,7 +39,7 @@ import (
 func TestTombstoneCleanupOperatorIdentitiesPostgres(t *testing.T) {
 	db, postgresContainer := setupTombstoneCleanupPostgres(t)
 	evaluationTime := time.Date(2026, 10, 25, 12, 0, 0, 0, time.UTC)
-	policy, err := bizmodel.NewTombstoneCleanupPolicy(evaluationTime, 7, " HBI ")
+	policy, err := NewTombstoneCleanupPolicy(evaluationTime, 7, " HBI ")
 	require.NoError(t, err)
 	cutoff := policy.Cutoff()
 
@@ -99,9 +98,9 @@ func TestTombstoneCleanupOperatorIdentitiesPostgres(t *testing.T) {
 	})
 	require.NoError(t, db.Exec("UPDATE reporter_resources SET updated_at = NULL WHERE id = ?", unknownReporterID).Error)
 
-	options, err := cleanupuc.NewOptions(1, 0, 1, time.Minute)
+	options, err := newTombstoneCleanupOptions(1, 0, 1, time.Minute)
 	require.NoError(t, err)
-	usecase := tombstoneCleanupUsecase(t, db)
+	usecase := newTestTombstoneCleanupUsecase(t, db)
 	report, err := usecase.Preview(context.Background(), policy, options)
 	require.NoError(t, err)
 	assert.Equal(t, int64(8), report.AgeCandidates())
@@ -180,7 +179,7 @@ func TestTombstoneCleanupOperatorIdentitiesPostgres(t *testing.T) {
 		assert.False(t, included, "identity artifact must not disclose %s", column)
 	}
 
-	unfilteredPolicy, err := bizmodel.NewTombstoneCleanupPolicy(evaluationTime, 7, "")
+	unfilteredPolicy, err := NewTombstoneCleanupPolicy(evaluationTime, 7, "")
 	require.NoError(t, err)
 	unfilteredReport, err := usecase.Preview(context.Background(), unfilteredPolicy, options)
 	require.NoError(t, err)
@@ -210,7 +209,7 @@ func TestTombstoneCleanupPostgres(t *testing.T) {
 	t.Run("preview protects structural anomalies and delete removes only safe touched roots", func(t *testing.T) {
 		isolateTombstoneCleanupPostgresSubtest(t, db)
 		evaluationTime := time.Date(2026, 10, 25, 12, 0, 0, 0, time.UTC)
-		policy, err := bizmodel.NewTombstoneCleanupPolicy(evaluationTime, 7, "")
+		policy, err := NewTombstoneCleanupPolicy(evaluationTime, 7, "")
 		require.NoError(t, err)
 		cutoff := policy.Cutoff()
 
@@ -279,9 +278,9 @@ func TestTombstoneCleanupPostgres(t *testing.T) {
 		})
 		require.NoError(t, db.Exec("UPDATE reporter_resources SET updated_at = NULL WHERE id = ?", unknownTimestampReporterID).Error)
 
-		options, err := cleanupuc.NewOptions(1, 0, 1, time.Minute)
+		options, err := newTombstoneCleanupOptions(1, 0, 1, time.Minute)
 		require.NoError(t, err)
-		usecase := tombstoneCleanupUsecase(t, db)
+		usecase := newTestTombstoneCleanupUsecase(t, db)
 		report, err := usecase.Preview(context.Background(), policy, options)
 		require.NoError(t, err)
 		assert.Equal(t, int64(8), report.AgeCandidates())
@@ -301,8 +300,8 @@ func TestTombstoneCleanupPostgres(t *testing.T) {
 		assert.Equal(t, int64(1), report.Exclusions().InconsistentTerminalRepresentation())
 		assert.Equal(t, int64(1), report.Exclusions().NewerHistory())
 
-		readOnlyTransaction := data.NewTombstoneCleanupTransaction(db, data.NewGormTransactionManager(metricscollector.NewFakeMetricsCollector(), 3))
-		readOnlyErr := readOnlyTransaction.WithinSerializableTombstoneCleanup(context.Background(), "tombstone_cleanup_read_only_enforcement_test", true, 30*time.Second, 5*time.Second, func(repository bizmodel.TombstoneCleanupRepository) error {
+		readOnlyTransaction := newTombstoneCleanupTransaction(db, data.NewGormTransactionManager(metricscollector.NewFakeMetricsCollector(), 3))
+		readOnlyErr := readOnlyTransaction.WithinSerializableTombstoneCleanup(context.Background(), "tombstone_cleanup_read_only_enforcement_test", true, 30*time.Second, 5*time.Second, func(repository TombstoneCleanupRepository) error {
 			_, err := repository.DeleteTombstoneBatch(context.Background(), policy, 1)
 			return err
 		})
@@ -312,7 +311,7 @@ func TestTombstoneCleanupPostgres(t *testing.T) {
 		assertTombstoneCleanupRootCount(t, db, eligibleRootID, 1)
 		assertTombstoneCleanupCommonCount(t, db, eligibleRootID, 2)
 
-		executeOptions, err := cleanupuc.NewOptions(2, 0, 1, time.Minute)
+		executeOptions, err := newTombstoneCleanupOptions(2, 0, 1, time.Minute)
 		require.NoError(t, err)
 		result, err := usecase.Execute(context.Background(), policy, executeOptions, nil)
 		require.NoError(t, err)
@@ -416,7 +415,7 @@ func TestTombstoneCleanupPostgres(t *testing.T) {
 		isolateTombstoneCleanupPostgresSubtest(t, db)
 		evaluationTime := time.Date(2026, 10, 26, 12, 0, 0, 0, time.UTC)
 		const reporterType = "batchtest"
-		policy, err := bizmodel.NewTombstoneCleanupPolicy(evaluationTime, 7, reporterType)
+		policy, err := NewTombstoneCleanupPolicy(evaluationTime, 7, reporterType)
 		require.NoError(t, err)
 		rootID := uuid.New()
 		tombstoneCleanupSeedRoot(t, db, rootID, "host", 0, 1)
@@ -427,12 +426,12 @@ func TestTombstoneCleanupPostgres(t *testing.T) {
 			})
 			reporterIDs = append(reporterIDs, reporterID)
 		}
-		usecase := tombstoneCleanupUsecase(t, db)
+		usecase := newTestTombstoneCleanupUsecase(t, db)
 
-		cancelOptions, err := cleanupuc.NewOptions(1, time.Hour, 3, 2*time.Minute)
+		cancelOptions, err := newTombstoneCleanupOptions(1, time.Hour, 3, 2*time.Minute)
 		require.NoError(t, err)
 		cancelContext, cancel := context.WithCancel(context.Background())
-		firstRun, firstRunErr := usecase.Execute(cancelContext, policy, cancelOptions, func(batchNumber int, _ bizmodel.TombstoneCleanupImpact) {
+		firstRun, firstRunErr := usecase.Execute(cancelContext, policy, cancelOptions, func(batchNumber int, _ TombstoneCleanupImpact) {
 			if batchNumber == 1 {
 				cancel()
 			}
@@ -455,7 +454,7 @@ func TestTombstoneCleanupPostgres(t *testing.T) {
 			}
 		}
 
-		rerunOptions, err := cleanupuc.NewOptions(1, 0, 2, time.Minute)
+		rerunOptions, err := newTombstoneCleanupOptions(1, 0, 2, time.Minute)
 		require.NoError(t, err)
 		freshReport, err := usecase.Preview(context.Background(), policy, rerunOptions)
 		require.NoError(t, err)
@@ -481,7 +480,7 @@ func TestTombstoneCleanupPostgres(t *testing.T) {
 		isolateTombstoneCleanupPostgresSubtest(t, db)
 		evaluationTime := time.Date(2026, 10, 27, 12, 0, 0, 0, time.UTC)
 		const reporterType = "revivalcase"
-		policy, err := bizmodel.NewTombstoneCleanupPolicy(evaluationTime, 7, reporterType)
+		policy, err := NewTombstoneCleanupPolicy(evaluationTime, 7, reporterType)
 		require.NoError(t, err)
 		rootID := uuid.New()
 		tombstoneCleanupSeedRoot(t, db, rootID, "host", 1)
@@ -498,15 +497,15 @@ func TestTombstoneCleanupPostgres(t *testing.T) {
 		release := func() { releaseOnce.Do(func() { close(gateLogger.release) }) }
 		defer release()
 		gatedDB := db.Session(&gorm.Session{Logger: gateLogger})
-		transactions := data.NewTombstoneCleanupTransaction(gatedDB, data.NewGormTransactionManager(metricscollector.NewFakeMetricsCollector(), 5))
+		transactions := newTombstoneCleanupTransaction(gatedDB, data.NewGormTransactionManager(metricscollector.NewFakeMetricsCollector(), 5))
 		completed := make(chan struct {
-			impact bizmodel.TombstoneCleanupImpact
+			impact TombstoneCleanupImpact
 			err    error
 		}, 1)
 		go func() {
-			var finalImpact bizmodel.TombstoneCleanupImpact
-			err := transactions.WithinSerializableTombstoneCleanup(context.Background(), "tombstone_cleanup_concurrent_revival", false, 30*time.Second, 5*time.Second, func(repository bizmodel.TombstoneCleanupRepository) error {
-				finalImpact = bizmodel.TombstoneCleanupImpact{}
+			var finalImpact TombstoneCleanupImpact
+			err := transactions.WithinSerializableTombstoneCleanup(context.Background(), "tombstone_cleanup_concurrent_revival", false, 30*time.Second, 5*time.Second, func(repository TombstoneCleanupRepository) error {
+				finalImpact = TombstoneCleanupImpact{}
 				impact, err := repository.DeleteTombstoneBatch(context.Background(), policy, 1)
 				if err != nil {
 					return err
@@ -515,7 +514,7 @@ func TestTombstoneCleanupPostgres(t *testing.T) {
 				return nil
 			})
 			completed <- struct {
-				impact bizmodel.TombstoneCleanupImpact
+				impact TombstoneCleanupImpact
 				err    error
 			}{impact: finalImpact, err: err}
 		}()
@@ -568,7 +567,7 @@ func TestTombstoneCleanupPostgres(t *testing.T) {
 		evaluationTime := time.Date(2026, 10, 29, 12, 0, 0, 0, time.UTC)
 		const reporterType = "expirycase"
 		const expiredTransactionID = "delete-id-expired-last-copy"
-		policy, err := bizmodel.NewTombstoneCleanupPolicy(evaluationTime, 7, reporterType)
+		policy, err := NewTombstoneCleanupPolicy(evaluationTime, 7, reporterType)
 		require.NoError(t, err)
 		oldRootID := uuid.New()
 		tombstoneCleanupSeedRoot(t, db, oldRootID, "host", 1)
@@ -581,9 +580,9 @@ func TestTombstoneCleanupPostgres(t *testing.T) {
 		require.NoError(t, err)
 		assert.True(t, processed, "the tombstone history is initially the last transaction-ID copy")
 
-		options, err := cleanupuc.NewOptions(1, 0, 1, time.Minute)
+		options, err := newTombstoneCleanupOptions(1, 0, 1, time.Minute)
 		require.NoError(t, err)
-		cleanupResult, err := tombstoneCleanupUsecase(t, db).Execute(context.Background(), policy, options, nil)
+		cleanupResult, err := newTestTombstoneCleanupUsecase(t, db).Execute(context.Background(), policy, options, nil)
 		require.NoError(t, err)
 		assert.Equal(t, int64(1), cleanupResult.Impact().ReporterResources())
 		assert.Equal(t, int64(1), cleanupResult.Impact().ReporterRepresentations())
@@ -645,17 +644,17 @@ func TestTombstoneCleanupPostgres(t *testing.T) {
 		require.NoError(t, db.Exec("CREATE CONSTRAINT TRIGGER "+triggerName+" AFTER DELETE ON reporter_resources DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION "+functionName+"()").Error)
 
 		evaluationTime := time.Date(2026, 10, 30, 12, 0, 0, 0, time.UTC)
-		policy, err := bizmodel.NewTombstoneCleanupPolicy(evaluationTime, 7, reporterType)
+		policy, err := NewTombstoneCleanupPolicy(evaluationTime, 7, reporterType)
 		require.NoError(t, err)
 		rootID := uuid.New()
 		tombstoneCleanupSeedRoot(t, db, rootID, "host", 1)
 		reporterID := tombstoneCleanupInsertReporter(t, db, rootID, "commit-retry-row", "host", reporterType, "cleanup-instance", true, 1, 0, policy.Cutoff().Add(-time.Hour), []tombstoneCleanupHistory{
 			{version: 1, tombstone: true, transactionID: "delete-id-commit-retry"},
 		})
-		options, err := cleanupuc.NewOptions(1, 0, 1, time.Minute)
+		options, err := newTombstoneCleanupOptions(1, 0, 1, time.Minute)
 		require.NoError(t, err)
 		var committedNotifications int
-		result, err := tombstoneCleanupUsecase(t, db).Execute(context.Background(), policy, options, func(int, bizmodel.TombstoneCleanupImpact) {
+		result, err := newTestTombstoneCleanupUsecase(t, db).Execute(context.Background(), policy, options, func(int, TombstoneCleanupImpact) {
 			committedNotifications++
 		})
 		require.NoError(t, err)
@@ -676,7 +675,7 @@ func TestTombstoneCleanupPostgres(t *testing.T) {
 		isolateTombstoneCleanupPostgresSubtest(t, db)
 		evaluationTime := time.Date(2026, 10, 28, 12, 0, 0, 0, time.UTC)
 		const reporterType = "rollbackcase"
-		policy, err := bizmodel.NewTombstoneCleanupPolicy(evaluationTime, 7, reporterType)
+		policy, err := NewTombstoneCleanupPolicy(evaluationTime, 7, reporterType)
 		require.NoError(t, err)
 		rootID := uuid.New()
 		tombstoneCleanupSeedRoot(t, db, rootID, "host", 1)
@@ -684,8 +683,8 @@ func TestTombstoneCleanupPostgres(t *testing.T) {
 			{version: 1, tombstone: true, transactionID: "delete-id-rollback"},
 		})
 		rollbackErr := errors.New("force rollback after cleanup work")
-		transactions := data.NewTombstoneCleanupTransaction(db, data.NewGormTransactionManager(metricscollector.NewFakeMetricsCollector(), 3))
-		err = transactions.WithinSerializableTombstoneCleanup(context.Background(), "tombstone_cleanup_rollback_test", false, 30*time.Second, 5*time.Second, func(repository bizmodel.TombstoneCleanupRepository) error {
+		transactions := newTombstoneCleanupTransaction(db, data.NewGormTransactionManager(metricscollector.NewFakeMetricsCollector(), 3))
+		err = transactions.WithinSerializableTombstoneCleanup(context.Background(), "tombstone_cleanup_rollback_test", false, 30*time.Second, 5*time.Second, func(repository TombstoneCleanupRepository) error {
 			_, err := repository.DeleteTombstoneBatch(context.Background(), policy, 1)
 			if err != nil {
 				return err
@@ -817,10 +816,10 @@ func setupTombstoneCleanupPostgres(t *testing.T) (*gorm.DB, testcontainers.Conta
 	return db, postgresContainer
 }
 
-func tombstoneCleanupUsecase(t *testing.T, db *gorm.DB) *cleanupuc.Usecase {
+func newTestTombstoneCleanupUsecase(t *testing.T, db *gorm.DB) *tombstoneCleanupUsecase {
 	t.Helper()
 	transactionManager := data.NewGormTransactionManager(metricscollector.NewFakeMetricsCollector(), 5)
-	usecase, err := cleanupuc.New(data.NewTombstoneCleanupTransaction(db, transactionManager))
+	usecase, err := newTombstoneCleanup(newTombstoneCleanupTransaction(db, transactionManager))
 	require.NoError(t, err)
 	return usecase
 }
@@ -1053,7 +1052,7 @@ func assertTombstoneCleanupHistoryTransactionCount(t *testing.T, db *gorm.DB, tr
 func runTombstoneCleanupIdentitySQL(
 	t *testing.T,
 	postgresContainer testcontainers.Container,
-	report bizmodel.TombstoneCleanupReport,
+	report TombstoneCleanupReport,
 	reporterTypeFilter string,
 ) []map[string]string {
 	t.Helper()
@@ -1109,7 +1108,7 @@ func findTombstoneCleanupIdentityRow(t *testing.T, rows []map[string]string, rec
 	return nil
 }
 
-func assertTombstoneCleanupIdentitySummaryMatchesReport(t *testing.T, summary map[string]string, report bizmodel.TombstoneCleanupReport) {
+func assertTombstoneCleanupIdentitySummaryMatchesReport(t *testing.T, summary map[string]string, report TombstoneCleanupReport) {
 	t.Helper()
 	total := report.TotalEligible()
 	bounded := report.BoundedImpact()

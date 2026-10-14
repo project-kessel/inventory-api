@@ -1,4 +1,4 @@
-package data
+package jobs
 
 import (
 	"context"
@@ -45,25 +45,25 @@ type tombstoneCleanupImpactCounts struct {
 // PreviewTombstones reports total eligible and bounded impact without modifying stored rows.
 func (repository *gormTombstoneCleanupRepository) PreviewTombstones(
 	ctx context.Context,
-	policy bizmodel.TombstoneCleanupPolicy,
+	policy TombstoneCleanupPolicy,
 	boundedReporterRowLimit int64,
-) (bizmodel.TombstoneCleanupReport, error) {
+) (TombstoneCleanupReport, error) {
 	if repository == nil || repository.db == nil {
-		return bizmodel.TombstoneCleanupReport{}, fmt.Errorf("tombstone cleanup repository is not configured")
+		return TombstoneCleanupReport{}, fmt.Errorf("tombstone cleanup repository is not configured")
 	}
 	if err := policy.Validate(); err != nil {
-		return bizmodel.TombstoneCleanupReport{}, err
+		return TombstoneCleanupReport{}, err
 	}
 	if boundedReporterRowLimit <= 0 {
-		return bizmodel.TombstoneCleanupReport{}, fmt.Errorf("bounded reporter row limit must be positive")
+		return TombstoneCleanupReport{}, fmt.Errorf("bounded reporter row limit must be positive")
 	}
 	if err := ctx.Err(); err != nil {
-		return bizmodel.TombstoneCleanupReport{}, err
+		return TombstoneCleanupReport{}, err
 	}
 
 	var snapshotAt time.Time
 	if err := repository.db.WithContext(ctx).Raw("SELECT transaction_timestamp()").Scan(&snapshotAt).Error; err != nil {
-		return bizmodel.TombstoneCleanupReport{}, fmt.Errorf("read tombstone cleanup snapshot time: %w", err)
+		return TombstoneCleanupReport{}, fmt.Errorf("read tombstone cleanup snapshot time: %w", err)
 	}
 
 	classifiedCTE, arguments := tombstoneCleanupClassifiedCTE(policy)
@@ -78,7 +78,7 @@ func (repository *gormTombstoneCleanupRepository) PreviewTombstones(
 	       COUNT(*) FILTER (WHERE exclusion_reason = 'newer_history') AS newer_history
 	FROM classified_candidates`
 	if err := repository.db.WithContext(ctx).Raw(exclusionQuery, arguments...).Scan(&exclusions).Error; err != nil {
-		return bizmodel.TombstoneCleanupReport{}, fmt.Errorf("count tombstone candidates and protections: %w", err)
+		return TombstoneCleanupReport{}, fmt.Errorf("count tombstone candidates and protections: %w", err)
 	}
 	unknownTimestampQuery := `SELECT COUNT(*) FROM reporter_resources AS rr
 		WHERE rr.tombstone IS TRUE AND rr.updated_at IS NULL`
@@ -89,18 +89,18 @@ func (repository *gormTombstoneCleanupRepository) PreviewTombstones(
 	}
 	var unknownTimestampRows int64
 	if err := repository.db.WithContext(ctx).Raw(unknownTimestampQuery, unknownTimestampArguments...).Scan(&unknownTimestampRows).Error; err != nil {
-		return bizmodel.TombstoneCleanupReport{}, fmt.Errorf("count tombstones with unknown timestamps: %w", err)
+		return TombstoneCleanupReport{}, fmt.Errorf("count tombstones with unknown timestamps: %w", err)
 	}
 
 	totalImpact, err := repository.readImpact(ctx, classifiedCTE, arguments, 0)
 	if err != nil {
-		return bizmodel.TombstoneCleanupReport{}, fmt.Errorf("count total tombstone cleanup impact: %w", err)
+		return TombstoneCleanupReport{}, fmt.Errorf("count total tombstone cleanup impact: %w", err)
 	}
 	boundedImpact, err := repository.readImpact(ctx, classifiedCTE, arguments, boundedReporterRowLimit)
 	if err != nil {
-		return bizmodel.TombstoneCleanupReport{}, fmt.Errorf("count bounded tombstone cleanup impact: %w", err)
+		return TombstoneCleanupReport{}, fmt.Errorf("count bounded tombstone cleanup impact: %w", err)
 	}
-	protected, err := bizmodel.NewTombstoneCleanupExclusions(
+	protected, err := NewTombstoneCleanupExclusions(
 		exclusions.MissingRoot,
 		exclusions.RootTypeMismatch,
 		exclusions.InvalidReporterKey,
@@ -109,9 +109,9 @@ func (repository *gormTombstoneCleanupRepository) PreviewTombstones(
 		exclusions.NewerHistory,
 	)
 	if err != nil {
-		return bizmodel.TombstoneCleanupReport{}, fmt.Errorf("validate tombstone cleanup exclusions: %w", err)
+		return TombstoneCleanupReport{}, fmt.Errorf("validate tombstone cleanup exclusions: %w", err)
 	}
-	total, err := bizmodel.NewTombstoneCleanupImpact(
+	total, err := NewTombstoneCleanupImpact(
 		totalImpact.ReporterEntities,
 		totalImpact.ReporterResources,
 		totalImpact.ReporterRepresentations,
@@ -120,9 +120,9 @@ func (repository *gormTombstoneCleanupRepository) PreviewTombstones(
 		totalImpact.ResourcesRemovable,
 	)
 	if err != nil {
-		return bizmodel.TombstoneCleanupReport{}, fmt.Errorf("validate total tombstone cleanup impact: %w", err)
+		return TombstoneCleanupReport{}, fmt.Errorf("validate total tombstone cleanup impact: %w", err)
 	}
-	bounded, err := bizmodel.NewTombstoneCleanupImpact(
+	bounded, err := NewTombstoneCleanupImpact(
 		boundedImpact.ReporterEntities,
 		boundedImpact.ReporterResources,
 		boundedImpact.ReporterRepresentations,
@@ -131,14 +131,14 @@ func (repository *gormTombstoneCleanupRepository) PreviewTombstones(
 		boundedImpact.ResourcesRemovable,
 	)
 	if err != nil {
-		return bizmodel.TombstoneCleanupReport{}, fmt.Errorf("validate bounded tombstone cleanup impact: %w", err)
+		return TombstoneCleanupReport{}, fmt.Errorf("validate bounded tombstone cleanup impact: %w", err)
 	}
-	report, err := bizmodel.NewTombstoneCleanupReport(
+	report, err := NewTombstoneCleanupReport(
 		policy.EvaluationTime(), snapshotAt, policy.Cutoff(), boundedReporterRowLimit,
 		exclusions.AgeCandidates, unknownTimestampRows, total, bounded, protected,
 	)
 	if err != nil {
-		return bizmodel.TombstoneCleanupReport{}, fmt.Errorf("build tombstone cleanup report: %w", err)
+		return TombstoneCleanupReport{}, fmt.Errorf("build tombstone cleanup report: %w", err)
 	}
 	return report, nil
 }
@@ -195,20 +195,20 @@ func (repository *gormTombstoneCleanupRepository) readImpact(
 // DeleteTombstoneBatch reselects and deletes one batch, then removes common history and only touched empty roots.
 func (repository *gormTombstoneCleanupRepository) DeleteTombstoneBatch(
 	ctx context.Context,
-	policy bizmodel.TombstoneCleanupPolicy,
+	policy TombstoneCleanupPolicy,
 	batchSize int,
-) (bizmodel.TombstoneCleanupImpact, error) {
+) (TombstoneCleanupImpact, error) {
 	if repository == nil || repository.db == nil {
-		return bizmodel.TombstoneCleanupImpact{}, fmt.Errorf("tombstone cleanup repository is not configured")
+		return TombstoneCleanupImpact{}, fmt.Errorf("tombstone cleanup repository is not configured")
 	}
 	if err := policy.Validate(); err != nil {
-		return bizmodel.TombstoneCleanupImpact{}, err
+		return TombstoneCleanupImpact{}, err
 	}
 	if batchSize <= 0 {
-		return bizmodel.TombstoneCleanupImpact{}, fmt.Errorf("tombstone cleanup batch size must be positive")
+		return TombstoneCleanupImpact{}, fmt.Errorf("tombstone cleanup batch size must be positive")
 	}
 	if err := ctx.Err(); err != nil {
-		return bizmodel.TombstoneCleanupImpact{}, err
+		return TombstoneCleanupImpact{}, err
 	}
 
 	classifiedCTE, arguments := tombstoneCleanupClassifiedCTE(policy)
@@ -221,10 +221,10 @@ func (repository *gormTombstoneCleanupRepository) DeleteTombstoneBatch(
 	arguments = append(arguments, batchSize)
 	var candidates []tombstoneCleanupCandidate
 	if err := repository.db.WithContext(ctx).Raw(candidateQuery, arguments...).Scan(&candidates).Error; err != nil {
-		return bizmodel.TombstoneCleanupImpact{}, fmt.Errorf("select structurally valid tombstone batch: %w", err)
+		return TombstoneCleanupImpact{}, fmt.Errorf("select structurally valid tombstone batch: %w", err)
 	}
 	if len(candidates) == 0 {
-		return bizmodel.NewTombstoneCleanupImpact(0, 0, 0, 0, 0, 0)
+		return NewTombstoneCleanupImpact(0, 0, 0, 0, 0, 0)
 	}
 
 	reporterResourceIDs := make([]uuid.UUID, 0, len(candidates))
@@ -236,7 +236,7 @@ func (repository *gormTombstoneCleanupRepository) DeleteTombstoneBatch(
 		if _, seen := seenResourceIDs[candidate.ResourceID]; !seen {
 			resourceRootID, err := bizmodel.NewResourceId(candidate.ResourceID)
 			if err != nil {
-				return bizmodel.TombstoneCleanupImpact{}, fmt.Errorf("selected tombstone has invalid resource root identity: %w", err)
+				return TombstoneCleanupImpact{}, fmt.Errorf("selected tombstone has invalid resource root identity: %w", err)
 			}
 			seenResourceIDs[candidate.ResourceID] = struct{}{}
 			resourceIDs = append(resourceIDs, candidate.ResourceID)
@@ -247,7 +247,7 @@ func (repository *gormTombstoneCleanupRepository) DeleteTombstoneBatch(
 	var reporterRepresentationRows int64
 	if err := repository.db.WithContext(ctx).Table("reporter_representations").
 		Where("reporter_resource_id IN ?", reporterResourceIDs).Count(&reporterRepresentationRows).Error; err != nil {
-		return bizmodel.TombstoneCleanupImpact{}, fmt.Errorf("count reporter history scheduled for cascade deletion: %w", err)
+		return TombstoneCleanupImpact{}, fmt.Errorf("count reporter history scheduled for cascade deletion: %w", err)
 	}
 	deleteReporters := repository.db.WithContext(ctx).Where("id IN ?", reporterResourceIDs).
 		Where("tombstone IS TRUE AND updated_at < ?", policy.Cutoff()).
@@ -282,10 +282,10 @@ func (repository *gormTombstoneCleanupRepository) DeleteTombstoneBatch(
 	}
 	deletedReporters := deleteReporters.Delete(&datamodel.ReporterResource{})
 	if deletedReporters.Error != nil {
-		return bizmodel.TombstoneCleanupImpact{}, fmt.Errorf("delete selected tombstone reporter resources: %w", deletedReporters.Error)
+		return TombstoneCleanupImpact{}, fmt.Errorf("delete selected tombstone reporter resources: %w", deletedReporters.Error)
 	}
 	if deletedReporters.RowsAffected != int64(len(candidates)) {
-		return bizmodel.TombstoneCleanupImpact{}, fmt.Errorf("selected tombstone batch changed before deletion: selected %d rows, deleted %d", len(candidates), deletedReporters.RowsAffected)
+		return TombstoneCleanupImpact{}, fmt.Errorf("selected tombstone batch changed before deletion: selected %d rows, deleted %d", len(candidates), deletedReporters.RowsAffected)
 	}
 
 	var removableRoots []uuid.UUID
@@ -293,22 +293,22 @@ func (repository *gormTombstoneCleanupRepository) DeleteTombstoneBatch(
 		Where("root.id IN ?", resourceIDs).
 		Where("NOT EXISTS (SELECT 1 FROM reporter_resources AS remaining WHERE remaining.resource_id = root.id)").
 		Order("root.id ASC").Scan(&removableRoots).Error; err != nil {
-		return bizmodel.TombstoneCleanupImpact{}, fmt.Errorf("identify touched roots with no surviving reporters: %w", err)
+		return TombstoneCleanupImpact{}, fmt.Errorf("identify touched roots with no surviving reporters: %w", err)
 	}
 
 	var commonRows int64
 	if len(removableRoots) > 0 {
 		if err := repository.db.WithContext(ctx).Table("common_representations").
 			Where("resource_id IN ?", removableRoots).Count(&commonRows).Error; err != nil {
-			return bizmodel.TombstoneCleanupImpact{}, fmt.Errorf("count common history on removable roots: %w", err)
+			return TombstoneCleanupImpact{}, fmt.Errorf("count common history on removable roots: %w", err)
 		}
 		deletedCommon := repository.db.WithContext(ctx).Where("resource_id IN ?", removableRoots).
 			Delete(&datamodel.CommonRepresentation{})
 		if deletedCommon.Error != nil {
-			return bizmodel.TombstoneCleanupImpact{}, fmt.Errorf("delete common history on removable roots: %w", deletedCommon.Error)
+			return TombstoneCleanupImpact{}, fmt.Errorf("delete common history on removable roots: %w", deletedCommon.Error)
 		}
 		if deletedCommon.RowsAffected != commonRows {
-			return bizmodel.TombstoneCleanupImpact{}, fmt.Errorf("common history changed within cleanup transaction: counted %d rows, deleted %d", commonRows, deletedCommon.RowsAffected)
+			return TombstoneCleanupImpact{}, fmt.Errorf("common history changed within cleanup transaction: counted %d rows, deleted %d", commonRows, deletedCommon.RowsAffected)
 		}
 	}
 
@@ -322,15 +322,15 @@ func (repository *gormTombstoneCleanupRepository) DeleteTombstoneBatch(
 				WHERE remaining.resource_id = root.id
 			  )`, removableRoots)
 		if result.Error != nil {
-			return bizmodel.TombstoneCleanupImpact{}, fmt.Errorf("delete touched orphan roots: %w", result.Error)
+			return TombstoneCleanupImpact{}, fmt.Errorf("delete touched orphan roots: %w", result.Error)
 		}
 		deletedRoots = result.RowsAffected
 		if deletedRoots != int64(len(removableRoots)) {
-			return bizmodel.TombstoneCleanupImpact{}, fmt.Errorf("touched roots changed within cleanup transaction: selected %d rows, deleted %d", len(removableRoots), deletedRoots)
+			return TombstoneCleanupImpact{}, fmt.Errorf("touched roots changed within cleanup transaction: selected %d rows, deleted %d", len(removableRoots), deletedRoots)
 		}
 	}
 
-	impact, err := bizmodel.NewTombstoneCleanupImpactWithRootIDs(
+	impact, err := NewTombstoneCleanupImpactWithRootIDs(
 		deletedReporters.RowsAffected,
 		deletedReporters.RowsAffected,
 		reporterRepresentationRows,
@@ -339,13 +339,13 @@ func (repository *gormTombstoneCleanupRepository) DeleteTombstoneBatch(
 		deletedRoots,
 	)
 	if err != nil {
-		return bizmodel.TombstoneCleanupImpact{}, fmt.Errorf("validate committed tombstone cleanup impact: %w", err)
+		return TombstoneCleanupImpact{}, fmt.Errorf("validate committed tombstone cleanup impact: %w", err)
 	}
 	return impact, nil
 }
 
 // tombstoneCleanupClassifiedCTE applies the age/filter selector and assigns at most one structural exclusion reason.
-func tombstoneCleanupClassifiedCTE(policy bizmodel.TombstoneCleanupPolicy) (string, []any) {
+func tombstoneCleanupClassifiedCTE(policy TombstoneCleanupPolicy) (string, []any) {
 	predicate := "rr.tombstone IS TRUE AND rr.updated_at < ?"
 	arguments := []any{policy.Cutoff()}
 	if reporterType, hasFilter := policy.ReporterType(); hasFilter {
@@ -388,4 +388,75 @@ func tombstoneCleanupClassifiedCTE(policy bizmodel.TombstoneCleanupPolicy) (stri
 		 AND terminal.generation = candidate.generation
 	)`
 	return query, arguments
+}
+
+type gormTombstoneCleanupTransaction struct {
+	db                 *gorm.DB
+	transactionManager bizmodel.TransactionManager
+}
+
+// newTombstoneCleanupTransaction adapts the shared transaction manager to cleanup repository work.
+func newTombstoneCleanupTransaction(db *gorm.DB, transactionManager bizmodel.TransactionManager) TombstoneCleanupTransaction {
+	return &gormTombstoneCleanupTransaction{db: db, transactionManager: transactionManager}
+}
+
+// WithinSerializableTombstoneCleanup runs bounded repository work with transaction-local timeouts.
+func (transaction *gormTombstoneCleanupTransaction) WithinSerializableTombstoneCleanup(
+	ctx context.Context,
+	operationName string,
+	readOnly bool,
+	statementTimeout time.Duration,
+	lockTimeout time.Duration,
+	work func(TombstoneCleanupRepository) error,
+) error {
+	if transaction == nil || transaction.db == nil || transaction.transactionManager == nil {
+		return fmt.Errorf("tombstone cleanup transaction adapter is not configured")
+	}
+	if transaction.db.Name() != "postgres" {
+		return fmt.Errorf("tombstone cleanup requires PostgreSQL")
+	}
+	if statementTimeout <= 0 || lockTimeout <= 0 || lockTimeout > statementTimeout {
+		return fmt.Errorf("tombstone cleanup transaction timeouts must be positive and lock timeout cannot exceed statement timeout")
+	}
+	if work == nil {
+		return fmt.Errorf("tombstone cleanup transaction work is required")
+	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+
+	return transaction.transactionManager.HandleSerializableTransaction(operationName, transaction.db.WithContext(ctx), func(tx *gorm.DB) error {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		if tx.Error != nil {
+			return tx.Error
+		}
+		if readOnly {
+			if err := tx.Exec("SET TRANSACTION READ ONLY").Error; err != nil {
+				return fmt.Errorf("set cleanup transaction read-only: %w", err)
+			}
+		}
+		if err := setLocalTombstoneCleanupTimeout(tx, "statement_timeout", statementTimeout); err != nil {
+			return fmt.Errorf("set tombstone cleanup statement timeout: %w", err)
+		}
+		if err := setLocalTombstoneCleanupTimeout(tx, "lock_timeout", lockTimeout); err != nil {
+			return fmt.Errorf("set tombstone cleanup lock timeout: %w", err)
+		}
+		return work(&gormTombstoneCleanupRepository{db: tx.WithContext(ctx)})
+	})
+}
+
+func setLocalTombstoneCleanupTimeout(tx *gorm.DB, setting string, timeout time.Duration) error {
+	if setting != "statement_timeout" && setting != "lock_timeout" {
+		return fmt.Errorf("unsupported PostgreSQL timeout setting %q", setting)
+	}
+	milliseconds := int64(timeout / time.Millisecond)
+	if timeout%time.Millisecond != 0 {
+		milliseconds++
+	}
+	if milliseconds < 1 {
+		milliseconds = 1
+	}
+	return tx.Exec(fmt.Sprintf("SET LOCAL %s = '%dms'", setting, milliseconds)).Error
 }

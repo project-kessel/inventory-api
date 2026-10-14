@@ -11,6 +11,10 @@ import "kessel/inventory/v1beta2/report_resource_request.proto";
 import "kessel/inventory/v1beta2/report_resource_response.proto";
 import "kessel/inventory/v1beta2/delete_resource_request.proto";
 import "kessel/inventory/v1beta2/delete_resource_response.proto";
+import "kessel/inventory/v1beta2/add_resource_relationships_request.proto";
+import "kessel/inventory/v1beta2/add_resource_relationships_response.proto";
+import "kessel/inventory/v1beta2/remove_resource_relationships_request.proto";
+import "kessel/inventory/v1beta2/remove_resource_relationships_response.proto";
 import "kessel/inventory/v1beta2/streamed_list_objects_request.proto";
 import "kessel/inventory/v1beta2/streamed_list_objects_response.proto";
 import "kessel/inventory/v1beta2/streamed_list_subjects_request.proto";
@@ -177,6 +181,60 @@ service KesselInventoryService {
   rpc DeleteResource(DeleteResourceRequest) returns (DeleteResourceResponse) {
     option (google.api.http) = {
       delete: "/api/kessel/v1beta2/resources"
+      body: "*"
+    };
+  }
+
+  // Adds one or more relationships to an existing *Resource*.
+  //
+  // If the *Resource* does not yet exist for this *Reporter*, it is created with
+  // the provided relationship fields as its initial representation. All other
+  // relationships already reported for that *Resource* are unaffected.
+  //
+  // Unlike `ReportResource`, which asserts the complete state of a *Resource*,
+  // this operation is a targeted mutation: it only touches the specific
+  // relationship fields and values named in the request. Attribute fields,
+  // other relationship fields, and metadata are left exactly as they were.
+  //
+  // Only relationship-typed fields from the *Resource's* schema are accepted;
+  // attribute fields are rejected.
+  //
+  // The relationships added through this API are used to determine relationship
+  // check outcomes via the Check and CheckForUpdate APIs.
+  //
+  // This API does **not** guarantee immediate read-your-writes consistency by default.
+  // If a reporter requires newly added relationships to be visible in subsequent
+  // checks (e.g., `Check`), the request must explicitly set `write_visibility = IMMEDIATE`.
+  rpc AddResourceRelationships(AddResourceRelationshipsRequest) returns (AddResourceRelationshipsResponse) {
+    option (google.api.http) = {
+      post: "/api/kessel/v1beta2/resources/relationships"
+      body: "*"
+    };
+  }
+
+  // Removes one or more specific relationships from an existing *Resource*.
+  //
+  // All other relationships for the *Resource* are unaffected. If the *Resource*
+  // does not exist, this operation returns `NOT_FOUND` — matching the behaviour
+  // of `DeleteResource`.
+  //
+  // Unlike `ReportResource`, which asserts the complete state of a *Resource*,
+  // this operation is a targeted mutation: it only removes the specific
+  // relationship values named in the request. Attribute fields and other
+  // relationship fields are left exactly as they were.
+  //
+  // Only relationship-typed fields from the *Resource's* schema are accepted;
+  // attribute fields are rejected.
+  //
+  // The relationships removed through this API are used to determine relationship
+  // check outcomes via the Check and CheckForUpdate APIs.
+  //
+  // This API does **not** guarantee immediate read-your-writes consistency by default.
+  // If a reporter requires removed relationships to no longer be visible in subsequent
+  // checks (e.g., `Check`), the request must explicitly set `write_visibility = IMMEDIATE`.
+  rpc RemoveResourceRelationships(RemoveResourceRelationshipsRequest) returns (RemoveResourceRelationshipsResponse) {
+    option (google.api.http) = {
+      delete: "/api/kessel/v1beta2/resources/relationships"
       body: "*"
     };
   }

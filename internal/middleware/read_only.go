@@ -19,9 +19,12 @@ var (
 	//
 	// a map is used to improve lookup speed by avoiding loops or uses slices pkg
 	writeEndpoints = map[string]bool{
-		"/kessel.inventory.v1beta2.KesselInventoryService/ReportResource": true,
-		"/kessel.inventory.v1beta2.KesselInventoryService/DeleteResource": true,
-		"/api/kessel/v1beta2/resources":                                   true,
+		"/kessel.inventory.v1beta2.KesselInventoryService/ReportResource":             true,
+		"/kessel.inventory.v1beta2.KesselInventoryService/DeleteResource":             true,
+		"/kessel.inventory.v1beta2.KesselInventoryService/AddResourceRelationships":   true,
+		"/kessel.inventory.v1beta2.KesselInventoryService/RemoveResourceRelationships": true,
+		"/api/kessel/v1beta2/resources":                                               true,
+		"/api/kessel/v1beta2/resources/relationships":                                  true,
 	}
 )
 

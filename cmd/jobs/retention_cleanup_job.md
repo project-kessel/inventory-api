@@ -165,7 +165,8 @@ UPDATE job_runtime_controls SET desired_state = 'stop', updated_by = 'you',
 ```
 
 Job names: `reporter_representations_cleanup`, `common_representations_cleanup`,
-`orphaned_common_representations_cleanup`, `tombstoned_resources_cleanup`.
+`orphaned_common_representations_cleanup`, `tombstoned_resources_cleanup`,
+`tombstone_cascade_cleanup`.
 The table (`job_runtime_controls`, migration `20261013120000`) is created by a
 normal deploy; if it is missing, jobs log one warning and run with controls
 disabled — deploy ordering is never a hard dependency. Any OTHER error reading
@@ -191,7 +192,8 @@ SIGKILL mid-collect — harmless, the rerun recollects.
 
 ## Deletion order
 
-All four jobs delete **oldest data first**, with deterministic full-key
+The four original jobs delete **oldest data first**, with deterministic
+full-key
 tiebreakers: `ORDER BY created_at, resource_id, version` for the two
 common-representations jobs, `created_at, reporter_resource_id, version,
 generation` for reporter-representations, and `updated_at, id` for the
@@ -199,6 +201,12 @@ tombstone job. A partial run — stopped by timeout, control stop, signal, or
 batch limit — therefore always leaves the NEWEST deletable rows in place, and
 the common-reps/orphan jobs' delete and worklist-drain statements use
 byte-identical ordered subselects so both provably target the same rows.
+
+The tombstone-cascade job defaults to the same oldest-first order; its
+`--deletion-order=largest-history-first` variant instead deletes resources
+with the biggest representation histories first (age as the tiebreak) — a
+partial run then leaves the smallest histories in place, newest first within
+each size.
 
 ## Incremental vacuum
 
@@ -258,6 +266,44 @@ Retention cleanup keeps the last N days of history for ALL resources. Two compan
 ### tombstoned-resources-cleanup-job
 
 Deletes tombstoned `reporter_resources` older than `--tombstone-days` (default 30) completely. The database cascade removes their `reporter_representations`, but **not** their `common_representations` — those rows become orphans handled by the next job.
+
+### tombstone-cascade-cleanup-job
+
+**Experimental** (v1.5): the combined form of the two jobs above — deletes an
+old-tombstoned `reporter_resources` row AND its `common_representations` in
+one run, so the whole resource's data disappears together. The tombstone
+worklist (with a per-resource history-size snapshot) is collected once into a
+temp table; each batch deletes the next `--batch-size` reporter_resources rows
+(the DB cascade removes their `reporter_representations`) and then deletes the
+batch's now-orphaned common reps — re-checked against live data, so a resource
+reported by multiple reporters only loses its common reps once its LAST
+reporter row is gone. A final orphan drain (same logic as the standalone
+orphan job) cleans any per-batch backlog on normal completion.
+
+```bash
+# Always dry-run first (reports both counts)
+./inventory-api run-job tombstone-cascade-cleanup-job \
+  --tombstone-days=30 --dry-run --config .inventory-api.yaml
+
+# Execute
+./inventory-api run-job tombstone-cascade-cleanup-job \
+  --tombstone-days=30 \
+  --deletion-order=oldest-first \
+  --batch-size=1000 --orphan-batch-size=10000 --batch-delay-ms=500 \
+  --config .inventory-api.yaml
+```
+
+`--deletion-order` picks the tombstone-loop ordering: `oldest-first`
+(`updated_at, id` — same as the standalone tombstone job) or
+`largest-history-first` (`history_size DESC, updated_at, id` — resources with
+the most representations die first; the history sizes are snapshotted when the
+worklist is collected). `--orphan-batch-size` sizes the interleaved
+common-reps batches; `--reporter-type` scopes only the tombstone worklist —
+orphan deletion always runs for all reporters. `--max-batches` bounds the
+tombstone loop only (the final drain runs to completion on a normal finish).
+On a partial stop the drain does NOT run — leftover orphans wait for the next
+run, matching the two-job semantics. Parent `resource` rows are left in place
+(same TODO as above).
 
 ### orphaned-common-representations-cleanup-job
 

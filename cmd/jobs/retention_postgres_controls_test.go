@@ -227,7 +227,7 @@ func TestPostgresRuntimeControls(t *testing.T) {
 }
 
 // controlsFixtureByName returns the fixture with the given name ("reporter_reps",
-// "common_reps", "orphan", "tombstoned") — safer than indexing the slice.
+// "common_reps", "orphan", "tombstoned", "cascade") — safer than indexing the slice.
 func controlsFixtureByName(name string) controlsFixture {
 	for _, f := range newControlsFixtures() {
 		if f.name == name {
@@ -413,9 +413,9 @@ func TestPostgresRuntimeControls_PausedThenTableUnreadable(t *testing.T) {
 }
 
 // newControlsFixtures returns one fixture per cleanup helper, in the order
-// reporter_reps, common_reps, orphan, tombstoned. Every fixture creates
-// exactly 6 deletable rows (plus keepers) and runs with batchSize 2 and a
-// short batch delay.
+// reporter_reps, common_reps, orphan, tombstoned, cascade. Every fixture
+// creates exactly 6 deletable rows (plus keepers) and runs with batchSize 2
+// and a short batch delay.
 func newControlsFixtures() []controlsFixture {
 	return []controlsFixture{
 		{
@@ -498,6 +498,35 @@ func newControlsFixtures() []controlsFixture {
 			},
 			run: func(db *gorm.DB, logger *log.Helper, opts *retentionRunOptions) (int64, string, error) {
 				return deleteOldTombstonedResources(db, logger, false, 30, "", 2, 30, 0, opts)
+			},
+			remaining: func(t *testing.T, db *gorm.DB, now time.Time) int64 {
+				return countPGRows(t, db, &model.ReporterResource{}, "tombstone = ? AND updated_at < ?", true, daysAgo(now, 30))
+			},
+		},
+		{
+			// The cascade helper's deleted count is its reporter_resources
+			// count; its common reps die in the interleaved orphan pass and
+			// the final drain (skipped after a partial stop, like the
+			// standalone orphan job).
+			name: "cascade",
+			job:  "controls_test_cascade",
+			setup: func(t *testing.T, db *gorm.DB, now time.Time) {
+				for i := 0; i < 6; i++ {
+					id := uuid.New()
+					resourceID := uuid.New()
+					createPGResource(t, db, resourceID)
+					createPGReporterResource(t, db, id, resourceID, "hbi", true, daysAgo(now, 60), daysAgo(now, 31+i))
+					createPGCommonRepresentation(t, db, resourceID, 0, "hbi", daysAgo(now, 40))
+				}
+				recentTombstone := uuid.New()
+				recentResource := uuid.New()
+				createPGResource(t, db, recentResource)
+				createPGReporterResource(t, db, recentTombstone, recentResource, "hbi", true, daysAgo(now, 60), daysAgo(now, 5))
+				createPGCommonRepresentation(t, db, recentResource, 0, "hbi", daysAgo(now, 4))
+			},
+			run: func(db *gorm.DB, logger *log.Helper, opts *retentionRunOptions) (int64, string, error) {
+				result, err := deleteOldTombstonedResourcesCascade(db, logger, false, 30, DeletionOrderOldestFirst, "", 2, 10, 30, 0, opts)
+				return result.ReporterResourcesDeleted, result.StopReason, err
 			},
 			remaining: func(t *testing.T, db *gorm.DB, now time.Time) int64 {
 				return countPGRows(t, db, &model.ReporterResource{}, "tombstone = ? AND updated_at < ?", true, daysAgo(now, 30))

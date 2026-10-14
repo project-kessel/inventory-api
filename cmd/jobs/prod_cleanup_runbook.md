@@ -50,6 +50,14 @@ Steps 2–5 each need a dry-run first. Steps 2/3/4/5 can be spread across separa
 off-peak windows — every job is resumable and order-independent except that 4 must run
 after 3 (it cleans up what 3 orphans).
 
+**Experimental alternative (v1.5)**: steps 3+4 can be replaced by a single
+`tombstone-cascade-cleanup-job` run, which deletes each old-tombstoned resource's
+reporter row and common reps together (batched, with an interleaved orphan pass and a
+final drain). It takes `--deletion-order` (`oldest-first`, the default, or
+`largest-history-first` — biggest histories die first) plus `--orphan-batch-size`.
+It is not yet in the measured evidence base (A/B testing in progress); prefer the
+split jobs until it is.
+
 ## 0. Preflight (read-only)
 
 ```sql
@@ -126,15 +134,17 @@ Every job: dry-run first, then execute with a graceful `--timeout`.
   --config .inventory-api.yaml
 ```
 
-Flags common to all four jobs: `--dry-run`, `--reporter-type`, `--batch-size`,
+Flags common to all five jobs: `--dry-run`, `--reporter-type`, `--batch-size`,
 `--batch-delay-ms`, `--timeout`, `--max-batches` (stop gracefully after N
 batches), `--vacuum-every-batches` (online incremental VACUUM, see below).
 Phases 2 and 5 additionally take `--retention-days` and `--tombstone-days`;
 phase 3 (tombstones) takes only `--tombstone-days`; phase 4 (orphans) takes
 neither.
 
-All four jobs delete **oldest data first** (deterministic full-key ordering),
-so any partial run leaves the newest deletable rows in place and is resumable.
+Four of the five jobs delete **oldest data first** (deterministic full-key
+ordering); the cascade job's `largest-history-first` variant is the one
+exception. Any partial run leaves the newest deletable rows in place (or, for
+that variant, the smallest histories) and is resumable.
 
 `--timeout` semantics: the job stops **between batches** once the deadline passes, drops
 its temp tables, exits 0, and logs `outcome: partial_timeout` with the deleted-so-far
@@ -165,7 +175,8 @@ UPDATE job_runtime_controls SET desired_state = 'stop', updated_by = 'you',
 ```
 
 Job names: `reporter_representations_cleanup`, `common_representations_cleanup`,
-`orphaned_common_representations_cleanup`, `tombstoned_resources_cleanup`. The table
+`orphaned_common_representations_cleanup`, `tombstoned_resources_cleanup`,
+`tombstone_cascade_cleanup`. The table
 ships as migration `20261013120000`; if absent (older schema), jobs warn once and run
 with controls disabled — deploy ordering is never a blocker. Any other read error
 stops the run gracefully, and a paused job with an unreadable control table stops

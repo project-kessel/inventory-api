@@ -27,6 +27,7 @@ func NewTestDataGeneratorJobCommand(storageOptions *storage.Options, loggerOptio
 	var oldDataDays int
 	var tombstonePercent int
 	var oldTombstonePercent int
+	var historySkew bool
 
 	cmd := &cobra.Command{
 		Use:   "test-data-generator-job",
@@ -39,9 +40,14 @@ Creates realistic test data for validating retention cleanup jobs:
 - Old tombstoned resources (>30 days)
 - Resources with current versions that are old (edge case testing)
 
+--history-skew varies the number of versions per resource with a deterministic
+skewed distribution (60% 1-3, 25% 4-7, 10% 8-15, 5% 16-50; mean ~5.3) instead
+of a near-uniform --versions-per-resource. Needed to A/B deletion orders that
+depend on history size; off by default so existing datasets are unchanged.
+
 WARNING: This generates large amounts of data. Use in test/ephemeral environments only.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return generateTestData(storageOptions, loggerOptions, resourcesCount, versionsPerResource, batchSize, oldDataDays, tombstonePercent, oldTombstonePercent)
+			return generateTestData(storageOptions, loggerOptions, resourcesCount, versionsPerResource, batchSize, oldDataDays, tombstonePercent, oldTombstonePercent, historySkew)
 		},
 	}
 
@@ -51,11 +57,40 @@ WARNING: This generates large amounts of data. Use in test/ephemeral environment
 	cmd.Flags().IntVar(&oldDataDays, "old-data-days", 60, "Maximum age of oldest data in days")
 	cmd.Flags().IntVar(&tombstonePercent, "tombstone-percent", 20, "Percentage of resources to tombstone (0-100)")
 	cmd.Flags().IntVar(&oldTombstonePercent, "old-tombstone-percent", 50, "Percentage of tombstoned resources that are >30 days old (0-100)")
+	cmd.Flags().BoolVar(&historySkew, "history-skew", false, "Skew versions per resource with a deterministic distribution (1-50, mean ~5.3) instead of --versions-per-resource")
 
 	return cmd
 }
 
-func generateTestData(storageOptions *storage.Options, loggerOptions common.LoggerOptions, resourcesCount int, versionsPerResource int, batchSize int, oldDataDays int, tombstonePercent int, oldTombstonePercent int) error {
+// historySkewVersions returns the number of representations for global
+// resource index i under --history-skew: a deterministic pure function of i
+// (no RNG — reruns generate identical data) bucketed on i % 1000:
+//
+//	60% of resources -> 1..3   versions (avg 2)
+//	25%              -> 4..7   versions (avg 5.5)
+//	10%              -> 8..15  versions (avg 11.5)
+//	 5%              -> 16..50 versions (avg 31.5)
+//
+// Mean 5.298 versions/resource (5298 per 1000-resource cycle — ~10.6M
+// representations at 2M resources), with a long tail of big histories — the
+// shape deletion-order experiments that prioritize by history size need. The
+// bucketing modulus is independent of the tombstone selection moduli, so the
+// tail spreads evenly across active / recent-tombstone / old-tombstone
+// populations.
+func historySkewVersions(i int) int {
+	switch bucket := i % 1000; {
+	case bucket < 600:
+		return 1 + (i % 3)
+	case bucket < 850:
+		return 4 + (i % 4)
+	case bucket < 950:
+		return 8 + (i % 8)
+	default:
+		return 16 + (i % 35)
+	}
+}
+
+func generateTestData(storageOptions *storage.Options, loggerOptions common.LoggerOptions, resourcesCount int, versionsPerResource int, batchSize int, oldDataDays int, tombstonePercent int, oldTombstonePercent int, historySkew bool) error {
 	_, logger := common.InitLogger(common.GetLogLevel(), loggerOptions)
 	logHelper := log.NewHelper(log.With(logger, "job", "test_data_generator"))
 
@@ -67,12 +102,21 @@ func generateTestData(storageOptions *storage.Options, loggerOptions common.Logg
 
 	logHelper.Infof("Starting test data generation")
 	logHelper.Infof("Resources: %d", resourcesCount)
-	logHelper.Infof("Versions per resource: ~%d", versionsPerResource)
+	if historySkew {
+		logHelper.Infof("Versions per resource: skewed deterministic distribution (1-50, mean ~5.3); --versions-per-resource=%d is ignored", versionsPerResource)
+	} else {
+		logHelper.Infof("Versions per resource: ~%d", versionsPerResource)
+	}
 	logHelper.Infof("Old data days: %d", oldDataDays)
 	logHelper.Infof("Tombstone percent: %d%%", tombstonePercent)
 	logHelper.Infof("Old tombstone percent: %d%%", oldTombstonePercent)
 
 	totalRecords := resourcesCount * versionsPerResource
+	if historySkew {
+		// --versions-per-resource is ignored under skew; estimate from the
+		// skew distribution's mean (~5.3 versions/resource).
+		totalRecords = int(float64(resourcesCount) * 5.3)
+	}
 	logHelper.Infof("Estimated total records: ~%d", totalRecords)
 
 	startTime := time.Now()
@@ -89,7 +133,7 @@ func generateTestData(storageOptions *storage.Options, loggerOptions common.Logg
 			end = resourcesCount
 		}
 
-		err := generateResourceBatch(db, logHelper, i, end, resourcesCount, versionsPerResource, oldDataDays, tombstonePercent, oldTombstonePercent,
+		err := generateResourceBatch(db, logHelper, i, end, resourcesCount, versionsPerResource, oldDataDays, tombstonePercent, oldTombstonePercent, historySkew,
 			&createdResources, &createdReporterResources, &createdReporterRepresentations, &createdCommonRepresentations)
 		if err != nil {
 			return fmt.Errorf("failed to generate batch %d-%d: %w", i, end, err)
@@ -119,7 +163,7 @@ func generateTestData(storageOptions *storage.Options, loggerOptions common.Logg
 }
 
 func generateResourceBatch(db *gorm.DB, logHelper *log.Helper, start int, end int, resourcesCount int, versionsPerResource int, oldDataDays int,
-	tombstonePercent int, oldTombstonePercent int,
+	tombstonePercent int, oldTombstonePercent int, historySkew bool,
 	createdResources *int, createdReporterResources *int, createdReporterRepresentations *int, createdCommonRepresentations *int) error {
 
 	now := time.Now()
@@ -156,9 +200,14 @@ func generateResourceBatch(db *gorm.DB, logHelper *log.Helper, start int, end in
 		}
 
 		// Create multiple versions (representations) with varied ages
-		numVersions := versionsPerResource + (i % 3) - 1 // Vary 4-6 versions
-		if numVersions < 1 {
-			numVersions = 1
+		var numVersions int
+		if historySkew {
+			numVersions = historySkewVersions(i)
+		} else {
+			numVersions = versionsPerResource + (i % 3) - 1 // Vary 4-6 versions
+			if numVersions < 1 {
+				numVersions = 1
+			}
 		}
 
 		// Create reporter_resource

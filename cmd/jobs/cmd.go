@@ -19,6 +19,7 @@ func NewRunJobCommand(storageOptions *storage.Options, loggerOptions common.Logg
 	cmds := []*cobra.Command{
 		NewResourceDeleteJobCommand(storageOptions, loggerOptions),
 		NewMetricsCollectJobCommand(storageOptions, loggerOptions),
+		NewCommonRepresentationsCleanupJobCommand(storageOptions, loggerOptions),
 	}
 
 	for _, c := range cmds {

@@ -117,6 +117,49 @@ still-approved scope. Do not infer completion from exit status alone if
 earlier batches committed. `batch_limit_reached` means the configured maximum
 was reached; it is not proof that no candidates remain.
 
+## Running in OpenShift
+
+`deploy/kessel-inventory-common-representations-cleanup-job.yaml` renders the
+job as a bounded one-time OpenShift Job using the deployed Inventory image and
+its database secret. `EXECUTE` and `ACKNOWLEDGE_DRAINED_CONSUMER` default to
+`false`, so a plain render is a read-only preview.
+
+Preview:
+
+```sh
+oc process -f deploy/kessel-inventory-common-representations-cleanup-job.yaml \
+  -p JOB_NAME=common-rep-cleanup-preview-$(date -u +%Y%m%dT%H%M%SZ) \
+  -p IMAGE_TAG=<immutable-image-tag> \
+  -p KEEP_VERSIONS=2 \
+  -p BATCH_SIZE=1000 -p MAX_BATCHES=10 -p MAX_DURATION=10m \
+  -p ACTIVE_DEADLINE_SECONDS=900 \
+  | oc apply -f - -n <namespace>
+oc logs -f job/<job-name> -n <namespace>
+```
+
+Destructive execution requires setting both gate parameters explicitly, in
+addition to a fresh reviewed preview and the drained-consumer preconditions:
+
+```sh
+oc process -f deploy/kessel-inventory-common-representations-cleanup-job.yaml \
+  -p JOB_NAME=common-rep-cleanup-$(date -u +%Y%m%dT%H%M%SZ) \
+  -p IMAGE_TAG=<immutable-image-tag> \
+  -p KEEP_VERSIONS=2 \
+  -p BATCH_SIZE=1000 -p MAX_BATCHES=100 -p BATCH_DELAY=500ms -p MAX_DURATION=10m \
+  -p ACTIVE_DEADLINE_SECONDS=900 \
+  -p EXECUTE=true -p ACKNOWLEDGE_DRAINED_CONSUMER=true \
+  | oc apply -f - -n <namespace>
+```
+
+`ACTIVE_DEADLINE_SECONDS` is the pod deadline and must exceed `MAX_DURATION`
+plus image pull and startup margin; the job's own `MAX_DURATION` bounds its
+work and SIGTERM cancellation keeps already-committed batches intact. Pausing
+is a bounded run or a SIGTERM; resuming is a fresh preview plus another
+bounded run. The template mounts the Inventory config secret named by
+`INVENTORY_API_CONFIG_NAME` and reads PostgreSQL credentials from the
+`kessel-inventory-db` secret, mirroring the existing one-time job templates.
+Delete the completed Job object after reviewing its logs.
+
 ## Stop conditions and reconciliation
 
 Do not execute, or stop before another batch, if the target/scope is

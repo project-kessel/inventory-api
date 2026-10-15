@@ -166,7 +166,7 @@ var File_kessel_inventory_v1beta2_add_resource_relationships_request_proto proto
 
 const file_kessel_inventory_v1beta2_add_resource_relationships_request_proto_rawDesc = "" +
 	"\n" +
-	"Akessel/inventory/v1beta2/add_resource_relationships_request.proto\x12\x18kessel.inventory.v1beta2\x1a\x1cgoogle/protobuf/struct.proto\x1a/kessel/inventory/v1beta2/write_visibility.proto\x1a\x1bbuf/validate/validate.proto\"\xdd\x04\n" +
+	"Akessel/inventory/v1beta2/add_resource_relationships_request.proto\x12\x18kessel.inventory.v1beta2\x1a\x1cgoogle/protobuf/struct.proto\x1a/kessel/inventory/v1beta2/write_visibility.proto\x1a\x1bbuf/validate/validate.proto\"\xc2\x06\n" +
 	"\x1fAddResourceRelationshipsRequest\x12&\n" +
 	"\finventory_id\x18\x01 \x01(\tH\x01R\vinventoryId\x88\x01\x01\x12-\n" +
 	"\x04type\x18\x02 \x01(\tB\x19\xbaH\x16r\x14\x10\x012\x10^[A-Za-z0-9_-]+$R\x04type\x12>\n" +
@@ -176,7 +176,8 @@ const file_kessel_inventory_v1beta2_add_resource_relationships_request_proto_raw
 	"\breporter\x18\x06 \x01(\v2\x17.google.protobuf.StructH\x02R\breporter\x88\x01\x01\x124\n" +
 	"\x06common\x18\a \x01(\v2\x17.google.protobuf.StructH\x03R\x06common\x88\x01\x01\x12'\n" +
 	"\x0etransaction_id\x18\b \x01(\tH\x00R\rtransactionId\x12^\n" +
-	"\x10write_visibility\x18\t \x01(\x0e2).kessel.inventory.v1beta2.WriteVisibilityB\b\xbaH\x05\x82\x01\x02\x10\x01R\x0fwriteVisibilityB\x11\n" +
+	"\x10write_visibility\x18\t \x01(\x0e2).kessel.inventory.v1beta2.WriteVisibilityB\b\xbaH\x05\x82\x01\x02\x10\x01R\x0fwriteVisibility:\xe2\x01\xbaH\xde\x01\x1a\xdb\x01\n" +
+	"6add_resource_relationships.at_least_one_representation\x12Aat least one of reporter or common must be provided and non-empty\x1a^(has(this.reporter) && size(this.reporter) > 0) || (has(this.common) && size(this.common) > 0)B\x11\n" +
 	"\x0fidempotency_keyB\x0f\n" +
 	"\r_inventory_idB\v\n" +
 	"\t_reporterB\t\n" +

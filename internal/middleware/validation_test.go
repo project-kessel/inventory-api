@@ -58,6 +58,144 @@ func TestValidation_InvalidRequest(t *testing.T) {
 	assert.True(t, errors.IsBadRequest(err))
 }
 
+func TestValidation_AddResourceRelationshipsRequest(t *testing.T) {
+	t.Parallel()
+
+	validator, err := protovalidate.New()
+	require.NoError(t, err)
+
+	mw := Validation(validator)
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return "ok", nil
+	}
+
+	validReporter, err := structpb.NewStruct(map[string]interface{}{
+		"direct_service_preferences": []interface{}{"550e8400-e29b-41d4-a716-446655440000"},
+	})
+	require.NoError(t, err)
+
+	validCommon, err := structpb.NewStruct(map[string]interface{}{
+		"workspace_id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+	})
+	require.NoError(t, err)
+
+	emptyStruct, err := structpb.NewStruct(map[string]interface{}{})
+	require.NoError(t, err)
+
+	tests := []struct {
+		name      string
+		reporter  *structpb.Struct
+		common    *structpb.Struct
+		expectErr bool
+	}{
+		{
+			name:      "reporter only is valid",
+			reporter:  validReporter,
+			expectErr: false,
+		},
+		{
+			name:     "common only is valid",
+			common:   validCommon,
+			expectErr: false,
+		},
+		{
+			name:      "both provided is valid",
+			reporter:  validReporter,
+			common:    validCommon,
+			expectErr: false,
+		},
+		{
+			name:      "both absent is rejected",
+			expectErr: true,
+		},
+		{
+			name:      "empty reporter struct with no common is rejected",
+			reporter:  emptyStruct,
+			expectErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			req := &pb.AddResourceRelationshipsRequest{
+				Type:               "workspace",
+				ReporterType:       "features",
+				ReporterInstanceId: "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+				LocalResourceId:    "root",
+				Reporter:           tt.reporter,
+				Common:             tt.common,
+			}
+
+			_, err := mw(handler)(context.Background(), req)
+			if tt.expectErr {
+				assert.Error(t, err)
+				assert.True(t, errors.IsBadRequest(err))
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestValidation_RemoveResourceRelationshipsRequest(t *testing.T) {
+	t.Parallel()
+
+	validator, err := protovalidate.New()
+	require.NoError(t, err)
+
+	mw := Validation(validator)
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return "ok", nil
+	}
+
+	validReporter, err := structpb.NewStruct(map[string]interface{}{
+		"direct_service_preferences": []interface{}{"6ba7b810-9dad-11d1-80b4-00c04fd430c8"},
+	})
+	require.NoError(t, err)
+
+	tests := []struct {
+		name      string
+		reporter  *structpb.Struct
+		common    *structpb.Struct
+		expectErr bool
+	}{
+		{
+			name:      "reporter only is valid",
+			reporter:  validReporter,
+			expectErr: false,
+		},
+		{
+			name:      "both absent is rejected",
+			expectErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			req := &pb.RemoveResourceRelationshipsRequest{
+				Type:               "workspace",
+				ReporterType:       "features",
+				ReporterInstanceId: "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+				LocalResourceId:    "root",
+				Reporter:           tt.reporter,
+				Common:             tt.common,
+			}
+
+			_, err := mw(handler)(context.Background(), req)
+			if tt.expectErr {
+				assert.Error(t, err)
+				assert.True(t, errors.IsBadRequest(err))
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
 func TestSanitizeReportResourceRequest(t *testing.T) {
 	t.Parallel()
 

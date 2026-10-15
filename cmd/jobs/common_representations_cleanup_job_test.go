@@ -24,11 +24,11 @@ func TestRunJobRegistersCommonRepresentationsCleanupAsPreviewByDefault(t *testin
 	assert.Equal(t, 2, keepVersions, "the default retention must keep the current version and its predecessor")
 }
 
-func TestCommonRepCleanupCommandRejectsSingleVersionRetentionAndRequiresAttestation(t *testing.T) {
-	require.Error(t, validateCommonRepCleanupInvocation(false, false, 1), "keep-versions below two must be rejected")
-	require.Error(t, validateCommonRepCleanupInvocation(true, false, 2), "execution requires the drained-consumer attestation")
-	require.NoError(t, validateCommonRepCleanupInvocation(true, true, 2))
-	require.NoError(t, validateCommonRepCleanupInvocation(false, false, 3))
+func TestCommonRepCleanupCommandRejectsSingleVersionRetention(t *testing.T) {
+	require.Error(t, validateCommonRepCleanupInvocation(1), "keep-versions below two must be rejected")
+	require.Error(t, validateCommonRepCleanupInvocation(0))
+	require.NoError(t, validateCommonRepCleanupInvocation(2))
+	require.NoError(t, validateCommonRepCleanupInvocation(3))
 }
 
 func TestCommonRepCleanupCommandDoesNotOpenStorageBeforeValidationGates(t *testing.T) {

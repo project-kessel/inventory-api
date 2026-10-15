@@ -34,20 +34,26 @@ Pruning may remove the last remaining copy of a transaction ID used for
 duplicate detection; a later report retry then follows normal validation and
 processing, consistent with the agreed implementation policy.
 
-The job does **not** query Kafka/CDC state, establish consumer drain, or fence
-an application operation already in flight. Update consumption reads event
-version v and v-1, so pruning must not run while pending update or delete
-events reference versions inside the prunable window. A violated gate looks
-like this: a pending update event for version v whose v-1 row was pruned makes
-the consumer's representation read fail, which stalls processing for that
-partition until the message is resolved operationally.
-`--acknowledge-drained-consumer` is a manual attestation gate only; it is not a
-safety check. Before any destructive run, an authorized operator must use the
-environment's independent operational evidence to verify that applicable
-update and delete processing is completed and committed, and that no relevant
-application operation is in flight at the cleanup boundary. Replay or offset
-rewind that requires pruned history is outside the supported contract;
-restore a consistent database state before any offset rewind.
+Concurrent operation: the job is designed to run while the Inventory API
+serves reads and writes and while the tuple consumer is processing events.
+It never deletes resource roots, reporter rows, or the retained newest
+versions, so API lookups, report writes, and delete-event processing are
+unaffected. Pending consumer events whose referenced versions were pruned
+degrade rather than fail: an update event whose v-1 row was pruned produces a
+create-only tuple delta, and an event whose own version was pruned is a no-op
+whose offset is committed. This has been verified against the real consumer
+code path with real PostgreSQL.
+
+The residual risk of that degradation is **stale workspace tuple residue**:
+when the consumer is behind and a resource's workspace changed across the
+pruned boundary, the delete side of the tuple delta is lost and the old
+workspace tuple remains in the relations store. This is authorization
+residue, not data corruption, and it is bounded by consumer health. Before
+any large destructive run, verify the consumer group is keeping up with the
+outbox topic so residue stays negligible; there is no automated cleanup for
+leaked tuples. Replay or offset rewind that requires pruned history is
+outside the supported contract; restore a consistent database state before
+any offset rewind.
 
 ## Preview
 
@@ -90,8 +96,8 @@ cleanup work; cancellation does not undo already committed batches.
 
 ## Destructive execution gate
 
-Execution requires both flags below, in addition to a fresh reviewed preview
-and the operational preconditions above:
+Execution requires the flag below, in addition to a fresh reviewed preview and
+the consumer-health check described above:
 
 ```sh
 inventory-api run-job common-representations-cleanup-job \
@@ -100,8 +106,7 @@ inventory-api run-job common-representations-cleanup-job \
   --max-batches 1 \
   --batch-delay 500ms \
   --max-duration 5m \
-  --execute \
-  --acknowledge-drained-consumer
+  --execute
 ```
 
 The command takes a read-only preview first, using the same retention rule and
@@ -121,8 +126,8 @@ was reached; it is not proof that no candidates remain.
 
 `deploy/kessel-inventory-common-representations-cleanup-job.yaml` renders the
 job as a bounded one-time OpenShift Job using the deployed Inventory image and
-its database secret. `EXECUTE` and `ACKNOWLEDGE_DRAINED_CONSUMER` default to
-`false`, so a plain render is a read-only preview.
+its database secret. `EXECUTE` defaults to `false`, so a plain render is a
+read-only preview.
 
 Preview:
 
@@ -137,8 +142,8 @@ oc process -f deploy/kessel-inventory-common-representations-cleanup-job.yaml \
 oc logs -f job/<job-name> -n <namespace>
 ```
 
-Destructive execution requires setting both gate parameters explicitly, in
-addition to a fresh reviewed preview and the drained-consumer preconditions:
+Destructive execution requires setting the gate parameter explicitly, in
+addition to a fresh reviewed preview and the consumer-health check:
 
 ```sh
 oc process -f deploy/kessel-inventory-common-representations-cleanup-job.yaml \
@@ -147,7 +152,7 @@ oc process -f deploy/kessel-inventory-common-representations-cleanup-job.yaml \
   -p KEEP_VERSIONS=2 \
   -p BATCH_SIZE=1000 -p MAX_BATCHES=100 -p BATCH_DELAY=500ms -p MAX_DURATION=10m \
   -p ACTIVE_DEADLINE_SECONDS=900 \
-  -p EXECUTE=true -p ACKNOWLEDGE_DRAINED_CONSUMER=true \
+  -p EXECUTE=true \
   | oc apply -f - -n <namespace>
 ```
 
@@ -163,8 +168,8 @@ Delete the completed Job object after reviewing its logs.
 ## Stop conditions and reconciliation
 
 Do not execute, or stop before another batch, if the target/scope is
-uncertain, update or delete processing or application quiescence is
-unverified, a new inconsistent-pointer exclusion appears, the report does not
+uncertain, the consumer group is falling significantly behind the outbox
+topic, a new inconsistent-pointer exclusion appears, the report does not
 match the reviewed bounds, or required observation or recovery evidence is
 unavailable. Never override an exclusion by weakening the retention rule or
 the pointer consistency check.

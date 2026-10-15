@@ -50,7 +50,6 @@ objects:
                 - --max-batches=${MAX_BATCHES}
                 - --max-duration=${MAX_DURATION}
                 - --execute=${EXECUTE}
-                - --acknowledge-drained-consumer=${ACKNOWLEDGE_DRAINED_CONSUMER}
               env:
                 - name: CLOWDER_ENABLED
                   value: ${CLOWDER_ENABLED}
@@ -127,9 +126,6 @@ parameters:
     value: ""
   - description: Enable deletion only after the runbook's operational preconditions are verified; false is a read-only preview
     name: EXECUTE
-    value: "false"
-  - description: Manual attestation that update and delete processing is complete and relevant application operations are quiesced; this flag verifies nothing
-    name: ACKNOWLEDGE_DRAINED_CONSUMER
     value: "false"
   - description: Maximum common representation rows deleted per transaction
     name: BATCH_SIZE

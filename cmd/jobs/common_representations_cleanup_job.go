@@ -31,14 +31,13 @@ const (
 // representation history cleanup command.
 func NewCommonRepresentationsCleanupJobCommand(storageOptions *storage.Options, loggerOptions common.LoggerOptions) *cobra.Command {
 	var (
-		execute                    bool
-		acknowledgeDrainedConsumer bool
-		keepVersions               int
-		resourceType               string
-		batchSize                  int
-		batchDelay                 time.Duration
-		maxBatches                 int
-		maxDuration                time.Duration
+		execute      bool
+		keepVersions int
+		resourceType string
+		batchSize    int
+		batchDelay   time.Duration
+		maxBatches   int
+		maxDuration  time.Duration
 	)
 
 	command := &cobra.Command{
@@ -47,15 +46,15 @@ func NewCommonRepresentationsCleanupJobCommand(storageOptions *storage.Options, 
 		Long: `Previews common representation history pruning by default. The per-resource
 retention rule keeps the authoritative current common representation and its
 predecessors; only older versions on resources that still have an active reporter
-are pruned. Destructive execution requires --execute and the explicit
---acknowledge-drained-consumer attestation; the attestation does not establish
-consumer drain or application quiescence. Use only after verifying the operational
-preconditions in the common representation cleanup runbook.`,
+are pruned. Destructive execution requires --execute. Pending consumer events
+whose versions were pruned degrade to create-only or no-op processing rather
+than failing; see the common representation cleanup runbook for the residual
+tuple-residue risk and the consumer-health guidance before mass pruning.`,
 		Args: cobra.NoArgs,
 		RunE: func(command *cobra.Command, _ []string) error {
 			signalContext, stopSignals := commonRepCleanupSignalContext(command.Context())
 			defer stopSignals()
-			if err := validateCommonRepCleanupInvocation(execute, acknowledgeDrainedConsumer, keepVersions); err != nil {
+			if err := validateCommonRepCleanupInvocation(keepVersions); err != nil {
 				return err
 			}
 			return runCommonRepresentationsCleanupJob(
@@ -75,7 +74,6 @@ preconditions in the common representation cleanup runbook.`,
 
 	flags := command.Flags()
 	flags.BoolVar(&execute, "execute", false, "Commit bounded common representation cleanup batches; default is read-only preview")
-	flags.BoolVar(&acknowledgeDrainedConsumer, "acknowledge-drained-consumer", false, "Attest that update and delete processing is complete and relevant application operations are quiesced; this flag does not verify either condition")
 	flags.IntVar(&keepVersions, "keep-versions", commonRepCleanupDefaultKeepVersions, "Number of newest common representations retained per resource; must be at least 2 because update consumption reads version v and v-1 (default 2)")
 	flags.StringVar(&resourceType, "resource-type", "", "Optional resource type filter")
 	flags.IntVar(&batchSize, "batch-size", commonRepCleanupDefaultBatchSize, "Maximum common representation rows per transaction (default 1000)")
@@ -114,12 +112,9 @@ func commonRepCleanupSignalContext(parentContext context.Context) (context.Conte
 	return signal.NotifyContext(parentContext, os.Interrupt, syscall.SIGTERM)
 }
 
-func validateCommonRepCleanupInvocation(execute, acknowledgeDrainedConsumer bool, keepVersions int) error {
+func validateCommonRepCleanupInvocation(keepVersions int) error {
 	if keepVersions < 2 {
 		return fmt.Errorf("--keep-versions must be at least 2 because update consumption reads version v and v-1")
-	}
-	if execute && !acknowledgeDrainedConsumer {
-		return fmt.Errorf("--execute requires --acknowledge-drained-consumer after verifying the operational preconditions")
 	}
 	return nil
 }

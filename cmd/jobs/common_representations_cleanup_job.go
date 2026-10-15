@@ -193,7 +193,7 @@ func runCommonRepresentationsCleanupJob(
 	if err != nil {
 		return err
 	}
-	logCommonRepCleanupPreview(logHelper, report, policy, options, keepVersions, execute)
+	logCommonRepCleanupPreview(logHelper, report, policy, options, execute)
 	if !execute {
 		logHelper.Info("Common representation cleanup preview completed; no database mutations were made")
 		return nil
@@ -216,7 +216,6 @@ func logCommonRepCleanupPreview(
 	report commonRepCleanupReport,
 	policy commonRepCleanupPolicy,
 	options commonRepCleanupOptions,
-	keepVersions int,
 	executeRequested bool,
 ) {
 	total := report.TotalPrunable()
@@ -227,7 +226,7 @@ func logCommonRepCleanupPreview(
 	}
 	logHelper.Infow("msg", "common representation cleanup preview",
 		"execution_requested", executeRequested,
-		"keep_versions", keepVersions,
+		"keep_versions", report.KeepVersions(),
 		"resource_type_filter", resourceTypeFilter,
 		"batch_size", options.BatchSize(),
 		"maximum_batches", options.MaxBatches(),
@@ -237,6 +236,7 @@ func logCommonRepCleanupPreview(
 		"database_snapshot_at_utc", report.SnapshotAt().Format(time.RFC3339Nano),
 		"scoped_active_roots", report.ScopedActiveRoots(),
 		"roots_without_active_reporter_out_of_scope", report.RootsWithoutActiveReporter(),
+		"roots_without_common_history", report.RootsWithoutCommonHistory(),
 		"excluded_inconsistent_pointer_roots", report.ExcludedInconsistentRoots(),
 		"prunable_common_representations", total.Representations(),
 		"prunable_resource_roots", total.ResourceRootsImpacted(),

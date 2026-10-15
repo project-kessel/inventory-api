@@ -21,6 +21,7 @@ type commonRepCleanupCandidateRow struct {
 
 type commonRepCleanupScopeCounts struct {
 	ScopedActiveRoots         int64 `gorm:"column:scoped_active_roots"`
+	RootsWithoutCommonHistory int64 `gorm:"column:roots_without_common_history"`
 	ExcludedInconsistentRoots int64 `gorm:"column:excluded_inconsistent_roots"`
 }
 
@@ -57,6 +58,7 @@ func (repository *gormCommonRepCleanupRepository) PreviewCommonHistory(
 	var scopeCounts commonRepCleanupScopeCounts
 	scopeQuery := classifiedCTE + `
 		SELECT (SELECT COUNT(*) FROM scoped_roots) AS scoped_active_roots,
+		       (SELECT COUNT(*) FROM classified_roots WHERE exclusion_reason = 'no_common_history') AS roots_without_common_history,
 		       (SELECT COUNT(*) FROM classified_roots WHERE exclusion_reason = 'inconsistent_pointer') AS excluded_inconsistent_roots`
 	if err := repository.db.WithContext(ctx).Raw(scopeQuery, arguments...).Scan(&scopeCounts).Error; err != nil {
 		return commonRepCleanupReport{}, fmt.Errorf("count common representation cleanup scope: %w", err)
@@ -68,11 +70,11 @@ func (repository *gormCommonRepCleanupRepository) PreviewCommonHistory(
 		return commonRepCleanupReport{}, fmt.Errorf("count common representation cleanup out-of-scope roots: %w", err)
 	}
 
-	totalImpact, err := repository.readImpact(ctx, classifiedCTE, arguments, 0)
+	totalImpact, err := repository.readImpact(ctx, classifiedCTE, arguments, policy.KeepVersions(), 0)
 	if err != nil {
 		return commonRepCleanupReport{}, fmt.Errorf("count total common representation cleanup impact: %w", err)
 	}
-	boundedImpact, err := repository.readImpact(ctx, classifiedCTE, arguments, boundedRowLimit)
+	boundedImpact, err := repository.readImpact(ctx, classifiedCTE, arguments, policy.KeepVersions(), boundedRowLimit)
 	if err != nil {
 		return commonRepCleanupReport{}, fmt.Errorf("count bounded common representation cleanup impact: %w", err)
 	}
@@ -87,8 +89,8 @@ func (repository *gormCommonRepCleanupRepository) PreviewCommonHistory(
 	}
 	report, err := newCommonRepCleanupReport(
 		time.Now().UTC(), snapshotAt, policy.KeepVersions(), boundedRowLimit,
-		scopeCounts.ScopedActiveRoots, rootsWithoutActiveReporter, scopeCounts.ExcludedInconsistentRoots,
-		total, bounded,
+		scopeCounts.ScopedActiveRoots, rootsWithoutActiveReporter, scopeCounts.RootsWithoutCommonHistory,
+		scopeCounts.ExcludedInconsistentRoots, total, bounded,
 	)
 	if err != nil {
 		return commonRepCleanupReport{}, fmt.Errorf("build common representation cleanup report: %w", err)
@@ -101,10 +103,12 @@ func (repository *gormCommonRepCleanupRepository) readImpact(
 	ctx context.Context,
 	classifiedCTE string,
 	arguments []any,
+	keepVersions int,
 	limit int64,
 ) (commonRepCleanupImpactCounts, error) {
 	queryArguments := append([]any(nil), arguments...)
-	selection := "SELECT resource_id FROM prunable"
+	queryArguments = append(queryArguments, keepVersions)
+	selection := "SELECT resource_id FROM prunable WHERE version_rank > ?"
 	if limit > 0 {
 		selection += " ORDER BY current_version DESC, resource_id ASC, version ASC LIMIT ?"
 		queryArguments = append(queryArguments, limit)
@@ -143,9 +147,10 @@ func (repository *gormCommonRepCleanupRepository) DeleteCommonHistoryBatch(
 	classifiedCTE, arguments := commonRepClassifiedCTE(policy)
 	candidateQuery := classifiedCTE + `
 		SELECT resource_id, version FROM prunable
+		WHERE version_rank > ?
 		ORDER BY current_version DESC, resource_id ASC, version ASC
 		LIMIT ?`
-	candidateArguments := append(append([]any(nil), arguments...), batchSize)
+	candidateArguments := append(append([]any(nil), arguments...), policy.KeepVersions(), batchSize)
 	var candidates []commonRepCleanupCandidateRow
 	if err := repository.db.WithContext(ctx).Raw(candidateQuery, candidateArguments...).Scan(&candidates).Error; err != nil {
 		return commonRepCleanupImpact{}, fmt.Errorf("select prunable common representation batch: %w", err)
@@ -158,7 +163,7 @@ func (repository *gormCommonRepCleanupRepository) DeleteCommonHistoryBatch(
 	seenResourceIDs := make(map[uuid.UUID]struct{}, len(candidates))
 	for _, candidate := range candidates {
 		if _, seen := seenResourceIDs[candidate.ResourceID]; !seen {
-			resourceRootID, err := commonRepRootIDFromUUID(candidate.ResourceID)
+			resourceRootID, err := bizmodel.NewResourceId(candidate.ResourceID)
 			if err != nil {
 				return commonRepCleanupImpact{}, fmt.Errorf("prunable common representation has invalid resource root identity: %w", err)
 			}
@@ -170,6 +175,7 @@ func (repository *gormCommonRepCleanupRepository) DeleteCommonHistoryBatch(
 	deleteQuery := classifiedCTE + `,
 		selected AS (
 			SELECT resource_id, version FROM prunable
+			WHERE version_rank > ?
 			ORDER BY current_version DESC, resource_id ASC, version ASC
 			LIMIT ?
 		)
@@ -193,10 +199,13 @@ func (repository *gormCommonRepCleanupRepository) DeleteCommonHistoryBatch(
 }
 
 // commonRepClassifiedCTE scopes active roots, resolves the authoritative current version,
-// and marks prunable rows per the per-resource retention rule. The authoritative current
-// version is the resource.common_version pointer, falling back to MAX(version) only when
-// the pointer is NULL. Roots whose pointer does not resolve to an existing row are
-// excluded rather than guessed.
+// and ranks common representations at or below that version from newest to oldest. The
+// authoritative current version is the resource.common_version pointer, falling back to
+// MAX(version) only when the pointer is NULL. Roots whose pointer does not resolve to an
+// existing row are excluded rather than guessed. Retention is a count of existing rows,
+// not a numeric version window: a caller deletes only rows whose rank exceeds keep, so
+// gapped history still retains the requested number of newest existing rows and rows
+// above a non-NULL pointer are never ranked or deleted.
 func commonRepClassifiedCTE(policy commonRepCleanupPolicy) (string, []any) {
 	scopedPredicate := `EXISTS (
 			SELECT 1 FROM reporter_resources AS rr
@@ -207,7 +216,6 @@ func commonRepClassifiedCTE(policy commonRepCleanupPolicy) (string, []any) {
 		scopedPredicate += " AND root.type = ?"
 		arguments = append(arguments, resourceType.Serialize())
 	}
-	arguments = append(arguments, policy.KeepVersions())
 	query := `WITH scoped_roots AS (
 		SELECT root.id AS resource_id, root.common_version
 		FROM resource AS root
@@ -232,11 +240,12 @@ func commonRepClassifiedCTE(policy commonRepCleanupPolicy) (string, []any) {
 		       END AS exclusion_reason
 		FROM authoritative
 	), prunable AS (
-		SELECT cr.resource_id, cr.version, roots.current_version
+		SELECT cr.resource_id, cr.version, roots.current_version,
+		       ROW_NUMBER() OVER (PARTITION BY cr.resource_id ORDER BY cr.version DESC) AS version_rank
 		FROM common_representations AS cr
 		JOIN classified_roots AS roots ON roots.resource_id = cr.resource_id
 		WHERE roots.exclusion_reason IS NULL
-		  AND cr.version <= roots.current_version - ?
+		  AND cr.version <= roots.current_version
 	)`
 	return query, arguments
 }

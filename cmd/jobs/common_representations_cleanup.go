@@ -7,7 +7,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
 	bizmodel "github.com/project-kessel/inventory-api/internal/biz/model"
 )
 
@@ -87,7 +86,7 @@ func newCommonRepCleanupImpactWithRootIDs(representations int64, resourceRootIDs
 	if representations < 0 {
 		return commonRepCleanupImpact{}, fmt.Errorf("common representation cleanup impact cannot be negative")
 	}
-	if representations > 0 && int64(len(resourceRootIDs)) > representations {
+	if int64(len(resourceRootIDs)) > representations {
 		return commonRepCleanupImpact{}, fmt.Errorf("impacted roots cannot exceed deleted representation rows")
 	}
 	return commonRepCleanupImpact{
@@ -104,39 +103,51 @@ func (impact commonRepCleanupImpact) Representations() int64 { return impact.rep
 // ResourceRootsImpacted returns distinct resource roots touched by the scope.
 func (impact commonRepCleanupImpact) ResourceRootsImpacted() int64 { return impact.distinctRoots }
 
-// Add combines committed batch impact, unioning private root identities so shared roots count once.
-func (impact commonRepCleanupImpact) Add(other commonRepCleanupImpact) (commonRepCleanupImpact, error) {
-	if impact.representations < 0 || other.representations < 0 {
-		return commonRepCleanupImpact{}, fmt.Errorf("common representation cleanup impact cannot be negative")
+// commonRepCumulativeImpact tracks committed batch impact for one invocation with
+// incremental accounting: each committed batch inserts its root identities into a set
+// once, so distinct roots are counted without rebuilding the cumulative set per batch.
+type commonRepCumulativeImpact struct {
+	representations int64
+	roots           map[bizmodel.ResourceId]struct{}
+}
+
+func newCommonRepCumulativeImpact() *commonRepCumulativeImpact {
+	return &commonRepCumulativeImpact{roots: make(map[bizmodel.ResourceId]struct{})}
+}
+
+// record merges one committed batch. It must be called only after the batch's
+// transaction commits, so failed or retried attempts never contribute.
+func (cumulative *commonRepCumulativeImpact) record(batch commonRepCleanupImpact) error {
+	if batch.representations < 0 {
+		return fmt.Errorf("common representation cleanup impact cannot be negative")
 	}
-	if (impact.distinctRoots > 0 && !impact.rootIDsKnown) ||
-		(other.distinctRoots > 0 && !other.rootIDsKnown) {
-		return commonRepCleanupImpact{}, fmt.Errorf("cannot aggregate distinct common representation cleanup roots without root identities")
+	if batch.distinctRoots > 0 && !batch.rootIDsKnown {
+		return fmt.Errorf("cannot account distinct common representation cleanup roots without root identities")
 	}
-	representations, err := safeCommonRepCountAdd(impact.representations, other.representations)
+	representations, err := safeCommonRepCountAdd(cumulative.representations, batch.representations)
 	if err != nil {
-		return commonRepCleanupImpact{}, err
+		return err
 	}
-	resourceRootIDs := make([]bizmodel.ResourceId, 0, len(impact.resourceRootIDs)+len(other.resourceRootIDs))
-	seen := make(map[bizmodel.ResourceId]struct{}, len(impact.resourceRootIDs)+len(other.resourceRootIDs))
-	for _, rootID := range impact.resourceRootIDs {
-		if _, duplicate := seen[rootID]; !duplicate {
-			seen[rootID] = struct{}{}
-			resourceRootIDs = append(resourceRootIDs, rootID)
-		}
+	cumulative.representations = representations
+	for _, rootID := range batch.resourceRootIDs {
+		cumulative.roots[rootID] = struct{}{}
 	}
-	for _, rootID := range other.resourceRootIDs {
-		if _, duplicate := seen[rootID]; !duplicate {
-			seen[rootID] = struct{}{}
-			resourceRootIDs = append(resourceRootIDs, rootID)
-		}
+	return nil
+}
+
+// impact materializes the cumulative counts. Recorded root identities never exceed
+// recorded rows because each recorded batch satisfies that invariant by construction.
+func (cumulative *commonRepCumulativeImpact) impact() commonRepCleanupImpact {
+	rootIDs := make([]bizmodel.ResourceId, 0, len(cumulative.roots))
+	for rootID := range cumulative.roots {
+		rootIDs = append(rootIDs, rootID)
 	}
 	return commonRepCleanupImpact{
-		representations: representations,
-		resourceRootIDs: resourceRootIDs,
+		representations: cumulative.representations,
+		resourceRootIDs: rootIDs,
 		rootIDsKnown:    true,
-		distinctRoots:   int64(len(resourceRootIDs)),
-	}, nil
+		distinctRoots:   int64(len(rootIDs)),
+	}
 }
 
 // commonRepCleanupReport separates full prunability from the configured bounded projection.
@@ -147,6 +158,7 @@ type commonRepCleanupReport struct {
 	keepVersions               int
 	scopedActiveRoots          int64
 	rootsWithoutActiveReporter int64
+	rootsWithoutCommonHistory  int64
 	excludedInconsistentRoots  int64
 	totalPrunable              commonRepCleanupImpact
 	boundedPrunable            commonRepCleanupImpact
@@ -160,6 +172,7 @@ func newCommonRepCleanupReport(
 	boundedRowLimit int64,
 	scopedActiveRoots int64,
 	rootsWithoutActiveReporter int64,
+	rootsWithoutCommonHistory int64,
 	excludedInconsistentRoots int64,
 	totalPrunable commonRepCleanupImpact,
 	boundedPrunable commonRepCleanupImpact,
@@ -170,7 +183,8 @@ func newCommonRepCleanupReport(
 	if keepVersions < 2 {
 		return commonRepCleanupReport{}, fmt.Errorf("common representation cleanup report requires a retention rule of at least two versions")
 	}
-	if boundedRowLimit < 0 || scopedActiveRoots < 0 || rootsWithoutActiveReporter < 0 || excludedInconsistentRoots < 0 {
+	if boundedRowLimit < 0 || scopedActiveRoots < 0 || rootsWithoutActiveReporter < 0 ||
+		rootsWithoutCommonHistory < 0 || excludedInconsistentRoots < 0 {
 		return commonRepCleanupReport{}, fmt.Errorf("common representation cleanup report counts cannot be negative")
 	}
 	if boundedPrunable.representations > boundedRowLimit {
@@ -187,6 +201,7 @@ func newCommonRepCleanupReport(
 		keepVersions:               keepVersions,
 		scopedActiveRoots:          scopedActiveRoots,
 		rootsWithoutActiveReporter: rootsWithoutActiveReporter,
+		rootsWithoutCommonHistory:  rootsWithoutCommonHistory,
 		excludedInconsistentRoots:  excludedInconsistentRoots,
 		totalPrunable:              totalPrunable,
 		boundedPrunable:            boundedPrunable,
@@ -212,6 +227,12 @@ func (report commonRepCleanupReport) ScopedActiveRoots() int64 { return report.s
 // they are out of scope and belong to the tombstone cleanup workstream.
 func (report commonRepCleanupReport) RootsWithoutActiveReporter() int64 {
 	return report.rootsWithoutActiveReporter
+}
+
+// RootsWithoutCommonHistory returns scoped active roots that have no common
+// representations at all; they are not cleanup candidates.
+func (report commonRepCleanupReport) RootsWithoutCommonHistory() int64 {
+	return report.rootsWithoutCommonHistory
 }
 
 // ExcludedInconsistentRoots returns roots whose common_version pointer does not resolve
@@ -393,9 +414,14 @@ func (usecase *commonRepCleanupUsecase) Execute(
 	defer cancel()
 
 	var result commonRepCleanupResult
+	cumulative := newCommonRepCumulativeImpact()
+	finish := func(err error) (commonRepCleanupResult, error) {
+		result.impact = cumulative.impact()
+		return result, err
+	}
 	for result.committedBatches < options.maxBatches {
 		if err := runContext.Err(); err != nil {
-			return result, fmt.Errorf("execute common representation cleanup: %w", err)
+			return finish(fmt.Errorf("execute common representation cleanup: %w", err))
 		}
 
 		var batchImpact commonRepCleanupImpact
@@ -410,36 +436,34 @@ func (usecase *commonRepCleanupUsecase) Execute(
 			return nil
 		})
 		if err != nil {
-			return result, fmt.Errorf("execute common representation cleanup batch: %w", err)
+			return finish(fmt.Errorf("execute common representation cleanup batch: %w", err))
 		}
 		if batchImpact.Representations() == 0 {
-			return result, nil
+			return finish(nil)
 		}
 
-		totalImpact, err := result.impact.Add(batchImpact)
-		if err != nil {
-			return result, fmt.Errorf("accumulate committed common representation cleanup impact: %w", err)
+		if err := cumulative.record(batchImpact); err != nil {
+			return finish(fmt.Errorf("accumulate committed common representation cleanup impact: %w", err))
 		}
-		result.impact = totalImpact
 		result.committedBatches++
 		if onBatchCommitted != nil {
 			onBatchCommitted(result.committedBatches, batchImpact)
 		}
 
 		if batchImpact.Representations() < int64(options.batchSize) {
-			return result, nil
+			return finish(nil)
 		}
 		if result.committedBatches == options.maxBatches {
 			result.batchLimitReached = true
-			return result, nil
+			return finish(nil)
 		}
 		if options.batchDelay > 0 {
 			if err := waitForCommonRepNextBatch(runContext, options.batchDelay); err != nil {
-				return result, fmt.Errorf("wait between common representation cleanup batches: %w", err)
+				return finish(fmt.Errorf("wait between common representation cleanup batches: %w", err))
 			}
 		}
 	}
-	return result, nil
+	return finish(nil)
 }
 
 func (usecase *commonRepCleanupUsecase) validate(policy commonRepCleanupPolicy, options commonRepCleanupOptions) error {
@@ -502,9 +526,4 @@ func safeCommonRepCountAdd(left, right int64) (int64, error) {
 		return 0, fmt.Errorf("common representation cleanup count overflow or negative count")
 	}
 	return left + right, nil
-}
-
-// commonRepRootIDFromUUID validates and converts a storage root UUID into a domain identity.
-func commonRepRootIDFromUUID(rootID uuid.UUID) (bizmodel.ResourceId, error) {
-	return bizmodel.NewResourceId(rootID)
 }

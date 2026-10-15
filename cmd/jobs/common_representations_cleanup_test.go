@@ -39,30 +39,60 @@ func TestNewCommonRepCleanupPolicyRejectsInvalidInputs(t *testing.T) {
 	assert.Error(t, (commonRepCleanupPolicy{}).Validate())
 }
 
-func TestCommonRepCleanupImpactAddsRowsAndUnionsRoots(t *testing.T) {
+func TestCommonRepCumulativeImpactCountsRowsAndDistinctRoots(t *testing.T) {
 	sharedRoot, err := bizmodel.NewResourceId(uuid.New())
 	require.NoError(t, err)
 	secondRoot, err := bizmodel.NewResourceId(uuid.New())
 	require.NoError(t, err)
 
+	cumulative := newCommonRepCumulativeImpact()
 	first, err := newCommonRepCleanupImpactWithRootIDs(3, []bizmodel.ResourceId{sharedRoot})
 	require.NoError(t, err)
 	second, err := newCommonRepCleanupImpactWithRootIDs(2, []bizmodel.ResourceId{sharedRoot, secondRoot})
 	require.NoError(t, err)
+	require.NoError(t, cumulative.record(first))
+	require.NoError(t, cumulative.record(second))
 
-	combined, err := first.Add(second)
-	require.NoError(t, err)
+	combined := cumulative.impact()
 	assert.Equal(t, int64(5), combined.Representations())
 	assert.Equal(t, int64(2), combined.ResourceRootsImpacted(), "the shared root must be counted once")
+	assert.True(t, combined.rootIDsKnown)
+}
 
-	_, err = newCommonRepCleanupImpact(-1, 0)
-	assert.Error(t, err)
-	_, err = newCommonRepCleanupImpact(0, 1)
-	assert.Error(t, err, "distinct roots cannot exceed rows")
-	maximum, err := newCommonRepCleanupImpact(math.MaxInt64, 1)
+func TestCommonRepCumulativeImpactRejectsInvalidBatches(t *testing.T) {
+	sharedRoot, err := bizmodel.NewResourceId(uuid.New())
 	require.NoError(t, err)
-	_, err = maximum.Add(first)
-	assert.Error(t, err, "row count overflow")
+	knownRoots, err := newCommonRepCleanupImpactWithRootIDs(2, []bizmodel.ResourceId{sharedRoot})
+	require.NoError(t, err)
+
+	// Unknown root identities with a nonzero distinct-root count must be rejected
+	// rather than silently dropping roots from the cumulative set.
+	unknownRoots, err := newCommonRepCleanupImpact(2, 1)
+	require.NoError(t, err)
+	cumulative := newCommonRepCumulativeImpact()
+	require.NoError(t, cumulative.record(knownRoots))
+	err = cumulative.record(unknownRoots)
+	require.ErrorContains(t, err, "without root identities")
+
+	// Zero rows with root identities is inconsistent and must be rejected.
+	_, err = newCommonRepCleanupImpactWithRootIDs(0, []bizmodel.ResourceId{sharedRoot})
+	assert.Error(t, err, "roots cannot exceed rows when no rows were deleted")
+}
+
+func TestCommonRepCumulativeImpactOverflowsCheckedArithmetic(t *testing.T) {
+	maximumRoot, err := bizmodel.NewResourceId(uuid.New())
+	require.NoError(t, err)
+	// Known root identities are required so aggregation reaches the checked
+	// addition rather than stopping at the unknown-identities guard.
+	maximum, err := newCommonRepCleanupImpactWithRootIDs(math.MaxInt64, []bizmodel.ResourceId{maximumRoot})
+	require.NoError(t, err)
+	increment, err := newCommonRepCleanupImpactWithRootIDs(1, []bizmodel.ResourceId{maximumRoot})
+	require.NoError(t, err)
+
+	cumulative := newCommonRepCumulativeImpact()
+	require.NoError(t, cumulative.record(maximum))
+	err = cumulative.record(increment)
+	require.ErrorContains(t, err, "overflow", "row count overflow must be the reported failure")
 }
 
 func TestCommonRepCleanupReportSeparatesTotalAndBoundedImpact(t *testing.T) {
@@ -73,7 +103,7 @@ func TestCommonRepCleanupReportSeparatesTotalAndBoundedImpact(t *testing.T) {
 	require.NoError(t, err)
 	report, err := newCommonRepCleanupReport(
 		evaluatedAt, evaluatedAt.Add(2*time.Second), 2, 6,
-		5, 3, 1, total, bounded,
+		5, 3, 1, 1, total, bounded,
 	)
 	require.NoError(t, err)
 
@@ -82,6 +112,7 @@ func TestCommonRepCleanupReportSeparatesTotalAndBoundedImpact(t *testing.T) {
 	assert.Equal(t, 2, report.KeepVersions())
 	assert.Equal(t, int64(5), report.ScopedActiveRoots())
 	assert.Equal(t, int64(3), report.RootsWithoutActiveReporter())
+	assert.Equal(t, int64(1), report.RootsWithoutCommonHistory())
 	assert.Equal(t, int64(1), report.ExcludedInconsistentRoots())
 	assert.Equal(t, total, report.TotalPrunable())
 	assert.Equal(t, bounded, report.BoundedPrunable())
@@ -93,14 +124,16 @@ func TestCommonRepCleanupReportRejectsInconsistentTotals(t *testing.T) {
 	require.NoError(t, err)
 	exceeding, err := newCommonRepCleanupImpact(3, 1)
 	require.NoError(t, err)
-	_, err = newCommonRepCleanupReport(evaluatedAt, evaluatedAt, 2, 2, 1, 0, 0, total, exceeding)
+	_, err = newCommonRepCleanupReport(evaluatedAt, evaluatedAt, 2, 2, 1, 0, 0, 0, total, exceeding)
 	assert.Error(t, err, "bounded impact cannot exceed total prunability")
-	_, err = newCommonRepCleanupReport(evaluatedAt, evaluatedAt, 1, 2, 1, 0, 0, total, total)
+	_, err = newCommonRepCleanupReport(evaluatedAt, evaluatedAt, 1, 2, 1, 0, 0, 0, total, total)
 	assert.Error(t, err, "retention below two versions is rejected")
-	_, err = newCommonRepCleanupReport(time.Time{}, evaluatedAt, 2, 2, 1, 0, 0, total, total)
+	_, err = newCommonRepCleanupReport(time.Time{}, evaluatedAt, 2, 2, 1, 0, 0, 0, total, total)
 	assert.Error(t, err, "evaluation time is required")
-	_, err = newCommonRepCleanupReport(evaluatedAt, evaluatedAt, 2, 1, 1, 0, 0, total, total)
+	_, err = newCommonRepCleanupReport(evaluatedAt, evaluatedAt, 2, 1, 1, 0, 0, 0, total, total)
 	assert.Error(t, err, "bounded rows cannot exceed the configured row limit")
+	_, err = newCommonRepCleanupReport(evaluatedAt, evaluatedAt, 2, 2, 1, 0, -1, 0, total, total)
+	assert.Error(t, err, "counts cannot be negative")
 }
 
 type commonRepRepositoryFake struct {
@@ -163,7 +196,7 @@ func TestCommonRepPreviewUsesReadOnlyTransactionAndRowBudget(t *testing.T) {
 	report, err := newCommonRepCleanupReport(
 		time.Date(2026, 10, 14, 12, 0, 0, 0, time.UTC),
 		time.Date(2026, 10, 14, 12, 0, 1, 0, time.UTC),
-		2, 2, 3, 0, 0, total, bounded,
+		2, 2, 3, 0, 1, 0, total, bounded,
 	)
 	require.NoError(t, err)
 	repository := &commonRepRepositoryFake{previewReport: report}
@@ -196,9 +229,8 @@ func TestCommonRepExecuteAccumulatesCommittedBatchesAndStopsAtBudget(t *testing.
 		committedCallbacks++
 	})
 	require.NoError(t, err)
-	expected, err := first.Add(second)
-	require.NoError(t, err)
-	assert.Equal(t, expected, result.Impact())
+	assert.Equal(t, int64(4), result.Impact().Representations())
+	assert.Equal(t, int64(3), result.Impact().ResourceRootsImpacted())
 	assert.Equal(t, 2, result.CommittedBatches())
 	assert.True(t, result.BatchLimitReached())
 	assert.Equal(t, 2, committedCallbacks)
@@ -236,7 +268,8 @@ func TestCommonRepExecuteDoesNotCountBatchWhenTransactionReturnsError(t *testing
 
 	result, err := usecase.Execute(context.Background(), policy, options, nil)
 	require.Error(t, err)
-	assert.Equal(t, commonRepCleanupImpact{}, result.Impact())
+	assert.Zero(t, result.Impact().Representations())
+	assert.Zero(t, result.Impact().ResourceRootsImpacted())
 	assert.Zero(t, result.CommittedBatches())
 	assert.False(t, result.BatchLimitReached())
 }
@@ -257,6 +290,57 @@ func TestCommonRepExecuteCancellationBetweenBatchesReturnsCommittedProgress(t *t
 	assert.Equal(t, first, result.Impact())
 	assert.Equal(t, 1, result.CommittedBatches())
 	assert.Equal(t, 1, repository.deleteCalls)
+}
+
+func TestCommonRepExecuteRetryOverwritesAttemptedImpactAndNotifiesOncePerCommit(t *testing.T) {
+	policy := commonRepPolicy(t)
+	firstAttempt := commonRepImpact(t, 2, 1)
+	retryAttempt := commonRepImpact(t, 3, 1)
+	repository := &commonRepRepositoryFake{}
+	transaction := &commonRepRetryingTransactionFake{repository: repository, attempts: []commonRepCleanupImpact{firstAttempt, retryAttempt}}
+	usecase, err := newCommonRepCleanup(transaction)
+	require.NoError(t, err)
+	options := commonRepOptions(t, 10, 0, 1, time.Minute)
+	var committedCallbacks int
+
+	result, err := usecase.Execute(context.Background(), policy, options, func(_ int, _ commonRepCleanupImpact) {
+		committedCallbacks++
+	})
+	require.NoError(t, err)
+	assert.Equal(t, 2, transaction.workInvocations, "the transaction adapter must be able to re-invoke work after a serialization retry")
+	assert.Equal(t, 1, repository.deleteCalls, "attempted deletions are not re-counted across retries")
+	assert.Equal(t, int64(3), result.Impact().Representations(), "only the retried attempt's counts may contribute")
+	assert.Equal(t, 1, result.CommittedBatches())
+	assert.Equal(t, 1, committedCallbacks, "progress notifications run only after the commit succeeds")
+}
+
+// commonRepRetryingTransactionFake simulates the transaction adapter invoking the
+// work callback twice within one transaction after a serialization failure.
+type commonRepRetryingTransactionFake struct {
+	repository      commonRepCleanupRepository
+	attempts        []commonRepCleanupImpact
+	workInvocations int
+}
+
+func (transaction *commonRepRetryingTransactionFake) WithinSerializableCommonRepCleanup(
+	ctx context.Context,
+	operationName string,
+	readOnly bool,
+	_, _ time.Duration,
+	work func(commonRepCleanupRepository) error,
+) error {
+	for _, attempt := range transaction.attempts {
+		transaction.workInvocations++
+		transaction.repository.(*commonRepRepositoryFake).batches = []commonRepCleanupImpact{attempt}
+		transaction.repository.(*commonRepRepositoryFake).deleteCalls = 0
+		if err := work(transaction.repository); err != nil {
+			return err
+		}
+	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	return nil
 }
 
 func TestNewCommonRepCleanupOptionsRejectsInvalidOrOverflowingLimits(t *testing.T) {

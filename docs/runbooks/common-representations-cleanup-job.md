@@ -22,6 +22,14 @@ are out of scope and untouched: they belong to the tombstone cleanup
 workstream. Resource roots, reporter rows, and the retained newest versions
 are never deleted. There is no global orphan sweep.
 
+Retention counts existing rows, not numeric version slots: history with gaps
+(for example versions 0, 2, and 4) retains the newest existing rows at or
+below the authoritative pointer, and a resource with fewer existing rows than
+the retention window is pruned entirely of nothing. Preserving existing
+predecessors never reconstructs a numerically missing version, so consumer
+v/v-1 reads still depend on that version existing when it was reported.
+Common representations above a non-NULL pointer are never ranked or deleted.
+
 Pruning may remove the last remaining copy of a transaction ID used for
 duplicate detection; a later report retry then follows normal validation and
 processing, consistent with the agreed implementation policy.
@@ -29,7 +37,10 @@ processing, consistent with the agreed implementation policy.
 The job does **not** query Kafka/CDC state, establish consumer drain, or fence
 an application operation already in flight. Update consumption reads event
 version v and v-1, so pruning must not run while pending update or delete
-events reference versions inside the prunable window.
+events reference versions inside the prunable window. A violated gate looks
+like this: a pending update event for version v whose v-1 row was pruned makes
+the consumer's representation read fail, which stalls processing for that
+partition until the message is resolved operationally.
 `--acknowledge-drained-consumer` is a manual attestation gate only; it is not a
 safety check. Before any destructive run, an authorized operator must use the
 environment's independent operational evidence to verify that applicable
@@ -122,12 +133,21 @@ them from the sample defaults or invent them during a run.
 
 The job needs only its normal PostgreSQL connection and standard DML
 privileges: it uses CTEs within the existing transaction manager, not
-temporary tables, and it creates no indexes or other DDL. No additional index
-is required by this job's selectors. Deleting rows reduces the number of
-versions each consumer lookup must walk, which reduces query plan cost; it is
-not by itself a physical disk reclamation or latency claim. Autovacuum is
-expected to reclaim dead tuples; compaction (pg_repack or VACUUM FULL) is a
-separate, conditional follow-up if measured improvements do not materialize.
+temporary tables, and it creates no indexes or other DDL. The existing
+primary key and reporter-resource indexes are sufficient for the selectors to
+execute correctly; whether they are sufficient for acceptable batch duration
+at production scale is a separate question that stage validation must
+measure. Every destructive batch classifies all scoped roots twice (candidate
+selection and deletion) inside one serializable transaction, and each
+statement is bounded by a 30-second statement timeout (further bounded by the
+remaining invocation time). If classification exceeds that timeout at scale,
+the batch fails safely with no partial commit; stage validation should
+capture `EXPLAIN (ANALYZE, BUFFERS)` on representative data before any
+production run. Deleting rows reduces the number of versions each consumer
+lookup must walk, which reduces query plan cost; it is not by itself a
+physical disk reclamation or latency claim. Autovacuum is expected to reclaim
+dead tuples; compaction (pg_repack or VACUUM FULL) is a separate, conditional
+follow-up if measured improvements do not materialize.
 
 After a run, reconcile committed common representation rows, distinct impacted
 roots, retained versions per resource, exclusion counts, and service/database
@@ -138,10 +158,22 @@ replay/recovery horizon; those require separate validation and approval.
 ## Local verification
 
 The implementation has passed the repository's `make test` race/short suite
-and race-enabled PostgreSQL integration tests covering per-resource retention
-boundaries, NULL-pointer fallback, inconsistent-pointer exclusion,
-out-of-scope tombstoned-only roots, shared roots, resource type filtering,
-most-versions-first batch targeting, bounded batch accounting with rerun,
-read-only enforcement, and API revival
-with consumer v/v-1 reads against pruned state. They do not establish the
-operator prerequisites, stage readiness, or production approval.
+and the race-enabled real-PostgreSQL integration suite, run with:
+
+```sh
+CONTAINER_RUNTIME=podman ./scripts/testcontainers-run.sh \
+  go test -race -short -tags=integration ./cmd/jobs \
+  -run '^TestCommonRepCleanupPostgres$' -count=1 -timeout 15m
+```
+
+Coverage includes per-resource retention boundaries, NULL-pointer fallback,
+inconsistent-pointer exclusion, out-of-scope tombstoned-only roots, shared
+roots, resource type filtering, gapped-history retention, version authority
+over row age, deterministic resource-id tie-breaking, most-versions-first
+batch targeting, bounded batch accounting with rerun, read-only enforcement,
+rollback after injected mid-batch failures, committed-then-failed batch
+progress accounting, injected serialization-failure retry with exactly-once
+deletion, concurrent-write conflict retry against new state, post-prune
+tombstone and revival with root identity and numbering continuation, and
+consumer v/v-1 reads against pruned state. They do not establish the operator
+prerequisites, stage readiness, or production approval.

@@ -94,8 +94,8 @@ func TestValidation_AddResourceRelationshipsRequest(t *testing.T) {
 			expectErr: false,
 		},
 		{
-			name:     "common only is valid",
-			common:   validCommon,
+			name:      "common only is valid",
+			common:    validCommon,
 			expectErr: false,
 		},
 		{

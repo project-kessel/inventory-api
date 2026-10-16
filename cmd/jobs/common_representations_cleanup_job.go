@@ -11,8 +11,6 @@ import (
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/google/uuid"
 	"github.com/project-kessel/inventory-api/cmd/common"
-	bizmodel "github.com/project-kessel/inventory-api/internal/biz/model"
-	"github.com/project-kessel/inventory-api/internal/biz/usecase/cleanup"
 	"github.com/project-kessel/inventory-api/internal/data"
 	"github.com/project-kessel/inventory-api/internal/metricscollector"
 	"github.com/project-kessel/inventory-api/internal/storage"
@@ -159,13 +157,13 @@ func runCommonRepresentationsCleanupJob(
 	if err != nil {
 		return fmt.Errorf("--start-after must be a valid resource id: %w", err)
 	}
-	options, err := cleanup.NewOptions(chunkRows, batchSize, batchDelay, maxBatches, maxDuration)
+	options, err := newCommonRepCleanupOptions(chunkRows, batchSize, batchDelay, maxBatches, maxDuration)
 	if err != nil {
 		return fmt.Errorf("invalid common representation cleanup execution bounds: %w", err)
 	}
-	jobContext, cancel := context.WithTimeout(parentContext, options.MaxDuration)
+	jobContext, cancel := context.WithTimeout(parentContext, options.maxDuration)
 	defer cancel()
-	policy, err := bizmodel.NewCommonRepCleanupPolicy(keepVersions, resourceType)
+	policy, err := newCommonRepCleanupPolicy(keepVersions, resourceType)
 	if err != nil {
 		return err
 	}
@@ -197,18 +195,18 @@ func runCommonRepresentationsCleanupJob(
 		return fmt.Errorf("initialize common representation cleanup transaction metrics: %w", err)
 	}
 	transactionManager := data.NewGormTransactionManager(metrics, storageOptions.MaxSerializationRetries)
-	transactions := data.NewCommonRepCleanupTransaction(db, transactionManager)
-	usecase, err := cleanup.New(transactions)
+	transactions := newCommonRepCleanupTransaction(db, transactionManager)
+	usecase, err := newCommonRepCleanup(transactions)
 	if err != nil {
 		return err
 	}
 
-	onChunk := func(progress cleanup.ChunkProgress) {
+	onChunk := func(progress commonRepChunkProgress) {
 		logHelper.Infow("msg", "common representation cleanup chunk scanned",
-			"chunk", progress.ChunkNumber,
-			"chunk_roots_scanned", progress.RootsScanned,
-			"chunk_prunable_rows", progress.PrunableRows,
-			"cursor", progress.Cursor.String(),
+			"chunk", progress.chunkNumber,
+			"chunk_roots_scanned", progress.rootsScanned,
+			"chunk_prunable_rows", progress.prunableRows,
+			"cursor", progress.cursor.String(),
 		)
 	}
 
@@ -223,23 +221,23 @@ func runCommonRepresentationsCleanupJob(
 	}
 
 	logHelper.Warn("Common representation cleanup execution explicitly enabled; committed batches cannot be undone by cancellation")
-	result, executeErr := usecase.Execute(jobContext, policy, options, resumeCursor, func(batchNumber int, impact bizmodel.CommonRepCleanupImpact) {
+	result, executeErr := usecase.Execute(jobContext, policy, options, resumeCursor, func(batchNumber int, impact commonRepCleanupImpact) {
 		logHelper.Infow("msg", "common representation cleanup batch committed",
 			"batch", batchNumber,
-			"common_representations_deleted", impact.Representations(),
-			"resource_roots_impacted", countCommonRepRoots(impact.ResourceRootIDs()),
+			"common_representations_deleted", impact.representations,
+			"resource_roots_impacted", countCommonRepRoots(impact.resourceRootIDs),
 		)
 	}, onChunk)
-	logCommonRepCleanupReport(logHelper, result.Report, policy, options, true)
+	logCommonRepCleanupReport(logHelper, result.report, policy, options, true)
 	logCommonRepCleanupResult(logHelper, result)
 	return executeErr
 }
 
 func logCommonRepCleanupReport(
 	logHelper *log.Helper,
-	report cleanup.Report,
-	policy bizmodel.CommonRepCleanupPolicy,
-	options cleanup.Options,
+	report commonRepCleanupReport,
+	policy commonRepCleanupPolicy,
+	options commonRepCleanupOptions,
 	executeRequested bool,
 ) {
 	resourceTypeFilter := "*"
@@ -248,37 +246,37 @@ func logCommonRepCleanupReport(
 	}
 	logHelper.Infow("msg", "common representation cleanup pass report",
 		"execution_requested", executeRequested,
-		"keep_versions", report.KeepVersions,
+		"keep_versions", report.keepVersions,
 		"resource_type_filter", resourceTypeFilter,
-		"chunk_rows", options.ChunkRows,
-		"batch_size", options.BatchSize,
-		"maximum_batches", options.MaxBatches,
-		"batch_delay", options.BatchDelay.String(),
-		"maximum_duration", options.MaxDuration.String(),
-		"scan_started_at_utc", report.StartedAt.Format(time.RFC3339Nano),
-		"scan_finished_at_utc", report.FinishedAt.Format(time.RFC3339Nano),
-		"chunks_processed", report.ChunksProcessed,
-		"roots_scanned", report.RootsScanned,
-		"prunable_common_representations", report.PrunableRows,
-		"prunable_resource_roots", report.PrunableRoots,
-		"roots_without_active_reporter_out_of_scope", report.RootsWithoutActiveReporter,
-		"excluded_inconsistent_pointer_roots", report.ExcludedInconsistentRoots,
-		"last_cursor", report.LastCursor.String(),
-		"pass_complete", report.PassComplete,
+		"chunk_rows", options.chunkRows,
+		"batch_size", options.batchSize,
+		"maximum_batches", options.maxBatches,
+		"batch_delay", options.batchDelay.String(),
+		"maximum_duration", options.maxDuration.String(),
+		"scan_started_at_utc", report.startedAt.Format(time.RFC3339Nano),
+		"scan_finished_at_utc", report.finishedAt.Format(time.RFC3339Nano),
+		"chunks_processed", report.chunksProcessed,
+		"roots_scanned", report.rootsScanned,
+		"prunable_common_representations", report.prunableRows,
+		"prunable_resource_roots", report.prunableRoots,
+		"roots_without_active_reporter_out_of_scope", report.rootsWithoutActiveReporter,
+		"excluded_inconsistent_pointer_roots", report.excludedInconsistentRoots,
+		"last_cursor", report.lastCursor.String(),
+		"pass_complete", report.passComplete,
 	)
 }
 
-func logCommonRepCleanupResult(logHelper *log.Helper, result cleanup.Result) {
+func logCommonRepCleanupResult(logHelper *log.Helper, result commonRepCleanupResult) {
 	logHelper.Infow("msg", "common representation cleanup execution result",
-		"committed_batches", result.CommittedBatches,
-		"batch_limit_reached", result.BatchLimitReached,
-		"common_representations_deleted", result.DeletedRows,
-		"resource_roots_impacted", result.ImpactedRoots,
+		"committed_batches", result.committedBatches,
+		"batch_limit_reached", result.batchLimitReached,
+		"common_representations_deleted", result.deletedRows,
+		"resource_roots_impacted", result.impactedRoots,
 	)
 }
 
-func countCommonRepRoots(rootIDs []bizmodel.ResourceId) int {
-	roots := make(map[bizmodel.ResourceId]struct{}, len(rootIDs))
+func countCommonRepRoots(rootIDs []uuid.UUID) int {
+	roots := make(map[uuid.UUID]struct{}, len(rootIDs))
 	for _, rootID := range rootIDs {
 		roots[rootID] = struct{}{}
 	}

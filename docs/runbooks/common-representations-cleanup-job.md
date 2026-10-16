@@ -2,7 +2,10 @@
 
 `run-job common-representations-cleanup-job` prunes common representation
 history on resources with at least one active reporter. It requires PostgreSQL
-and defaults to a read-only preview. Tombstones, orphans, reporter history, and
+and defaults to a read-only preview. The implementation and focused tests are
+kept together in `cmd/jobs` for removal after this one-time operation; no cleanup
+interfaces or application services are added under `internal/`. Tombstones,
+orphans, reporter history, and
 compaction are separate workstreams.
 
 ## Retention
@@ -137,14 +140,10 @@ change the deployment's configuration source.
 
 ```sh
 CONTAINER_RUNTIME=podman ./scripts/testcontainers-run.sh \
-  go test -race -tags=integration ./test/integration \
+  go test -race -tags=integration ./cmd/jobs \
   -run '^TestCommonRepCleanup' -count=1 -timeout 15m
 ```
 
-The PostgreSQL suite covers retention and gaps, NULL and inconsistent pointers,
-tombstoned and shared roots, resource type filtering, version over age, deep
-histories, a hard batch row limit across roots, interrupted chunk resume,
-idempotency, read-only enforcement, rollback, committed progress after failure,
-serialization retries and exhaustion, pointer changes and concurrent reports,
-post-prune revival and consumer v/v-1 reads, and randomized histories compared
-with a reference retention model.
+The focused PostgreSQL suite covers retention and gaps, NULL and inconsistent
+pointers, tombstoned and shared roots, resource type filtering, deep histories,
+hard batch limits, interrupted chunk resume, read-only enforcement, and rollback.

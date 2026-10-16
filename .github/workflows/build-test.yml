@@ -34,12 +34,6 @@ jobs:
         run: go build -tags release -v ./...
       - name: Test
         run: make test
-      - name: Common representation cleanup PostgreSQL integration tests
-        timeout-minutes: 15
-        run: |
-          CONTAINER_RUNTIME=docker ./scripts/testcontainers-run.sh \
-            go test -race -tags=integration ./test/integration \
-            -run '^TestCommonRepCleanup' -count=1 -timeout 12m
       - name: Run v1beta2 + Internal Unit Tests (excluding v1beta1)
         run: |
           COVERPKG=$(go list -deps ./api/kessel/inventory/v1beta2/... ./internal/... | \

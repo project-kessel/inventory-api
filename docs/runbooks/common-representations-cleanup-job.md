@@ -80,12 +80,17 @@ The residual risk of that degradation is **stale workspace tuple residue**:
 when the consumer is behind and a resource's workspace changed across the
 pruned boundary, the delete side of the tuple delta is lost and the old
 workspace tuple remains in the relations store. This is authorization
-residue, not data corruption, and it is bounded by consumer health. Before
-any large destructive run, verify the consumer group is keeping up with the
-outbox topic so residue stays negligible; there is no automated cleanup for
-leaked tuples. Replay or offset rewind that requires pruned history is
-outside the supported contract; restore a consistent database state before
-any offset rewind.
+residue, not data corruption, and it is bounded by consumer health. A
+standing consumer backlog is disqualifying for a destructive run: during
+the observed incident class (roughly 200k pending events taking a day or
+more to drain), events still in the queue reference versions a concurrent
+pass would prune, so duplicate-retry detection for their transaction IDs
+degrades to normal validation and the delete side of their tuple deltas is
+lost. Before any destructive run, verify the consumer group is keeping up
+with the outbox topic — drain time in minutes, not hours; there is no
+automated cleanup for leaked tuples. Replay or offset rewind that requires
+pruned history is outside the supported contract; restore a consistent
+database state before any offset rewind.
 
 ## Preview
 
@@ -193,11 +198,12 @@ Delete the completed Job object after reviewing its logs.
 ## Stop conditions and reconciliation
 
 Do not execute, or stop before another batch, if the target/scope is
-uncertain, the consumer group is falling significantly behind the outbox
-topic, a new inconsistent-pointer exclusion appears, the report does not
-match the reviewed bounds, or required observation or recovery evidence is
-unavailable. Never override an exclusion by weakening the retention rule or
-the pointer consistency check.
+uncertain, the consumer group has a standing backlog on the outbox topic
+(the observed incident class of roughly 200k events taking a day or more to
+drain is disqualifying), a new inconsistent-pointer exclusion appears, the
+report does not match the reviewed bounds, or required observation or
+recovery evidence is unavailable. Never override an exclusion by weakening
+the retention rule or the pointer consistency check.
 
 No backup/recovery procedure, numerical stop limits, or staffed
 stage-validation plan is approved by this document. Obtain those approvals and

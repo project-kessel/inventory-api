@@ -5,6 +5,8 @@ package jobs
 import (
 	"context"
 	"fmt"
+	"math/rand"
+	"sort"
 	"strings"
 	"sync"
 	"testing"
@@ -67,24 +69,20 @@ func TestCommonRepCleanupPostgres(t *testing.T) {
 		seedCommonRepRoot(t, db, tombstonedOnlyRootID, "host", uintPointer(4), 0, 1, 2, 3, 4)
 		require.NoError(t, insertCommonRepReporter(t, db, tombstonedOnlyRootID, "tombstoned-only-root", "host", "hbi", true).Error)
 
-		// Active root with no common history at all: not a candidate, never a failure.
-		noHistoryRootID := uuid.New()
-		seedCommonRepRoot(t, db, noHistoryRootID, "host", nil)
-		require.NoError(t, insertCommonRepReporter(t, db, noHistoryRootID, "no-history-root", "host", "hbi", false).Error)
-
-		options, err := newCommonRepCleanupOptions(100, 0, 1, time.Minute)
+		options, err := newCommonRepCleanupOptions(100, 100, 0, 1, time.Minute)
 		require.NoError(t, err)
 		usecase := newTestCommonRepCleanupUsecase(t, db)
 
-		report, err := usecase.Preview(context.Background(), policy, options)
+		report, err := usecase.Preview(context.Background(), policy, options, uuid.Nil, nil)
 		require.NoError(t, err)
-		assert.Equal(t, int64(6), report.ScopedActiveRoots())
+		// Roots without common history are never visited: the pass walks
+		// common_representations, so only the six roots with rows are scanned.
+		assert.Equal(t, int64(6), report.RootsScanned())
 		assert.Equal(t, int64(1), report.RootsWithoutActiveReporter(), "the tombstoned-only root is out of scope")
-		assert.Equal(t, int64(1), report.RootsWithoutCommonHistory(), "the root without common history is not a candidate")
 		assert.Equal(t, int64(1), report.ExcludedInconsistentRoots())
-		assert.Equal(t, int64(9), report.TotalPrunable().Representations(), "three roots with three prunable versions each")
-		assert.Equal(t, int64(3), report.TotalPrunable().ResourceRootsImpacted())
-		assert.Equal(t, int64(9), report.BoundedPrunable().Representations())
+		assert.Equal(t, int64(9), report.PrunableRows(), "three roots with three prunable versions each")
+		assert.Equal(t, int64(3), report.PrunableRoots())
+		assert.True(t, report.PassComplete())
 
 		// Preview must not mutate anything.
 		assertCommonRepVersions(t, db, pointerRootID, []uint{0, 1, 2, 3, 4})
@@ -93,16 +91,16 @@ func TestCommonRepCleanupPostgres(t *testing.T) {
 		// Read-only transactions must refuse deletion.
 		readOnlyTransaction := newCommonRepCleanupTransaction(db, data.NewGormTransactionManager(metricscollector.NewFakeMetricsCollector(), 3))
 		readOnlyErr := readOnlyTransaction.WithinSerializableCommonRepCleanup(context.Background(), "common_rep_cleanup_read_only_enforcement_test", true, 30*time.Second, 5*time.Second, func(repository commonRepCleanupRepository) error {
-			_, err := repository.DeleteCommonHistoryBatch(context.Background(), policy, 10)
+			_, err := repository.DeletePrunableRoots(context.Background(), policy, []uuid.UUID{pointerRootID})
 			return err
 		})
 		require.ErrorContains(t, readOnlyErr, "read-only transaction")
 
-		result, err := usecase.Execute(context.Background(), policy, options, nil)
+		result, err := usecase.Execute(context.Background(), policy, options, uuid.Nil, nil, nil)
 		require.NoError(t, err)
-		assert.Equal(t, 1, result.CommittedBatches())
 		assert.Equal(t, int64(9), result.Impact().Representations())
 		assert.Equal(t, int64(3), result.Impact().ResourceRootsImpacted())
+		assert.Empty(t, result.ParkedRoots())
 
 		assertCommonRepVersions(t, db, pointerRootID, []uint{3, 4}, "only the retained window survives")
 		assertCommonRepVersions(t, db, nullPointerRootID, []uint{3, 4}, "a NULL pointer falls back to MAX(version)")
@@ -110,7 +108,6 @@ func TestCommonRepCleanupPostgres(t *testing.T) {
 		assertCommonRepVersions(t, db, freshRootID, []uint{0, 1})
 		assertCommonRepVersions(t, db, inconsistentRootID, []uint{0, 1, 2, 3}, "an inconsistent pointer excludes the whole root")
 		assertCommonRepVersions(t, db, tombstonedOnlyRootID, []uint{0, 1, 2, 3, 4}, "out-of-scope roots are untouched")
-		assertCommonRepVersions(t, db, noHistoryRootID, nil)
 
 		// Roots and reporter rows are never deleted.
 		assertCommonRepRootCount(t, db, pointerRootID, 1)
@@ -129,10 +126,10 @@ func TestCommonRepCleanupPostgres(t *testing.T) {
 		seedCommonRepRoot(t, db, rootID, "host", uintPointer(4), 0, 1, 2, 3, 4)
 		require.NoError(t, insertCommonRepReporter(t, db, rootID, "keep-three-root", "host", "hbi", false).Error)
 
-		options, err := newCommonRepCleanupOptions(100, 0, 1, time.Minute)
+		options, err := newCommonRepCleanupOptions(100, 100, 0, 1, time.Minute)
 		require.NoError(t, err)
 		usecase := newTestCommonRepCleanupUsecase(t, db)
-		result, err := usecase.Execute(context.Background(), policy, options, nil)
+		result, err := usecase.Execute(context.Background(), policy, options, uuid.Nil, nil, nil)
 		require.NoError(t, err)
 		assert.Equal(t, int64(2), result.Impact().Representations())
 		assertCommonRepVersions(t, db, rootID, []uint{2, 3, 4})
@@ -150,55 +147,20 @@ func TestCommonRepCleanupPostgres(t *testing.T) {
 		seedCommonRepRoot(t, db, hostRootID, "host", uintPointer(4), 0, 1, 2, 3, 4)
 		require.NoError(t, insertCommonRepReporter(t, db, hostRootID, "host-root", "host", "hbi", false).Error)
 
-		options, err := newCommonRepCleanupOptions(100, 0, 1, time.Minute)
+		options, err := newCommonRepCleanupOptions(100, 100, 0, 1, time.Minute)
 		require.NoError(t, err)
 		usecase := newTestCommonRepCleanupUsecase(t, db)
 
-		report, err := usecase.Preview(context.Background(), policy, options)
+		report, err := usecase.Preview(context.Background(), policy, options, uuid.Nil, nil)
 		require.NoError(t, err)
-		assert.Equal(t, int64(1), report.ScopedActiveRoots())
-		assert.Equal(t, int64(3), report.TotalPrunable().Representations())
+		assert.Equal(t, int64(1), report.RootsScanned(), "roots of other types are not classified")
+		assert.Equal(t, int64(3), report.PrunableRows())
 
-		result, err := usecase.Execute(context.Background(), policy, options, nil)
+		result, err := usecase.Execute(context.Background(), policy, options, uuid.Nil, nil, nil)
 		require.NoError(t, err)
 		assert.Equal(t, int64(3), result.Impact().Representations())
 		assertCommonRepVersions(t, db, clusterRootID, []uint{3, 4})
 		assertCommonRepVersions(t, db, hostRootID, []uint{0, 1, 2, 3, 4}, "the unfiltered type is untouched")
-	})
-
-	t.Run("bounded batches commit exact accounting and rerun remaining eligibility", func(t *testing.T) {
-		isolateCommonRepCleanupPostgresSubtest(t, db)
-		policy, err := newCommonRepCleanupPolicy(2, "")
-		require.NoError(t, err)
-
-		firstRootID := uuid.New()
-		seedCommonRepRoot(t, db, firstRootID, "host", uintPointer(9), 0, 1, 2, 3, 4, 5, 6, 7, 8, 9)
-		require.NoError(t, insertCommonRepReporter(t, db, firstRootID, "batch-first-root", "host", "hbi", false).Error)
-		secondRootID := uuid.New()
-		seedCommonRepRoot(t, db, secondRootID, "host", uintPointer(9), 0, 1, 2, 3, 4, 5, 6, 7, 8, 9)
-		require.NoError(t, insertCommonRepReporter(t, db, secondRootID, "batch-second-root", "host", "hbi", false).Error)
-
-		usecase := newTestCommonRepCleanupUsecase(t, db)
-		boundedOptions, err := newCommonRepCleanupOptions(3, 0, 1, time.Minute)
-		require.NoError(t, err)
-		report, err := usecase.Preview(context.Background(), policy, boundedOptions)
-		require.NoError(t, err)
-		assert.Equal(t, int64(16), report.TotalPrunable().Representations())
-		assert.Equal(t, int64(3), report.BoundedPrunable().Representations(), "the bounded projection covers one batch prefix")
-
-		firstRun, err := usecase.Execute(context.Background(), policy, boundedOptions, nil)
-		require.NoError(t, err)
-		assert.Equal(t, 1, firstRun.CommittedBatches())
-		assert.True(t, firstRun.BatchLimitReached())
-		assert.Equal(t, int64(3), firstRun.Impact().Representations())
-
-		rerunOptions, err := newCommonRepCleanupOptions(3, 0, 5, time.Minute)
-		require.NoError(t, err)
-		secondRun, err := usecase.Execute(context.Background(), policy, rerunOptions, nil)
-		require.NoError(t, err)
-		assert.Equal(t, int64(13), secondRun.Impact().Representations(), "the rerun removes the remaining eligibility")
-		assertCommonRepVersions(t, db, firstRootID, []uint{8, 9})
-		assertCommonRepVersions(t, db, secondRootID, []uint{8, 9})
 	})
 
 	t.Run("gapped history retains the newest existing rows at or below the pointer", func(t *testing.T) {
@@ -222,15 +184,15 @@ func TestCommonRepCleanupPostgres(t *testing.T) {
 		seedCommonRepRoot(t, db, sparseRootID, "host", uintPointer(2), 0, 1, 5)
 		require.NoError(t, insertCommonRepReporter(t, db, sparseRootID, "sparse-root", "host", "hbi", false).Error)
 
-		options, err := newCommonRepCleanupOptions(100, 0, 1, time.Minute)
+		options, err := newCommonRepCleanupOptions(100, 100, 0, 1, time.Minute)
 		require.NoError(t, err)
 		usecase := newTestCommonRepCleanupUsecase(t, db)
 
-		report, err := usecase.Preview(context.Background(), policy, options)
+		report, err := usecase.Preview(context.Background(), policy, options, uuid.Nil, nil)
 		require.NoError(t, err)
-		assert.Equal(t, int64(3), report.TotalPrunable().Representations(), "one prunable row per gapped root with three or more rows")
+		assert.Equal(t, int64(3), report.PrunableRows(), "one prunable row per gapped root with three or more rows")
 
-		result, err := usecase.Execute(context.Background(), policy, options, nil)
+		result, err := usecase.Execute(context.Background(), policy, options, uuid.Nil, nil, nil)
 		require.NoError(t, err)
 		assert.Equal(t, int64(3), result.Impact().Representations())
 
@@ -255,36 +217,148 @@ func TestCommonRepCleanupPostgres(t *testing.T) {
 		}
 		require.NoError(t, insertCommonRepReporter(t, db, rootID, "age-anchor-root", "host", "hbi", false).Error)
 
-		options, err := newCommonRepCleanupOptions(100, 0, 1, time.Minute)
+		options, err := newCommonRepCleanupOptions(100, 100, 0, 1, time.Minute)
 		require.NoError(t, err)
 		usecase := newTestCommonRepCleanupUsecase(t, db)
-		result, err := usecase.Execute(context.Background(), policy, options, nil)
+		result, err := usecase.Execute(context.Background(), policy, options, uuid.Nil, nil, nil)
 		require.NoError(t, err)
 		assert.Equal(t, int64(3), result.Impact().Representations())
 		assertCommonRepVersions(t, db, rootID, []uint{3, 4}, "the oldest-timestamp rows survive because ranking is by version")
 	})
 
-	t.Run("equal current versions break ties by resource id", func(t *testing.T) {
+	t.Run("chunk boundaries stay root-aligned and deep roots prune in bounded batches", func(t *testing.T) {
 		isolateCommonRepCleanupPostgresSubtest(t, db)
 		policy, err := newCommonRepCleanupPolicy(2, "")
 		require.NoError(t, err)
 
-		firstRootID := uuid.MustParse("10000000-0000-0000-0000-00000000000a")
-		secondRootID := uuid.MustParse("10000000-0000-0000-0000-00000000000b")
-		for _, rootID := range []uuid.UUID{firstRootID, secondRootID} {
-			seedCommonRepRoot(t, db, rootID, "host", uintPointer(5), 0, 1, 2, 3, 4, 5)
-			require.NoError(t, insertCommonRepReporter(t, db, rootID, "tie-root-"+rootID.String(), "host", "hbi", false).Error)
-		}
+		// Twelve versions behind a chunk-rows cap of five: the boundary probe lands
+		// inside this root, so the first chunk must contain the root alone and whole.
+		deepRootID := uuid.MustParse("10000000-0000-0000-0000-000000000001")
+		seedCommonRepRoot(t, db, deepRootID, "host", uintPointer(11), 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11)
+		require.NoError(t, insertCommonRepReporter(t, db, deepRootID, "deep-root", "host", "hbi", false).Error)
 
-		options, err := newCommonRepCleanupOptions(4, 0, 1, time.Minute)
+		smallRootID := uuid.MustParse("20000000-0000-0000-0000-000000000002")
+		seedCommonRepRoot(t, db, smallRootID, "host", uintPointer(2), 0, 1, 2)
+		require.NoError(t, insertCommonRepReporter(t, db, smallRootID, "small-root", "host", "hbi", false).Error)
+
+		// A batch size of four forces the deep root through the bounded
+		// lowest-version loop: ten prunable rows commit as three batches.
+		options, err := newCommonRepCleanupOptions(5, 4, 0, 10, time.Minute)
 		require.NoError(t, err)
 		usecase := newTestCommonRepCleanupUsecase(t, db)
-		result, err := usecase.Execute(context.Background(), policy, options, nil)
+
+		report, err := usecase.Preview(context.Background(), policy, options, uuid.Nil, nil)
 		require.NoError(t, err)
-		assert.Equal(t, int64(4), result.Impact().Representations())
-		assert.Equal(t, int64(1), result.Impact().ResourceRootsImpacted())
-		assertCommonRepVersions(t, db, firstRootID, []uint{4, 5}, "the lexicographically smaller resource id wins the tie")
-		assertCommonRepVersions(t, db, secondRootID, []uint{0, 1, 2, 3, 4, 5})
+		assert.True(t, report.PassComplete())
+		assert.GreaterOrEqual(t, report.ChunksProcessed(), int64(2), "the deep root and the small root land in different chunks")
+
+		result, err := usecase.Execute(context.Background(), policy, options, uuid.Nil, nil, nil)
+		require.NoError(t, err)
+		assert.Equal(t, int64(11), result.Impact().Representations())
+		assert.Equal(t, 4, result.CommittedBatches(), "ten deep rows at four per statement plus one small-root batch")
+		assertCommonRepVersions(t, db, deepRootID, []uint{10, 11}, "the deep root is pruned completely across chunk-aligned batches")
+		assertCommonRepVersions(t, db, smallRootID, []uint{1, 2})
+	})
+
+	t.Run("resume after the reported cursor completes the pass", func(t *testing.T) {
+		isolateCommonRepCleanupPostgresSubtest(t, db)
+		policy, err := newCommonRepCleanupPolicy(2, "")
+		require.NoError(t, err)
+
+		// Five rows each: with chunk-rows capped at three, each root gets its own
+		// root-aligned chunk and the budget stops after the first.
+		firstRootID := uuid.MustParse("10000000-0000-0000-0000-00000000000a")
+		seedCommonRepRoot(t, db, firstRootID, "host", uintPointer(4), 0, 1, 2, 3, 4)
+		require.NoError(t, insertCommonRepReporter(t, db, firstRootID, "resume-first-root", "host", "hbi", false).Error)
+		secondRootID := uuid.MustParse("20000000-0000-0000-0000-00000000000b")
+		seedCommonRepRoot(t, db, secondRootID, "host", uintPointer(4), 0, 1, 2, 3, 4)
+		require.NoError(t, insertCommonRepReporter(t, db, secondRootID, "resume-second-root", "host", "hbi", false).Error)
+
+		usecase := newTestCommonRepCleanupUsecase(t, db)
+		budgeted, err := newCommonRepCleanupOptions(3, 100, 0, 1, time.Minute)
+		require.NoError(t, err)
+		firstRun, err := usecase.Execute(context.Background(), policy, budgeted, uuid.Nil, nil, nil)
+		require.NoError(t, err)
+		assert.Equal(t, int64(3), firstRun.Impact().Representations())
+		assert.True(t, firstRun.BatchLimitReached())
+		assert.False(t, firstRun.Report().PassComplete())
+		assert.Equal(t, firstRootID, firstRun.Report().LastCursor(), "the cursor names the last fully processed root")
+		assertCommonRepVersions(t, db, firstRootID, []uint{3, 4})
+		assertCommonRepVersions(t, db, secondRootID, []uint{0, 1, 2, 3, 4}, "roots after the stopped cursor are untouched")
+
+		resume, err := newCommonRepCleanupOptions(3, 100, 0, 5, time.Minute)
+		require.NoError(t, err)
+		secondRun, err := usecase.Execute(context.Background(), policy, resume, firstRun.Report().LastCursor(), nil, nil)
+		require.NoError(t, err)
+		assert.Equal(t, int64(3), secondRun.Impact().Representations())
+		assert.True(t, secondRun.Report().PassComplete())
+		assert.Equal(t, int64(1), secondRun.Report().RootsScanned(), "resuming after the cursor skips already-passed roots")
+		assertCommonRepVersions(t, db, secondRootID, []uint{3, 4})
+	})
+
+	t.Run("resume after a mid-chunk budget stop reprocesses the interrupted chunk", func(t *testing.T) {
+		isolateCommonRepCleanupPostgresSubtest(t, db)
+		policy, err := newCommonRepCleanupPolicy(2, "")
+		require.NoError(t, err)
+
+		// Three roots in one chunk: the first group commits and the budget
+		// refuses the second, so the chunk itself is incomplete.
+		rootIDs := []uuid.UUID{
+			uuid.MustParse("10000000-0000-0000-0000-000000000041"),
+			uuid.MustParse("20000000-0000-0000-0000-000000000042"),
+			uuid.MustParse("30000000-0000-0000-0000-000000000043"),
+		}
+		for index, rootID := range rootIDs {
+			seedCommonRepRoot(t, db, rootID, "host", uintPointer(4), 0, 1, 2, 3, 4)
+			require.NoError(t, insertCommonRepReporter(t, db, rootID, fmt.Sprintf("mid-chunk-root-%d", index), "host", "hbi", false).Error)
+		}
+
+		usecase := newTestCommonRepCleanupUsecase(t, db)
+		stopped, err := newCommonRepCleanupOptions(100, 4, 0, 1, time.Minute)
+		require.NoError(t, err)
+		firstRun, err := usecase.Execute(context.Background(), policy, stopped, uuid.Nil, nil, nil)
+		require.NoError(t, err)
+		assert.Equal(t, int64(6), firstRun.Impact().Representations(), "the first group commits both roots' rows")
+		assert.True(t, firstRun.BatchLimitReached())
+		assert.False(t, firstRun.Report().PassComplete())
+		assert.Equal(t, uuid.Nil, firstRun.Report().LastCursor(), "an interrupted chunk does not advance the cursor past unprocessed groups")
+
+		resume, err := newCommonRepCleanupOptions(100, 4, 0, 5, time.Minute)
+		require.NoError(t, err)
+		secondRun, err := usecase.Execute(context.Background(), policy, resume, firstRun.Report().LastCursor(), nil, nil)
+		require.NoError(t, err)
+		assert.Equal(t, int64(3), secondRun.Impact().Representations(), "the resume reprocesses the interrupted chunk's remaining group")
+		assert.True(t, secondRun.Report().PassComplete())
+		assert.Equal(t, int64(3), secondRun.Report().RootsScanned(), "the interrupted chunk is re-scanned wholesale")
+
+		for _, rootID := range rootIDs {
+			assertCommonRepVersions(t, db, rootID, []uint{3, 4})
+		}
+	})
+
+	t.Run("a completed pass is idempotent", func(t *testing.T) {
+		isolateCommonRepCleanupPostgresSubtest(t, db)
+		policy, err := newCommonRepCleanupPolicy(2, "")
+		require.NoError(t, err)
+
+		rootID := uuid.New()
+		seedCommonRepRoot(t, db, rootID, "host", uintPointer(4), 0, 1, 2, 3, 4)
+		require.NoError(t, insertCommonRepReporter(t, db, rootID, "idempotent-root", "host", "hbi", false).Error)
+
+		usecase := newTestCommonRepCleanupUsecase(t, db)
+		options, err := newCommonRepCleanupOptions(100, 100, 0, 5, time.Minute)
+		require.NoError(t, err)
+		first, err := usecase.Execute(context.Background(), policy, options, uuid.Nil, nil, nil)
+		require.NoError(t, err)
+		assert.Equal(t, int64(3), first.Impact().Representations())
+		assert.True(t, first.Report().PassComplete())
+
+		second, err := usecase.Execute(context.Background(), policy, options, uuid.Nil, nil, nil)
+		require.NoError(t, err)
+		assert.Zero(t, second.Impact().Representations(), "a second completed pass finds nothing to prune")
+		assert.True(t, second.Report().PassComplete())
+		assert.Equal(t, int64(1), second.Report().RootsScanned())
+		assert.Zero(t, second.Report().PrunableRows())
 	})
 
 	t.Run("injected failure after deletion rolls back the entire batch", func(t *testing.T) {
@@ -309,25 +383,26 @@ func TestCommonRepCleanupPostgres(t *testing.T) {
 			_ = db.Exec("DROP FUNCTION IF EXISTS common_rep_test_fail_mid_delete()").Error
 		})
 
-		options, err := newCommonRepCleanupOptions(100, 0, 1, time.Minute)
+		options, err := newCommonRepCleanupOptions(100, 100, 0, 1, time.Minute)
 		require.NoError(t, err)
 		usecase := newTestCommonRepCleanupUsecase(t, db)
-		result, err := usecase.Execute(context.Background(), policy, options, nil)
+		result, err := usecase.Execute(context.Background(), policy, options, uuid.Nil, nil, nil)
 		require.ErrorContains(t, err, "injected cleanup failure")
 		assert.Zero(t, result.Impact().Representations(), "a failed batch contributes no committed progress")
 		assert.Zero(t, result.CommittedBatches())
 		assertCommonRepVersions(t, db, rootID, []uint{0, 1, 2, 3, 4}, "rows deleted before the injected failure must be restored by rollback")
 	})
 
-	t.Run("committed first batch followed by failed later batch reports only committed progress", func(t *testing.T) {
+	t.Run("committed first batches followed by a failed later batch report only committed progress", func(t *testing.T) {
 		isolateCommonRepCleanupPostgresSubtest(t, db)
 		policy, err := newCommonRepCleanupPolicy(2, "")
 		require.NoError(t, err)
 
-		firstRootID := uuid.New()
+		// Deterministic scan order: the deep root is processed before the poison root.
+		firstRootID := uuid.MustParse("10000000-0000-0000-0000-000000000021")
 		seedCommonRepRoot(t, db, firstRootID, "host", uintPointer(9), 0, 1, 2, 3, 4, 5, 6, 7, 8, 9)
 		require.NoError(t, insertCommonRepReporter(t, db, firstRootID, "committed-first-root", "host", "hbi", false).Error)
-		poisonRootID := uuid.New()
+		poisonRootID := uuid.MustParse("20000000-0000-0000-0000-000000000022")
 		seedCommonRepRoot(t, db, poisonRootID, "host", uintPointer(5), 0, 1, 2, 3, 4, 5)
 		require.NoError(t, insertCommonRepReporter(t, db, poisonRootID, "poison-root", "host", "hbi", false).Error)
 
@@ -344,13 +419,15 @@ func TestCommonRepCleanupPostgres(t *testing.T) {
 			_ = db.Exec("DROP FUNCTION IF EXISTS common_rep_test_fail_poison()").Error
 		})
 
-		options, err := newCommonRepCleanupOptions(4, 0, 5, time.Minute)
+		// A batch size of four routes the eight planned rows of the first root
+		// through the deep loop as two committed batches before the poison group fails.
+		options, err := newCommonRepCleanupOptions(100, 4, 0, 5, time.Minute)
 		require.NoError(t, err)
 		usecase := newTestCommonRepCleanupUsecase(t, db)
 		var committedCallbacks int
-		result, err := usecase.Execute(context.Background(), policy, options, func(_ int, _ commonRepCleanupImpact) {
+		result, err := usecase.Execute(context.Background(), policy, options, uuid.Nil, func(_ int, _ commonRepCleanupImpact) {
 			committedCallbacks++
-		})
+		}, nil)
 		require.ErrorContains(t, err, "injected poison failure")
 		assert.Equal(t, 2, result.CommittedBatches(), "the two batches before the poison root committed")
 		assert.Equal(t, int64(8), result.Impact().Representations())
@@ -385,54 +462,64 @@ func TestCommonRepCleanupPostgres(t *testing.T) {
 			_ = db.Exec("DROP SEQUENCE IF EXISTS common_rep_test_retry_seq").Error
 		})
 
-		options, err := newCommonRepCleanupOptions(100, 0, 1, time.Minute)
+		options, err := newCommonRepCleanupOptions(100, 100, 0, 1, time.Minute)
 		require.NoError(t, err)
 		usecase := newTestCommonRepCleanupUsecase(t, db)
 		var committedCallbacks int
-		result, err := usecase.Execute(context.Background(), policy, options, func(_ int, _ commonRepCleanupImpact) {
+		result, err := usecase.Execute(context.Background(), policy, options, uuid.Nil, func(_ int, _ commonRepCleanupImpact) {
 			committedCallbacks++
-		})
+		}, nil)
 		require.NoError(t, err, "the shared transaction manager must retry the injected serialization failure")
 		assert.Equal(t, int64(3), result.Impact().Representations(), "rows are deleted exactly once despite the retry")
 		assert.Equal(t, 1, result.CommittedBatches())
 		assert.Equal(t, 1, committedCallbacks)
+		assert.Empty(t, result.ParkedRoots(), "a retry that succeeds must not park the root")
 		assertCommonRepVersions(t, db, rootID, []uint{3, 4})
 	})
 
-	t.Run("batches target resources with the most versions first", func(t *testing.T) {
+	t.Run("serialization-exhausted roots are parked and the pass continues", func(t *testing.T) {
 		isolateCommonRepCleanupPostgresSubtest(t, db)
 		policy, err := newCommonRepCleanupPolicy(2, "")
 		require.NoError(t, err)
 
-		// The low-version root is seeded first; only version-count ordering can
-		// guarantee the high-version root is selected ahead of it.
-		lowRootID := uuid.New()
-		seedCommonRepRoot(t, db, lowRootID, "host", uintPointer(4), 0, 1, 2, 3, 4)
-		require.NoError(t, insertCommonRepReporter(t, db, lowRootID, "low-version-root", "host", "hbi", false).Error)
+		cleanRootID := uuid.MustParse("10000000-0000-0000-0000-000000000031")
+		seedCommonRepRoot(t, db, cleanRootID, "host", uintPointer(4), 0, 1, 2, 3, 4)
+		require.NoError(t, insertCommonRepReporter(t, db, cleanRootID, "park-clean-root", "host", "hbi", false).Error)
+		// Seven versions make the hot root deeper than the batch size, so it is
+		// isolated into its own deep group and parked without touching the clean
+		// root's group.
+		hotRootID := uuid.MustParse("20000000-0000-0000-0000-000000000032")
+		seedCommonRepRoot(t, db, hotRootID, "host", uintPointer(6), 0, 1, 2, 3, 4, 5, 6)
+		require.NoError(t, insertCommonRepReporter(t, db, hotRootID, "park-hot-root", "host", "hbi", false).Error)
 
-		highRootID := uuid.New()
-		seedCommonRepRoot(t, db, highRootID, "host", uintPointer(9), 0, 1, 2, 3, 4, 5, 6, 7, 8, 9)
-		require.NoError(t, insertCommonRepReporter(t, db, highRootID, "high-version-root", "host", "hbi", false).Error)
+		// The hot root always raises a serialization failure, so the transaction
+		// manager exhausts its retries and the pass must park it instead of failing.
+		require.NoError(t, db.Exec(fmt.Sprintf(`CREATE OR REPLACE FUNCTION common_rep_test_always_40001() RETURNS trigger AS $$
+			BEGIN
+				RAISE EXCEPTION 'injected serialization failure' USING ERRCODE = '40001';
+			END $$ LANGUAGE plpgsql`)).Error)
+		require.NoError(t, db.Exec(fmt.Sprintf(`CREATE TRIGGER common_rep_test_hot_root_trigger
+			BEFORE DELETE ON common_representations
+			FOR EACH ROW WHEN (OLD.resource_id = '%s')
+			EXECUTE FUNCTION common_rep_test_always_40001()`, hotRootID)).Error)
+		t.Cleanup(func() {
+			_ = db.Exec("DROP TRIGGER IF EXISTS common_rep_test_hot_root_trigger ON common_representations").Error
+			_ = db.Exec("DROP FUNCTION IF EXISTS common_rep_test_always_40001()").Error
+		})
 
+		options, err := newCommonRepCleanupOptions(100, 4, 0, 10, time.Minute)
+		require.NoError(t, err)
 		usecase := newTestCommonRepCleanupUsecase(t, db)
-		options, err := newCommonRepCleanupOptions(3, 0, 1, time.Minute)
-		require.NoError(t, err)
-
-		report, err := usecase.Preview(context.Background(), policy, options)
-		require.NoError(t, err)
-		assert.Equal(t, int64(11), report.TotalPrunable().Representations())
-		assert.Equal(t, int64(3), report.BoundedPrunable().Representations())
-		assert.Equal(t, int64(1), report.BoundedPrunable().ResourceRootsImpacted(), "the bounded prefix must target only the high-version root")
-
-		result, err := usecase.Execute(context.Background(), policy, options, nil)
-		require.NoError(t, err)
-		assert.Equal(t, int64(3), result.Impact().Representations())
-		assert.Equal(t, int64(1), result.Impact().ResourceRootsImpacted())
-		assertCommonRepVersions(t, db, highRootID, []uint{3, 4, 5, 6, 7, 8, 9}, "the high-version root loses its oldest three versions")
-		assertCommonRepVersions(t, db, lowRootID, []uint{0, 1, 2, 3, 4}, "the low-version root stays untouched while higher-version resources remain")
+		result, err := usecase.Execute(context.Background(), policy, options, uuid.Nil, nil, nil)
+		require.NoError(t, err, "an exhausted hot root is parked, not fatal")
+		assert.Equal(t, int64(3), result.Impact().Representations(), "the clean root still prunes")
+		assert.Equal(t, []uuid.UUID{hotRootID}, result.ParkedRoots(), "the hot root is reported for a rerun")
+		assert.True(t, result.Report().PassComplete(), "the scan still completes")
+		assertCommonRepVersions(t, db, cleanRootID, []uint{3, 4})
+		assertCommonRepVersions(t, db, hotRootID, []uint{0, 1, 2, 3, 4, 5, 6}, "the parked root keeps its rows for the rerun")
 	})
 
-	t.Run("concurrent report during an in-flight batch is retried against the new state", func(t *testing.T) {
+	t.Run("concurrent report between chunk planning and deletion prunes against the new state", func(t *testing.T) {
 		isolateCommonRepCleanupPostgresSubtest(t, db)
 		policy, err := newCommonRepCleanupPolicy(2, "")
 		require.NoError(t, err)
@@ -453,7 +540,7 @@ func TestCommonRepCleanupPostgres(t *testing.T) {
 		transactions := newCommonRepCleanupTransaction(gatedDB, data.NewGormTransactionManager(metricscollector.NewFakeMetricsCollector(), 5))
 		usecase, err := newCommonRepCleanup(transactions)
 		require.NoError(t, err)
-		options, err := newCommonRepCleanupOptions(100, 0, 1, time.Minute)
+		options, err := newCommonRepCleanupOptions(100, 100, 0, 1, time.Minute)
 		require.NoError(t, err)
 
 		completed := make(chan struct {
@@ -461,19 +548,21 @@ func TestCommonRepCleanupPostgres(t *testing.T) {
 			err    error
 		}, 1)
 		go func() {
-			result, executeErr := usecase.Execute(context.Background(), policy, options, nil)
+			result, executeErr := usecase.Execute(context.Background(), policy, options, uuid.Nil, nil, nil)
 			completed <- struct {
 				result commonRepCleanupResult
 				err    error
 			}{result, executeErr}
 		}()
 
-		// Wait until the cleanup transaction has selected its candidates, then
-		// commit a concurrent common-bearing write through a separate connection.
+		// Wait until the chunk scan has classified the root, then commit a
+		// concurrent common-bearing write through a separate connection. The
+		// delete transaction must re-classify against the new state rather than
+		// trusting the plan.
 		select {
 		case <-gateLogger.entered:
 		case <-time.After(10 * time.Second):
-			t.Fatal("cleanup transaction did not reach candidate selection")
+			t.Fatal("cleanup chunk scan did not reach classification")
 		}
 		concurrentDB := db.Session(&gorm.Session{})
 		require.NoError(t, concurrentDB.Exec(`INSERT INTO common_representations (resource_id, version, data, reported_by_reporter_type, reported_by_reporter_instance, transaction_id, created_at)
@@ -483,16 +572,15 @@ func TestCommonRepCleanupPostgres(t *testing.T) {
 
 		select {
 		case outcome := <-completed:
-			require.NoError(t, outcome.err, "the serialization conflict must be retried, not surfaced")
-			assert.Equal(t, int64(3), outcome.result.Impact().Representations(), "the retry prunes against the concurrent write's new state")
-			assert.Equal(t, 1, outcome.result.CommittedBatches())
-			assertCommonRepVersions(t, db, rootID, []uint{3, 4, 5}, "version 5 from the concurrent write is retained")
+			require.NoError(t, outcome.err, "the chunked pass must adapt to the concurrent write, not fail")
+			assert.Equal(t, int64(4), outcome.result.Impact().Representations(), "deletion re-ranks against the concurrent write's new state")
+			assertCommonRepVersions(t, db, rootID, []uint{4, 5}, "version 5 from the concurrent write is retained")
 		case <-time.After(30 * time.Second):
 			t.Fatal("cleanup did not finish after the concurrent write")
 		}
 	})
 
-	t.Run("post-prune tombstone and revival keeps root identity and resumes numbering", func(t *testing.T) {
+	t.Run("post-prune tombstone, revival, and re-report keep root identity and consumer reads", func(t *testing.T) {
 		isolateCommonRepCleanupPostgresSubtest(t, db)
 		const reporterType = "revivalcase"
 		resourceUsecase, resourceRepository := commonRepAPIUsecase(t, db, reporterType)
@@ -514,10 +602,10 @@ func TestCommonRepCleanupPostgres(t *testing.T) {
 
 		policy, err := newCommonRepCleanupPolicy(2, "")
 		require.NoError(t, err)
-		options, err := newCommonRepCleanupOptions(100, 0, 1, time.Minute)
+		options, err := newCommonRepCleanupOptions(100, 100, 0, 1, time.Minute)
 		require.NoError(t, err)
 		usecase := newTestCommonRepCleanupUsecase(t, db)
-		firstPrune, err := usecase.Execute(context.Background(), policy, options, nil)
+		firstPrune, err := usecase.Execute(context.Background(), policy, options, uuid.Nil, nil, nil)
 		require.NoError(t, err)
 		assert.Equal(t, int64(3), firstPrune.Impact().Representations())
 		assertCommonRepVersions(t, db, rootID, []uint{3, 4})
@@ -544,68 +632,184 @@ func TestCommonRepCleanupPostgres(t *testing.T) {
 		assert.Equal(t, uint(5), current.CommonVersion().Uint())
 		assert.Equal(t, uint(4), previous.CommonVersion().Uint())
 
-		secondPrune, err := usecase.Execute(context.Background(), policy, options, nil)
+		secondPrune, err := usecase.Execute(context.Background(), policy, options, uuid.Nil, nil, nil)
 		require.NoError(t, err)
 		assert.Equal(t, int64(1), secondPrune.Impact().Representations())
 		assertCommonRepVersions(t, db, rootID, []uint{4, 5})
 	})
 
-	t.Run("re-report after pruning resumes numbering and consumer reads stay available", func(t *testing.T) {
+	t.Run("randomized histories match a reference model of the retention rule", func(t *testing.T) {
 		isolateCommonRepCleanupPostgresSubtest(t, db)
-		const reporterType = "commonrep"
-		resourceUsecase, resourceRepository := commonRepAPIUsecase(t, db, reporterType)
 
-		// Create the resource through the real API so the base state is API-valid.
-		reportErr := resourceUsecase.ReportResource(
-			commonRepAPIAuthzContext(),
-			commonRepAPIReportCommand(t, reporterType, "revival-root", "report-id-initial"),
-		)
-		require.NoError(t, reportErr)
+		scenarios := generateCommonRepPropertyScenarios(t, 20)
+		for scenarioIndex, scenario := range scenarios {
+			t.Run(fmt.Sprintf("seed-%d", scenario.seed), func(t *testing.T) {
+				isolateCommonRepCleanupPostgresSubtest(t, db)
+				policy, err := newCommonRepCleanupPolicy(scenario.keepVersions, "")
+				require.NoError(t, err)
+				seedCommonRepPropertyScenario(t, db, scenario)
 
-		var rootIDText string
-		require.NoError(t, db.Raw("SELECT resource_id FROM reporter_resources WHERE local_resource_id = ?", "revival-root").Scan(&rootIDText).Error)
-		rootID, err := uuid.Parse(rootIDText)
-		require.NoError(t, err)
-		// Advance history to five versions with the pointer at the current version.
-		for version := uint(1); version <= 4; version++ {
-			require.NoError(t, insertCommonRepRow(t, db, rootID, version, fmt.Sprintf("revival-txid-%d", version)).Error)
+				usecase := newTestCommonRepCleanupUsecase(t, db)
+				// Small chunk and batch sizes force chunk boundaries and deep-root loops.
+				options, err := newCommonRepCleanupOptions(3, 3, 0, 1000, time.Minute)
+				require.NoError(t, err)
+
+				report, err := usecase.Preview(context.Background(), policy, options, uuid.Nil, nil)
+				require.NoError(t, err)
+				assert.True(t, report.PassComplete())
+				assert.Equal(t, scenario.expectedPrunableRows, report.PrunableRows(), "scenario %d preview", scenarioIndex)
+				assert.Equal(t, int64(len(scenario.roots)), report.RootsScanned(), "scenario %d scanned roots", scenarioIndex)
+
+				result, err := usecase.Execute(context.Background(), policy, options, uuid.Nil, nil, nil)
+				require.NoError(t, err)
+				assert.Empty(t, result.ParkedRoots())
+				assert.Equal(t, scenario.expectedPrunableRows, result.Impact().Representations(), "scenario %d deleted rows", scenarioIndex)
+				assert.True(t, result.Report().PassComplete())
+
+				for rootIndex := range scenario.roots {
+					root := scenario.roots[rootIndex]
+					expectedVersions, retained := scenario.expectedRetainedByRoot[root.resourceID.String()]
+					if !retained {
+						expectedVersions = scenario.originalVersionsByRoot[root.resourceID.String()]
+					}
+					assertCommonRepVersions(t, db, root.resourceID, expectedVersions,
+						"scenario %d root %s", scenarioIndex, root.resourceID)
+				}
+			})
 		}
-		require.NoError(t, db.Exec("UPDATE resource SET common_version = 4 WHERE id = ?", rootID).Error)
-
-		policy, err := newCommonRepCleanupPolicy(2, "")
-		require.NoError(t, err)
-		options, err := newCommonRepCleanupOptions(100, 0, 1, time.Minute)
-		require.NoError(t, err)
-		usecase := newTestCommonRepCleanupUsecase(t, db)
-		firstPrune, err := usecase.Execute(context.Background(), policy, options, nil)
-		require.NoError(t, err)
-		assert.Equal(t, int64(3), firstPrune.Impact().Representations())
-		assertCommonRepVersions(t, db, rootID, []uint{3, 4})
-
-		// A new report through the API must resume numbering above the retained maximum.
-		reportErr = resourceUsecase.ReportResource(
-			commonRepAPIAuthzContext(),
-			commonRepAPIReportCommand(t, reporterType, "revival-root", "report-id-after-prune"),
-		)
-		require.NoError(t, reportErr)
-
-		key := commonRepReporterKey(t, reporterType, "revival-root")
-		versionFive := bizmodel.NewVersion(5)
-		current, previous, readErr := resourceRepository.FindCurrentAndPreviousVersionedRepresentations(nil, key, &versionFive, bizmodel.OperationTypeUpdated)
-		require.NoError(t, readErr, "the consumer update read of v and v-1 must succeed against pruned state")
-		require.NotNil(t, current)
-		require.NotNil(t, previous)
-		require.NotNil(t, current.CommonVersion())
-		require.NotNil(t, previous.CommonVersion())
-		assert.Equal(t, uint(5), current.CommonVersion().Uint())
-		assert.Equal(t, uint(4), previous.CommonVersion().Uint())
-
-		// Pruning again removes the newly superseded version while keeping v and v-1.
-		secondPrune, err := usecase.Execute(context.Background(), policy, options, nil)
-		require.NoError(t, err)
-		assert.Equal(t, int64(1), secondPrune.Impact().Representations(), "only the newly superseded version 3 is pruned")
-		assertCommonRepVersions(t, db, rootID, []uint{4, 5})
 	})
+}
+
+// commonRepPropertyRoot is one generated root of a property-test scenario.
+type commonRepPropertyRoot struct {
+	resourceID      uuid.UUID
+	resourceType    string
+	versions        []uint
+	commonVersion   *uint
+	reporterTombsto bool
+	hasReporter     bool
+}
+
+// commonRepPropertyScenario is one randomized world plus its expected outcome.
+type commonRepPropertyScenario struct {
+	seed                  int64
+	keepVersions          int
+	roots                 []commonRepPropertyRoot
+	expectedPrunableRows  int64
+	expectedRetainedByRoot map[string][]uint
+	originalVersionsByRoot map[string][]uint
+}
+
+// generateCommonRepPropertyScenarios builds deterministic randomized scenarios.
+func generateCommonRepPropertyScenarios(t *testing.T, count int) []commonRepPropertyScenario {
+	t.Helper()
+	scenarios := make([]commonRepPropertyScenario, 0, count)
+	for index := 0; index < count; index++ {
+		source := rand.New(rand.NewSource(int64(index + 1))) //nolint:gosec // deterministic scenarios, not security
+		keepVersions := 2 + source.Intn(3)
+		rootCount := 3 + source.Intn(5)
+		scenario := commonRepPropertyScenario{
+			seed:                   int64(index + 1),
+			keepVersions:           keepVersions,
+			expectedRetainedByRoot: map[string][]uint{},
+			originalVersionsByRoot: map[string][]uint{},
+		}
+		for rootIndex := 0; rootIndex < rootCount; rootIndex++ {
+			versionCount := 1 + source.Intn(11)
+			versionSet := map[uint]struct{}{}
+			for len(versionSet) < versionCount {
+				versionSet[uint(source.Intn(40))] = struct{}{}
+			}
+			versions := make([]uint, 0, len(versionSet))
+			for version := range versionSet {
+				versions = append(versions, version)
+			}
+			sort.Slice(versions, func(left, right int) bool { return versions[left] < versions[right] })
+
+			root := commonRepPropertyRoot{
+				resourceID:   uuid.New(),
+				resourceType: []string{"host", "cluster"}[source.Intn(2)],
+				versions:     versions,
+				hasReporter:  source.Intn(10) > 0,
+			}
+			if root.hasReporter {
+				root.reporterTombsto = source.Intn(4) == 0
+			}
+			switch source.Intn(3) {
+			case 0:
+				root.commonVersion = nil
+			case 1:
+				pointer := versions[source.Intn(len(versions))]
+				root.commonVersion = &pointer
+			default:
+				// A pointer that resolves to nothing excludes the root.
+				unresolved := uint(50 + source.Intn(10))
+				root.commonVersion = &unresolved
+			}
+
+			scenario.roots = append(scenario.roots, root)
+			scenario.originalVersionsByRoot[root.resourceID.String()] = versions
+
+			// Reference model: only actively reported roots with resolvable
+			// pointers are pruned; retention keeps the newest existing rows at
+			// or below the authoritative current version.
+			if !root.hasReporter || root.reporterTombsto {
+				continue
+			}
+			currentVersion := uint(0)
+			if root.commonVersion != nil {
+				resolves := false
+				for _, version := range versions {
+					if version == *root.commonVersion {
+						resolves = true
+						break
+					}
+				}
+				if !resolves {
+					continue
+				}
+				currentVersion = *root.commonVersion
+			} else {
+				currentVersion = versions[len(versions)-1]
+			}
+			ranked := make([]uint, 0, len(versions))
+			for _, version := range versions {
+				if version <= currentVersion {
+					ranked = append(ranked, version)
+				}
+			}
+			// ranked ascends; retain the newest keepVersions rows.
+			retainedCount := keepVersions
+			if retainedCount > len(ranked) {
+				retainedCount = len(ranked)
+			}
+			retained := ranked[len(ranked)-retainedCount:]
+			// Versions above a non-NULL pointer are never ranked and always survive.
+			expectedSurvivors := append([]uint(nil), retained...)
+			for _, version := range versions {
+				if version > currentVersion {
+					expectedSurvivors = append(expectedSurvivors, version)
+				}
+			}
+			sort.Slice(expectedSurvivors, func(left, right int) bool { return expectedSurvivors[left] < expectedSurvivors[right] })
+			scenario.expectedRetainedByRoot[root.resourceID.String()] = expectedSurvivors
+			scenario.expectedPrunableRows += int64(len(ranked) - retainedCount)
+		}
+		scenarios = append(scenarios, scenario)
+	}
+	return scenarios
+}
+
+// seedCommonRepPropertyScenario loads one generated scenario into the database.
+func seedCommonRepPropertyScenario(t *testing.T, db *gorm.DB, scenario commonRepPropertyScenario) {
+	t.Helper()
+	for _, root := range scenario.roots {
+		seedCommonRepRoot(t, db, root.resourceID, root.resourceType, root.commonVersion, root.versions...)
+		if root.hasReporter {
+			require.NoError(t, insertCommonRepReporter(t, db, root.resourceID,
+				fmt.Sprintf("property-%s", root.resourceID), root.resourceType, "hbi", root.reporterTombsto).Error)
+		}
+	}
 }
 
 func setupCommonRepCleanupPostgres(t *testing.T) (*gorm.DB, testcontainers.Container) {
@@ -847,8 +1051,8 @@ func commonRepAPIReportCommand(
 	}
 }
 
-// commonRepCleanupPauseLogger pauses the cleanup transaction after candidate
-// selection so a test can commit a concurrent write before the batch proceeds.
+// commonRepCleanupPauseLogger pauses the cleanup chunk scan after classification
+// so a test can commit a concurrent write before the pass proceeds to deletion.
 type commonRepCleanupPauseLogger struct {
 	gormlogger.Interface
 	entered chan struct{}
@@ -857,7 +1061,7 @@ type commonRepCleanupPauseLogger struct {
 
 func (logger *commonRepCleanupPauseLogger) Trace(ctx context.Context, begin time.Time, fc func() (string, int64), err error) {
 	sql, _ := fc()
-	if strings.Contains(sql, "SELECT resource_id, version FROM prunable") {
+	if strings.Contains(sql, "WITH chunk AS") {
 		select {
 		case logger.entered <- struct{}{}:
 		default:

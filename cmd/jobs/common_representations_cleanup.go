@@ -2,11 +2,13 @@ package jobs
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"math"
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgconn"
 	bizmodel "github.com/project-kessel/inventory-api/internal/biz/model"
 )
 
@@ -150,128 +152,211 @@ func (cumulative *commonRepCumulativeImpact) impact() commonRepCleanupImpact {
 	}
 }
 
-// commonRepCleanupReport separates full prunability from the configured bounded projection.
-type commonRepCleanupReport struct {
-	evaluatedAt                time.Time
-	snapshotAt                 time.Time
-	boundedRowLimit            int64
-	keepVersions               int
-	scopedActiveRoots          int64
-	rootsWithoutActiveReporter int64
-	rootsWithoutCommonHistory  int64
-	excludedInconsistentRoots  int64
-	totalPrunable              commonRepCleanupImpact
-	boundedPrunable            commonRepCleanupImpact
+// Exclusion labels for chunk classification. Every visited root has common history by
+// construction, so only reporter and pointer states can exclude a root.
+const (
+	commonRepExclusionNone                = ""
+	commonRepExclusionNoActiveReporter    = "no_active_reporter"
+	commonRepExclusionInconsistentPointer = "inconsistent_pointer"
+)
+
+// commonRepRootClassification is the planning verdict for one resource root inside a
+// scanned chunk: either an exclusion reason or the number of rows the retention rule
+// would prune from that root.
+type commonRepRootClassification struct {
+	resourceID   uuid.UUID
+	exclusion    string
+	prunableRows int64
 }
 
-// newCommonRepCleanupReport validates a read-only report and its candidate accounting.
+// newCommonRepRootClassification validates one classification row. A root carries
+// either an exclusion or a prunable row count, never both.
+func newCommonRepRootClassification(resourceID uuid.UUID, exclusion string, prunableRows int64) (commonRepRootClassification, error) {
+	if resourceID == uuid.Nil {
+		return commonRepRootClassification{}, fmt.Errorf("common representation classification requires a resource id")
+	}
+	switch exclusion {
+	case commonRepExclusionNone:
+	case commonRepExclusionNoActiveReporter, commonRepExclusionInconsistentPointer:
+		if prunableRows != 0 {
+			return commonRepRootClassification{}, fmt.Errorf("an excluded root cannot report prunable rows")
+		}
+	default:
+		return commonRepRootClassification{}, fmt.Errorf("unknown common representation classification exclusion %q", exclusion)
+	}
+	if prunableRows < 0 {
+		return commonRepRootClassification{}, fmt.Errorf("common representation classification prunable rows cannot be negative")
+	}
+	return commonRepRootClassification{resourceID: resourceID, exclusion: exclusion, prunableRows: prunableRows}, nil
+}
+
+// ResourceID returns the classified root.
+func (classification commonRepRootClassification) ResourceID() uuid.UUID {
+	return classification.resourceID
+}
+
+// Exclusion returns the empty string for an eligible root, or the exclusion reason.
+func (classification commonRepRootClassification) Exclusion() string { return classification.exclusion }
+
+// PrunableRows returns the rows the retention rule would delete from an eligible root.
+func (classification commonRepRootClassification) PrunableRows() int64 {
+	return classification.prunableRows
+}
+
+// commonRepScanTotals accumulates classification results over one pass. Counts are
+// taken from per-chunk transactions, so they describe the scan window, not a single
+// database snapshot.
+type commonRepScanTotals struct {
+	chunksProcessed            int64
+	rootsScanned               int64
+	prunableRoots              int64
+	prunableRows               int64
+	rootsWithoutActiveReporter int64
+	excludedInconsistentRoots  int64
+}
+
+// recordChunk merges one chunk's classifications into the pass totals.
+func (totals *commonRepScanTotals) recordChunk(classifications []commonRepRootClassification) error {
+	totals.chunksProcessed++
+	for index := range classifications {
+		classification := classifications[index]
+		totals.rootsScanned++
+		switch classification.exclusion {
+		case commonRepExclusionNoActiveReporter:
+			totals.rootsWithoutActiveReporter++
+		case commonRepExclusionInconsistentPointer:
+			totals.excludedInconsistentRoots++
+		case commonRepExclusionNone:
+			if classification.prunableRows > 0 {
+				totals.prunableRoots++
+				prunableRows, err := safeCommonRepCountAdd(totals.prunableRows, classification.prunableRows)
+				if err != nil {
+					return err
+				}
+				totals.prunableRows = prunableRows
+			}
+		}
+	}
+	return nil
+}
+
+// commonRepCleanupReport describes one pass over common representation history. The
+// scan walks resource ids in primary-key order, so lastCursor is the resume point and
+// passComplete means no prunable row remained below the cursor at scan time.
+type commonRepCleanupReport struct {
+	startedAt    time.Time
+	finishedAt   time.Time
+	keepVersions int
+	totals       commonRepScanTotals
+	lastCursor   uuid.UUID
+	passComplete bool
+}
+
+// newCommonRepCleanupReport validates pass totals and timing.
 func newCommonRepCleanupReport(
-	evaluatedAt time.Time,
-	snapshotAt time.Time,
+	startedAt time.Time,
+	finishedAt time.Time,
 	keepVersions int,
-	boundedRowLimit int64,
-	scopedActiveRoots int64,
-	rootsWithoutActiveReporter int64,
-	rootsWithoutCommonHistory int64,
-	excludedInconsistentRoots int64,
-	totalPrunable commonRepCleanupImpact,
-	boundedPrunable commonRepCleanupImpact,
+	totals commonRepScanTotals,
+	lastCursor uuid.UUID,
+	passComplete bool,
 ) (commonRepCleanupReport, error) {
-	if evaluatedAt.IsZero() || snapshotAt.IsZero() {
-		return commonRepCleanupReport{}, fmt.Errorf("common representation cleanup report requires valid evaluation and snapshot times")
+	if startedAt.IsZero() || finishedAt.IsZero() || finishedAt.Before(startedAt) {
+		return commonRepCleanupReport{}, fmt.Errorf("common representation cleanup report requires a valid scan window")
 	}
 	if keepVersions < 2 {
 		return commonRepCleanupReport{}, fmt.Errorf("common representation cleanup report requires a retention rule of at least two versions")
 	}
-	if boundedRowLimit < 0 || scopedActiveRoots < 0 || rootsWithoutActiveReporter < 0 ||
-		rootsWithoutCommonHistory < 0 || excludedInconsistentRoots < 0 {
+	if totals.chunksProcessed < 0 || totals.rootsScanned < 0 || totals.prunableRoots < 0 ||
+		totals.prunableRows < 0 || totals.rootsWithoutActiveReporter < 0 || totals.excludedInconsistentRoots < 0 {
 		return commonRepCleanupReport{}, fmt.Errorf("common representation cleanup report counts cannot be negative")
 	}
-	if boundedPrunable.representations > boundedRowLimit {
-		return commonRepCleanupReport{}, fmt.Errorf("bounded rows exceed configured row limit")
-	}
-	if boundedPrunable.representations > totalPrunable.representations ||
-		boundedPrunable.distinctRoots > totalPrunable.distinctRoots {
-		return commonRepCleanupReport{}, fmt.Errorf("bounded common representation impact cannot exceed total prunability")
+	classified := totals.prunableRoots + totals.rootsWithoutActiveReporter + totals.excludedInconsistentRoots
+	if classified > totals.rootsScanned {
+		return commonRepCleanupReport{}, fmt.Errorf("classified roots cannot exceed scanned roots")
 	}
 	return commonRepCleanupReport{
-		evaluatedAt:                evaluatedAt.UTC(),
-		snapshotAt:                 snapshotAt.UTC(),
-		boundedRowLimit:            boundedRowLimit,
-		keepVersions:               keepVersions,
-		scopedActiveRoots:          scopedActiveRoots,
-		rootsWithoutActiveReporter: rootsWithoutActiveReporter,
-		rootsWithoutCommonHistory:  rootsWithoutCommonHistory,
-		excludedInconsistentRoots:  excludedInconsistentRoots,
-		totalPrunable:              totalPrunable,
-		boundedPrunable:            boundedPrunable,
+		startedAt:    startedAt.UTC(),
+		finishedAt:   finishedAt.UTC(),
+		keepVersions: keepVersions,
+		totals:       totals,
+		lastCursor:   lastCursor,
+		passComplete: passComplete,
 	}, nil
 }
 
-// EvaluatedAt returns the UTC time at which the invocation policy was frozen.
-func (report commonRepCleanupReport) EvaluatedAt() time.Time { return report.evaluatedAt }
+// StartedAt returns the UTC time the pass began.
+func (report commonRepCleanupReport) StartedAt() time.Time { return report.startedAt }
 
-// SnapshotAt returns the UTC snapshot timestamp used by the read-only database report.
-func (report commonRepCleanupReport) SnapshotAt() time.Time { return report.snapshotAt }
+// FinishedAt returns the UTC time the pass ended.
+func (report commonRepCleanupReport) FinishedAt() time.Time { return report.finishedAt }
 
-// KeepVersions returns the per-resource retention rule used for the report.
+// KeepVersions returns the per-resource retention rule used for the pass.
 func (report commonRepCleanupReport) KeepVersions() int { return report.keepVersions }
 
-// BoundedRowLimit returns the configured row budget used for the bounded projection.
-func (report commonRepCleanupReport) BoundedRowLimit() int64 { return report.boundedRowLimit }
+// ChunksProcessed returns the number of chunks the pass scanned.
+func (report commonRepCleanupReport) ChunksProcessed() int64 { return report.totals.chunksProcessed }
 
-// ScopedActiveRoots returns resources with at least one active reporter in scope.
-func (report commonRepCleanupReport) ScopedActiveRoots() int64 { return report.scopedActiveRoots }
+// RootsScanned returns the number of distinct roots the pass classified. Roots
+// without common history are never visited, and roots excluded by a resource
+// type filter are not classified.
+func (report commonRepCleanupReport) RootsScanned() int64 { return report.totals.rootsScanned }
 
-// RootsWithoutActiveReporter returns roots with common history but no active reporter;
-// they are out of scope and belong to the tombstone cleanup workstream.
+// PrunableRoots returns roots the retention rule would prune.
+func (report commonRepCleanupReport) PrunableRoots() int64 { return report.totals.prunableRoots }
+
+// PrunableRows returns common representation rows the retention rule would prune.
+func (report commonRepCleanupReport) PrunableRows() int64 { return report.totals.prunableRows }
+
+// RootsWithoutActiveReporter returns visited roots with common history but no active
+// reporter; they are out of scope and belong to the tombstone cleanup workstream.
 func (report commonRepCleanupReport) RootsWithoutActiveReporter() int64 {
-	return report.rootsWithoutActiveReporter
+	return report.totals.rootsWithoutActiveReporter
 }
 
-// RootsWithoutCommonHistory returns scoped active roots that have no common
-// representations at all; they are not cleanup candidates.
-func (report commonRepCleanupReport) RootsWithoutCommonHistory() int64 {
-	return report.rootsWithoutCommonHistory
-}
-
-// ExcludedInconsistentRoots returns roots whose common_version pointer does not resolve
-// to an existing common representation; they are excluded rather than guessed.
+// ExcludedInconsistentRoots returns visited roots whose common_version pointer does
+// not resolve to an existing common representation; they are excluded, not repaired.
 func (report commonRepCleanupReport) ExcludedInconsistentRoots() int64 {
-	return report.excludedInconsistentRoots
+	return report.totals.excludedInconsistentRoots
 }
 
-// TotalPrunable returns full prunable impact across the scoped active roots.
-func (report commonRepCleanupReport) TotalPrunable() commonRepCleanupImpact {
-	return report.totalPrunable
-}
+// LastCursor returns the resource id the pass reached. A completed pass ignores it;
+// an interrupted pass resumes after it with --start-after.
+func (report commonRepCleanupReport) LastCursor() uuid.UUID { return report.lastCursor }
 
-// BoundedPrunable returns projected impact for the deterministic configured row budget.
-func (report commonRepCleanupReport) BoundedPrunable() commonRepCleanupImpact {
-	return report.boundedPrunable
-}
+// PassComplete reports whether the scan reached the end of the key space. Rows that
+// concurrent writers inserted below the cursor during the pass are picked up by the
+// next pass, not by this flag.
+func (report commonRepCleanupReport) PassComplete() bool { return report.passComplete }
 
-// commonRepCleanupRepository reads common history prunability or deletes one bounded set.
-// The authoritative current version is the resource.common_version pointer, falling back
-// to MAX(version) only when the pointer is NULL; selection is per resource and never
-// anchored to the job run date. Roots without an active reporter are out of scope, and
-// roots whose pointer does not resolve must be excluded and reported, not repaired.
+// commonRepCleanupRepository reads one chunk of common history prunability or deletes
+// bounded prunable rows. The authoritative current version is the
+// resource.common_version pointer, falling back to MAX(version) only when the pointer
+// is NULL; selection is per resource and never anchored to the job run date. Roots
+// without an active reporter are out of scope, and roots whose pointer does not
+// resolve must be excluded and reported, not repaired.
 type commonRepCleanupRepository interface {
-	// PreviewCommonHistory reports complete prunability, out-of-scope roots, and the
-	// deterministic bounded prefix that selects resources with the most versions first
-	// and the oldest versions within each resource, without writing.
-	PreviewCommonHistory(ctx context.Context, policy commonRepCleanupPolicy, boundedRowLimit int64) (commonRepCleanupReport, error)
-	// DeleteCommonHistoryBatch reselects and rechecks the same per-resource retention rule
-	// inside its transaction, then deletes at most batchSize prunable common representation
-	// rows. It must never delete the retained newest versions, any root row, or any row
-	// belonging to a root without an active reporter; callers may treat its impact as
-	// committed only after the enclosing transaction commits.
-	DeleteCommonHistoryBatch(ctx context.Context, policy commonRepCleanupPolicy, batchSize int) (commonRepCleanupImpact, error)
+	// ReadChunk discovers the next chunk boundary at least chunkRows rows past the
+	// cursor and classifies every root in (cursor, boundary], root-aligned so no
+	// root is ever split across chunks. When fewer than chunkRows rows remain,
+	// found is false and the classifications cover all remaining roots.
+	ReadChunk(ctx context.Context, policy commonRepCleanupPolicy, after uuid.UUID, chunkRows int) (classifications []commonRepRootClassification, boundary uuid.UUID, found bool, err error)
+	// DeletePrunableRoots re-classifies the given roots inside the caller's
+	// transaction and deletes every prunable row they still have. It must never
+	// delete retained versions, root rows, or rows belonging to an excluded root;
+	// callers may treat its impact as committed only after the enclosing
+	// transaction commits.
+	DeletePrunableRoots(ctx context.Context, policy commonRepCleanupPolicy, resourceIDs []uuid.UUID) (commonRepCleanupImpact, error)
+	// DeleteLowestPrunableVersions re-derives the retention threshold for one root
+	// inside the caller's transaction and deletes at most rowLimit of its lowest
+	// prunable versions, so pathological roots are pruned in bounded statements
+	// instead of one unbounded delete.
+	DeleteLowestPrunableVersions(ctx context.Context, policy commonRepCleanupPolicy, resourceID uuid.UUID, rowLimit int64) (int64, error)
 }
 
 // commonRepCleanupTransaction scopes cleanup repository work to one bounded PostgreSQL transaction.
 type commonRepCleanupTransaction interface {
-	// WithinSerializableCommonRepCleanup enforces read-only mode for previews and
+	// WithinSerializableCommonRepCleanup enforces read-only mode for scans and
 	// serializable isolation for every transaction. A write transaction may retry its
 	// callback after a serialization failure, so the callback must reselect eligibility,
 	// reset attempted impact, and emit committed-progress notifications only after this
@@ -292,8 +377,10 @@ const (
 	commonRepDefaultLockTimeout      = 5 * time.Second
 )
 
-// commonRepCleanupOptions bounds cleanup batch size, pacing, batch count, and total time.
+// commonRepCleanupOptions bounds chunk scan size, delete batch size, pacing, batch
+// count, and total time for one invocation.
 type commonRepCleanupOptions struct {
+	chunkRows   int
 	batchSize   int
 	batchDelay  time.Duration
 	maxBatches  int
@@ -301,16 +388,19 @@ type commonRepCleanupOptions struct {
 }
 
 // newCommonRepCleanupOptions validates positive finite execution limits.
-func newCommonRepCleanupOptions(batchSize int, batchDelay time.Duration, maxBatches int, maxDuration time.Duration) (commonRepCleanupOptions, error) {
-	options := commonRepCleanupOptions{batchSize: batchSize, batchDelay: batchDelay, maxBatches: maxBatches, maxDuration: maxDuration}
+func newCommonRepCleanupOptions(chunkRows int, batchSize int, batchDelay time.Duration, maxBatches int, maxDuration time.Duration) (commonRepCleanupOptions, error) {
+	options := commonRepCleanupOptions{chunkRows: chunkRows, batchSize: batchSize, batchDelay: batchDelay, maxBatches: maxBatches, maxDuration: maxDuration}
 	if err := options.Validate(); err != nil {
 		return commonRepCleanupOptions{}, err
 	}
 	return options, nil
 }
 
-// Validate rejects non-positive limits, negative delay, and overflowing row budgets.
+// Validate rejects non-positive limits and negative delay.
 func (options commonRepCleanupOptions) Validate() error {
+	if options.chunkRows <= 0 {
+		return fmt.Errorf("chunk rows must be positive")
+	}
 	if options.batchSize <= 0 {
 		return fmt.Errorf("batch size must be positive")
 	}
@@ -323,11 +413,11 @@ func (options commonRepCleanupOptions) Validate() error {
 	if options.maxDuration <= 0 {
 		return fmt.Errorf("maximum duration must be positive")
 	}
-	if int64(options.batchSize) > math.MaxInt64/int64(options.maxBatches) {
-		return fmt.Errorf("bounded row limit overflows int64")
-	}
 	return nil
 }
+
+// ChunkRows returns the maximum common representation rows scanned per chunk.
+func (options commonRepCleanupOptions) ChunkRows() int { return options.chunkRows }
 
 // BatchSize returns the maximum common representation rows in one committed batch.
 func (options commonRepCleanupOptions) BatchSize() int { return options.batchSize }
@@ -341,17 +431,26 @@ func (options commonRepCleanupOptions) MaxBatches() int { return options.maxBatc
 // MaxDuration returns the total invocation deadline, including delays.
 func (options commonRepCleanupOptions) MaxDuration() time.Duration { return options.maxDuration }
 
-// BoundedRowLimit returns the finite upper bound used in preview projections.
-func (options commonRepCleanupOptions) BoundedRowLimit() int64 {
-	return int64(options.batchSize) * int64(options.maxBatches)
+// commonRepChunkProgress reports one scanned chunk to an optional observer.
+type commonRepChunkProgress struct {
+	chunkNumber  int64
+	rootsScanned int64
+	prunableRows int64
+	cursor       uuid.UUID
 }
 
-// commonRepCleanupResult contains only counts from transactions that committed successfully.
+// commonRepCleanupResult contains committed impact and pass progress from one
+// destructive invocation.
 type commonRepCleanupResult struct {
+	report            commonRepCleanupReport
 	impact            commonRepCleanupImpact
 	committedBatches  int
 	batchLimitReached bool
+	parkedRoots       []uuid.UUID
 }
+
+// Report returns the scan progress of the invocation.
+func (result commonRepCleanupResult) Report() commonRepCleanupReport { return result.report }
 
 // Impact returns the aggregate impact of committed batches.
 func (result commonRepCleanupResult) Impact() commonRepCleanupImpact { return result.impact }
@@ -362,7 +461,81 @@ func (result commonRepCleanupResult) CommittedBatches() int { return result.comm
 // BatchLimitReached reports whether the configured batch count stopped execution.
 func (result commonRepCleanupResult) BatchLimitReached() bool { return result.batchLimitReached }
 
-// commonRepCleanupUsecase orchestrates read-only preview and bounded cleanup execution.
+// ParkedRoots returns roots whose deletions repeatedly hit serialization conflicts
+// and were skipped; rerunning the job retries them.
+func (result commonRepCleanupResult) ParkedRoots() []uuid.UUID { return result.parkedRoots }
+
+// commonRepPrunableRoot carries one eligible root and its planned row count from
+// chunk classification into batch assembly.
+type commonRepPrunableRoot struct {
+	resourceID  uuid.UUID
+	plannedRows int64
+}
+
+// commonRepDeleteGroup is one unit of destructive work: either several small roots
+// deleted by one statement, or one deep root whose planned rows exceed the batch size
+// and is deleted in bounded lowest-version batches.
+type commonRepDeleteGroup struct {
+	roots []commonRepPrunableRoot
+	deep  bool
+}
+
+// assembleCommonRepDeleteGroups packs eligible roots into delete groups in scan
+// order. A group closes once its planned rows reach the batch size; a root whose
+// planned rows alone exceed the batch size becomes its own deep group so no delete
+// statement is ever unbounded by a pathological root.
+func assembleCommonRepDeleteGroups(roots []commonRepPrunableRoot, batchSize int64) []commonRepDeleteGroup {
+	groups := make([]commonRepDeleteGroup, 0)
+	current := make([]commonRepPrunableRoot, 0, len(roots))
+	currentRows := int64(0)
+	flush := func() {
+		if len(current) > 0 {
+			groups = append(groups, commonRepDeleteGroup{roots: current})
+			current = make([]commonRepPrunableRoot, 0, len(roots))
+			currentRows = 0
+		}
+	}
+	for _, root := range roots {
+		if root.plannedRows > batchSize {
+			flush()
+			groups = append(groups, commonRepDeleteGroup{roots: []commonRepPrunableRoot{root}, deep: true})
+			continue
+		}
+		current = append(current, root)
+		currentRows += root.plannedRows
+		if currentRows >= batchSize {
+			flush()
+		}
+	}
+	flush()
+	return groups
+}
+
+// prunableCommonRepRoots filters a chunk's classifications down to eligible roots
+// with planned deletions, preserving scan order.
+func prunableCommonRepRoots(classifications []commonRepRootClassification) []commonRepPrunableRoot {
+	roots := make([]commonRepPrunableRoot, 0, len(classifications))
+	for index := range classifications {
+		classification := classifications[index]
+		if classification.exclusion == commonRepExclusionNone && classification.prunableRows > 0 {
+			roots = append(roots, commonRepPrunableRoot{resourceID: classification.resourceID, plannedRows: classification.prunableRows})
+		}
+	}
+	return roots
+}
+
+// isCommonRepSerializationExhaustion reports whether an error still wraps a
+// PostgreSQL serialization failure after the shared transaction manager exhausted
+// its retries. The pass parks such roots and continues instead of failing.
+func isCommonRepSerializationExhaustion(err error) bool {
+	if err == nil {
+		return false
+	}
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) && pgErr.Code == "40001"
+}
+
+// commonRepCleanupUsecase orchestrates read-only preview passes and chunked cleanup execution.
 type commonRepCleanupUsecase struct {
 	transactions commonRepCleanupTransaction
 }
@@ -375,92 +548,285 @@ func newCommonRepCleanup(transactions commonRepCleanupTransaction) (*commonRepCl
 	return &commonRepCleanupUsecase{transactions: transactions}, nil
 }
 
-// Preview returns full prunability and bounded impact from one read-only snapshot.
-func (usecase *commonRepCleanupUsecase) Preview(ctx context.Context, policy commonRepCleanupPolicy, options commonRepCleanupOptions) (commonRepCleanupReport, error) {
+// Preview scans the pass read-only from the cursor and reports prunability. The scan
+// stops and reports partial progress when the invocation budget is exhausted.
+func (usecase *commonRepCleanupUsecase) Preview(
+	ctx context.Context,
+	policy commonRepCleanupPolicy,
+	options commonRepCleanupOptions,
+	startAfter uuid.UUID,
+	onChunk func(progress commonRepChunkProgress),
+) (commonRepCleanupReport, error) {
 	if err := usecase.validate(policy, options); err != nil {
 		return commonRepCleanupReport{}, err
 	}
-	runContext, cancel := context.WithTimeout(ctx, options.maxDuration)
+	runContext, cancel := context.WithTimeout(ctx, options.MaxDuration())
 	defer cancel()
 
-	var report commonRepCleanupReport
-	err := usecase.withSerializable(runContext, "common_rep_cleanup_preview", true, func(repository commonRepCleanupRepository) error {
-		// The transaction adapter may invoke this callback again after a retry.
-		report = commonRepCleanupReport{}
-		preview, err := repository.PreviewCommonHistory(runContext, policy, options.BoundedRowLimit())
-		if err != nil {
-			return err
+	startedAt := time.Now().UTC()
+	totals := commonRepScanTotals{}
+	cursor := startAfter
+	passComplete := false
+	for {
+		if err := runContext.Err(); err != nil {
+			break
 		}
-		report = preview
-		return nil
-	})
+		var classifications []commonRepRootClassification
+		var boundary uuid.UUID
+		var found bool
+		err := usecase.withSerializable(runContext, "common_rep_cleanup_preview_chunk", true, func(repository commonRepCleanupRepository) error {
+			read, readBoundary, readFound, readErr := repository.ReadChunk(runContext, policy, cursor, options.ChunkRows())
+			if readErr != nil {
+				return readErr
+			}
+			classifications, boundary, found = read, readBoundary, readFound
+			return nil
+		})
+		if err != nil {
+			return commonRepCleanupReport{}, fmt.Errorf("preview common representation history: %w", err)
+		}
+		chunkPrunableRows := int64(0)
+		for index := range classifications {
+			if classifications[index].exclusion == commonRepExclusionNone {
+				chunkPrunableRows += classifications[index].prunableRows
+			}
+		}
+		if err := totals.recordChunk(classifications); err != nil {
+			return commonRepCleanupReport{}, fmt.Errorf("preview common representation history: %w", err)
+		}
+		if found {
+			cursor = boundary
+		}
+		if onChunk != nil {
+			onChunk(commonRepChunkProgress{
+				chunkNumber:  totals.chunksProcessed,
+				rootsScanned: int64(len(classifications)),
+				prunableRows: chunkPrunableRows,
+				cursor:       cursor,
+			})
+		}
+		if !found {
+			passComplete = true
+			break
+		}
+	}
+	report, err := newCommonRepCleanupReport(startedAt, time.Now().UTC(), policy.KeepVersions(), totals, cursor, passComplete)
 	if err != nil {
 		return commonRepCleanupReport{}, fmt.Errorf("preview common representation history: %w", err)
 	}
 	return report, nil
 }
 
-// Execute commits at most MaxBatches eligible batches and reports only committed impact.
+// Execute scans the pass from the cursor and commits bounded deletions for every
+// eligible root. Roots whose deletions repeatedly hit serialization conflicts are
+// parked and reported rather than failing the invocation.
 func (usecase *commonRepCleanupUsecase) Execute(
 	ctx context.Context,
 	policy commonRepCleanupPolicy,
 	options commonRepCleanupOptions,
-	onBatchCommitted func(batchNumber int, impact commonRepCleanupImpact),
+	startAfter uuid.UUID,
+	onBatch func(batchNumber int, impact commonRepCleanupImpact),
+	onChunk func(progress commonRepChunkProgress),
 ) (commonRepCleanupResult, error) {
 	if err := usecase.validate(policy, options); err != nil {
 		return commonRepCleanupResult{}, err
 	}
-	runContext, cancel := context.WithTimeout(ctx, options.maxDuration)
+	runContext, cancel := context.WithTimeout(ctx, options.MaxDuration())
 	defer cancel()
 
-	var result commonRepCleanupResult
+	startedAt := time.Now().UTC()
 	cumulative := newCommonRepCumulativeImpact()
+	totals := commonRepScanTotals{}
+	cursor := startAfter
+	result := commonRepCleanupResult{}
+	passComplete := false
+	parked := make(map[uuid.UUID]struct{})
+	stopped := false
+
 	finish := func(err error) (commonRepCleanupResult, error) {
+		parkedRoots := make([]uuid.UUID, 0, len(parked))
+		for rootID := range parked {
+			parkedRoots = append(parkedRoots, rootID)
+		}
 		result.impact = cumulative.impact()
-		return result, err
+		result.parkedRoots = parkedRoots
+		report, reportErr := newCommonRepCleanupReport(startedAt, time.Now().UTC(), policy.KeepVersions(), totals, cursor, passComplete)
+		if reportErr != nil {
+			return result, fmt.Errorf("execute common representation history cleanup: %w", reportErr)
+		}
+		result.report = report
+		if err != nil {
+			return result, fmt.Errorf("execute common representation history cleanup: %w", err)
+		}
+		return result, nil
 	}
-	for result.committedBatches < options.maxBatches {
+
+	// Budget checks only refuse work that has not started, so a budget consumed
+	// exactly by the final batch of the final chunk still reports a complete pass.
+	for !stopped {
 		if err := runContext.Err(); err != nil {
-			return finish(fmt.Errorf("execute common representation cleanup: %w", err))
+			return finish(err)
+		}
+		if result.committedBatches >= options.MaxBatches() {
+			result.batchLimitReached = true
+			break
 		}
 
-		var batchImpact commonRepCleanupImpact
-		err := usecase.withSerializable(runContext, "common_rep_cleanup_batch", false, func(repository commonRepCleanupRepository) error {
-			// Serialization retries must overwrite, not accumulate, attempted counts.
-			batchImpact = commonRepCleanupImpact{}
-			impact, err := repository.DeleteCommonHistoryBatch(runContext, policy, options.batchSize)
-			if err != nil {
-				return err
+		var classifications []commonRepRootClassification
+		var boundary uuid.UUID
+		var found bool
+		err := usecase.withSerializable(runContext, "common_rep_cleanup_chunk_scan", true, func(repository commonRepCleanupRepository) error {
+			read, readBoundary, readFound, readErr := repository.ReadChunk(runContext, policy, cursor, options.ChunkRows())
+			if readErr != nil {
+				return readErr
 			}
-			batchImpact = impact
+			classifications, boundary, found = read, readBoundary, readFound
 			return nil
 		})
 		if err != nil {
-			return finish(fmt.Errorf("execute common representation cleanup batch: %w", err))
+			return finish(err)
 		}
-		if batchImpact.Representations() == 0 {
-			return finish(nil)
-		}
-
-		if err := cumulative.record(batchImpact); err != nil {
-			return finish(fmt.Errorf("accumulate committed common representation cleanup impact: %w", err))
-		}
-		result.committedBatches++
-		if onBatchCommitted != nil {
-			onBatchCommitted(result.committedBatches, batchImpact)
-		}
-
-		if batchImpact.Representations() < int64(options.batchSize) {
-			return finish(nil)
-		}
-		if result.committedBatches == options.maxBatches {
-			result.batchLimitReached = true
-			return finish(nil)
-		}
-		if options.batchDelay > 0 {
-			if err := waitForCommonRepNextBatch(runContext, options.batchDelay); err != nil {
-				return finish(fmt.Errorf("wait between common representation cleanup batches: %w", err))
+		chunkPrunableRows := int64(0)
+		for index := range classifications {
+			if classifications[index].exclusion == commonRepExclusionNone {
+				chunkPrunableRows += classifications[index].prunableRows
 			}
+		}
+		if err := totals.recordChunk(classifications); err != nil {
+			return finish(err)
+		}
+		if onChunk != nil {
+			onChunk(commonRepChunkProgress{
+				chunkNumber:  totals.chunksProcessed,
+				rootsScanned: int64(len(classifications)),
+				prunableRows: chunkPrunableRows,
+				cursor:       boundary,
+			})
+		}
+
+		for _, group := range assembleCommonRepDeleteGroups(prunableCommonRepRoots(classifications), int64(options.BatchSize())) {
+			if stopped {
+				break
+			}
+			if err := runContext.Err(); err != nil {
+				return finish(err)
+			}
+			if result.committedBatches >= options.MaxBatches() {
+				result.batchLimitReached = true
+				stopped = true
+				break
+			}
+
+			if group.deep {
+				root := group.roots[0]
+			deep:
+				for {
+					if err := runContext.Err(); err != nil {
+						return finish(err)
+					}
+					if result.committedBatches >= options.MaxBatches() {
+						result.batchLimitReached = true
+						stopped = true
+						break deep
+					}
+					var deleted int64
+					err := usecase.withSerializable(runContext, "common_rep_cleanup_deep_batch", false, func(repository commonRepCleanupRepository) error {
+						// Serialization retries must overwrite, not accumulate, attempted rows.
+						deleted = 0
+						deletedRows, deleteErr := repository.DeleteLowestPrunableVersions(runContext, policy, root.resourceID, int64(options.BatchSize()))
+						if deleteErr != nil {
+							return deleteErr
+						}
+						deleted = deletedRows
+						return nil
+					})
+					if err != nil {
+						if isCommonRepSerializationExhaustion(err) {
+							parked[root.resourceID] = struct{}{}
+							break deep
+						}
+						return finish(err)
+					}
+					if deleted == 0 {
+						break deep
+					}
+					rootID, rootIDErr := bizmodel.NewResourceId(root.resourceID)
+					if rootIDErr != nil {
+						return finish(fmt.Errorf("prunable common representation has invalid resource root identity: %w", rootIDErr))
+					}
+					batchImpact, impactErr := newCommonRepCleanupImpactWithRootIDs(deleted, []bizmodel.ResourceId{rootID})
+					if impactErr != nil {
+						return finish(impactErr)
+					}
+					if err := cumulative.record(batchImpact); err != nil {
+						return finish(err)
+					}
+					result.committedBatches++
+					if onBatch != nil {
+						onBatch(result.committedBatches, batchImpact)
+					}
+					if options.BatchDelay() > 0 {
+						if err := waitForCommonRepNextBatch(runContext, options.BatchDelay()); err != nil {
+							return finish(err)
+						}
+					}
+				}
+				continue
+			}
+
+			resourceIDs := make([]uuid.UUID, 0, len(group.roots))
+			for _, root := range group.roots {
+				resourceIDs = append(resourceIDs, root.resourceID)
+			}
+			var batchImpact commonRepCleanupImpact
+			err := usecase.withSerializable(runContext, "common_rep_cleanup_batch", false, func(repository commonRepCleanupRepository) error {
+				// Serialization retries must overwrite, not accumulate, attempted impact.
+				batchImpact = commonRepCleanupImpact{}
+				deleteImpact, deleteErr := repository.DeletePrunableRoots(runContext, policy, resourceIDs)
+				if deleteErr != nil {
+					return deleteErr
+				}
+				batchImpact = deleteImpact
+				return nil
+			})
+			if err != nil {
+				if isCommonRepSerializationExhaustion(err) {
+					for _, root := range group.roots {
+						parked[root.resourceID] = struct{}{}
+					}
+					continue
+				}
+				return finish(err)
+			}
+			// A group may have drifted to nothing between planning and deletion.
+			if batchImpact.Representations() == 0 {
+				continue
+			}
+			if err := cumulative.record(batchImpact); err != nil {
+				return finish(err)
+			}
+			result.committedBatches++
+			if onBatch != nil {
+				onBatch(result.committedBatches, batchImpact)
+			}
+			if options.BatchDelay() > 0 {
+				if err := waitForCommonRepNextBatch(runContext, options.BatchDelay()); err != nil {
+					return finish(err)
+				}
+			}
+		}
+
+		// The cursor advances only after every group of the chunk committed, so a
+		// budget stop mid-chunk reports the previous chunk boundary and a resume
+		// re-processes the interrupted chunk instead of skipping its roots.
+		if !stopped && found {
+			cursor = boundary
+		}
+		if !found {
+			if !stopped {
+				passComplete = true
+			}
+			break
 		}
 	}
 	return finish(nil)

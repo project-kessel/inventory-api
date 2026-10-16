@@ -45,6 +45,8 @@ objects:
                 - common-representations-cleanup-job
                 - --keep-versions=${KEEP_VERSIONS}
                 - --resource-type=${RESOURCE_TYPE}
+                - --start-after=${START_AFTER}
+                - --chunk-rows=${CHUNK_ROWS}
                 - --batch-size=${BATCH_SIZE}
                 - --batch-delay=${BATCH_DELAY}
                 - --max-batches=${MAX_BATCHES}
@@ -124,6 +126,12 @@ parameters:
   - description: Optional resource type filter; empty means all resource types
     name: RESOURCE_TYPE
     value: ""
+  - description: Resume the pass after this resource id (the previous run's last cursor); the zero UUID starts from the beginning
+    name: START_AFTER
+    value: "00000000-0000-0000-0000-000000000000"
+  - description: Maximum common representation rows classified per chunk scan
+    name: CHUNK_ROWS
+    value: "20000"
   - description: Enable deletion only after the runbook's operational preconditions are verified; false is a read-only preview
     name: EXECUTE
     value: "false"

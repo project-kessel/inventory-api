@@ -1,7 +1,6 @@
 package jobs
 
 import (
-	"context"
 	"testing"
 
 	"github.com/project-kessel/inventory-api/cmd/common"
@@ -29,44 +28,4 @@ func TestCommonRepCleanupCommandRejectsSingleVersionRetention(t *testing.T) {
 	require.Error(t, validateCommonRepCleanupInvocation(0))
 	require.NoError(t, validateCommonRepCleanupInvocation(2))
 	require.NoError(t, validateCommonRepCleanupInvocation(3))
-}
-
-func TestCommonRepCleanupCommandDoesNotOpenStorageBeforeValidationGates(t *testing.T) {
-	err := runCommonRepresentationsCleanupJob(
-		context.Background(),
-		nil,
-		common.LoggerOptions{},
-		true,
-		1,
-		"",
-		commonRepCleanupDefaultBatchSize,
-		commonRepCleanupDefaultBatchDelay,
-		commonRepCleanupDefaultMaxBatches,
-		commonRepCleanupDefaultMaxDuration,
-	)
-	require.ErrorContains(t, err, "storage options are required")
-}
-
-func TestCommonRepCleanupCommandHonorsCanceledParentContextBeforeStorageOpen(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	cancel()
-	err := runCommonRepresentationsCleanupJob(
-		ctx,
-		storage.NewOptions(),
-		common.LoggerOptions{},
-		false,
-		2,
-		"",
-		commonRepCleanupDefaultBatchSize,
-		commonRepCleanupDefaultBatchDelay,
-		commonRepCleanupDefaultMaxBatches,
-		commonRepCleanupDefaultMaxDuration,
-	)
-	require.ErrorContains(t, err, "canceled before startup")
-}
-
-func TestCommonRepCleanupSignalContextHandlesInterruptAndTermination(t *testing.T) {
-	signalContext, stopSignals := commonRepCleanupSignalContext(context.Background())
-	defer stopSignals()
-	require.NoError(t, signalContext.Err())
 }

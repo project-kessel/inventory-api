@@ -86,6 +86,12 @@ a no-op. If a workspace changed across that boundary, the old workspace tuple
 can remain in the relations store. This can retain authorization and there is
 no automatic reconciliation in this job.
 
+The limitation occurs with just two pending updates: after A is applied, queue
+A→B and B→B, prune A's representation, and then drain the updates. The A tuple
+remains although processing succeeds. A low aggregate lag reading does not
+prove correctness while writes continue. This tradeoff is accepted for this
+job; there is no consumer watermark or write fence.
+
 Check consumer lag and service/database health before and during execution.
 Keeping two versions does not guarantee safety for a delayed consumer or an
 offset rewind. Pruning also removes historical transaction IDs used for retry
@@ -99,8 +105,12 @@ local and ephemeral tests do not establish production readiness.
 
 ## OpenShift
 
-The one-time Job template uses the configured Inventory image, config secret,
-and `kessel-inventory-db` credentials. `EXECUTE` defaults to false.
+The one-time Job template uses the configured Inventory image and Inventory YAML
+Secret. It mounts the Clowder application Secret (`CLOWDER_CONFIG_SECRET_NAME`,
+default `kessel-inventory`) at `/cdapp` and sets `ACG_CONFIG`. The existing
+Clowder loader supplies PostgreSQL credentials and enables `verify-full` with
+the supplied RDS CA when present. The former `CLOWDER_ENABLED` parameter has
+been removed because app-common-go does not read it. `EXECUTE` defaults to false.
 
 ```sh
 oc process -f deploy/kessel-inventory-common-representations-cleanup-job.yaml \
@@ -118,12 +128,17 @@ For execution, use a new Job name and add `-p EXECUTE=true`, the reviewed
 above `MAX_DURATION` to allow image pull and startup time. Review final logs and
 Job status, including failures, before removing the completed Job object.
 
+Ephemeral deployments use a ConfigMap for the Inventory YAML. For a test run,
+copy that YAML into a uniquely named temporary Secret and set
+`INVENTORY_API_CONFIG_NAME` to it; remove the test Secret afterward. Do not
+change the deployment's configuration source.
+
 ## Verification
 
 ```sh
 CONTAINER_RUNTIME=podman ./scripts/testcontainers-run.sh \
-  go test -race -tags=integration ./cmd/jobs \
-  -run '^TestCommonRepCleanupPostgres$' -count=1 -timeout 15m
+  go test -race -tags=integration ./test/integration \
+  -run '^TestCommonRepCleanup' -count=1 -timeout 15m
 ```
 
 The PostgreSQL suite covers retention and gaps, NULL and inconsistent pointers,

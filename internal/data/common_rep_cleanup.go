@@ -1,4 +1,4 @@
-package jobs
+package data
 
 import (
 	"context"
@@ -28,10 +28,10 @@ type commonRepChunkClassificationRow struct {
 // all remaining roots.
 func (repository *gormCommonRepCleanupRepository) ReadChunk(
 	ctx context.Context,
-	policy commonRepCleanupPolicy,
+	policy bizmodel.CommonRepCleanupPolicy,
 	after uuid.UUID,
 	chunkRows int,
-) ([]commonRepRootClassification, uuid.UUID, bool, error) {
+) ([]bizmodel.CommonRepRootClassification, uuid.UUID, bool, error) {
 	if repository == nil || repository.db == nil {
 		return nil, uuid.Nil, false, fmt.Errorf("common representation cleanup repository is not configured")
 	}
@@ -78,10 +78,12 @@ func (repository *gormCommonRepCleanupRepository) ReadChunk(
 			FROM common_representations cr
 			WHERE ` + rangeFilter + `
 		), typed AS (
-			SELECT DISTINCT c.resource_id AS resource_id, r.common_version
+			SELECT c.resource_id, r.common_version, MAX(c.version) AS max_version,
+ BOOL_OR(c.version = r.common_version) AS pointer_exists
 			FROM chunk c JOIN resource r ON r.id = c.resource_id` + typeFilter + `
+ GROUP BY c.resource_id, r.common_version
 		), scoped AS (
-			SELECT t.resource_id, t.common_version
+			SELECT t.resource_id, t.common_version, t.max_version, t.pointer_exists
 			FROM typed t
 			WHERE EXISTS (
 				SELECT 1 FROM reporter_resources rr
@@ -92,17 +94,12 @@ func (repository *gormCommonRepCleanupRepository) ReadChunk(
 			EXCEPT
 			SELECT s.resource_id FROM scoped s
 		), authoritative AS (
-			SELECT s.resource_id, s.common_version,
-				COALESCE(s.common_version, (
-					SELECT MAX(c.version) FROM chunk c WHERE c.resource_id = s.resource_id
-				)) AS current_version
+			SELECT s.resource_id, s.common_version, s.pointer_exists,
+                COALESCE(s.common_version, s.max_version) AS current_version
 			FROM scoped s
 		), classified AS (
 			SELECT a.resource_id, a.current_version,
-				CASE WHEN a.common_version IS NOT NULL AND NOT EXISTS (
-					SELECT 1 FROM chunk c
-					WHERE c.resource_id = a.resource_id AND c.version = a.common_version
-				) THEN 'inconsistent_pointer' ELSE '' END AS exclusion
+				CASE WHEN a.common_version IS NOT NULL AND NOT a.pointer_exists THEN 'inconsistent_pointer' ELSE '' END AS exclusion
 			FROM authoritative a
 		), ranked AS (
 			SELECT c.resource_id, c.version,
@@ -120,14 +117,18 @@ func (repository *gormCommonRepCleanupRepository) ReadChunk(
 		)
 		SELECT resource_id, exclusion, prunable_rows FROM per_root ORDER BY resource_id`
 
-	classificationArguments := append(rangeArguments, policy.keepVersions)
+	classificationArguments := append(rangeArguments, policy.KeepVersions())
 	var rows []commonRepChunkClassificationRow
 	if err := repository.db.WithContext(ctx).Raw(classificationQuery, classificationArguments...).Scan(&rows).Error; err != nil {
 		return nil, uuid.Nil, false, fmt.Errorf("classify common representation cleanup chunk: %w", err)
 	}
-	classifications := make([]commonRepRootClassification, 0, len(rows))
+	classifications := make([]bizmodel.CommonRepRootClassification, 0, len(rows))
 	for _, row := range rows {
-		classifications = append(classifications, commonRepRootClassification{resourceID: row.ResourceID, exclusion: row.Exclusion, prunableRows: row.PrunableRows})
+		classification, err := bizmodel.NewCommonRepRootClassification(bizmodel.DeserializeResourceId(row.ResourceID), row.Exclusion, row.PrunableRows)
+		if err != nil {
+			return nil, uuid.Nil, false, err
+		}
+		classifications = append(classifications, classification)
 	}
 	return classifications, boundary, found, nil
 }
@@ -136,23 +137,27 @@ func (repository *gormCommonRepCleanupRepository) ReadChunk(
 // delete transaction. A SQL LIMIT enforces the row cap even if a concurrent
 // report has expanded history since the scan. Index probes find the oldest
 // retained row without ranking the full history of a deep root.
-func (repository *gormCommonRepCleanupRepository) DeletePrunableRoots(ctx context.Context, policy commonRepCleanupPolicy, resourceIDs []uuid.UUID, rowLimit int) (commonRepCleanupImpact, error) {
+func (repository *gormCommonRepCleanupRepository) DeletePrunableRoots(ctx context.Context, policy bizmodel.CommonRepCleanupPolicy, resourceIDs []bizmodel.ResourceId, rowLimit int) (bizmodel.CommonRepCleanupImpact, error) {
 	if err := policy.Validate(); err != nil {
-		return commonRepCleanupImpact{}, err
+		return bizmodel.CommonRepCleanupImpact{}, err
 	}
 	if rowLimit <= 0 {
-		return commonRepCleanupImpact{}, fmt.Errorf("row limit must be positive")
+		return bizmodel.CommonRepCleanupImpact{}, fmt.Errorf("row limit must be positive")
 	}
 	if len(resourceIDs) == 0 {
-		return commonRepCleanupImpact{}, nil
+		return bizmodel.CommonRepCleanupImpact{}, nil
 	}
 	typeFilter := ""
-	arguments := []any{resourceIDs}
+	storedIDs := make([]uuid.UUID, len(resourceIDs))
+	for index, resourceID := range resourceIDs {
+		storedIDs[index] = resourceID.Serialize()
+	}
+	arguments := []any{storedIDs}
 	if resourceType, hasFilter := policy.ResourceType(); hasFilter {
 		typeFilter = " AND r.type = ?"
 		arguments = append(arguments, resourceType.Serialize())
 	}
-	arguments = append(arguments, policy.keepVersions-1, rowLimit, rowLimit)
+	arguments = append(arguments, policy.KeepVersions()-1, rowLimit, rowLimit)
 	query := `
   WITH scoped AS (
    SELECT r.id, COALESCE(r.common_version, (
@@ -190,9 +195,13 @@ func (repository *gormCommonRepCleanupRepository) DeletePrunableRoots(ctx contex
   RETURNING cr.resource_id`
 	var deletedIDs []uuid.UUID
 	if err := repository.db.WithContext(ctx).Raw(query, arguments...).Scan(&deletedIDs).Error; err != nil {
-		return commonRepCleanupImpact{}, fmt.Errorf("delete prunable common representations: %w", err)
+		return bizmodel.CommonRepCleanupImpact{}, fmt.Errorf("delete prunable common representations: %w", err)
 	}
-	return commonRepCleanupImpact{representations: int64(len(deletedIDs)), resourceRootIDs: deletedIDs}, nil
+	rootIDs := make([]bizmodel.ResourceId, len(deletedIDs))
+	for index, resourceID := range deletedIDs {
+		rootIDs[index] = bizmodel.DeserializeResourceId(resourceID)
+	}
+	return bizmodel.NewCommonRepCleanupImpact(int64(len(deletedIDs)), rootIDs)
 }
 
 type gormCommonRepCleanupTransaction struct {
@@ -200,8 +209,8 @@ type gormCommonRepCleanupTransaction struct {
 	transactionManager bizmodel.TransactionManager
 }
 
-// newCommonRepCleanupTransaction adapts the shared transaction manager to cleanup repository work.
-func newCommonRepCleanupTransaction(db *gorm.DB, transactionManager bizmodel.TransactionManager) commonRepCleanupTransaction {
+// NewCommonRepCleanupTransaction adapts the shared transaction manager to cleanup repository work.
+func NewCommonRepCleanupTransaction(db *gorm.DB, transactionManager bizmodel.TransactionManager) bizmodel.CommonRepCleanupTransaction {
 	return &gormCommonRepCleanupTransaction{db: db, transactionManager: transactionManager}
 }
 
@@ -212,7 +221,7 @@ func (transaction *gormCommonRepCleanupTransaction) WithinSerializableCommonRepC
 	readOnly bool,
 	statementTimeout time.Duration,
 	lockTimeout time.Duration,
-	work func(commonRepCleanupRepository) error,
+	work func(bizmodel.CommonRepCleanupRepository) error,
 ) error {
 	if transaction == nil || transaction.db == nil || transaction.transactionManager == nil {
 		return fmt.Errorf("common representation cleanup transaction adapter is not configured")

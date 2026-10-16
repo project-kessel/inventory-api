@@ -53,42 +53,12 @@ objects:
                 - --max-duration=${MAX_DURATION}
                 - --execute=${EXECUTE}
               env:
-                - name: CLOWDER_ENABLED
-                  value: ${CLOWDER_ENABLED}
+                - name: ACG_CONFIG
+                  value: /cdapp/cdappconfig.json
                 - name: INVENTORY_API_CONFIG
                   value: "/inventory/inventory-api-config.yaml"
                 - name: INVENTORY_API_STORAGE_DATABASE
                   value: postgres
-                - name: INVENTORY_API_STORAGE_POSTGRES_HOST
-                  valueFrom:
-                    secretKeyRef:
-                      name: kessel-inventory-db
-                      key: db.host
-                      optional: true
-                - name: INVENTORY_API_STORAGE_POSTGRES_PORT
-                  valueFrom:
-                    secretKeyRef:
-                      name: kessel-inventory-db
-                      key: db.port
-                      optional: true
-                - name: INVENTORY_API_STORAGE_POSTGRES_DBNAME
-                  valueFrom:
-                    secretKeyRef:
-                      name: kessel-inventory-db
-                      key: db.name
-                      optional: true
-                - name: INVENTORY_API_STORAGE_POSTGRES_USER
-                  valueFrom:
-                    secretKeyRef:
-                      name: kessel-inventory-db
-                      key: db.user
-                      optional: true
-                - name: INVENTORY_API_STORAGE_POSTGRES_PASSWORD
-                  valueFrom:
-                    secretKeyRef:
-                      name: kessel-inventory-db
-                      key: db.password
-                      optional: true
                 - name: TMPDIR
                   value: /tmp
               volumeMounts:
@@ -96,6 +66,9 @@ objects:
                   mountPath: "/inventory"
                 - name: tmp
                   mountPath: "/tmp"
+                - name: clowder-config
+                  mountPath: /cdapp
+                  readOnly: true
               resources:
                 requests:
                   memory: ${REQUESTS_MEMORY}
@@ -107,6 +80,9 @@ objects:
             - name: config-volume
               secret:
                 secretName: ${INVENTORY_API_CONFIG_NAME}
+            - name: clowder-config
+              secret:
+                secretName: ${CLOWDER_CONFIG_SECRET_NAME}
             - name: tmp
               emptyDir:
                 sizeLimit: 64Mi
@@ -150,9 +126,9 @@ parameters:
   - description: Pod deadline in seconds; must exceed MAX_DURATION plus image pull and startup margin
     name: ACTIVE_DEADLINE_SECONDS
     value: "360"
-  - description: Enable Clowder integration (true/false)
-    name: CLOWDER_ENABLED
-    value: "true"
+  - description: Clowder application configuration Secret containing cdappconfig.json
+    name: CLOWDER_CONFIG_SECRET_NAME
+    value: kessel-inventory
   - description: Name of the Inventory API Config Secret
     name: INVENTORY_API_CONFIG_NAME
     value: inventory-api-config

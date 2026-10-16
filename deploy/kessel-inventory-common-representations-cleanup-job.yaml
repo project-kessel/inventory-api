@@ -129,7 +129,7 @@ parameters:
   - description: Resume the pass after this resource id (the previous run's last cursor); the zero UUID starts from the beginning
     name: START_AFTER
     value: "00000000-0000-0000-0000-000000000000"
-  - description: Maximum common representation rows classified per chunk scan
+  - description: Target common representation rows per chunk; the boundary resource is included whole
     name: CHUNK_ROWS
     value: "20000"
   - description: Enable deletion only after the runbook's operational preconditions are verified; false is a read-only preview

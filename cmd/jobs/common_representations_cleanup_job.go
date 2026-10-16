@@ -86,7 +86,7 @@ guidance before mass pruning.`,
 	flags.IntVar(&keepVersions, "keep-versions", commonRepCleanupDefaultKeepVersions, "Number of newest common representations retained per resource; must be at least 2 because update consumption reads version v and v-1 (default 2)")
 	flags.StringVar(&resourceType, "resource-type", "", "Optional resource type filter")
 	flags.StringVar(&startAfter, "start-after", uuid.Nil.String(), "Resume the pass after this resource id, as reported in the last cursor of an interrupted run")
-	flags.IntVar(&chunkRows, "chunk-rows", commonRepCleanupDefaultChunkRows, "Maximum common representation rows classified per chunk scan (default 20000)")
+	flags.IntVar(&chunkRows, "chunk-rows", commonRepCleanupDefaultChunkRows, "Target common representation rows per chunk; the final root is included whole (default 20000)")
 	flags.IntVar(&batchSize, "batch-size", commonRepCleanupDefaultBatchSize, "Maximum common representation rows per transaction (default 1000)")
 	flags.DurationVar(&batchDelay, "batch-delay", commonRepCleanupDefaultBatchDelay, "Interruptible delay between committed batches (default 500ms)")
 	flags.IntVar(&maxBatches, "max-batches", commonRepCleanupDefaultMaxBatches, "Maximum number of destructive batches in one invocation (default 1)")
@@ -97,7 +97,7 @@ guidance before mass pruning.`,
 
 // openCommonRepCleanupDatabase opens PostgreSQL with the invocation context so the
 // job deadline bounds connection validation and all subsequent GORM operations.
-func openCommonRepCleanupDatabase(ctx context.Context, storageConfig storage.CompletedConfig, logger *log.Helper) (*gorm.DB, error) {
+func openCommonRepCleanupDatabase(ctx context.Context, storageConfig storage.CompletedConfig) (*gorm.DB, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, fmt.Errorf("error opening database: %w", err)
 	}
@@ -161,7 +161,7 @@ func runCommonRepresentationsCleanupJob(
 	if err != nil {
 		return fmt.Errorf("invalid common representation cleanup execution bounds: %w", err)
 	}
-	jobContext, cancel := context.WithTimeout(parentContext, options.MaxDuration())
+	jobContext, cancel := context.WithTimeout(parentContext, options.maxDuration)
 	defer cancel()
 	policy, err := newCommonRepCleanupPolicy(keepVersions, resourceType)
 	if err != nil {
@@ -177,7 +177,7 @@ func runCommonRepresentationsCleanupJob(
 	_, logger := common.InitLogger(common.GetLogLevel(), loggerOptions)
 	logHelper := log.NewHelper(log.With(logger, "job", "common_representations_cleanup"))
 	storageConfig := storage.NewConfig(storageOptions).Complete()
-	db, err := openCommonRepCleanupDatabase(jobContext, storageConfig, logHelper)
+	db, err := openCommonRepCleanupDatabase(jobContext, storageConfig)
 	if err != nil {
 		return err
 	}
@@ -212,10 +212,10 @@ func runCommonRepresentationsCleanupJob(
 
 	if !execute {
 		report, previewErr := usecase.Preview(jobContext, policy, options, resumeCursor, onChunk)
+		logCommonRepCleanupReport(logHelper, report, policy, options, false)
 		if previewErr != nil {
 			return previewErr
 		}
-		logCommonRepCleanupReport(logHelper, report, policy, options, false)
 		logHelper.Info("Common representation cleanup preview completed; no database mutations were made")
 		return nil
 	}
@@ -224,11 +224,11 @@ func runCommonRepresentationsCleanupJob(
 	result, executeErr := usecase.Execute(jobContext, policy, options, resumeCursor, func(batchNumber int, impact commonRepCleanupImpact) {
 		logHelper.Infow("msg", "common representation cleanup batch committed",
 			"batch", batchNumber,
-			"common_representations_deleted", impact.Representations(),
-			"resource_roots_impacted", impact.ResourceRootsImpacted(),
+			"common_representations_deleted", impact.representations,
+			"resource_roots_impacted", countCommonRepRoots(impact.resourceRootIDs),
 		)
 	}, onChunk)
-	logCommonRepCleanupReport(logHelper, result.Report(), policy, options, true)
+	logCommonRepCleanupReport(logHelper, result.report, policy, options, true)
 	logCommonRepCleanupResult(logHelper, result)
 	return executeErr
 }
@@ -246,38 +246,39 @@ func logCommonRepCleanupReport(
 	}
 	logHelper.Infow("msg", "common representation cleanup pass report",
 		"execution_requested", executeRequested,
-		"keep_versions", report.KeepVersions(),
+		"keep_versions", report.keepVersions,
 		"resource_type_filter", resourceTypeFilter,
-		"chunk_rows", options.ChunkRows(),
-		"batch_size", options.BatchSize(),
-		"maximum_batches", options.MaxBatches(),
-		"batch_delay", options.BatchDelay().String(),
-		"maximum_duration", options.MaxDuration().String(),
-		"scan_started_at_utc", report.StartedAt().Format(time.RFC3339Nano),
-		"scan_finished_at_utc", report.FinishedAt().Format(time.RFC3339Nano),
-		"chunks_processed", report.ChunksProcessed(),
-		"roots_scanned", report.RootsScanned(),
-		"prunable_common_representations", report.PrunableRows(),
-		"prunable_resource_roots", report.PrunableRoots(),
-		"roots_without_active_reporter_out_of_scope", report.RootsWithoutActiveReporter(),
-		"excluded_inconsistent_pointer_roots", report.ExcludedInconsistentRoots(),
-		"last_cursor", report.LastCursor().String(),
-		"pass_complete", report.PassComplete(),
+		"chunk_rows", options.chunkRows,
+		"batch_size", options.batchSize,
+		"maximum_batches", options.maxBatches,
+		"batch_delay", options.batchDelay.String(),
+		"maximum_duration", options.maxDuration.String(),
+		"scan_started_at_utc", report.startedAt.Format(time.RFC3339Nano),
+		"scan_finished_at_utc", report.finishedAt.Format(time.RFC3339Nano),
+		"chunks_processed", report.chunksProcessed,
+		"roots_scanned", report.rootsScanned,
+		"prunable_common_representations", report.prunableRows,
+		"prunable_resource_roots", report.prunableRoots,
+		"roots_without_active_reporter_out_of_scope", report.rootsWithoutActiveReporter,
+		"excluded_inconsistent_pointer_roots", report.excludedInconsistentRoots,
+		"last_cursor", report.lastCursor.String(),
+		"pass_complete", report.passComplete,
 	)
 }
 
 func logCommonRepCleanupResult(logHelper *log.Helper, result commonRepCleanupResult) {
-	impact := result.Impact()
 	logHelper.Infow("msg", "common representation cleanup execution result",
-		"committed_batches", result.CommittedBatches(),
-		"batch_limit_reached", result.BatchLimitReached(),
-		"common_representations_deleted", impact.Representations(),
-		"resource_roots_impacted", impact.ResourceRootsImpacted(),
-		"parked_root_count", len(result.ParkedRoots()),
+		"committed_batches", result.committedBatches,
+		"batch_limit_reached", result.batchLimitReached,
+		"common_representations_deleted", result.deletedRows,
+		"resource_roots_impacted", result.impactedRoots,
 	)
-	for _, parkedRoot := range result.ParkedRoots() {
-		logHelper.Warnw("msg", "common representation cleanup root parked after repeated serialization conflicts; rerun the job to retry it",
-			"resource_id", parkedRoot.String(),
-		)
+}
+
+func countCommonRepRoots(rootIDs []uuid.UUID) int {
+	roots := make(map[uuid.UUID]struct{}, len(rootIDs))
+	for _, rootID := range rootIDs {
+		roots[rootID] = struct{}{}
 	}
+	return len(roots)
 }

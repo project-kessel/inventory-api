@@ -1,253 +1,135 @@
 # Common representations cleanup job
 
-> **Operational caution:** this job is an implementation of the common
-> representation history cleanup path, not approval to run it against stage or
-> production. No destructive run is authorized by this document.
+`run-job common-representations-cleanup-job` prunes common representation
+history on resources with at least one active reporter. It requires PostgreSQL
+and defaults to a read-only preview. Tombstones, orphans, reporter history, and
+compaction are separate workstreams.
 
-## Scope and safety contract
+## Retention
 
-The command is `run-job common-representations-cleanup-job`. It is
-PostgreSQL-only and defaults to a read-only preview. It prunes
-`common_representations` history on resources that still have at least one
-active (non-tombstoned) reporter, keeping the newest `--keep-versions` common
-representations per resource (default 2). The retention rule is per resource:
-it is never anchored to the job run date.
+`--keep-versions` keeps the newest existing rows at or below each resource's
+`common_version` pointer (default 2, minimum 2). A NULL pointer falls back to
+that resource's maximum version. A pointer that does not resolve excludes the
+whole resource. Versions above a non-NULL pointer are never deleted. For
+example, versions `{0, 2, 4}` with current version 4 and keep=2 retain `{2, 4}`.
+Retention is per resource, independent of row age or the job's start time.
 
-The authoritative current version of each resource is the
-`resource.common_version` pointer; when the pointer is NULL the job falls back
-to `MAX(version)` over that resource's common history. Roots whose pointer
-does not resolve to an existing common representation are excluded and
-reported as inconsistent, never guessed. Roots with only tombstoned reporters
-are out of scope and untouched: they belong to the tombstone cleanup
-workstream. Resource roots, reporter rows, and the retained newest versions
-are never deleted. There is no global orphan sweep.
+Resource roots, reporter rows, and retained common representations survive.
+Both preview and deletion exclude roots without an active reporter. Deletion
+rechecks reporter state, pointer consistency, and the retention threshold in
+its transaction, including after serialization retries.
 
-Retention counts existing rows, not numeric version slots: history with gaps
-(for example versions 0, 2, and 4) retains the newest existing rows at or
-below the authoritative pointer, and a resource with fewer existing rows than
-the retention window is pruned entirely of nothing. Preserving existing
-predecessors never reconstructs a numerically missing version, so consumer
-v/v-1 reads still depend on that version existing when it was reported.
-Common representations above a non-NULL pointer are never ranked or deleted.
+## Batching and resume
 
-Pruning may remove the last remaining copy of a transaction ID used for
-duplicate detection; a later report retry then follows normal validation and
-processing, consistent with the agreed implementation policy.
+The job scans the existing `(resource_id, version)` primary key in resource ID
+order. `--chunk-rows` is a target, not a hard scan cap: the boundary resource's
+whole history is included. A resource with very deep history can exceed the
+target and the scan can hit the statement timeout. This avoids a table-wide
+ranking before every batch; it does **not** implement global most-versions-first
+priority. Within each resource, deletion selects the lowest versions first.
 
-## Pass model
+Every deletion follows one path: find each resource's oldest retained version
+through the primary key, select older rows, and delete at most `--batch-size`
+rows. SQL enforces this limit even when reports add versions between the scan
+and deletion. Batches use the existing serializable transaction manager, with
+30-second statement and 5-second lock timeouts. The invocation context also
+bounds database startup, work, and delays.
 
-The job walks `common_representations` in primary-key (`resource_id`) order
-using the existing primary-key index. Each chunk scan classifies the next
-`--chunk-rows` rows' worth of roots (chunks are root-aligned: a root's full
-history always lands in one chunk, so the `MAX(version)` fallback and pointer
-checks see complete histories). Deletions are committed in bounded
-transactions: small roots are grouped until their planned rows reach
-`--batch-size`, and a single root deeper than the batch size is pruned by
-repeated bounded lowest-version statements. Every delete transaction
-re-classifies its roots inside the transaction, so concurrent reports are
-always pruned against current state, never against a stale plan.
+`--max-batches` limits committed nonempty batches; `--max-duration` bounds total
+runtime. Defaults are one batch of at most 1,000 rows, a 500ms delay, a 20,000-row
+scan target, and five minutes. SIGINT/SIGTERM, deadline expiry, or a database
+error stop the run and preserve earlier commits. Exhausted serialization
+retries return an error; failed resources are not silently skipped.
 
-Per-statement cost is bounded by the chunk or batch size, not by table size:
-total scan work for a pass is one index walk of the table, which is what makes
-production-scale passes feasible. A full pass at production scale is expected
-to take tens of minutes warm and possibly hours cold; budget `--max-duration`
-and `ACTIVE_DEADLINE_SECONDS` accordingly.
+The final report's `last_cursor` is the last fully processed chunk boundary.
+Resume with `--start-after <last_cursor>`. If a chunk was interrupted, it is
+scanned again so no unfinished resource is skipped. `pass_complete` means the
+scan reached the end; concurrent writes behind the cursor require another
+pass. When an exact full batch consumes the budget, completion may require a
+rerun to check for more rows. A completed pass over unchanged data is idempotent.
 
-The pass is resumable: an interrupted run reports its `last_cursor` (the last
-fully processed resource id) and log progress per chunk; rerun with
-`--start-after <cursor>` to continue. A rerun without the cursor re-scans the
-cleaned prefix, which is correct but wasteful. `pass_complete` means the scan
-reached the end of the key space with nothing prunable left below the cursor
-at scan time; rows inserted behind the cursor by concurrent writers are picked
-up by the next pass. A second completed pass deletes nothing.
+Preview and execution share the same chunk scan. Counts describe that scan
+window, not one database snapshot, and execution can differ from preview under
+concurrent writes. Final deletion totals count committed rows and distinct
+roots only. On cancellation or error, both modes log partial scan progress;
+the command returns a nonzero exit status.
 
-Roots whose deletions repeatedly hit serialization conflicts (for example
-extremely hot resources being reported continuously) are parked: the pass
-skips them, completes, and reports them by resource id. Parked roots are not
-an error; rerun the job to retry them.
+## Preview and execute
 
-Concurrent operation: the job is designed to run while the Inventory API
-serves reads and writes and while the tuple consumer is processing events.
-It never deletes resource roots, reporter rows, or the retained newest
-versions, so API lookups, report writes, and delete-event processing are
-unaffected. Pending consumer events whose referenced versions were pruned
-degrade rather than fail: an update event whose v-1 row was pruned produces a
-create-only tuple delta, and an event whose own version was pruned is a no-op
-whose offset is committed. This has been verified against the real consumer
-code path with real PostgreSQL.
-
-The residual risk of that degradation is **stale workspace tuple residue**:
-when the consumer is behind and a resource's workspace changed across the
-pruned boundary, the delete side of the tuple delta is lost and the old
-workspace tuple remains in the relations store. This is authorization
-residue, not data corruption, and it is bounded by consumer health. Before
-any large destructive run, verify the consumer group is keeping up with the
-outbox topic so residue stays negligible; there is no automated cleanup for
-leaked tuples. Replay or offset rewind that requires pruned history is
-outside the supported contract; restore a consistent database state before
-any offset rewind.
-
-## Preview
-
-Use the normal Inventory API executable and approved PostgreSQL configuration:
+Use the normal Inventory executable and PostgreSQL configuration:
 
 ```sh
 inventory-api run-job common-representations-cleanup-job \
-  --keep-versions 2 \
-  --chunk-rows 20000 \
-  --max-duration 30m
+  --keep-versions 2 --chunk-rows 20000 --max-duration 30m
 ```
 
-Without `--execute`, this performs a read-only chunked scan and makes no row
-or event mutations. Add `--resource-type <type>` only when an explicit
-resource scope is intended. The scan reports progress per chunk and stops
-with partial results (reported, not failed) if `--max-duration` is exhausted
-before the pass completes; widen the duration for a full count. Because the
-scan is chunked, totals describe the scan window, not a single database
-snapshot. Record the scan times, retention rule, scope, and report before
-considering any execution.
-
-The report distinguishes scanned roots, roots with common history but no
-active reporter (out of scope), roots excluded for an unresolvable
-`common_version` pointer, and prunable rows and roots. Standard logs contain
-counts, timestamps, and chunk cursors, not resource IDs or versions (parked
-roots are the deliberate exception). Conservative defaults are 20,000 rows
-per chunk, five minutes total runtime, and one batch; execution defaults are
-deliberately tiny for a first cautious run. SIGINT and SIGTERM cancel startup
-or future cleanup work; cancellation does not undo already committed batches.
-
-## Destructive execution gate
-
-Execution requires the flag below, in addition to a fresh reviewed preview and
-the consumer-health check described above:
+Add `--resource-type <type>` to restrict the resource type. Review the scope,
+prunable row counts, and inconsistent-pointer exclusions before execution:
 
 ```sh
 inventory-api run-job common-representations-cleanup-job \
-  --keep-versions 2 \
-  --chunk-rows 20000 \
-  --batch-size 1000 \
-  --max-batches 100000 \
-  --batch-delay 500ms \
-  --max-duration 2h \
-  --execute
+  --keep-versions 2 --chunk-rows 20000 \
+  --batch-size 1000 --max-batches 100000 --batch-delay 500ms \
+  --max-duration 2h --execute
 ```
 
-An executing run performs the same chunked scan and commits bounded
-deletions as it goes; it does not take a separate preview first, so budget
-`--max-duration` for one full pass. Every deletion reselects and rechecks
-eligibility inside its bounded transaction. The command logs each chunk
-scanned, each successful commit, and total counts from committed batches
-only.
+After interruption, rerun with the same retention and scope plus
+`--start-after <last_cursor>`. Cancellation does not undo committed batches.
+Investigate inconsistent pointers rather than weakening their exclusion.
 
-Cancellation or an error stops future batches; it does not undo commits
-already completed. After an interrupted or limited run, note `last_cursor`
-from the report and resume with `--start-after <cursor>` after re-verifying
-the preconditions. `batch_limit_reached` means the configured maximum was
-reached; it is not proof that no candidates remain. Parked roots are retried
-by rerunning the pass.
+## Consumer history and service traffic
 
-## Running in OpenShift
+Current API reads and writes continue using retained versions. Pending consumer
+events can reference older versions that this job removes: a missing previous
+version produces a create-only tuple delta; a missing current version becomes
+a no-op. If a workspace changed across that boundary, the old workspace tuple
+can remain in the relations store. This can retain authorization and there is
+no automatic reconciliation in this job.
 
-`deploy/kessel-inventory-common-representations-cleanup-job.yaml` renders the
-job as a bounded one-time OpenShift Job using the deployed Inventory image and
-its database secret. `EXECUTE` defaults to `false`, so a plain render is a
-read-only preview.
+Check consumer lag and service/database health before and during execution.
+Keeping two versions does not guarantee safety for a delayed consumer or an
+offset rewind. Pruning also removes historical transaction IDs used for retry
+deduplication. Establish the acceptable history window and recovery procedure
+before a production run; this runbook does not approve that run.
 
-Preview:
+Deletion creates dead tuples; allow autovacuum and autoanalyze to work before
+measuring the effect. Physical compaction is a separate follow-up if measurements
+show it is needed. Validate query plans and batch cost at representative scale;
+local and ephemeral tests do not establish production readiness.
+
+## OpenShift
+
+The one-time Job template uses the configured Inventory image, config secret,
+and `kessel-inventory-db` credentials. `EXECUTE` defaults to false.
 
 ```sh
 oc process -f deploy/kessel-inventory-common-representations-cleanup-job.yaml \
-  -p JOB_NAME=common-rep-cleanup-preview-$(date -u +%Y%m%dT%H%M%SZ) \
-  -p IMAGE_TAG=<immutable-image-tag> \
-  -p KEEP_VERSIONS=2 \
-  -p CHUNK_ROWS=20000 -p MAX_DURATION=60m \
+  -p JOB_NAME=common-rep-preview-<unique-suffix> \
+  -p IMAGE_TAG=<immutable-tag> \
+  -p KEEP_VERSIONS=2 -p MAX_DURATION=60m \
   -p ACTIVE_DEADLINE_SECONDS=3900 \
   | oc apply -f - -n <namespace>
-oc logs -f job/<job-name> -n <namespace>
+oc logs -f job/common-rep-preview-<unique-suffix> -n <namespace>
 ```
 
-Destructive execution requires setting the gate parameter explicitly, in
-addition to a fresh reviewed preview and the consumer-health check:
+For execution, use a new Job name and add `-p EXECUTE=true`, the reviewed
+`BATCH_SIZE`, `MAX_BATCHES`, `BATCH_DELAY`, and `MAX_DURATION`. For resume, set
+`START_AFTER` to the final report's `last_cursor`. Set `ACTIVE_DEADLINE_SECONDS`
+above `MAX_DURATION` to allow image pull and startup time. Review final logs and
+Job status, including failures, before removing the completed Job object.
 
-```sh
-oc process -f deploy/kessel-inventory-common-representations-cleanup-job.yaml \
-  -p JOB_NAME=common-rep-cleanup-$(date -u +%Y%m%dT%H%M%SZ) \
-  -p IMAGE_TAG=<immutable-image-tag> \
-  -p KEEP_VERSIONS=2 \
-  -p CHUNK_ROWS=20000 -p BATCH_SIZE=1000 -p MAX_BATCHES=100000 -p BATCH_DELAY=500ms \
-  -p MAX_DURATION=2h -p START_AFTER=<last-cursor-or-00000000-0000-0000-0000-000000000000> \
-  -p ACTIVE_DEADLINE_SECONDS=7800 \
-  -p EXECUTE=true \
-  | oc apply -f - -n <namespace>
-```
-
-`ACTIVE_DEADLINE_SECONDS` is the pod deadline and must exceed `MAX_DURATION`
-plus image pull and startup margin; the job's own `MAX_DURATION` bounds its
-work and SIGTERM cancellation keeps already-committed batches intact. Pausing
-is a bounded run or a SIGTERM; resuming is `START_AFTER` set to the previous
-run's `last_cursor`. The template mounts the Inventory config secret named by
-`INVENTORY_API_CONFIG_NAME` and reads PostgreSQL credentials from the
-`kessel-inventory-db` secret, mirroring the existing one-time job templates.
-Delete the completed Job object after reviewing its logs.
-
-## Stop conditions and reconciliation
-
-Do not execute, or stop before another batch, if the target/scope is
-uncertain, the consumer group is falling significantly behind the outbox
-topic, a new inconsistent-pointer exclusion appears, the report does not
-match the reviewed bounds, or required observation or recovery evidence is
-unavailable. Never override an exclusion by weakening the retention rule or
-the pointer consistency check.
-
-No backup/recovery procedure, numerical stop limits, or staffed
-stage-validation plan is approved by this document. Obtain those approvals and
-complete staffed stage validation before considering production; do not infer
-them from the sample defaults or invent them during a run.
-
-The job needs only its normal PostgreSQL connection and standard DML
-privileges: it uses CTEs within the existing transaction manager, not
-temporary tables, and it creates no indexes or other DDL. The existing
-primary key index carries the chunk scan and the per-root deletes, so no
-statement's cost grows with table size. Every statement is bounded by a
-30-second statement timeout (further bounded by the remaining invocation
-time); a statement that exceeds it fails safely with no partial commit. The
-job's own deletes generate dead tuples that autovacuum reclaims behind the
-pass because transactions are short; expect dead-tuple churn and reusable
-space rather than on-disk shrink. Deleting rows reduces the number of
-versions each consumer lookup must walk, which reduces query plan cost; it is
-not by itself a physical disk reclamation or latency claim. Compaction
-(pg_repack or VACUUM FULL) is a separate, conditional follow-up if measured
-improvements do not materialize.
-
-After a run, reconcile committed common representation rows, distinct impacted
-roots, retained versions per resource, exclusion counts, parked roots, and
-service/database health against the fresh preview. Investigate any difference
-before rerunning. This job does not establish stage readiness, production
-policy, or a replay/recovery horizon; those require separate validation and
-approval.
-
-## Local verification
-
-The implementation has passed the repository's `make test` race/short suite
-and the race-enabled real-PostgreSQL integration suite, run with:
+## Verification
 
 ```sh
 CONTAINER_RUNTIME=podman ./scripts/testcontainers-run.sh \
-  go test -race -short -tags=integration ./cmd/jobs \
+  go test -race -tags=integration ./cmd/jobs \
   -run '^TestCommonRepCleanupPostgres$' -count=1 -timeout 15m
 ```
 
-Coverage includes per-resource retention boundaries, NULL-pointer fallback,
-inconsistent-pointer exclusion, out-of-scope tombstoned-only roots, shared
-roots, resource type filtering, gapped-history retention, version authority
-over row age, root-aligned chunk boundaries with deep roots pruned in bounded
-batches, cursor resume completing a partial pass, pass idempotency, bounded
-batch accounting, read-only enforcement, rollback after injected mid-batch
-failures, committed-then-failed batch progress accounting, injected
-serialization-failure retry with exactly-once deletion, parking of
-serialization-exhausted hot roots while the pass continues, concurrent-write
-re-classification against new state, post-prune tombstone and revival with
-root identity, numbering continuation, and consumer v/v-1 reads against
-pruned state, plus twenty randomized history scenarios verified against a
-reference model of the retention rule. They do not establish the operator
-prerequisites, stage readiness, or production approval.
+The PostgreSQL suite covers retention and gaps, NULL and inconsistent pointers,
+tombstoned and shared roots, resource type filtering, version over age, deep
+histories, a hard batch row limit across roots, interrupted chunk resume,
+idempotency, read-only enforcement, rollback, committed progress after failure,
+serialization retries and exhaustion, pointer changes and concurrent reports,
+post-prune revival and consumer v/v-1 reads, and randomized histories compared
+with a reference retention model.

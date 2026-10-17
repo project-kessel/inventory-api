@@ -1,0 +1,648 @@
+package jobs
+
+import (
+	"testing"
+	"time"
+
+	"github.com/go-kratos/kratos/v2/log"
+	"github.com/google/uuid"
+	"github.com/project-kessel/inventory-api/internal/data/model"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"gorm.io/gorm"
+)
+
+// Tombstone-cascade behavioral tests: deleteOldTombstonedResourcesCascade must
+// remove old-tombstoned reporter_resources rows (the DB cascade removes their
+// reporter_representations) in the selected deletion order, while (a) never
+// touching recent tombstones or active resources, (b) never deleting the
+// parent resource row, and (c) never deleting common_representations — those
+// are orphaned for the orphaned-common-representations-cleanup-job to handle.
+//
+// Eligibility: tombstone = true AND updated_at older than the tombstone-days
+// cutoff, evaluated per reporter_resources row.
+func TestPostgresCascade_OnlyOldTombstonesDeleted(t *testing.T) {
+	db, _ := setupPostgresTestDBPair(t)
+	logger := testLogger()
+	now := time.Now().UTC()
+
+	// Three single-reporter resources: old tombstone, recent tombstone, active.
+	oldID, oldResource := uuid.New(), uuid.New()
+	recentID, recentResource := uuid.New(), uuid.New()
+	activeID, activeResource := uuid.New(), uuid.New()
+	for _, f := range []struct {
+		id, res  uuid.UUID
+		tomb     bool
+		ageDays  int
+		reporter string
+	}{
+		{oldID, oldResource, true, 40, "hbi"},
+		{recentID, recentResource, true, 5, "hbi"},
+		{activeID, activeResource, false, 5, "hbi"},
+	} {
+		createPGResource(t, db, f.res)
+		createPGReporterResource(t, db, f.id, f.res, f.reporter, f.tomb, daysAgo(now, 60), daysAgo(now, f.ageDays))
+		createPGCommonRepresentation(t, db, f.res, 0, f.reporter, daysAgo(now, 40))
+	}
+
+	result, err := deleteOldTombstonedResourcesCascade(db, logger, false, 30, DeletionOrderOldestFirst, "", 10, 0, 0, nil)
+	require.NoError(t, err)
+	assert.Empty(t, result.StopReason)
+
+	assert.Equal(t, int64(1), result.ReporterResourcesDeleted)
+	assert.Equal(t, int64(0), countPGRows(t, db, &model.ReporterResource{}, "id = ?", oldID),
+		"old tombstones must be deleted")
+	assert.Equal(t, int64(1), countPGRows(t, db, &model.ReporterResource{}, "id = ?", recentID),
+		"recent tombstones must survive")
+	assert.Equal(t, int64(1), countPGRows(t, db, &model.ReporterResource{}, "id = ?", activeID),
+		"active resources must survive")
+}
+
+func TestPostgresCascade_CascadesReporterReps_OrphansCommonReps(t *testing.T) {
+	db, _ := setupPostgresTestDBPair(t)
+	logger := testLogger()
+	now := time.Now().UTC()
+
+	resourceID := uuid.New()
+	rrID := uuid.New()
+	createPGResource(t, db, resourceID)
+	createPGReporterResource(t, db, rrID, resourceID, "hbi", true, daysAgo(now, 60), daysAgo(now, 40))
+	createPGReporterRepresentation(t, db, rrID, 0, 1, daysAgo(now, 45))
+	createPGReporterRepresentation(t, db, rrID, 1, 1, daysAgo(now, 41))
+	createPGCommonRepresentation(t, db, resourceID, 0, "hbi", daysAgo(now, 45))
+	createPGCommonRepresentation(t, db, resourceID, 1, "hbi", daysAgo(now, 41))
+
+	result, err := deleteOldTombstonedResourcesCascade(db, logger, false, 30, DeletionOrderOldestFirst, "", 10, 0, 0, nil)
+	require.NoError(t, err)
+	assert.Empty(t, result.StopReason)
+
+	assert.Equal(t, int64(1), result.ReporterResourcesDeleted)
+	assert.Equal(t, int64(0), countPGRows(t, db, &model.ReporterResource{}, "resource_id = ?", resourceID),
+		"the tombstoned reporter_resources row must be gone")
+	assert.Equal(t, int64(0), countPGRows(t, db, &model.ReporterRepresentation{}, "reporter_resource_id = ?", rrID),
+		"reporter_representations must be removed by the DB cascade")
+	assert.Equal(t, int64(2), countPGRows(t, db, &model.CommonRepresentation{}, "resource_id = ?", resourceID),
+		"common_representations must survive as orphans — they belong to the orphan job, not this one")
+	assert.Equal(t, int64(1), countPGRows(t, db, &model.Resource{}, "id = ?", resourceID),
+		"the parent resource row must survive (known TODO, same as the tombstone job)")
+}
+
+// Each reporter_resources row is eligible independently: the old-tombstoned
+// HBI row dies, the active OCM row for the same resource survives, and the
+// common reps are never touched by this job.
+func TestPostgresCascade_MultiReporter_EachRowEligibleIndependently(t *testing.T) {
+	db, _ := setupPostgresTestDBPair(t)
+	logger := testLogger()
+	now := time.Now().UTC()
+
+	resourceID := uuid.New()
+	hbiID, ocmID := uuid.New(), uuid.New()
+	createPGResource(t, db, resourceID)
+	createPGReporterResource(t, db, hbiID, resourceID, "hbi", true, daysAgo(now, 60), daysAgo(now, 40))
+	createPGReporterResource(t, db, ocmID, resourceID, "ocm", false, daysAgo(now, 60), daysAgo(now, 3))
+	createPGCommonRepresentation(t, db, resourceID, 0, "hbi", daysAgo(now, 45))
+	createPGCommonRepresentation(t, db, resourceID, 1, "ocm", daysAgo(now, 10))
+
+	result, err := deleteOldTombstonedResourcesCascade(db, logger, false, 30, DeletionOrderOldestFirst, "", 10, 0, 0, nil)
+	require.NoError(t, err)
+	assert.Empty(t, result.StopReason)
+
+	assert.Equal(t, int64(1), result.ReporterResourcesDeleted)
+	assert.Equal(t, int64(0), countPGRows(t, db, &model.ReporterResource{}, "id = ?", hbiID))
+	assert.Equal(t, int64(1), countPGRows(t, db, &model.ReporterResource{}, "id = ?", ocmID))
+	assert.Equal(t, int64(2), countPGRows(t, db, &model.CommonRepresentation{}, "resource_id = ?", resourceID),
+		"this job never deletes common_representations")
+}
+
+// Two old-tombstoned reporter rows for the SAME resource, forced into
+// different batches (batchSize=1): both are eligible and both die across the
+// two runs; the common reps survive throughout — they are the orphan job's
+// work, not this job's.
+func TestPostgresCascade_MultiReporter_BothOldAcrossBatches(t *testing.T) {
+	db, _ := setupPostgresTestDBPair(t)
+	logger := testLogger()
+	now := time.Now().UTC()
+
+	resourceID := uuid.New()
+	hbiID, ocmID := uuid.New(), uuid.New()
+	createPGResource(t, db, resourceID)
+	createPGReporterResource(t, db, hbiID, resourceID, "hbi", true, daysAgo(now, 60), daysAgo(now, 45))
+	createPGReporterResource(t, db, ocmID, resourceID, "ocm", true, daysAgo(now, 60), daysAgo(now, 40))
+	for v := 0; v < 3; v++ {
+		createPGCommonRepresentation(t, db, resourceID, uint(v), "hbi", daysAgo(now, 45-v))
+	}
+
+	// Run 1: --max-batches 1 deletes exactly one reporter row — the older
+	// HBI one, oldest-first.
+	result, err := deleteOldTombstonedResourcesCascade(db, logger, false, 30, DeletionOrderOldestFirst, "", 1, 0, 0, &retentionRunOptions{MaxBatches: 1})
+	require.NoError(t, err)
+	assert.Equal(t, stopReasonMaxBatches, result.StopReason)
+	assert.Equal(t, int64(1), result.ReporterResourcesDeleted)
+	assert.Equal(t, int64(0), countPGRows(t, db, &model.ReporterResource{}, "id = ?", hbiID))
+	assert.Equal(t, int64(1), countPGRows(t, db, &model.ReporterResource{}, "id = ?", ocmID))
+	assert.Equal(t, int64(3), countPGRows(t, db, &model.CommonRepresentation{}, "resource_id = ?", resourceID),
+		"common reps are never deleted by this job")
+
+	// Run 2: deletes the remaining OCM row.
+	result, err = deleteOldTombstonedResourcesCascade(db, logger, false, 30, DeletionOrderOldestFirst, "", 1, 0, 0, nil)
+	require.NoError(t, err)
+	assert.Empty(t, result.StopReason)
+	assert.Equal(t, int64(1), result.ReporterResourcesDeleted)
+	assert.Equal(t, int64(0), countPGRows(t, db, &model.ReporterResource{}, "resource_id = ?", resourceID))
+	assert.Equal(t, int64(3), countPGRows(t, db, &model.CommonRepresentation{}, "resource_id = ?", resourceID),
+		"the now-orphaned common reps must survive for the orphan job")
+	assert.Equal(t, int64(1), countPGRows(t, db, &model.Resource{}, "id = ?", resourceID))
+}
+
+func TestPostgresCascade_OldestFirst(t *testing.T) {
+	db, observerDB := setupPostgresTestDBPair(t)
+	logger := testLogger()
+	now := time.Now().UTC()
+
+	// 8 old-tombstoned resources, inserted newest-first by updated_at.
+	for _, ageDays := range []int{36, 38, 40, 42, 44, 46, 48, 50} {
+		id := uuid.New()
+		resourceID := uuid.New()
+		createPGResource(t, db, resourceID)
+		createPGReporterResource(t, db, id, resourceID, "hbi", true, daysAgo(now, 60), daysAgo(now, ageDays))
+		createPGCommonRepresentation(t, db, resourceID, 0, "hbi", daysAgo(now, ageDays))
+	}
+
+	// Keepers: a recent tombstone and an active resource, both with reps.
+	recentTombstone, recentResource := uuid.New(), uuid.New()
+	createPGResource(t, db, recentResource)
+	createPGReporterResource(t, db, recentTombstone, recentResource, "hbi", true, daysAgo(now, 60), daysAgo(now, 5))
+	createPGCommonRepresentation(t, db, recentResource, 0, "hbi", daysAgo(now, 5))
+	activeID, activeResource := uuid.New(), uuid.New()
+	createPGResource(t, db, activeResource)
+	createPGReporterResource(t, db, activeID, activeResource, "hbi", false, daysAgo(now, 60), daysAgo(now, 5))
+	createPGCommonRepresentation(t, db, activeResource, 0, "hbi", daysAgo(now, 5))
+
+	sample := func() map[string]time.Time {
+		rows := []struct {
+			ID        uuid.UUID `gorm:"column:id"`
+			UpdatedAt time.Time `gorm:"column:updated_at"`
+		}{}
+		require.NoError(t, observerDB.Raw("SELECT id, updated_at FROM reporter_resources WHERE tombstone = true AND updated_at < ?", daysAgo(now, 20)).Scan(&rows).Error)
+		out := make(map[string]time.Time, len(rows))
+		for _, r := range rows {
+			out[r.ID.String()] = r.UpdatedAt
+		}
+		return out
+	}
+
+	var result cascadeCleanupResult
+	var err error
+	runWithOldestFirstCheck(t, func() {
+		result, err = deleteOldTombstonedResourcesCascade(db, logger, false, 30, DeletionOrderOldestFirst, "", 2, 300, 0, nil)
+	}, sample)
+
+	require.NoError(t, err)
+	assert.Empty(t, result.StopReason)
+	assert.Equal(t, int64(8), result.ReporterResourcesDeleted)
+	assert.Equal(t, int64(1), countPGRows(t, db, &model.ReporterResource{}, "id = ?", recentTombstone),
+		"recent tombstones must survive")
+	assert.Equal(t, int64(1), countPGRows(t, db, &model.ReporterResource{}, "id = ?", activeID),
+		"active resources must survive")
+	assert.Equal(t, int64(10), countPGRows(t, db, &model.CommonRepresentation{}, ""),
+		"all 10 common reps must survive — 8 orphaned for the orphan job plus the 2 keepers'")
+}
+
+// runWithLargestFirstCheck is the largest-history-first analogue of
+// runWithOldestFirstCheck: while the run is in progress, no deleted row may
+// have a SMALLER history size than a still-remaining one (sizes are distinct
+// in the fixtures that use this, so the invariant is strict).
+func runWithLargestFirstCheck(t *testing.T, run func(), sample func() map[string]int) {
+	t.Helper()
+
+	initial := sample()
+	require.NotEmpty(t, initial, "fixture must produce deletable rows")
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		run()
+	}()
+
+	ticker := time.NewTicker(15 * time.Millisecond)
+	defer ticker.Stop()
+
+	observedPartial := false
+	for {
+		select {
+		case <-done:
+			if !observedPartial {
+				t.Log("warning: no partial-deletion state was observed; ordering was not exercised")
+			}
+			return
+		case <-ticker.C:
+			current := sample()
+			if len(current) == len(initial) || len(current) == 0 {
+				continue
+			}
+			observedPartial = true
+			for deletedKey, deletedSize := range initial {
+				if _, stillPresent := current[deletedKey]; stillPresent {
+					continue
+				}
+				for remainingKey, remainingSize := range current {
+					if deletedSize < remainingSize {
+						t.Errorf("largest-history-first violated: deleted row %s (history %d) is smaller than remaining row %s (history %d)",
+							deletedKey, deletedSize, remainingKey, remainingSize)
+					}
+				}
+			}
+		}
+	}
+}
+
+func TestPostgresCascade_LargestHistoryFirst(t *testing.T) {
+	db, observerDB := setupPostgresTestDBPair(t)
+	logger := testLogger()
+	now := time.Now().UTC()
+
+	// 8 old-tombstoned resources with DISTINCT history sizes 1..8. The
+	// tombstone age is ANTI-correlated with the history size (biggest
+	// history = newest tombstone), so an implementation that ignores
+	// history_size and orders by age alone deletes the smallest histories
+	// first and violates the invariant deterministically.
+	//
+	// The size map is FROZEN before the run: live counts shrink as the job
+	// deletes, so the poller cannot re-count mid-run.
+	frozenSizes := make(map[string]int, 8)
+	totalReps := 0
+	for i := 0; i < 8; i++ {
+		size := i + 1
+		totalReps += size
+		ageDays := 36 + 2*(7-i) // size 8 -> age 36, size 1 -> age 50
+		id := uuid.New()
+		resourceID := uuid.New()
+		createPGResource(t, db, resourceID)
+		createPGReporterResource(t, db, id, resourceID, "hbi", true, daysAgo(now, 60), daysAgo(now, ageDays))
+		for v := 0; v < size; v++ {
+			createPGCommonRepresentation(t, db, resourceID, uint(v), "hbi", daysAgo(now, ageDays))
+		}
+		frozenSizes[id.String()] = size
+	}
+
+	sample := func() map[string]int {
+		rows := []struct {
+			ID uuid.UUID `gorm:"column:id"`
+		}{}
+		require.NoError(t, observerDB.Raw("SELECT id FROM reporter_resources WHERE tombstone = true AND updated_at < ?", daysAgo(now, 20)).Scan(&rows).Error)
+		out := make(map[string]int, len(rows))
+		for _, r := range rows {
+			out[r.ID.String()] = frozenSizes[r.ID.String()]
+		}
+		return out
+	}
+
+	var result cascadeCleanupResult
+	var err error
+	runWithLargestFirstCheck(t, func() {
+		result, err = deleteOldTombstonedResourcesCascade(db, logger, false, 30, DeletionOrderLargestHistoryFirst, "", 1, 300, 0, nil)
+	}, sample)
+
+	require.NoError(t, err)
+	assert.Empty(t, result.StopReason)
+	assert.Equal(t, int64(8), result.ReporterResourcesDeleted)
+	assert.Equal(t, int64(totalReps), countPGRows(t, db, &model.CommonRepresentation{}, ""),
+		"every common rep must survive as an orphan — sum of history sizes 1..8")
+}
+
+// Within equal history sizes, the older tombstone dies first (the
+// updated_at tiebreak of the largest-history-first order).
+func TestPostgresCascade_LargestHistoryFirst_AgeTiebreak(t *testing.T) {
+	db, _ := setupPostgresTestDBPair(t)
+	logger := testLogger()
+	now := time.Now().UTC()
+
+	olderID, olderResource := uuid.New(), uuid.New()
+	newerID, newerResource := uuid.New(), uuid.New()
+	for _, f := range []struct {
+		id, res uuid.UUID
+		ageDays int
+	}{
+		{olderID, olderResource, 45},
+		{newerID, newerResource, 40},
+	} {
+		createPGResource(t, db, f.res)
+		createPGReporterResource(t, db, f.id, f.res, "hbi", true, daysAgo(now, 60), daysAgo(now, f.ageDays))
+		createPGCommonRepresentation(t, db, f.res, 0, "hbi", daysAgo(now, f.ageDays))
+		createPGCommonRepresentation(t, db, f.res, 1, "hbi", daysAgo(now, f.ageDays))
+	}
+
+	// batchSize 1 + MaxBatches 1: exactly one deletion, which must be the
+	// OLDER of the two equal-history resources.
+	result, err := deleteOldTombstonedResourcesCascade(db, logger, false, 30, DeletionOrderLargestHistoryFirst, "", 1, 0, 0, &retentionRunOptions{MaxBatches: 1})
+	require.NoError(t, err)
+	assert.Equal(t, stopReasonMaxBatches, result.StopReason)
+	assert.Equal(t, int64(1), result.ReporterResourcesDeleted)
+	assert.Equal(t, int64(0), countPGRows(t, db, &model.ReporterResource{}, "id = ?", olderID),
+		"the older tombstone of the equal-history pair must be the one deleted")
+	assert.Equal(t, int64(1), countPGRows(t, db, &model.ReporterResource{}, "id = ?", newerID))
+	assert.Equal(t, int64(2), countPGRows(t, db, &model.CommonRepresentation{}, "resource_id = ?", olderResource),
+		"the deleted resource's common reps must survive (orphaned for the orphan job)")
+	assert.Equal(t, int64(2), countPGRows(t, db, &model.CommonRepresentation{}, "resource_id = ?", newerResource))
+}
+
+func TestPostgresCascade_DryRun(t *testing.T) {
+	db, _ := setupPostgresTestDBPair(t)
+	logger := testLogger()
+	now := time.Now().UTC()
+
+	// Fixture:
+	//   res1: hbi old tomb, 2 reps    — eligible (both scopes)
+	//   res2: hbi old tomb, 3 reps    — eligible (both scopes)
+	//   res3: hbi old tomb + ocm ACTIVE, 2 — the hbi row is eligible; the ocm
+	//                                     row is not (not tombstoned)
+	//   res4: hbi RECENT tomb, 2 reps — not eligible (30-day cutoff)
+	//   res5: ocm old tomb, 1 rep     — eligible unscoped, excluded when
+	//                                   scoped to hbi
+	build := func(res uuid.UUID, rrID uuid.UUID, reporter string, tomb bool, ageDays int, reps int) {
+		createPGResource(t, db, res)
+		createPGReporterResource(t, db, rrID, res, reporter, tomb, daysAgo(now, 60), daysAgo(now, ageDays))
+		for v := 0; v < reps; v++ {
+			createPGCommonRepresentation(t, db, res, uint(v), reporter, daysAgo(now, ageDays))
+		}
+	}
+
+	res1, rr1 := uuid.New(), uuid.New()
+	build(res1, rr1, "hbi", true, 40, 2)
+	res2, rr2 := uuid.New(), uuid.New()
+	build(res2, rr2, "hbi", true, 40, 3)
+	res3, rr3 := uuid.New(), uuid.New()
+	build(res3, rr3, "hbi", true, 40, 2)
+	ocmID := uuid.New()
+	createPGReporterResource(t, db, ocmID, res3, "ocm", false, daysAgo(now, 60), daysAgo(now, 3))
+	res4, rr4 := uuid.New(), uuid.New()
+	build(res4, rr4, "hbi", true, 5, 2)
+	res5, rr5 := uuid.New(), uuid.New()
+	build(res5, rr5, "ocm", true, 40, 1)
+
+	t.Run("unscoped", func(t *testing.T) {
+		result, err := deleteOldTombstonedResourcesCascade(db, logger, true, 30, DeletionOrderOldestFirst, "", 10, 0, 0, nil)
+		require.NoError(t, err)
+
+		assert.Equal(t, int64(4), result.ReporterResourcesDeleted,
+			"the four old-tombstoned reporter rows (res1, res2, res3-hbi, res5-ocm)")
+	})
+
+	t.Run("scoped_to_hbi", func(t *testing.T) {
+		result, err := deleteOldTombstonedResourcesCascade(db, logger, true, 30, DeletionOrderOldestFirst, "hbi", 10, 0, 0, nil)
+		require.NoError(t, err)
+
+		assert.Equal(t, int64(3), result.ReporterResourcesDeleted,
+			"only the hbi old-tombstoned rows enter the scoped worklist (res5 is ocm)")
+	})
+
+	// Nothing was modified by either dry run.
+	assert.Equal(t, int64(6), countPGRows(t, db, &model.ReporterResource{}, ""),
+		"dry-run must not delete reporter_resources")
+	assert.Equal(t, int64(10), countPGRows(t, db, &model.CommonRepresentation{}, ""),
+		"dry-run must not delete common_representations")
+	assert.Equal(t, int64(5), countPGRows(t, db, &model.Resource{}, ""))
+}
+
+// TestPostgresCascade_TimeoutStopsBeforeFirstBatch pins the deadline check at
+// the top of the batch loop: an already-expired timeout stops the run before
+// any deletion.
+func TestPostgresCascade_TimeoutStopsBeforeFirstBatch(t *testing.T) {
+	db, _ := setupPostgresTestDBPair(t)
+	logger := testLogger()
+	now := time.Now().UTC()
+
+	res := uuid.New()
+	createPGResource(t, db, res)
+	createPGReporterResource(t, db, uuid.New(), res, "hbi", true, daysAgo(now, 60), daysAgo(now, 40))
+	for v := 0; v < 2; v++ {
+		createPGCommonRepresentation(t, db, res, uint(v), "hbi", daysAgo(now, 45))
+	}
+
+	result, err := deleteOldTombstonedResourcesCascade(db, logger, false, 30, DeletionOrderOldestFirst, "", 10, 0, time.Nanosecond, nil)
+	require.NoError(t, err)
+
+	assert.Equal(t, stopReasonTimeout, result.StopReason)
+	assert.Equal(t, int64(0), result.ReporterResourcesDeleted, "nothing deleted before the expired timeout")
+	assert.Equal(t, int64(1), countPGRows(t, db, &model.ReporterResource{}, ""),
+		"the old-tombstoned resource must survive")
+	assert.Equal(t, int64(2), countPGRows(t, db, &model.CommonRepresentation{}, ""))
+}
+
+func TestPostgresCascade_BatchAccounting(t *testing.T) {
+	db, _ := setupPostgresTestDBPair(t)
+	logger := testLogger()
+	now := time.Now().UTC()
+
+	// 3 old-tombstoned resources with 2 common reps each. batchSize 2 puts
+	// A+B in batch 1 and C in batch 2 — the run must account for all three
+	// reporter rows across the batch boundary.
+	resourceIDs := make([]uuid.UUID, 3)
+	for i := range resourceIDs {
+		resourceIDs[i] = uuid.New()
+		id := uuid.New()
+		createPGResource(t, db, resourceIDs[i])
+		createPGReporterResource(t, db, id, resourceIDs[i], "hbi", true, daysAgo(now, 60), daysAgo(now, 40+i))
+		createPGReporterRepresentation(t, db, id, 0, 1, daysAgo(now, 45))
+		for v := 0; v < 2; v++ {
+			createPGCommonRepresentation(t, db, resourceIDs[i], uint(v), "hbi", daysAgo(now, 45-v-i))
+		}
+	}
+
+	result, err := deleteOldTombstonedResourcesCascade(db, logger, false, 30, DeletionOrderOldestFirst, "", 2, 0, 0, nil)
+	require.NoError(t, err)
+	assert.Empty(t, result.StopReason)
+
+	assert.Equal(t, int64(3), result.ReporterResourcesDeleted)
+	assert.Equal(t, int64(0), countPGRows(t, db, &model.ReporterRepresentation{}, ""),
+		"all reporter reps gone via cascade")
+	assert.Equal(t, int64(6), countPGRows(t, db, &model.CommonRepresentation{}, ""),
+		"all common reps must survive as orphans")
+	assert.Equal(t, int64(3), countPGRows(t, db, &model.Resource{}, ""),
+		"parent resource rows survive")
+}
+
+func TestPostgresCascade_RecentTombstoneSurvives(t *testing.T) {
+	db, _ := setupPostgresTestDBPair(t)
+	logger := testLogger()
+	now := time.Now().UTC()
+
+	// A recent tombstone (<30d) keeps its reporter row AND its common reps,
+	// even while an old tombstone in the same run loses its reporter row.
+	oldRes, oldRR := uuid.New(), uuid.New()
+	createPGResource(t, db, oldRes)
+	createPGReporterResource(t, db, oldRR, oldRes, "hbi", true, daysAgo(now, 60), daysAgo(now, 40))
+	createPGCommonRepresentation(t, db, oldRes, 0, "hbi", daysAgo(now, 40))
+
+	recentRes, recentRR := uuid.New(), uuid.New()
+	createPGResource(t, db, recentRes)
+	createPGReporterResource(t, db, recentRR, recentRes, "hbi", true, daysAgo(now, 60), daysAgo(now, 5))
+	createPGCommonRepresentation(t, db, recentRes, 0, "hbi", daysAgo(now, 5))
+	createPGCommonRepresentation(t, db, recentRes, 1, "hbi", daysAgo(now, 6))
+
+	result, err := deleteOldTombstonedResourcesCascade(db, logger, false, 30, DeletionOrderOldestFirst, "", 10, 0, 0, nil)
+	require.NoError(t, err)
+	assert.Empty(t, result.StopReason)
+
+	assert.Equal(t, int64(1), result.ReporterResourcesDeleted)
+	assert.Equal(t, int64(1), countPGRows(t, db, &model.ReporterResource{}, "id = ?", recentRR),
+		"recent tombstones must survive")
+	assert.Equal(t, int64(3), countPGRows(t, db, &model.CommonRepresentation{}, ""),
+		"the old resource's rep survives as an orphan; the recent resource keeps both of its reps")
+}
+
+func TestPostgresCascade_ResumableAcrossRuns(t *testing.T) {
+	db, _ := setupPostgresTestDBPair(t)
+	logger := testLogger()
+	now := time.Now().UTC()
+
+	// 4 old-tombstoned resources with 1 common rep each.
+	resourceIDs := make([]uuid.UUID, 4)
+	for i := range resourceIDs {
+		resourceIDs[i] = uuid.New()
+		id := uuid.New()
+		createPGResource(t, db, resourceIDs[i])
+		createPGReporterResource(t, db, id, resourceIDs[i], "hbi", true, daysAgo(now, 60), daysAgo(now, 40+i))
+		createPGCommonRepresentation(t, db, resourceIDs[i], 0, "hbi", daysAgo(now, 40))
+	}
+
+	// Run 1: two batches of one, then a graceful --max-batches stop.
+	result, err := deleteOldTombstonedResourcesCascade(db, logger, false, 30, DeletionOrderOldestFirst, "", 1, 0, 0, &retentionRunOptions{MaxBatches: 2})
+	require.NoError(t, err)
+	assert.Equal(t, stopReasonMaxBatches, result.StopReason)
+	assert.Equal(t, int64(2), result.ReporterResourcesDeleted)
+	assert.Equal(t, int64(2), countPGRows(t, db, &model.ReporterResource{}, "tombstone = ? AND updated_at < ?", true, daysAgo(now, 30)))
+	assert.Equal(t, int64(4), countPGRows(t, db, &model.CommonRepresentation{}, ""),
+		"common reps are never deleted by this job")
+
+	// Run 2: a fresh run recollects the remaining worklist and finishes.
+	result, err = deleteOldTombstonedResourcesCascade(db, logger, false, 30, DeletionOrderOldestFirst, "", 1, 0, 0, nil)
+	require.NoError(t, err)
+	assert.Empty(t, result.StopReason)
+	assert.Equal(t, int64(2), result.ReporterResourcesDeleted)
+	assert.Equal(t, int64(0), countPGRows(t, db, &model.ReporterResource{}, "tombstone = ? AND updated_at < ?", true, daysAgo(now, 30)))
+	assert.Equal(t, int64(4), countPGRows(t, db, &model.CommonRepresentation{}, ""))
+	assert.Equal(t, int64(4), countPGRows(t, db, &model.Resource{}, ""),
+		"parent resource rows survive both runs")
+}
+
+func TestPostgresCascade_ZeroHistoryResource(t *testing.T) {
+	db, _ := setupPostgresTestDBPair(t)
+	logger := testLogger()
+	now := time.Now().UTC()
+
+	// An old-tombstoned resource with NO common representations (the
+	// COALESCE(history_size, 0) path): its deletion must not stall the loop.
+	zeroRes, zeroRR := uuid.New(), uuid.New()
+	createPGResource(t, db, zeroRes)
+	createPGReporterResource(t, db, zeroRR, zeroRes, "hbi", true, daysAgo(now, 60), daysAgo(now, 45))
+
+	normalRes, normalRR := uuid.New(), uuid.New()
+	createPGResource(t, db, normalRes)
+	createPGReporterResource(t, db, normalRR, normalRes, "hbi", true, daysAgo(now, 60), daysAgo(now, 40))
+	createPGCommonRepresentation(t, db, normalRes, 0, "hbi", daysAgo(now, 40))
+	createPGCommonRepresentation(t, db, normalRes, 1, "hbi", daysAgo(now, 41))
+
+	// batchSize 1 forces the zero-history resource into its own batch.
+	result, err := deleteOldTombstonedResourcesCascade(db, logger, false, 30, DeletionOrderOldestFirst, "", 1, 0, 0, nil)
+	require.NoError(t, err)
+	assert.Empty(t, result.StopReason)
+
+	assert.Equal(t, int64(2), result.ReporterResourcesDeleted,
+		"the zero-history resource must not prevent the run from completing")
+	assert.Equal(t, int64(0), countPGRows(t, db, &model.ReporterResource{}, "id IN ?", []uuid.UUID{zeroRR, normalRR}))
+	assert.Equal(t, int64(2), countPGRows(t, db, &model.CommonRepresentation{}, "resource_id = ?", normalRes),
+		"the normal resource's reps survive as orphans")
+}
+
+func TestPostgresCascade_InvalidDeletionOrder(t *testing.T) {
+	db, _ := setupPostgresTestDBPair(t)
+	logger := testLogger()
+
+	_, err := deleteOldTombstonedResourcesCascade(db, logger, false, 30, "newest-first", "", 10, 0, 0, nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid deletion order")
+}
+
+// Runtime controls for the cascade job, using the job's REAL control-table
+// name (tombstone_cascade_cleanup) — pause/resume parks between batches with
+// the worklist preserved, and a control stop exits gracefully having deleted
+// nothing. Common reps are never touched by this job.
+func TestPostgresCascade_RuntimeControls(t *testing.T) {
+	setup := func(t *testing.T, db *gorm.DB, now time.Time) {
+		for i := 0; i < 6; i++ {
+			id := uuid.New()
+			resourceID := uuid.New()
+			createPGResource(t, db, resourceID)
+			createPGReporterResource(t, db, id, resourceID, "hbi", true, daysAgo(now, 60), daysAgo(now, 31+i))
+			createPGCommonRepresentation(t, db, resourceID, 0, "hbi", daysAgo(now, 40))
+		}
+	}
+	remaining := func(t *testing.T, db *gorm.DB, now time.Time) int64 {
+		return countPGRows(t, db, &model.ReporterResource{}, "tombstone = ? AND updated_at < ?", true, daysAgo(now, 30))
+	}
+	run := func(db *gorm.DB, logger *log.Helper, opts *retentionRunOptions) (cascadeCleanupResult, error) {
+		return deleteOldTombstonedResourcesCascade(db, logger, false, 30, DeletionOrderOldestFirst, "", 2, 30, 0, opts)
+	}
+
+	t.Run("stop_before_start_deletes_nothing", func(t *testing.T) {
+		db, observer := setupPostgresTestDBPair(t)
+		logger := testLogger()
+		now := time.Now().UTC()
+		setup(t, db, now)
+		require.NoError(t, observer.Exec(
+			"INSERT INTO job_runtime_controls (job_name, desired_state, updated_by, note) VALUES ('tombstone_cascade_cleanup', 'stop', 'test', 'stop before start')").Error)
+
+		result, err := run(db, logger, &retentionRunOptions{
+			ControlJobName:      "tombstone_cascade_cleanup",
+			ControlPollInterval: controlsTestPollInterval,
+		})
+
+		require.NoError(t, err)
+		assert.Equal(t, stopReasonControlStop, result.StopReason)
+		assert.Equal(t, int64(0), result.ReporterResourcesDeleted)
+		assert.Equal(t, int64(6), remaining(t, db, now))
+		assert.Equal(t, int64(6), countPGRows(t, db, &model.CommonRepresentation{}, ""),
+			"a stopped run must not touch common_representations")
+	})
+
+	t.Run("pause_then_resume_completes", func(t *testing.T) {
+		db, observer := setupPostgresTestDBPair(t)
+		logger := testLogger()
+		now := time.Now().UTC()
+		setup(t, db, now)
+		require.NoError(t, observer.Exec(
+			"INSERT INTO job_runtime_controls (job_name, desired_state, updated_by, note) VALUES ('tombstone_cascade_cleanup', 'paused', 'test', 'pause at start')").Error)
+
+		opts := &retentionRunOptions{
+			ControlJobName:      "tombstone_cascade_cleanup",
+			ControlPollInterval: controlsTestPollInterval,
+		}
+		var result cascadeCleanupResult
+		var err error
+		done := make(chan struct{})
+		go func() {
+			defer close(done)
+			result, err = run(db, logger, opts)
+		}()
+
+		// The job must be parked in the pause loop, not finished.
+		time.Sleep(150 * time.Millisecond)
+		select {
+		case <-done:
+			t.Fatal("job completed while it should be paused")
+		default:
+		}
+
+		require.NoError(t, observer.Exec(
+			"UPDATE job_runtime_controls SET desired_state = 'running', updated_by = 'test' WHERE job_name = 'tombstone_cascade_cleanup'").Error)
+		<-done
+
+		require.NoError(t, err)
+		assert.Empty(t, result.StopReason)
+		assert.Equal(t, int64(6), result.ReporterResourcesDeleted)
+		assert.Equal(t, int64(0), remaining(t, db, now))
+		assert.Equal(t, int64(6), countPGRows(t, db, &model.CommonRepresentation{}, ""),
+			"common reps survive the completed run — they are the orphan job's work")
+	})
+}

@@ -163,6 +163,17 @@ test:
 check-e2e-tests:
 	./scripts/check-e2e-tests.sh
 
+.PHONY: test-retention-pg
+# run the retention cleanup jobs' Postgres behavioral tests (not part of `make test`).
+# Starts a throwaway postgres:17-alpine testcontainer; requires a container daemon
+# (podman or docker). On podman the Ryuk reaper usually cannot run — export
+# TESTCONTAINERS_RYUK_DISABLED=true (the suite terminates its container itself).
+# Alternatively point KESSEL_POSTGRES_TEST_DSN at an existing Postgres, e.g. the
+# one from `make db/setup`:
+#   KESSEL_POSTGRES_TEST_DSN="host=localhost port=5435 user=inventory_api password=postgres dbname=inventory sslmode=disable" make test-retention-pg
+test-retention-pg:
+	@$(GO) test ./cmd/jobs -count=1 -race -run 'TestPostgres' -v
+
 test-coverage: test
 	@$(GO) tool cover -html=coverage.txt -o coverage.html
 	@echo "coverage report written to coverage.html"

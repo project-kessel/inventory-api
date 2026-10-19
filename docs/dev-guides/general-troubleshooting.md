@@ -4,12 +4,12 @@
 ## Tuple Failures and Schema Related Issues
 
 There are two known distinct reasons tuple creation could fail due to schema issues:
-1) The schema definitions between Inventory API and Relations API are not in sync
+1) The schema definitions between Inventory API and SpiceDB are not in sync
 2) The schema is valid but the tuple request values are malformed by Inventory API
 
 For #1, the process to fix this issue is well covered in our [runbook](../runbooks/stage/consumer-message-process-failures.md#inventory-consumer-fails-to-createmodify-a-relationship-due-to-schema-mismatch) with some minor differences:
 
-1) The preshared token secret for setting up the Zed cli is stored in a different secret, which can be found in Relations API deploy files or compose file
+1) The preshared token secret for setting up the Zed cli is stored in a different secret, which can be found in the SpiceDB deploy files or compose file
 2) The schema configmap is hardcoded into the epehmeral deployment manifest instead of loaded from upstream source
 
 For #2, the process is also similar to our [runbook](../runbooks/stage/consumer-message-process-failures.md#inventory-consumer-fails-due-to-malformed-tuple-request) but there are some extra options that may be simpler:

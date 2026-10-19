@@ -239,7 +239,7 @@ const (
 - Log debug messages for skipped operations
 - Separate concerns: token presence vs operation success
 
-## Relations API Integration
+## SpiceDB / Relations Integration
 
 ### Client Authentication
 - Use **OIDC token client** when `EnableOIDCAuth` is true
@@ -253,7 +253,7 @@ const (
 - Implement **consistency tokens** for read-after-write guarantees via `UpdateConsistencyToken()`
 - Apply **fencing checks** for all tuple operations to prevent race conditions
 
-### Kessel Relations-API Client
+### Kessel Relations Client (SpiceDB)
 - Use gRPC client with proper bearer token authentication
 - Implement token caching with 5-minute expiration via `tokenClient`
 - Default to `minimize_latency` consistency for non-existent resources
@@ -274,7 +274,7 @@ const (
 ## Service Discovery
 
 ### ClowdApp Dependencies
-- **Optional dependencies** declared in deployment template for Relations API
+- **Optional dependencies** declared in deployment template for SpiceDB
 - **Hostname/port resolution** via ClowdApp endpoint configuration
 - **Automatic URL construction** for dependent service connections
 
@@ -326,7 +326,7 @@ Use `fakeTransactionManager` with call tracking for unit tests.
 | `NewFakeResourceRepository()` | `internal/data/fake_resource_repository.go` | Full in-memory resource storage with mutex and transaction ID tracking |
 | `NewFakeTransactionManager()` | `internal/data/fake_transaction_manager.go` | No-op transaction handling for tests that don't need real DB transactions |
 | `NewFakeMetricsCollector()` | `internal/metricscollector/fake_metricscollector.go` | No-op OTEL counters for tests that need a `MetricsCollector` shape |
-| `NewSimpleRelationsRepository()` | `internal/data/relations_simple.go` | In-process Relations API behavior (tuples, checks, snapshots) |
+| `NewSimpleRelationsRepository()` | `internal/data/relations_simple.go` | In-process relations behavior (tuples, checks, snapshots) |
 
 Note: `NewInMemorySchemaRepository()` (`internal/data/schema_inmemory.go`) is the **production** schema store, not a fake. It is used directly in tests as a real instance — a good example of preferring the real thing when no external I/O is involved.
 

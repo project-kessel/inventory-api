@@ -32,7 +32,7 @@ This is the Kessel Inventory API, a Go-based microservice that provides resource
 - **gRPC and HTTP APIs** using Kratos framework with protobuf definitions
 - **PostgreSQL/SQLite database** with GORM ORM and serializable transactions
 - **Kafka consumer** for event processing with Debezium CDC integration
-- **Relations API integration** for authorization via Kessel relations service
+- **SpiceDB integration** for authorization (relations functionality is merged into Inventory API)
 - **Multi-protocol authentication** supporting OIDC, X-RH-Identity, and development modes
 - **Comprehensive observability** with OpenTelemetry metrics and structured logging
 
@@ -40,7 +40,7 @@ This is the Kessel Inventory API, a Go-based microservice that provides resource
 - **Clean Architecture**: Business logic in `internal/biz`, data layer in `internal/data`, service layer in `internal/service`
 - **Domain-Driven Design**: Aggregate roots in `model` package with repository patterns
 - **Event Sourcing**: Outbox pattern with WAL logical decoding for reliable event publishing (no-op mode available for SQLite/standalone deployments)
-- **CQRS-like separation**: Read-after-write consistency with Relations API integration
+- **CQRS-like separation**: Read-after-write consistency with SpiceDB integration
 - **Hexagonal ports**: Abstractions for external dependencies (database, auth, messaging)
 
 ### Domain Model Conventions (`internal/biz/model`)

@@ -6,7 +6,7 @@ This is the Kessel Inventory API, a Go-based microservice for resource inventory
 - **gRPC and HTTP APIs** with protobuf definitions and Kratos framework
 - **PostgreSQL/SQLite** with GORM ORM and serializable transactions  
 - **Kafka integration** for event processing via Debezium CDC
-- **Relations API** integration for authorization
+- **SpiceDB** integration for authorization (relations functionality merged into Inventory API)
 - **Multi-protocol authentication** (OIDC, X-RH-Identity, development modes)
 
 ## Build and Test Commands
@@ -53,7 +53,7 @@ make docker-build-push
 
 - **Clean Architecture**: `internal/biz` (business), `internal/data` (persistence), `internal/service` (API)
 - **Event Sourcing**: Outbox pattern with WAL logical decoding for reliable event publishing (no-op mode for SQLite/standalone)
-- **CQRS**: Read-after-write consistency with Relations API integration
+- **CQRS**: Read-after-write consistency with SpiceDB integration
 - **Hexagonal**: Port abstractions for external dependencies
 
 ## Personal configuration

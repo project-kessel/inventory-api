@@ -17,7 +17,7 @@ The debug container is configured with environment variables consisting of Kesse
 **What's Configured?**:
 * SpiceDB endpoint and token configuration (via `ZED_ENDPOINT`, `ZED_TOKEN`, and `ZED_INSECURE` variables)
 * Inventory API Endpoints: (via `INVENTORY_API_GRPC_ENDPOINT` and `INVENTORY_API_HTTP_ENDPOINT` variables)
-* Relations API Endpoints: (via `RELATIONS_API_GRPC_ENDPOINT` and `RELATIONS_API_HTTP_ENDPOINT` variables)
+* Relations Endpoints _(deprecated)_: (via `RELATIONS_API_GRPC_ENDPOINT` and `RELATIONS_API_HTTP_ENDPOINT` variables)
 * Kafka Endpoints and auth info (configured by running `source /usr/local/bin/env-setup.sh` if needed)
 * Inventory API DB Endpoints and auth info (configured by running `source /usr/local/bin/env-setup.sh` if needed)
 * Clowder cdappconfig for Inventory API mounted to `/cdapp`

@@ -114,7 +114,7 @@ make api
 
 Testing locally is fine for simple changes but in order to test the full application, it requires all the dependent backing services.
 
-The quickest way to run the full Kessel suite locally (Inventory API, Relations API + SpiceDB, Inventory Consumer, Kafka, and Kafka Connect) is:
+The quickest way to run the full Kessel suite locally (Inventory API, SpiceDB, Inventory Consumer, Kafka, and Kafka Connect) is:
 
 ```shell
 make kessel-up
@@ -125,7 +125,7 @@ This uses pre-built images so no other repos need to be cloned. To stop:
 make kessel-down
 ```
 
-For Inventory API only (without Relations API or Consumer), use:
+For Inventory API only (without Consumer), use:
 ```shell
 make inventory-up    # start
 make inventory-down  # stop
@@ -135,7 +135,7 @@ make inventory-down  # stop
 
 There are numerous ways to run Inventory API using Docker Compose for various testing and debugging needs. For more options, see our [guide](./docs/dev-guides/docker-compose-options.md)
 
-### Running in Ephemeral Cluster with Relations API using Bonfire
+### Running in Ephemeral Cluster using Bonfire
 
 See [Testing Inventory in Ephemeral](./docs/dev-guides/ephemeral-testing.md) for instructions on how to deploy Kessel Inventory in the ephemeral cluster.
 
@@ -190,7 +190,7 @@ All these examples use the  REST API and assume we are running the default local
 adjustments needs to be made to the curl requests if running  with different configuration,
 such as port, authentication mechanisms, etc.
 
-> Note: When testing in Stage, the current schema leveraged by Relations only supports notifications integrations and not any of the infra we have in our API (RHEL hosts, K8s Clusters, etc). Testing with any other resource type will throw errors from Relations API but will still succeed in Inventory API
+> Note: When testing in Stage, the current SpiceDB schema only supports notifications integrations and not any of the infra we have in our API (RHEL hosts, K8s Clusters, etc). Testing with any other resource type will throw errors from the relations subsystem but will still succeed in Inventory API.
 
 ### Health check endpoints
 

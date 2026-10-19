@@ -1,6 +1,6 @@
-# Running Notifications + Relations + Inventory using Ephemeral with Custom Images
+# Running Notifications + Inventory using Ephemeral with Custom Images
 
-This process goes through running Notifications, Inventory API and Relations API in Ephemeral leveraging custom built container images. By using custom built images, you can test code changes in an OpenShift cluster, and reap all the benefits of Clowder to handle dependencies.
+This process goes through running Notifications and Inventory API in Ephemeral leveraging custom built container images. By using custom built images, you can test code changes in an OpenShift cluster, and reap all the benefits of Clowder to handle dependencies.
 
 ## Prerequisites
 
@@ -20,7 +20,6 @@ If you have not used Bonfire before or in a long time, you'll likely need to go 
 * Reading through the [Local Config](https://github.com/RedHatInsights/bonfire/tree/master?tab=readme-ov-file#using-a-local-config) is also beneficial as this SOP will leverage local configs
 
 To build custom images for these services, you'll also need the following repos cloned to your system:
-* [Relations API](https://github.com/project-kessel/relations-api)
 * [Inventory API](https://github.com/project-kessel/inventory-api)
 * [Notifications Backend](https://github.com/RedHatInsights/notifications-backend)
 
@@ -36,7 +35,7 @@ To create a Repo:
 * Select the **empty repository** radio button
 * Hit **Create Public Repository**
 
-If you intend to build custom images for each service, you'll want a Quay repo for each service (inventory-api, relations-api, notifications-backend).
+If you intend to build custom images for each service, you'll want a Quay repo for each service (inventory-api, notifications-backend).
 
 > NOTE: If you already have a Quay repo for an image, you can make sure its set to public by navigating to the repo in Quay --> Settings --> Repository Visibility --> Make Public
 
@@ -57,36 +56,6 @@ Login Succeeded!
 ```
 
 > NOTE: The process for Mac and Linux is slightly different to account for those using ARM laptops. The `build-push-minimal` make target used for Mac forces the image be built for linux/amd64 arch to ensure it can run in the ephemeral cluster. If you are running on an ARM laptop, it is not suitable for running locally
-
-### Building Relations API
-1) Change to the Relations API code path: `cd /path/to/relations-api`
-
-**On Linux**:
-
-2) Set required ENV vars for the script to run
-
-```shell
-export IMAGE=quay.io/you-username/relations-api
-export QUAY_USER=your-quay-username
-export QUAY_TOKEN=your-quay-password
-export RH_REGISTRY_USER=your-redhat-registry-username
-export RH_REGISTRY_TOKEN=your-redhat-registry-password
-```
-
-3) Build and push the image: `make docker-build-push`
-
-**On Mac:**
-
-2) Set required ENV vars for the script to run:
-
-```shell
-export QUAY_REPO_RELATIONS=quay.io/you-username/relations-api
-```
-
-3) Login to Quay with Podman/Docker and your Quay credentials: `podman login quay.io` or `docker login quay.io`
-
-4) Build and push the image: `make build-push-minimal`
-
 
 ### Building Inventory API
 1) Change to the Inventory API code path: `cd /path/to/inventory-api`
@@ -142,9 +111,9 @@ docker/podman push ${QUAY_REPO_NOTIFICATIONS}:${IMAGE_TAG}
 
 ## Deploy to Ephemeral (All-in-One)
 
-Since the Notifications Backend ClowdApp defines both Inventory API and Relations API as dependencies, deploying Notifications to ephemeral alone will handle deploying all three. By leveraging custom images and a local bonfire config, you can deploy your custom images for Inventory and/or Relations all while deploying Notifications to ephemeral
+Since the Notifications Backend ClowdApp defines Inventory API as a dependency, deploying Notifications to ephemeral alone will handle deploying both services. By leveraging custom images and a local bonfire config, you can deploy your custom images for Inventory all while deploying Notifications to ephemeral.
 
-> NOTE: If desired, you can deploy/redeploy Inventory API and/or Relations API separately from Notifications. This is covered fairly well in the [Internal Kessel Docs](https://cuddly-tribble-gq7r66v.pages.github.io/start-here/getting-started/)
+> NOTE: If desired, you can deploy/redeploy Inventory API separately from Notifications. This is covered fairly well in the [Internal Kessel Docs](https://cuddly-tribble-gq7r66v.pages.github.io/start-here/getting-started/)
 
 ### Setup Local Config
 
@@ -152,13 +121,11 @@ By default, bonfire ships with a config file located under $HOME/.config/bonfire
 
 > NOTE: If your config is missing, or you want to start clean: `bonfire config write-default`
 
-The below local config will allow you to control all three services as needed. Each service specifies some form of image parameter; this is where you can set your custom image that has your code changes.
+The below local config will allow you to control both services as needed. Each service specifies some form of image parameter; this is where you can set your custom image that has your code changes.
 
 > NOTE: If you do not have changes to test for a particular service, you can comment out the parameter section for the service, or set it to its respective default values
 >
 > Notifications Image/Tag Default: quay.io/cloudservices/notifications-backend:latest
->
-> Relations Image/Tag Default: quay.io/redhat-services-prod/project-kessel-tenant/kessel-relations/relations-api: latest
 >
 > Inventory Image/Tag Default: quay.io/redhat-services-prod/project-kessel-tenant/kessel-inventory/inventory-api:latest
 
@@ -177,7 +144,6 @@ apps:
         IMAGE: quay.io/username/notifications-backend
         IMAGE_TAG: your-image-tag
         NOTIFICATIONS_KESSEL_INVENTORY_ENABLED: true
-        NOTIFICATIONS_KESSEL_RELATIONS_ENABLED: true
 - name: kessel
   components:
     - name: kessel-inventory
@@ -187,18 +153,11 @@ apps:
       parameters:
         INVENTORY_IMAGE: quay.io/username/inventory-api
         IMAGE_TAG: your-image-tag
-    - name: kessel-relations
-      host: local
-      repo: /path/to/relations-api-cloned-repo
-      path: deploy/kessel-relations.yaml
-      parameters:
-        RELATIONS_IMAGE: quay.io/username/relations-api
-        RELATIONS_IMAGE_TAG: latest
 ```
 
 ### Deploy
 
-After updating your config, ensuring your images are built, and publicly available in Quay, run the following to deploy all 3 services
+After updating your config, ensuring your images are built, and publicly available in Quay, run the following to deploy all services
 
 ```shell
 bonfire deploy notifications --source=appsre --ref-env insights-stage --timeout 600 --local-config-method merge

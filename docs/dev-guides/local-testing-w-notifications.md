@@ -1,6 +1,6 @@
-# Running Notifications + Relations + Inventory using Local Built Binaries
+# Running Notifications + Inventory using Local Built Binaries
 
-This process goes through running Notifications, Inventory API and Relations API locally using built binaries. Since there are database dependencies involved, podman/docker are leveraged to handle running databases.
+This process goes through running Notifications and Inventory API locally using built binaries. Since there are database dependencies involved, podman/docker are leveraged to handle running databases.
 
 ## Prerequisites
 
@@ -11,24 +11,19 @@ You'll need the following tools:
 * [Maven](https://maven.apache.org/install.html)
 
 You'll also need the following repos cloned to your system:
-* [Relations API](https://github.com/project-kessel/relations-api)
 * [Inventory API](https://github.com/project-kessel/inventory-api)
 * [Notifications Backend](https://github.com/RedHatInsights/notifications-backend)
 
-### Running Relations:
+### Running SpiceDB:
 
-1) Change to the Relations API code path: `cd /path/to/relations-api`
-
-2) Start up SpiceDB
+Inventory API requires SpiceDB for authorization. Start SpiceDB using the embedded setup:
 
 ```shell
-# Start up SpiceDB Alt -- uses a different postgres port to avoid conflicts with notifications
-make spicedb-alt-up
+cd /path/to/inventory-api
+make inventory-up-spicedb
 ```
 
-3) Build and Run Relations API: `make run`
-
-When done, SpiceDB and Postgres should be running in Podman/Docker, and Relations will be running in your locally attached to your terminal
+This starts SpiceDB with its backing Postgres, Kafka, and the Inventory Consumer automatically.
 
 ### Running Inventory:
 1) Change to the Inventory API code path: `cd /path/to/inventory-api`
@@ -46,8 +41,7 @@ make migrate
 4) Run Inventory API:
 
 ```shell
-# The config provided assumes Relations is running locally on ports 8000/9000
-# so Inventory is set to use ports 8081/9081 instead to not conflict
+# Inventory API includes relations functionality and connects directly to SpiceDB
 ./bin/inventory-api serve --config development/configs/local-w-relations.yaml
 ```
 
@@ -75,8 +69,8 @@ cd ..
 4) Run the Notifications Service
 
 ```shell
-# If you are not running one of the below kessel services, you can set the enabled flags for that service to false below
-./mvnw clean quarkus:dev -Dnotifications.use-default-template=true -Dnotifications.kessel-inventory.enabled=true -Dnotifications.kessel-relations.enabled=true -pl :notifications-backend
+# Inventory API now handles both inventory and relations — enable the inventory integration
+./mvnw clean quarkus:dev -Dnotifications.use-default-template=true -Dnotifications.kessel-inventory.enabled=true -pl :notifications-backend
 ```
 
 
@@ -84,13 +78,13 @@ cd ..
 
 1) Shutdown Notifications: enter `q` in the running window to shut it down
 
-2) Kill inventory and relations: `ctrl+c` or use whatever fun killing technique you like!
+2) Kill Inventory API: `ctrl+c` or use whatever fun killing technique you like!
 
-3) Teardown SpiceDB:
+3) Teardown SpiceDB and backing services:
 
 ```shell
-cd /path/to/relations-api
-make spicedb-down
+cd /path/to/inventory-api
+make inventory-down
 ```
 
 4) Teardown Notifications DB: `podman/docker stop notifications_db && podman/docker rm notifications_db`

@@ -9,12 +9,12 @@
 | `make test-performance` | Runs resource lifecycle performance tests and prints a summary; auto-detects Docker/Podman (must be running) | Measure resource lifecycle performance |
 | `make kessel-up-monitoring` | Full Kessel + Prometheus/Grafana/Alertmanager | Metrics and dashboard development |
 | `make inventory-up` | Inventory API only (built from source) | Developing Inventory API code |
-| `make inventory-up-relations-ready` | Inventory API (built from source, x-rh-identity auth) | Testing with external Relations API |
+| `make inventory-up-relations-ready` | Inventory API (built from source, x-rh-identity auth) | _(deprecated — use `inventory-up-spicedb`)_ |
 | `make inventory-up-w-monitoring` | Inventory API + monitoring stack | Inventory metrics testing |
 | `make inventory-up-sso` | Inventory API + Keycloak SSO | Testing OIDC authentication |
 | `make inventory-up-spicedb` | Inventory API + SpiceDB + Kafka | Testing embedded SpiceDB authz |
 | `make inventory-up-split` | Infra only (Postgres, Kafka, Connect) | Debugging with local binary + debugger |
-| `make inventory-up-split-relations-ready` | Infra only (relations-compatible ports) | Debugging with local binary + Relations |
+| `make inventory-up-split-relations-ready` | Infra only (SpiceDB-compatible ports) | _(deprecated — use `inventory-up-spicedb`)_ |
 | `make monitoring-only` | Prometheus/Grafana/Alertmanager for ephemeral | Monitoring an ephemeral namespace |
 
 All setups are stopped with `make inventory-down` except Full Kessel which uses `make kessel-down`. To run the end-to-end integration test against the full Kessel stack, use `make kessel-compose-integration-test`.
@@ -25,7 +25,7 @@ All setups are stopped with `make inventory-down` except Full Kessel which uses 
 
 ## Full Kessel Stack (Recommended)
 
-Deploy the entire Kessel suite locally with a single command: Inventory API, Relations API + SpiceDB, Inventory Consumer, RBAC, Kafka, and Kafka Connect. Uses pre-built images so no other repos need to be cloned.
+Deploy the entire Kessel suite locally with a single command: Inventory API, SpiceDB, Inventory Consumer, RBAC, Kafka, and Kafka Connect. Uses pre-built images so no other repos need to be cloned.
 
 ```shell
 make kessel-up
@@ -39,8 +39,8 @@ This starts all services using the compose file at `development/full-kessel/dock
 |------|---------|
 | 8081 | Inventory API (HTTP) |
 | 9081 | Inventory API (gRPC) |
-| 8000 | Relations API (HTTP) |
-| 9000 | Relations API (gRPC) |
+| 8000 | Relations API (HTTP) _(deprecated)_ |
+| 9000 | Relations API (gRPC) _(deprecated)_ |
 | 50051 | SpiceDB (gRPC) |
 | 8083 | Inventory Kafka Connect |
 | 9092 | Kafka |
@@ -59,7 +59,6 @@ Edit `development/full-kessel/.env` to use custom images for development:
 
 ```env
 INVENTORY_API_IMAGE=localhost/kessel-inventory:dev
-RELATIONS_API_IMAGE=quay.io/redhat-services-prod/project-kessel-tenant/kessel-relations/relations-api:latest
 INVENTORY_CONSUMER_IMAGE=quay.io/redhat-services-prod/project-kessel-tenant/kessel-inventory-consumer/inventory-consumer:latest
 RBAC_IMAGE=quay.io/redhat-services-prod/hcc-accessmanagement-tenant/insights-rbac:latest
 ```
@@ -110,19 +109,19 @@ To include Prometheus, Grafana, and Alertmanager:
 make kessel-up-monitoring
 ```
 
-Grafana is pre-loaded with a local Prometheus datasource and the current dashboards from the [dashboards folder](../../dashboards/). Prometheus is configured to scrape all Kessel services (Inventory API, Relations API, Consumer, RBAC, and Kafka Connect).
+Grafana is pre-loaded with a local Prometheus datasource and the current dashboards from the [dashboards folder](../../dashboards/). Prometheus is configured to scrape all Kessel services (Inventory API, Consumer, RBAC, SpiceDB, and Kafka Connect).
 
 See [Monitoring Info](#monitoring-info) for URLs and login details.
 
 ### RBAC Integration
 
-The full Kessel stack includes [insights-rbac](https://github.com/project-kessel/insights-rbac) for role-based access control testing. RBAC connects to both Relations API (gRPC) and Inventory API (gRPC) automatically. The V2 APIs are enabled by default.
+The full Kessel stack includes [insights-rbac](https://github.com/project-kessel/insights-rbac) for role-based access control testing. RBAC connects to Inventory API (gRPC) and SpiceDB automatically. The V2 APIs are enabled by default.
 
 RBAC is available at `http://localhost:9080/api/rbac/v2/`. Metrics are served at `http://localhost:9080/metrics`.
 
 ### Integration Test
 
-Run end-to-end integration tests that exercise the full service flow: RBAC tenant bootstrap, simulated HBI host events via Kafka, Inventory Consumer processing, Relations API tuple verification, and resource deletion.
+Run end-to-end integration tests that exercise the full service flow: RBAC tenant bootstrap, simulated HBI host events via Kafka, Inventory Consumer processing, SpiceDB tuple verification, and resource deletion.
 
 ```shell
 make kessel-compose-integration-test
@@ -132,10 +131,10 @@ Requires `kcat`, `grpcurl`, and `jq` to be installed locally. The script will pr
 
 The test flow:
 1. Verifies all services are healthy
-2. Bootstraps a tenant via RBAC V2 API (creates workspace hierarchy in Relations API)
+2. Bootstraps a tenant via RBAC V2 API (creates workspace hierarchy in SpiceDB)
 3. Publishes a simulated HBI host event to Kafka using the real workspace ID
 4. Verifies the Inventory Consumer processes the event and the resource appears in Inventory API
-5. Confirms the resource-to-workspace authorization tuple exists in Relations API
+5. Confirms the resource-to-workspace authorization tuple exists in SpiceDB
 6. Validates RBAC V2 roles and workspaces for the tenant
 7. Deletes the resource and verifies tuple cleanup
 
@@ -151,7 +150,7 @@ This stops the stack and removes its project-scoped volumes, including the ephem
 
 ## Inventory API Only (Built from Source)
 
-These setups use the compose file at `development/docker-compose.yaml` and build Inventory API from source. They do **not** include Relations API, SpiceDB, or Inventory Consumer -- those must be run separately if needed.
+These setups use the compose file at `development/docker-compose.yaml` and build Inventory API from source. They do **not** include SpiceDB or Inventory Consumer -- those must be run separately if needed.
 
 All of these are stopped with `make inventory-down`.
 
@@ -165,15 +164,17 @@ make inventory-up
 
 Inventory API is available at `localhost:8000` (HTTP) and `localhost:9000` (gRPC).
 
-### With Relations API (x-rh-identity Auth)
+### With SpiceDB Authorization (x-rh-identity Auth) _(deprecated)_
 
-Same as above but on ports `8081`/`9081` to avoid conflicts with Relations API, using x-rh-identity chain authentication and kessel authorization.
+> **Deprecated** — use `make inventory-up-spicedb` instead, which includes SpiceDB and the full authz pipeline.
+
+Same as above but on ports `8081`/`9081`, using x-rh-identity chain authentication and kessel authorization via SpiceDB.
 
 ```shell
 make inventory-up-relations-ready
 ```
 
-To deploy Relations API, clone the [Relations API repo](https://github.com/project-kessel/relations-api) and use their [Docker Compose process](https://github.com/project-kessel/relations-api/tree/main?tab=readme-ov-file#spicedb-using-dockerpodman). Both compose files share the `kessel` Docker network for connectivity.
+SpiceDB must be running separately or use `make inventory-up-spicedb` for an all-in-one setup.
 
 ### With Monitoring Stack
 
@@ -243,9 +244,11 @@ make build
   --authz.impl allow-all
 ```
 
-### With Relations
+### With SpiceDB Authorization _(deprecated)_
 
-Uses ports `8081`/`9081` to avoid conflicts with a locally running Relations API:
+> **Deprecated** — use `make inventory-up-spicedb` instead, which includes SpiceDB and the full authz pipeline.
+
+Uses ports `8081`/`9081` and configures Inventory API with kessel authorization via SpiceDB:
 
 ```shell
 make inventory-up-split-relations-ready
@@ -257,17 +260,15 @@ make build
   --authz.kessel.url localhost:9000
 ```
 
-To deploy Relations API, clone the [Relations API repo](https://github.com/project-kessel/relations-api) and use their [Docker Compose process](https://github.com/project-kessel/relations-api/tree/main?tab=readme-ov-file#spicedb-using-dockerpodman).
+SpiceDB must be running separately on port 50051, or use `make inventory-up-spicedb` for an all-in-one setup.
 
 ---
 
 ## Local Binaries (No Docker)
 
-Inventory and Relations can both be run as local binaries, but the default config for Inventory will conflict with Relations.
+Inventory API can be run as a local binary with SpiceDB authorization. The default config uses allow-all authorization; use the SpiceDB-compatible config for authorization testing.
 
-To run Relations locally, see the [Relations README](https://github.com/project-kessel/relations-api?tab=readme-ov-file#prerequisites). Relations also requires SpiceDB ([instructions](https://github.com/project-kessel/relations-api?tab=readme-ov-file#spicedb-using-dockerpodman)).
-
-For Inventory, use the relations-compatible config:
+For Inventory with SpiceDB authorization, use the SpiceDB-compatible config:
 ```shell
 make build
 make migrate

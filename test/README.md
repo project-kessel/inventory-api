@@ -10,7 +10,7 @@ Includes:
 
 * Builds inventory container image
 * Build E2E test container image
-* Deploys local kind cluster with contour, strimzi, postgres, spicedb, kafka, relations-api and inventory
+* Deploys local kind cluster with contour, strimzi, postgres, spicedb, kafka, and inventory
 * Runs E2E test job in kind cluster
 
 Check the result of the E2E test job with:

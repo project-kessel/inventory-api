@@ -440,15 +440,23 @@ func (f *fakeResourceRepository) FindCurrentAndPreviousVersionedRepresentations(
 	return fetchCurrentAndPreviousRepresentations(fetcher, versions, operationType)
 }
 
-func (f *fakeResourceRepository) FindLatestRepresentations(tx *gorm.DB, key bizmodel.ReporterResourceKey) (*bizmodel.Representations, error) {
+// FindLatestCommonRepresentation returns only the latest common data for the resource.
+func (f *fakeResourceRepository) FindLatestCommonRepresentation(tx *gorm.DB, key bizmodel.ReporterResourceKey) (*bizmodel.Representations, error) {
 	f.mu.RLock()
 	defer f.mu.RUnlock()
-
-	resourceID, reporterResourceID, found := f.findResourceIDs(key)
+	resourceID, _, found := f.findResourceIDs(key)
 	if !found {
 		return nil, fmt.Errorf("resource not found for key")
 	}
+	commonData, commonVersion := f.findLatestCommonRepresentation(resourceID)
+	if len(commonData) == 0 {
+		return nil, fmt.Errorf("no common representation found for key")
+	}
+	return bizmodel.NewRepresentations(commonData, commonVersion, nil, nil)
+}
 
+// findLatestCommonRepresentation requires the caller to hold f.mu.
+func (f *fakeResourceRepository) findLatestCommonRepresentation(resourceID uuid.UUID) (bizmodel.Representation, *bizmodel.Version) {
 	// Find latest common representation
 	var latestCommon bizmodel.Representation
 	var latestCommonVer *bizmodel.Version
@@ -468,6 +476,20 @@ func (f *fakeResourceRepository) FindLatestRepresentations(tx *gorm.DB, key bizm
 			latestCommonVer = &v
 		}
 	}
+
+	return latestCommon, latestCommonVer
+}
+
+func (f *fakeResourceRepository) FindLatestRepresentations(tx *gorm.DB, key bizmodel.ReporterResourceKey) (*bizmodel.Representations, error) {
+	f.mu.RLock()
+	defer f.mu.RUnlock()
+
+	resourceID, reporterResourceID, found := f.findResourceIDs(key)
+	if !found {
+		return nil, fmt.Errorf("resource not found for key")
+	}
+
+	latestCommon, latestCommonVer := f.findLatestCommonRepresentation(resourceID)
 
 	// Find latest reporter representation
 	var latestReporter bizmodel.Representation

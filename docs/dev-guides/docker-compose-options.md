@@ -217,6 +217,8 @@ curl -H "Authorization: bearer ${TOKEN}" http://localhost:8081/api/kessel/v1/liv
 
 Deploys Inventory API with its own SpiceDB instance (and backing Postgres), Kafka, and the Inventory Consumer for testing the full embedded SpiceDB authz pipeline. Resources reported via `ReportResource` flow through the consumer to SpiceDB as tuples automatically. Also supports manual tuple management via `CreateTuples` and permission checks (Check, LookupObjects, LookupSubjects). Uses the compose overlay at `development/docker-compose.spicedb.yaml`.
 
+The consumer defaults to `consumer.load_reporter_representation: false`. In this mode, creates and updates replicate common representation tuples, and deletes use the latest stored common representation, including for queued legacy events without a common version. To opt into reporter representation processing, set this key to `true` in the mounted YAML configuration (or pass `--consumer.load_reporter_representation=true` when running the binary). You can also enable it with `INVENTORY_API_CONSUMER_LOAD_REPORTER_REPRESENTATION=true`.
+
 ```shell
 make inventory-up-spicedb
 ```

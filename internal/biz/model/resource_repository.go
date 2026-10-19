@@ -10,6 +10,8 @@ type ResourceRepository interface {
 	Save(tx *gorm.DB, resource Resource, operationType EventOperationType, txid TransactionId) error
 	FindResourceByKeys(tx *gorm.DB, key ReporterResourceKey) (*Resource, error)
 	FindCurrentAndPreviousVersionedRepresentations(tx *gorm.DB, key ReporterResourceKey, versions RepresentationVersions, operationType EventOperationType) (*Representations, *Representations, error)
+	// FindLatestCommonRepresentation returns the latest common data without loading reporter data.
+	FindLatestCommonRepresentation(tx *gorm.DB, key ReporterResourceKey) (*Representations, error)
 	FindLatestRepresentations(tx *gorm.DB, key ReporterResourceKey) (*Representations, error)
 	GetDB() *gorm.DB
 	GetTransactionManager() TransactionManager

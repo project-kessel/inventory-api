@@ -536,6 +536,19 @@ func (r *resourceRepository) fetchLastLiveReporterBefore(db *gorm.DB, key bizmod
 	return bizmodel.Representation(result.Data), &v, nil
 }
 
+// FindLatestCommonRepresentation loads only the latest common representation for tuple replication.
+func (r *resourceRepository) FindLatestCommonRepresentation(tx *gorm.DB, key bizmodel.ReporterResourceKey) (*bizmodel.Representations, error) {
+	commonData, commonVersion, err := r.fetchLatestCommonRepresentation(r.getDBSession(tx), key)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch latest common representation: %w", err)
+	}
+	// Preserve the legacy delete behavior: missing or empty common data is an error.
+	if len(commonData) == 0 {
+		return nil, fmt.Errorf("no common representation found for key")
+	}
+	return bizmodel.NewRepresentations(commonData, commonVersion, nil, nil)
+}
+
 func (r *resourceRepository) FindLatestRepresentations(tx *gorm.DB, key bizmodel.ReporterResourceKey) (*bizmodel.Representations, error) {
 	db := r.getDBSession(tx)
 

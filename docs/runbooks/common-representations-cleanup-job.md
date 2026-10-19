@@ -150,6 +150,9 @@ Inventory YAML and application defaults. The optional `CA_CERT_SECRET`
 the API deployment for configurations that specify a Kafka CA file. The former
 `CLOWDER_ENABLED` parameter has
 been removed because app-common-go does not read it. `EXECUTE` defaults to false.
+The Job reuses the existing Inventory API service account (`SERVICE_ACCOUNT_NAME`,
+default `kessel-inventory-api`) for its image pull credentials, with API token
+mounting disabled. It creates no service account or RBAC resources.
 
 ```sh
 oc process -f deploy/kessel-inventory-common-representations-cleanup-job.yaml \

@@ -22,6 +22,7 @@ objects:
             job-type: common-representations-cleanup-job
         spec:
           restartPolicy: Never
+          serviceAccountName: ${SERVICE_ACCOUNT_NAME}
           automountServiceAccountToken: false
           terminationGracePeriodSeconds: 30
           securityContext:
@@ -140,6 +141,9 @@ parameters:
   - description: Clowder application configuration Secret containing cdappconfig.json
     name: CLOWDER_CONFIG_SECRET_NAME
     value: kessel-inventory
+  - description: Existing Inventory API service account, including its image pull credentials; no API token is mounted
+    name: SERVICE_ACCOUNT_NAME
+    value: kessel-inventory-api
   - description: Name of the Inventory API Config Secret
     name: INVENTORY_API_CONFIG_NAME
     value: inventory-api-config

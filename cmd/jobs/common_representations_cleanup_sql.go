@@ -62,63 +62,52 @@ func (repository *gormCommonRepCleanupRepository) ReadChunk(
 		boundary = boundaries[0]
 	}
 
-	rangeFilter := "cr.resource_id > ?"
+	rangeFilter := "history.resource_id > ?"
 	rangeArguments := []any{after}
 	if found {
-		rangeFilter += " AND cr.resource_id <= ?"
+		rangeFilter += " AND history.resource_id <= ?"
 		rangeArguments = append(rangeArguments, boundary)
 	}
 	typeFilter := ""
 	if resourceType, hasFilter := policy.ResourceType(); hasFilter {
-		typeFilter = " WHERE r.type = ?"
+		typeFilter = " WHERE resource.type = ?"
 		rangeArguments = append(rangeArguments, resourceType.Serialize())
 	}
 
+	// Classify each resource once, then rank only its eligible history. Checking
+	// reporter state first preserves the exclusion reason for inactive resources
+	// even when their current pointer is also inconsistent.
 	classificationQuery := `
 		WITH chunk AS (
-			SELECT cr.resource_id, cr.version
-			FROM common_representations cr
+			SELECT history.resource_id, history.version
+			FROM common_representations history
 			WHERE ` + rangeFilter + `
-		), typed AS (
-			SELECT c.resource_id, r.common_version, MAX(c.version) AS max_version,
-				BOOL_OR(c.version = r.common_version) AS pointer_exists
-			FROM chunk c JOIN resource r ON r.id = c.resource_id` + typeFilter + `
-			GROUP BY c.resource_id, r.common_version
-		), scoped AS (
-			SELECT t.resource_id, t.common_version, t.max_version, t.pointer_exists
-			FROM typed t
-			WHERE EXISTS (
-				SELECT 1 FROM reporter_resources rr
-				WHERE rr.resource_id = t.resource_id AND rr.tombstone IS FALSE
-			)
-		), out_of_scope AS (
-			SELECT t.resource_id FROM typed t
-			EXCEPT
-			SELECT s.resource_id FROM scoped s
-		), authoritative AS (
-			SELECT s.resource_id, s.common_version, s.pointer_exists,
-				COALESCE(s.common_version, s.max_version) AS current_version
-			FROM scoped s
-		), classified AS (
-			SELECT a.resource_id, a.current_version,
-				CASE WHEN a.common_version IS NOT NULL AND NOT a.pointer_exists THEN 'inconsistent_pointer' ELSE '' END AS exclusion
-			FROM authoritative a
+		), resource_status AS (
+			SELECT chunk.resource_id,
+				COALESCE(resource.common_version, MAX(chunk.version)) AS current_version,
+				CASE
+					WHEN NOT EXISTS (
+						SELECT 1 FROM reporter_resources reporter
+						WHERE reporter.resource_id = chunk.resource_id AND reporter.tombstone IS FALSE
+					) THEN 'no_active_reporter'
+					WHEN resource.common_version IS NOT NULL
+						AND NOT BOOL_OR(chunk.version = resource.common_version) THEN 'inconsistent_pointer'
+					ELSE ''
+				END AS exclusion
+			FROM chunk JOIN resource ON resource.id = chunk.resource_id` + typeFilter + `
+			GROUP BY chunk.resource_id, resource.common_version
 		), ranked AS (
-			SELECT c.resource_id, c.version,
-				ROW_NUMBER() OVER (PARTITION BY c.resource_id ORDER BY c.version DESC) AS version_rank
-			FROM chunk c JOIN classified cl ON cl.resource_id = c.resource_id
-			WHERE cl.exclusion = '' AND c.version <= cl.current_version
-		), per_root AS (
-			SELECT cl.resource_id, cl.exclusion,
-				COUNT(r.version) FILTER (WHERE r.version_rank > ?) AS prunable_rows,
-				MIN(r.version) FILTER (WHERE r.version_rank <= ?) AS retain_from
-			FROM classified cl LEFT JOIN ranked r ON r.resource_id = cl.resource_id
-			GROUP BY cl.resource_id, cl.exclusion
-			UNION ALL
-			SELECT o.resource_id, 'no_active_reporter', 0, 0
-			FROM out_of_scope o
+			SELECT chunk.resource_id, chunk.version,
+				ROW_NUMBER() OVER (PARTITION BY chunk.resource_id ORDER BY chunk.version DESC) AS version_rank
+			FROM chunk JOIN resource_status status ON status.resource_id = chunk.resource_id
+			WHERE status.exclusion = '' AND chunk.version <= status.current_version
 		)
-		SELECT resource_id, exclusion, prunable_rows, COALESCE(retain_from, 0) AS retain_from FROM per_root ORDER BY resource_id`
+		SELECT status.resource_id, status.exclusion,
+			COUNT(ranked.version) FILTER (WHERE ranked.version_rank > ?) AS prunable_rows,
+			COALESCE(MIN(ranked.version) FILTER (WHERE ranked.version_rank <= ?), 0) AS retain_from
+		FROM resource_status status LEFT JOIN ranked ON ranked.resource_id = status.resource_id
+		GROUP BY status.resource_id, status.exclusion
+		ORDER BY status.resource_id`
 
 	classificationArguments := append(rangeArguments, policy.keepVersions, policy.keepVersions)
 	var rows []commonRepChunkClassificationRow
@@ -153,47 +142,54 @@ func (repository *gormCommonRepCleanupRepository) DeletePrunableRoots(ctx contex
 	}
 	arguments := []any{string(captured)}
 	if resourceType, hasFilter := policy.ResourceType(); hasFilter {
-		typeFilter = " AND r.type = ?"
+		typeFilter = " AND resource.type = ?"
 		arguments = append(arguments, resourceType.Serialize())
 	}
 	arguments = append(arguments, policy.keepVersions-1, rowLimit, rowLimit)
 	query := `
-  WITH captured AS (
-   SELECT * FROM jsonb_to_recordset(?::jsonb) AS c(resource_id uuid, retain_from bigint)
-  ), scoped AS (
-   SELECT r.id, c.retain_from, COALESCE(r.common_version, (
-    SELECT MAX(cr.version) FROM common_representations cr WHERE cr.resource_id = r.id
-   )) AS current_version
-   FROM resource r JOIN captured c ON c.resource_id = r.id
-   WHERE c.retain_from > 0
-   AND (r.common_version IS NULL OR EXISTS (
-    SELECT 1 FROM common_representations cr
-    WHERE cr.resource_id = r.id AND cr.version = r.common_version
-   ))
-   AND EXISTS (
-    SELECT 1 FROM reporter_resources rr
-    WHERE rr.resource_id = r.id AND rr.tombstone IS FALSE
-   )` + typeFilter + `
-  ), thresholds AS (
-   SELECT s.id, LEAST(retained.version, s.retain_from) AS version FROM scoped s
-   CROSS JOIN LATERAL (
-    SELECT cr.version FROM common_representations cr
-    WHERE cr.resource_id = s.id AND cr.version <= s.current_version
-    ORDER BY cr.version DESC LIMIT 1 OFFSET ?
-   ) retained
-  ), batch AS (
-   SELECT cr.resource_id, cr.version
-   FROM thresholds t
-   CROSS JOIN LATERAL (
-    SELECT cr.resource_id, cr.version FROM common_representations cr
-    WHERE cr.resource_id = t.id AND cr.version < t.version
-    ORDER BY cr.version LIMIT ?
-   ) cr
-   ORDER BY cr.resource_id, cr.version LIMIT ?
-  )
-  DELETE FROM common_representations cr USING batch
-  WHERE cr.resource_id = batch.resource_id AND cr.version = batch.version
-  RETURNING cr.resource_id`
+		WITH captured AS (
+			SELECT resource_id, retain_from
+			FROM jsonb_to_recordset(?::jsonb) AS captured(resource_id uuid, retain_from bigint)
+		), eligible_resources AS (
+			-- Recheck the live pointer and reporter state in this delete transaction.
+			SELECT resource.id, captured.retain_from,
+				COALESCE(resource.common_version, (
+					SELECT MAX(history.version) FROM common_representations history
+					WHERE history.resource_id = resource.id
+				)) AS current_version
+			FROM resource JOIN captured ON captured.resource_id = resource.id
+			WHERE captured.retain_from > 0
+				AND (resource.common_version IS NULL OR EXISTS (
+					SELECT 1 FROM common_representations history
+					WHERE history.resource_id = resource.id AND history.version = resource.common_version
+				))
+				AND EXISTS (
+					SELECT 1 FROM reporter_resources reporter
+					WHERE reporter.resource_id = resource.id AND reporter.tombstone IS FALSE
+				)` + typeFilter + `
+		), deletion_cutoffs AS (
+			-- The live retained window may narrow deletion, never advance the captured cutoff.
+			SELECT resource.id, LEAST(retained.version, resource.retain_from) AS delete_before
+			FROM eligible_resources resource
+			CROSS JOIN LATERAL (
+				SELECT history.version FROM common_representations history
+				WHERE history.resource_id = resource.id AND history.version <= resource.current_version
+				ORDER BY history.version DESC LIMIT 1 OFFSET ?
+			) retained
+		), batch AS (
+			-- Bound each index probe and then the total rows deleted across all resources.
+			SELECT candidate.resource_id, candidate.version
+			FROM deletion_cutoffs cutoff
+			CROSS JOIN LATERAL (
+				SELECT history.resource_id, history.version FROM common_representations history
+				WHERE history.resource_id = cutoff.id AND history.version < cutoff.delete_before
+				ORDER BY history.version LIMIT ?
+			) candidate
+			ORDER BY candidate.resource_id, candidate.version LIMIT ?
+		)
+		DELETE FROM common_representations history USING batch
+		WHERE history.resource_id = batch.resource_id AND history.version = batch.version
+		RETURNING history.resource_id`
 	var deletedIDs []uuid.UUID
 	if err := repository.db.WithContext(ctx).Raw(query, arguments...).Scan(&deletedIDs).Error; err != nil {
 		return commonRepCleanupImpact{}, fmt.Errorf("delete prunable common representations: %w", err)

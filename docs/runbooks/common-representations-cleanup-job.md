@@ -137,6 +137,11 @@ measuring the effect. Physical compaction is a separate follow-up if measurement
 show it is needed. Validate query plans and batch cost at representative scale;
 local and ephemeral tests do not establish production readiness.
 
+The earlier [PR #1508 performance experiment](https://docs.google.com/document/d/18xugoI-Tv_YEsegl0QufNQyRw7xrChZbVW0-gqK0rEY/edit?tab=t.pwyzu9l7nrdf)
+used age-based retention across a broader resource scope, 10,000-row batches,
+and separate read measurements before/after deletion and compaction. Its cleanup
+runtime and total table shrink do not directly predict this job's results.
+
 ## OpenShift
 
 The one-time Job template uses the configured Inventory image and Inventory YAML

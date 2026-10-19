@@ -9,12 +9,12 @@
 | `make test-performance` | Runs resource lifecycle performance tests and prints a summary; auto-detects Docker/Podman (must be running) | Measure resource lifecycle performance |
 | `make kessel-up-monitoring` | Full Kessel + Prometheus/Grafana/Alertmanager | Metrics and dashboard development |
 | `make inventory-up` | Inventory API only (built from source) | Developing Inventory API code |
-| `make inventory-up-relations-ready` | Inventory API (built from source, x-rh-identity auth) | Testing with SpiceDB authz |
+| `make inventory-up-relations-ready` | Inventory API (built from source, x-rh-identity auth) | _(deprecated — use `inventory-up-spicedb`)_ |
 | `make inventory-up-w-monitoring` | Inventory API + monitoring stack | Inventory metrics testing |
 | `make inventory-up-sso` | Inventory API + Keycloak SSO | Testing OIDC authentication |
 | `make inventory-up-spicedb` | Inventory API + SpiceDB + Kafka | Testing embedded SpiceDB authz |
 | `make inventory-up-split` | Infra only (Postgres, Kafka, Connect) | Debugging with local binary + debugger |
-| `make inventory-up-split-relations-ready` | Infra only (SpiceDB-compatible ports) | Debugging with local binary + SpiceDB authz |
+| `make inventory-up-split-relations-ready` | Infra only (SpiceDB-compatible ports) | _(deprecated — use `inventory-up-spicedb`)_ |
 | `make monitoring-only` | Prometheus/Grafana/Alertmanager for ephemeral | Monitoring an ephemeral namespace |
 
 All setups are stopped with `make inventory-down` except Full Kessel which uses `make kessel-down`. To run the end-to-end integration test against the full Kessel stack, use `make kessel-compose-integration-test`.
@@ -39,8 +39,8 @@ This starts all services using the compose file at `development/full-kessel/dock
 |------|---------|
 | 8081 | Inventory API (HTTP) |
 | 9081 | Inventory API (gRPC) |
-| 8000 | _(available)_ |
-| 9000 | _(available)_ |
+| 8000 | Relations API (HTTP) _(deprecated)_ |
+| 9000 | Relations API (gRPC) _(deprecated)_ |
 | 50051 | SpiceDB (gRPC) |
 | 8083 | Inventory Kafka Connect |
 | 9092 | Kafka |
@@ -164,7 +164,9 @@ make inventory-up
 
 Inventory API is available at `localhost:8000` (HTTP) and `localhost:9000` (gRPC).
 
-### With SpiceDB Authorization (x-rh-identity Auth)
+### With SpiceDB Authorization (x-rh-identity Auth) _(deprecated)_
+
+> **Deprecated** — use `make inventory-up-spicedb` instead, which includes SpiceDB and the full authz pipeline.
 
 Same as above but on ports `8081`/`9081`, using x-rh-identity chain authentication and kessel authorization via SpiceDB.
 
@@ -242,7 +244,9 @@ make build
   --authz.impl allow-all
 ```
 
-### With SpiceDB Authorization
+### With SpiceDB Authorization _(deprecated)_
+
+> **Deprecated** — use `make inventory-up-spicedb` instead, which includes SpiceDB and the full authz pipeline.
 
 Uses ports `8081`/`9081` and configures Inventory API with kessel authorization via SpiceDB:
 

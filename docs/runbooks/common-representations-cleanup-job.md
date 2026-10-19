@@ -143,7 +143,12 @@ The one-time Job template uses the configured Inventory image and Inventory YAML
 Secret. It mounts the Clowder application Secret (`CLOWDER_CONFIG_SECRET_NAME`,
 default `kessel-inventory`) at `/cdapp` and sets `ACG_CONFIG`. The existing
 Clowder loader supplies PostgreSQL credentials and enables `verify-full` with
-the supplied RDS CA when present. The former `CLOWDER_ENABLED` parameter has
+the supplied RDS CA when present. Kafka brokers and SASL credentials come from
+that same Clowder configuration; the topic and consumer group come from the
+Inventory YAML and application defaults. The optional `CA_CERT_SECRET`
+(default `kessel-kafka-connect-config`) is mounted at `/kafka-ca-certs`, matching
+the API deployment for configurations that specify a Kafka CA file. The former
+`CLOWDER_ENABLED` parameter has
 been removed because app-common-go does not read it. `EXECUTE` defaults to false.
 
 ```sh
@@ -167,6 +172,41 @@ Ephemeral deployments use a ConfigMap for the Inventory YAML. For a test run,
 copy that YAML into a uniquely named temporary Secret and set
 `INVENTORY_API_CONFIG_NAME` to it; remove the test Secret afterward. Do not
 change the deployment's configuration source.
+
+### Stage deployment
+
+The stage deployment definitions use `kessel-stage` on **hccs01ue1** for the
+active Inventory writer and consumer. Run the Job in that namespace on that
+cluster so its `inventory-api-config` and `kessel-inventory` Secrets resolve
+locally. The older **crcs02ue1** stage deployment shares the database but has its
+consumer disabled; its configuration will be rejected for cleanup execution.
+Use an explicit OpenShift context for both processing and applying the template.
+
+The Debezium `kessel-inventory-api-connector` runs under `kessel-kafka-connect`
+in the separate `kessel-kafka-connect-stage` namespace on hccs01ue1. The Job
+needs no Connect service URL or Kubernetes access to that namespace: it reads
+`inventory_api_debezium` on the Inventory primary and queries Kafka directly.
+The connector template uses `pgoutput`, routes `kessel.tuples` logical messages
+through the outbox transform, and defaults to a five-minute heartbeat. The
+Inventory topic is `outbox.event.kessel.tuples` with one partition, and the
+default consumer group is `inventory-consumer` with explicit commits every
+10 messages.
+
+These mappings come from the [stage namespace configuration](https://gitlab.cee.redhat.com/service/app-interface/-/blob/master/data/services/insights/kessel/namespaces/hccs01ue1-kessel.yml),
+[Connect deployment targets](https://gitlab.cee.redhat.com/service/app-interface/-/blob/master/data/services/insights/kessel/deploy-kessel-kafka-connect.yml),
+and [Inventory connector template](https://github.com/project-kessel/kessel-kafka-connect/blob/main/deploy/inventory-api-connector.yml).
+
+Allow more than the five-minute default invocation budget for a stage execution
+(for example, `MAX_DURATION=30m`, `ACTIVE_DEADLINE_SECONDS=2100`); heartbeat and
+Connect offset flushing can otherwise exhaust the wait. Sparse tuple traffic
+can also delay the consumer's committed restart position. A timeout deletes no
+unverified chunk; it does not justify weakening the gate.
+
+Before the first stage execution, read the live slot, topic partition count,
+group offsets, and connector status/settings using the deployed credentials.
+Template inspection cannot establish their live state or Kafka metadata ACLs.
+An ordinary preview only scans PostgreSQL and does not exercise the consumption
+gate.
 
 ## Verification
 

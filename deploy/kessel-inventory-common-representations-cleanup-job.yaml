@@ -70,6 +70,9 @@ objects:
                 - name: clowder-config
                   mountPath: /cdapp
                   readOnly: true
+                - name: kafka-ca-certs
+                  mountPath: /kafka-ca-certs
+                  readOnly: true
               resources:
                 requests:
                   memory: ${REQUESTS_MEMORY}
@@ -84,6 +87,10 @@ objects:
             - name: clowder-config
               secret:
                 secretName: ${CLOWDER_CONFIG_SECRET_NAME}
+            - name: kafka-ca-certs
+              secret:
+                secretName: ${CA_CERT_SECRET}
+                optional: true
             - name: tmp
               emptyDir:
                 sizeLimit: 64Mi
@@ -136,6 +143,9 @@ parameters:
   - description: Name of the Inventory API Config Secret
     name: INVENTORY_API_CONFIG_NAME
     value: inventory-api-config
+  - description: Name of Secret that contains the Kafka cluster CA certificate, matching the Inventory API deployment when required
+    name: CA_CERT_SECRET
+    value: kessel-kafka-connect-config
   - description: Memory request for job
     name: REQUESTS_MEMORY
     value: '384Mi'

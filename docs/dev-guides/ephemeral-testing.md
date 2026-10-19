@@ -93,7 +93,7 @@ To Deploy:
 `bonfire deploy kessel -C kessel-inventory`
 
 The full deployment will include:
-* Inventory API (includes merged relations functionality)
+* Inventory API
 * SpiceDB
 * Kafka Cluster
 * Kafka Connect cluster with Debezium plugin

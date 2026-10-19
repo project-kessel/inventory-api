@@ -25,7 +25,7 @@ All setups are stopped with `make inventory-down` except Full Kessel which uses 
 
 ## Full Kessel Stack (Recommended)
 
-Deploy the entire Kessel suite locally with a single command: Inventory API, SpiceDB, Inventory Consumer, RBAC, Kafka, and Kafka Connect. Uses pre-built images so no other repos need to be cloned. Relations functionality is built into Inventory API — there is no separate Relations API service.
+Deploy the entire Kessel suite locally with a single command: Inventory API, SpiceDB, Inventory Consumer, RBAC, Kafka, and Kafka Connect. Uses pre-built images so no other repos need to be cloned.
 
 ```shell
 make kessel-up
@@ -39,8 +39,8 @@ This starts all services using the compose file at `development/full-kessel/dock
 |------|---------|
 | 8081 | Inventory API (HTTP) |
 | 9081 | Inventory API (gRPC) |
-| 8000 | _(available — formerly Relations API)_ |
-| 9000 | _(available — formerly Relations API)_ |
+| 8000 | _(available)_ |
+| 9000 | _(available)_ |
 | 50051 | SpiceDB (gRPC) |
 | 8083 | Inventory Kafka Connect |
 | 9092 | Kafka |
@@ -172,7 +172,7 @@ Same as above but on ports `8081`/`9081`, using x-rh-identity chain authenticati
 make inventory-up-relations-ready
 ```
 
-> **Note:** The make target retains the `relations-ready` name for backward compatibility. It configures Inventory API to use SpiceDB for authorization. SpiceDB must be running separately or use `make inventory-up-spicedb` for an all-in-one setup.
+SpiceDB must be running separately or use `make inventory-up-spicedb` for an all-in-one setup.
 
 ### With Monitoring Stack
 
@@ -256,7 +256,7 @@ make build
   --authz.kessel.url localhost:9000
 ```
 
-> **Note:** The make target retains the `relations-ready` name for backward compatibility. SpiceDB must be running separately on port 50051, or use `make inventory-up-spicedb` for an all-in-one setup.
+SpiceDB must be running separately on port 50051, or use `make inventory-up-spicedb` for an all-in-one setup.
 
 ---
 

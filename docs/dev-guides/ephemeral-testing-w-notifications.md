@@ -1,6 +1,6 @@
 # Running Notifications + Inventory using Ephemeral with Custom Images
 
-This process goes through running Notifications and Inventory API in Ephemeral leveraging custom built container images. By using custom built images, you can test code changes in an OpenShift cluster, and reap all the benefits of Clowder to handle dependencies. Relations functionality is now merged into Inventory API, so there is no separate Relations API service to deploy.
+This process goes through running Notifications and Inventory API in Ephemeral leveraging custom built container images. By using custom built images, you can test code changes in an OpenShift cluster, and reap all the benefits of Clowder to handle dependencies.
 
 ## Prerequisites
 

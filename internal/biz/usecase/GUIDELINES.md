@@ -17,7 +17,7 @@ This file covers the application services (usecases) under `internal/biz/usecase
 
 ### Authorization Logging
 - Track authorization success/failure counters per method
-- Use OpenTelemetry meter: `inventory_relations_api_success/failure` (metric name retained for backward compatibility)
+- Use OpenTelemetry meter: `inventory_relations_api_success/failure`
 - Log authorization decisions at Info level with resource details
 
 ### Authorization Error Handling

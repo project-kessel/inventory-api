@@ -1,6 +1,6 @@
 # Running Notifications + Inventory using Local Built Binaries
 
-This process goes through running Notifications and Inventory API locally using built binaries. Relations functionality is now merged into Inventory API, so there is no need to run a separate Relations API service. Since there are database dependencies involved, podman/docker are leveraged to handle running databases.
+This process goes through running Notifications and Inventory API locally using built binaries. Since there are database dependencies involved, podman/docker are leveraged to handle running databases.
 
 ## Prerequisites
 

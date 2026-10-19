@@ -32,7 +32,7 @@ This is the Kessel Inventory API, a Go-based microservice that provides resource
 - **gRPC and HTTP APIs** using Kratos framework with protobuf definitions
 - **PostgreSQL/SQLite database** with GORM ORM and serializable transactions
 - **Kafka consumer** for event processing with Debezium CDC integration
-- **SpiceDB integration** for authorization (relations functionality is merged into Inventory API)
+- **SpiceDB integration** for authorization
 - **Multi-protocol authentication** supporting OIDC, X-RH-Identity, and development modes
 - **Comprehensive observability** with OpenTelemetry metrics and structured logging
 

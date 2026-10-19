@@ -2,7 +2,9 @@ package consumer
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"io"
 	"testing"
 
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
@@ -83,6 +85,7 @@ type TestCase struct {
 // TestSetup creates a test struct that calls most of the initial constructor methods we intend to test in unit tests.
 func (t *TestCase) TestSetup(testingT *testing.T) []error {
 	t.options = NewOptions()
+	t.options.LoadReporterRepresentation = true
 	t.options.BootstrapServers = []string{"localhost:9092"}
 	t.config = NewConfig(t.options)
 	t.config.AuthConfig.Enabled = false
@@ -1176,6 +1179,18 @@ func TestInventoryConsumer_VersionCombinations(t *testing.T) {
 	}
 }
 
+func TestProcessMessage_LoadReporterRepresentationDisabled(t *testing.T) {
+	tester := TestCase{}
+	require.Nil(t, tester.TestSetup(t))
+	tester.inv.Config.LoadReporterRepresentation = false
+
+	// A reporter-only event must not fetch reporter data or block the partition.
+	msg := &kafka.Message{Value: []byte(`{"payload":{"reporter_resource_key":{"local_resource_id":"missing","resource_type":"integration","reporter":{"reporter_type":"notifications","reporter_instance_id":"instance"}},"reporter_representation_version":0}}`)}
+	result, err := tester.inv.ProcessMessage(map[string]string{"operation": string(model.OperationTypeCreated)}, true, msg)
+	require.NoError(t, err)
+	require.Empty(t, result)
+}
+
 // Test 1.4: Consumer-level test for delete with version gaps
 // Verifies that DeleteTuple receives tuples derived from the v0 reporter representation
 // even when a common-only update creates a gap at v1.
@@ -1238,4 +1253,75 @@ func TestInventoryConsumer_DeleteAfterCommonOnlyUpdate_TupleCleanup(t *testing.T
 		// Verify that processing succeeded without error, which implies the fetch worked
 		t.Logf("Delete processing succeeded with version gap (v0 → gap at v1 → tombstone at v2)")
 	})
+}
+
+// TestConsumerCommonOnlyCompatibility exercises the default configuration against both repositories.
+func TestConsumerCommonOnlyCompatibility(t *testing.T) {
+	for _, useFake := range []bool{false, true} {
+		name := "sql"
+		if useFake {
+			name = "fake"
+		}
+		t.Run(name, func(t *testing.T) {
+			for _, legacy := range []bool{true, false} {
+				eventName := "event with older common version"
+				if legacy {
+					eventName = "legacy event without common version"
+				}
+				t.Run(eventName, func(t *testing.T) {
+					tester := TestCase{}
+					require.Nil(t, tester.TestSetup(t))
+					tester.inv.Config.LoadReporterRepresentation = NewOptions().LoadReporterRepresentation
+					require.False(t, tester.inv.Config.LoadReporterRepresentation)
+					if useFake {
+						tester.inv.ResourceRepository = data.NewFakeResourceRepository()
+					}
+					repo := tester.inv.ResourceRepository
+					fixture, err := model.NewResourceFixture("test-resource-4321", "integration", "notifications", "test-instance-1", "workspace-v0")
+					require.NoError(t, err)
+					require.NoError(t, repo.Save(tester.inv.DB, *fixture.Resource, model.OperationTypeCreated, fixture.InitialTransactionId))
+					relations := data.NewSimpleRelationsRepository()
+					tester.inv.Relations = relations
+					process := func(operation model.EventOperationType, payload string) {
+						t.Helper()
+						_, err := tester.inv.ProcessMessage(map[string]string{"operation": string(operation.OperationType())}, true, &kafka.Message{Value: []byte(payload)})
+						require.NoError(t, err)
+					}
+					process(model.OperationTypeCreated, testCreateMessage)
+					updatedCommon, err := model.NewRepresentation(map[string]interface{}{"workspace_id": "workspace-v1"})
+					require.NoError(t, err)
+					require.NoError(t, fixture.Resource.Update(fixture.Key, fixture.ApiHref, &fixture.ConsoleHref, nil, nil, &updatedCommon, model.NewTransactionId("update")))
+					require.NoError(t, repo.Save(tester.inv.DB, *fixture.Resource, model.OperationTypeUpdated, model.NewTransactionId("update")))
+					process(model.OperationTypeUpdated, testUpdateMessage)
+					commonVersion := model.NewVersion(1)
+					expectedCommon, err := model.NewRepresentations(updatedCommon, &commonVersion, nil, nil)
+					require.NoError(t, err)
+					latestCommon, err := repo.FindLatestCommonRepresentation(nil, fixture.Key)
+					require.NoError(t, err)
+					require.Equal(t, expectedCommon, latestCommon, "common-only lookup must exclude reporter data")
+					current, err := repo.FindLatestRepresentations(nil, fixture.Key)
+					require.NoError(t, err)
+					tuples, err := tester.inv.SchemaService.CalculateTuplesForResource(context.Background(), current, nil, fixture.Key)
+					require.NoError(t, err)
+					require.NotEmpty(t, *tuples.TuplesToCreate())
+					filter := tupleToFilter((*tuples.TuplesToCreate())[0])
+					stream, err := relations.ReadTuples(context.Background(), filter, nil, model.NewConsistencyMinimizeLatency())
+					require.NoError(t, err)
+					_, err = stream.Recv()
+					require.NoError(t, err)
+					payload := map[string]interface{}{"reporter_resource_key": fixture.Key, "reporter_representation_version": 1}
+					if !legacy {
+						payload["common_version"] = 0
+					}
+					message, err := json.Marshal(map[string]interface{}{"payload": payload})
+					require.NoError(t, err)
+					process(model.OperationTypeDeleted, string(message))
+					stream, err = relations.ReadTuples(context.Background(), filter, nil, model.NewConsistencyMinimizeLatency())
+					require.NoError(t, err)
+					_, err = stream.Recv()
+					require.ErrorIs(t, err, io.EOF, "delete must remove the latest common tuple")
+				})
+			}
+		})
+	}
 }

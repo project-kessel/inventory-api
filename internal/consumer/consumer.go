@@ -320,6 +320,10 @@ func (i *InventoryConsumer) ProcessMessage(headers map[string]string, relationsE
 		if relationsEnabled {
 			return i.processRelationsOperation(operation, txid, msg, operationConfig{
 				fetchRepresentations: func(i *InventoryConsumer, key model.ReporterResourceKey, versions model.RepresentationVersions) (*model.Representations, *model.Representations, error) {
+					if !i.Config.LoadReporterRepresentation {
+						previous, err := i.ResourceRepository.FindLatestCommonRepresentation(nil, key)
+						return nil, previous, err
+					}
 					// For DELETE operations, fetch the last live state using OperationTypeDeleted.
 					// The delete branch uses upper-bound semantics to tolerate version gaps:
 					// - commonVersion: exact fetch (unchanged during delete, already last-live)
@@ -379,6 +383,14 @@ func (i *InventoryConsumer) processRelationsOperation(
 
 	key := tupleEvent.ReporterResourceKey()
 	versions := model.NewRepresentationVersionsFromTupleEvent(*tupleEvent)
+	if !i.Config.LoadReporterRepresentation {
+		// Creates and updates without a common version have no common tuples to replicate.
+		// Legacy deletes omit the common version and must still fetch the latest common data.
+		if versions.CommonVersion() == nil && operation != string(model.OperationTypeDeleted) {
+			return "", nil
+		}
+		versions = model.NewRepresentationVersions(versions.CommonVersion(), nil, nil)
+	}
 
 	current, previous, err := config.fetchRepresentations(i, key, versions)
 	if err != nil {

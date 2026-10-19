@@ -50,6 +50,7 @@ schema:
     type: json
     path: schema_cache.json
 consumer:
+  load_reporter_representation: false
   enabled: true
   bootstrap-servers: kafka:9093
   retry-options:

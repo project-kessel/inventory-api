@@ -10,7 +10,7 @@ import (
 )
 
 func TestRunJobRegistersCommonRepresentationsCleanupAsPreviewByDefault(t *testing.T) {
-	command := NewRunJobCommand(storage.NewOptions(), common.LoggerOptions{})
+	command := NewRunJobCommand(storage.NewOptions(), nil, common.LoggerOptions{})
 	cleanupCommand, _, err := command.Find([]string{"common-representations-cleanup-job"})
 	require.NoError(t, err)
 

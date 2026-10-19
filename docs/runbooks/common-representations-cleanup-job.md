@@ -31,12 +31,22 @@ target and the scan can hit the statement timeout. This avoids a table-wide
 ranking before every batch; it does **not** implement global most-versions-first
 priority. Within each resource, deletion selects the lowest versions first.
 
-Every deletion follows one path: find each resource's oldest retained version
-through the primary key, select older rows, and delete at most `--batch-size`
-rows. SQL enforces this limit even when reports add versions between the scan
-and deletion. Batches use the existing serializable transaction manager, with
-30-second statement and 5-second lock timeouts. The invocation context also
-bounds database startup, work, and delays.
+Each chunk freezes the oldest retained version per resource in memory. After the
+scan transaction commits, the job records a WAL insertion position and waits for
+the configured Debezium slot's durable acknowledgment to reach it. Only then does
+it sample the tuple topic's end offset and wait for Inventory's committed restart
+offset to reach that fixed target. Writes may continue throughout; the targets
+never advance during the wait.
+
+Every deletion follows one path: find the live retention threshold, clamp it to
+the frozen cutoff, and delete at most `--batch-size` rows below both. Versions
+written after capture survive this pass even when that leaves more than
+`--keep-versions` rows. Each batch rechecks source progress, topic identity,
+consumer offsets, active reporters and pointer consistency. SQL enforces the row
+limit. Batches use the existing serializable transaction manager, with 30-second
+statement and 5-second lock timeouts. The invocation deadline bounds startup,
+boundary waits, transactions, and delays; no database transaction stays open
+while waiting on Kafka or CDC.
 
 `--max-batches` limits committed nonempty batches; `--max-duration` bounds total
 runtime. Defaults are one batch of at most 1,000 rows, a 500ms delay, a 20,000-row
@@ -71,7 +81,7 @@ prunable row counts, and inconsistent-pointer exclusions before execution:
 
 ```sh
 inventory-api run-job common-representations-cleanup-job \
-  --keep-versions 2 --chunk-rows 20000 \
+  --keep-versions 2 --chunk-rows 20000 --replication-slot inventory_api_debezium \
   --batch-size 1000 --max-batches 100000 --batch-delay 500ms \
   --max-duration 2h --execute
 ```
@@ -82,24 +92,45 @@ Investigate inconsistent pointers rather than weakening their exclusion.
 
 ## Consumer history and service traffic
 
-Current API reads and writes continue using retained versions. Pending consumer
-events can reference older versions that this job removes: a missing previous
-version produces a create-only tuple delta; a missing current version becomes
-a no-op. If a workspace changed across that boundary, the old workspace tuple
-can remain in the relations store. This can retain authorization and there is
-no automatic reconciliation in this job.
+Reads and writes remain enabled. Execution requires `--replication-slot` and the
+existing `consumer` broker/authentication/TLS, topic, and group configuration.
+The job uses read-only Kafka admin operations; it never joins the consumer group,
+produces marker events, changes offsets, or pauses the consumer. Preview does not
+require Kafka or a replication slot.
 
-The limitation occurs with just two pending updates: after A is applied, queue
-A→B and B→B, prune A's representation, and then drain the updates. The A tuple
-remains although processing succeeds. A low aggregate lag reading does not
-prove correctness while writes continue. This tradeoff is accepted for this
-job; there is no consumer watermark or write fence.
+Before execution, verify all of these deployment assumptions:
 
-Check consumer lag and service/database health before and during execution.
-Keeping two versions does not guarantee safety for a delayed consumer or an
-offset rewind. Pruning also removes historical transaction IDs used for retry
-deduplication. Establish the acceptable history window and recovery procedure
-before a production run; this runbook does not approve that run.
+- The named slot belongs to the Inventory Debezium connector on the same primary
+  database, uses `pgoutput`, and acknowledges WAL only after source offsets have
+  been durably committed. This is the Debezium commit callback behavior reviewed
+  for this design; verify the deployed connector/Connect versions and settings.
+- The connector routes every relevant transactional `kessel.tuples` message to
+  the configured topic. Do not use error-tolerant dropping of these events.
+- Inventory's actual consumer group uses explicit offset commits, has relations
+  replication enabled, and processes the single-partition tuple topic. Missing
+  group offsets, a retention gap, or a different topic shape stop execution.
+- The Job has read access to `pg_replication_slots` and Kafka topic/group metadata,
+  in addition to its existing database cleanup privileges.
+
+The broker-reported committed offset must reach the sampled *end* offset. This
+also protects against replay of the last message in an uncommitted consumer
+batch. With sparse traffic, offset batching and Debezium heartbeat/flush intervals
+can extend the wait; expiry returns an error before any unverified deletion.
+
+Do not reset connector/group offsets, recreate the slot/topic, fail over the
+database, or rewind events during cleanup. The job detects topic identity and
+partition changes, database restart, source checkpoint regression, and consumer
+progress falling behind its target when checked before a batch. These checks do
+not make concurrent administrative resets atomic with database deletion. Stop the
+job before such changes; a rerun captures and verifies fresh cutoffs.
+
+A missing predecessor can cause obsolete authorization to survive consumer
+processing. The fixed cutoffs and consumption gate prevent this job from pruning
+history still needed by the normal pipeline under the verified assumptions above.
+They do not reconcile existing stale tuples or support arbitrary historical
+replays after pruning. Establish the restore/rebuild procedure before rewinding.
+Pruning also removes historical transaction IDs used for client retry deduplication;
+the acceptable idempotency history window remains a separate policy decision.
 
 Deletion creates dead tuples; allow autovacuum and autoanalyze to work before
 measuring the effect. Physical compaction is a separate follow-up if measurements
@@ -127,7 +158,8 @@ oc logs -f job/common-rep-preview-<unique-suffix> -n <namespace>
 
 For execution, use a new Job name and add `-p EXECUTE=true`, the reviewed
 `BATCH_SIZE`, `MAX_BATCHES`, `BATCH_DELAY`, and `MAX_DURATION`. For resume, set
-`START_AFTER` to the final report's `last_cursor`. Set `ACTIVE_DEADLINE_SECONDS`
+`START_AFTER` to the final report's `last_cursor` and verify `REPLICATION_SLOT`
+(default `inventory_api_debezium`). Set `ACTIVE_DEADLINE_SECONDS`
 above `MAX_DURATION` to allow image pull and startup time. Review final logs and
 Job status, including failures, before removing the completed Job object.
 
@@ -146,4 +178,5 @@ CONTAINER_RUNTIME=podman ./scripts/testcontainers-run.sh \
 
 The focused PostgreSQL suite covers retention and gaps, NULL and inconsistent
 pointers, tombstoned and shared roots, resource type filtering, deep histories,
-hard batch limits, interrupted chunk resume, read-only enforcement, and rollback.
+hard batch limits, interrupted chunk resume, frozen cutoffs under later writes,
+boundary failure before and after committed work, read-only enforcement, and rollback.

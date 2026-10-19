@@ -44,6 +44,7 @@ objects:
                 - run-job
                 - common-representations-cleanup-job
                 - --keep-versions=${KEEP_VERSIONS}
+                - --replication-slot=${REPLICATION_SLOT}
                 - --resource-type=${RESOURCE_TYPE}
                 - --start-after=${START_AFTER}
                 - --chunk-rows=${CHUNK_ROWS}
@@ -99,6 +100,9 @@ parameters:
   - description: Number of newest common representations retained per resource; must be at least 2
     name: KEEP_VERSIONS
     value: "2"
+  - description: Debezium pgoutput slot for this Inventory database; verify before execution
+    name: REPLICATION_SLOT
+    value: inventory_api_debezium
   - description: Optional resource type filter; empty means all resource types
     name: RESOURCE_TYPE
     value: ""

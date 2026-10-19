@@ -112,7 +112,7 @@ func init() {
 		panic(err)
 	}
 
-	runJobCmd := jobs.NewRunJobCommand(options.Storage, loggerOptions)
+	runJobCmd := jobs.NewRunJobCommand(options.Storage, options.Consumer, loggerOptions)
 	rootCmd.AddCommand(runJobCmd)
 	err = viper.BindPFlags(runJobCmd.Flags())
 	if err != nil {

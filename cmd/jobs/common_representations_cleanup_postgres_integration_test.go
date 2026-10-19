@@ -81,7 +81,7 @@ func TestCommonRepCleanupPostgres(t *testing.T) {
 		// Read-only transactions must refuse deletion.
 		readOnlyTransaction := newCommonRepCleanupTransaction(db, data.NewGormTransactionManager(metricscollector.NewFakeMetricsCollector(), 3))
 		readOnlyErr := readOnlyTransaction.WithinSerializableCommonRepCleanup(context.Background(), "common_rep_cleanup_read_only_enforcement_test", true, 30*time.Second, 5*time.Second, func(repository commonRepCleanupRepository) error {
-			_, err := repository.DeletePrunableRoots(context.Background(), policy, []uuid.UUID{pointerRootID}, 100)
+			_, err := repository.DeletePrunableRoots(context.Background(), policy, []commonRepCleanupRoot{{ResourceID: pointerRootID, RetainFrom: 3}}, 100)
 			return err
 		})
 		require.ErrorContains(t, readOnlyErr, "read-only transaction")
@@ -250,6 +250,62 @@ func TestCommonRepCleanupPostgres(t *testing.T) {
 		}
 	})
 
+	t.Run("writes after capture cannot advance the deletion cutoff", func(t *testing.T) {
+		isolateCommonRepCleanupPostgresSubtest(t, db)
+		rootID := uuid.New()
+		seedCommonRepRoot(t, db, rootID, "host", uintPointer(4), 0, 1, 2, 3, 4)
+		require.NoError(t, insertCommonRepReporter(t, db, rootID, "boundary-root", "host", "hbi", false).Error)
+		policy, err := newCommonRepCleanupPolicy(2, "")
+		require.NoError(t, err)
+		options, err := newCommonRepCleanupOptions(100, 100, 0, 1, time.Minute)
+		require.NoError(t, err)
+		result, err := newTestCommonRepCleanupUsecase(t, db).Execute(context.Background(), policy, options, uuid.Nil, nil, func(commonRepChunkProgress) {
+			require.NoError(t, insertCommonRepRow(t, db, rootID, 5, "boundary-write-5").Error)
+			require.NoError(t, insertCommonRepRow(t, db, rootID, 6, "boundary-write-6").Error)
+			require.NoError(t, db.Exec("UPDATE resource SET common_version=6 WHERE id=?", rootID).Error)
+		})
+		require.NoError(t, err)
+		require.Equal(t, int64(3), result.deletedRows)
+		assertCommonRepVersions(t, db, rootID, []uint{3, 4, 5, 6})
+	})
+
+	t.Run("unverified consumption never deletes and a lost boundary preserves prior commits", func(t *testing.T) {
+		for _, failAfter := range []int{0, 1} {
+			isolateCommonRepCleanupPostgresSubtest(t, db)
+			rootID := uuid.New()
+			seedCommonRepRoot(t, db, rootID, "host", uintPointer(4), 0, 1, 2, 3, 4)
+			require.NoError(t, insertCommonRepReporter(t, db, rootID, "blocked-boundary", "host", "hbi", false).Error)
+			policy, err := newCommonRepCleanupPolicy(2, "")
+			require.NoError(t, err)
+			options, err := newCommonRepCleanupOptions(100, 1, 0, 5, time.Minute)
+			require.NoError(t, err)
+			usecase := newTestCommonRepCleanupUsecase(t, db)
+			checks := 0
+			usecase.awaitBoundary = func(context.Context) (func(context.Context) error, error) {
+				if failAfter == 0 {
+					return nil, context.DeadlineExceeded
+				}
+				return func(context.Context) error {
+					checks++
+					if checks > failAfter {
+						return context.Canceled
+					}
+					return nil
+				}, nil
+			}
+			result, err := usecase.Execute(context.Background(), policy, options, uuid.Nil, nil, nil)
+			require.Error(t, err)
+			require.Equal(t, int64(failAfter), result.deletedRows)
+			require.Equal(t, failAfter, result.committedBatches)
+			require.Equal(t, uuid.Nil, result.report.lastCursor)
+			if failAfter == 0 {
+				assertCommonRepVersions(t, db, rootID, []uint{0, 1, 2, 3, 4})
+			} else {
+				assertCommonRepVersions(t, db, rootID, []uint{1, 2, 3, 4})
+			}
+		}
+	})
+
 	t.Run("injected failure after deletion rolls back the entire batch", func(t *testing.T) {
 		isolateCommonRepCleanupPostgresSubtest(t, db)
 		policy, err := newCommonRepCleanupPolicy(2, "")
@@ -341,7 +397,9 @@ func isolateCommonRepCleanupPostgresSubtest(t *testing.T, db *gorm.DB) {
 func newTestCommonRepCleanupUsecase(t *testing.T, db *gorm.DB) *commonRepCleanupUsecase {
 	t.Helper()
 	transactionManager := data.NewGormTransactionManager(metricscollector.NewFakeMetricsCollector(), 5)
-	usecase, err := newCommonRepCleanup(newCommonRepCleanupTransaction(db, transactionManager))
+	usecase, err := newCommonRepCleanup(newCommonRepCleanupTransaction(db, transactionManager), func(context.Context) (func(context.Context) error, error) {
+		return func(context.Context) error { return nil }, nil
+	})
 	require.NoError(t, err)
 	return usecase
 }

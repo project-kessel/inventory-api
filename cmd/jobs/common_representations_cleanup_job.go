@@ -11,6 +11,7 @@ import (
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/google/uuid"
 	"github.com/project-kessel/inventory-api/cmd/common"
+	"github.com/project-kessel/inventory-api/internal/consumer"
 	"github.com/project-kessel/inventory-api/internal/data"
 	"github.com/project-kessel/inventory-api/internal/metricscollector"
 	"github.com/project-kessel/inventory-api/internal/storage"
@@ -31,17 +32,18 @@ const (
 
 // NewCommonRepresentationsCleanupJobCommand creates a dry-run-by-default common
 // representation history cleanup command.
-func NewCommonRepresentationsCleanupJobCommand(storageOptions *storage.Options, loggerOptions common.LoggerOptions) *cobra.Command {
+func NewCommonRepresentationsCleanupJobCommand(storageOptions *storage.Options, consumerOptions *consumer.Options, loggerOptions common.LoggerOptions) *cobra.Command {
 	var (
-		execute      bool
-		keepVersions int
-		resourceType string
-		startAfter   string
-		chunkRows    int
-		batchSize    int
-		batchDelay   time.Duration
-		maxBatches   int
-		maxDuration  time.Duration
+		replicationSlot string
+		execute         bool
+		keepVersions    int
+		resourceType    string
+		startAfter      string
+		chunkRows       int
+		batchSize       int
+		batchDelay      time.Duration
+		maxBatches      int
+		maxDuration     time.Duration
 	)
 
 	command := &cobra.Command{
@@ -53,10 +55,9 @@ rule that keeps the authoritative current common representation and its
 predecessors; only older versions on resources that still have an active reporter
 are pruned. Destructive execution requires --execute. The scan is resumable:
 an interrupted pass reports its last cursor and continues after it with
---start-after. Pending consumer events whose versions were pruned degrade to
-create-only or no-op processing rather than failing; see the common representation
-cleanup runbook for the residual tuple-residue risk and the consumer-health
-guidance before mass pruning.`,
+--start-after. Execution freezes each chunk's retention cutoff, then waits for the Debezium
+checkpoint and Inventory consumer committed offsets before pruning. Reads and
+writes continue; versions written after capture are retained.`,
 		Args: cobra.NoArgs,
 		RunE: func(command *cobra.Command, _ []string) error {
 			signalContext, stopSignals := commonRepCleanupSignalContext(command.Context())
@@ -67,6 +68,8 @@ guidance before mass pruning.`,
 			return runCommonRepresentationsCleanupJob(
 				signalContext,
 				storageOptions,
+				consumerOptions,
+				replicationSlot,
 				loggerOptions,
 				execute,
 				keepVersions,
@@ -82,6 +85,7 @@ guidance before mass pruning.`,
 	}
 
 	flags := command.Flags()
+	flags.StringVar(&replicationSlot, "replication-slot", "", "Debezium logical replication slot for this database; required for execution")
 	flags.BoolVar(&execute, "execute", false, "Commit bounded common representation cleanup batches; default is read-only preview")
 	flags.IntVar(&keepVersions, "keep-versions", commonRepCleanupDefaultKeepVersions, "Number of newest common representations retained per resource; must be at least 2 because update consumption reads version v and v-1 (default 2)")
 	flags.StringVar(&resourceType, "resource-type", "", "Optional resource type filter")
@@ -133,6 +137,8 @@ func validateCommonRepCleanupInvocation(keepVersions int) error {
 func runCommonRepresentationsCleanupJob(
 	parentContext context.Context,
 	storageOptions *storage.Options,
+	consumerOptions *consumer.Options,
+	replicationSlot string,
 	loggerOptions common.LoggerOptions,
 	execute bool,
 	keepVersions int,
@@ -196,7 +202,16 @@ func runCommonRepresentationsCleanupJob(
 	}
 	transactionManager := data.NewGormTransactionManager(metrics, storageOptions.MaxSerializationRetries)
 	transactions := newCommonRepCleanupTransaction(db, transactionManager)
-	usecase, err := newCommonRepCleanup(transactions)
+	var awaitBoundary func(context.Context) (func(context.Context) error, error)
+	if execute {
+		boundary, err := newCommonRepCleanupBoundary(db, consumerOptions, replicationSlot, logHelper)
+		if err != nil {
+			return err
+		}
+		defer boundary.admin.Close()
+		awaitBoundary = boundary.Await
+	}
+	usecase, err := newCommonRepCleanup(transactions, awaitBoundary)
 	if err != nil {
 		return err
 	}

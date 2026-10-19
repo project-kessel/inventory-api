@@ -2,6 +2,7 @@ package jobs
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -18,6 +19,7 @@ type commonRepChunkClassificationRow struct {
 	ResourceID   uuid.UUID `gorm:"column:resource_id"`
 	Exclusion    string    `gorm:"column:exclusion"`
 	PrunableRows int64     `gorm:"column:prunable_rows"`
+	RetainFrom   int64     `gorm:"column:retain_from"`
 }
 
 // ReadChunk discovers the chunk boundary at least chunkRows rows past the cursor and
@@ -108,23 +110,24 @@ func (repository *gormCommonRepCleanupRepository) ReadChunk(
 			WHERE cl.exclusion = '' AND c.version <= cl.current_version
 		), per_root AS (
 			SELECT cl.resource_id, cl.exclusion,
-				COUNT(r.version) FILTER (WHERE r.version_rank > ?) AS prunable_rows
+				COUNT(r.version) FILTER (WHERE r.version_rank > ?) AS prunable_rows,
+				MIN(r.version) FILTER (WHERE r.version_rank <= ?) AS retain_from
 			FROM classified cl LEFT JOIN ranked r ON r.resource_id = cl.resource_id
 			GROUP BY cl.resource_id, cl.exclusion
 			UNION ALL
-			SELECT o.resource_id, 'no_active_reporter', 0
+			SELECT o.resource_id, 'no_active_reporter', 0, 0
 			FROM out_of_scope o
 		)
-		SELECT resource_id, exclusion, prunable_rows FROM per_root ORDER BY resource_id`
+		SELECT resource_id, exclusion, prunable_rows, COALESCE(retain_from, 0) AS retain_from FROM per_root ORDER BY resource_id`
 
-	classificationArguments := append(rangeArguments, policy.keepVersions)
+	classificationArguments := append(rangeArguments, policy.keepVersions, policy.keepVersions)
 	var rows []commonRepChunkClassificationRow
 	if err := repository.db.WithContext(ctx).Raw(classificationQuery, classificationArguments...).Scan(&rows).Error; err != nil {
 		return nil, uuid.Nil, false, fmt.Errorf("classify common representation cleanup chunk: %w", err)
 	}
 	classifications := make([]commonRepRootClassification, 0, len(rows))
 	for _, row := range rows {
-		classifications = append(classifications, commonRepRootClassification{resourceID: row.ResourceID, exclusion: row.Exclusion, prunableRows: row.PrunableRows})
+		classifications = append(classifications, commonRepRootClassification{resourceID: row.ResourceID, exclusion: row.Exclusion, prunableRows: row.PrunableRows, retainFrom: row.RetainFrom})
 	}
 	return classifications, boundary, found, nil
 }
@@ -133,30 +136,36 @@ func (repository *gormCommonRepCleanupRepository) ReadChunk(
 // delete transaction. A SQL LIMIT enforces the row cap even if a concurrent
 // report has expanded history since the scan. Index probes find the oldest
 // retained row without ranking the full history of a deep root.
-func (repository *gormCommonRepCleanupRepository) DeletePrunableRoots(ctx context.Context, policy commonRepCleanupPolicy, resourceIDs []uuid.UUID, rowLimit int) (commonRepCleanupImpact, error) {
+func (repository *gormCommonRepCleanupRepository) DeletePrunableRoots(ctx context.Context, policy commonRepCleanupPolicy, roots []commonRepCleanupRoot, rowLimit int) (commonRepCleanupImpact, error) {
 	if err := policy.Validate(); err != nil {
 		return commonRepCleanupImpact{}, err
 	}
 	if rowLimit <= 0 {
 		return commonRepCleanupImpact{}, fmt.Errorf("row limit must be positive")
 	}
-	if len(resourceIDs) == 0 {
+	if len(roots) == 0 {
 		return commonRepCleanupImpact{}, nil
 	}
 	typeFilter := ""
-	arguments := []any{resourceIDs}
+	captured, err := json.Marshal(roots)
+	if err != nil {
+		return commonRepCleanupImpact{}, fmt.Errorf("encode captured cleanup roots: %w", err)
+	}
+	arguments := []any{string(captured)}
 	if resourceType, hasFilter := policy.ResourceType(); hasFilter {
 		typeFilter = " AND r.type = ?"
 		arguments = append(arguments, resourceType.Serialize())
 	}
 	arguments = append(arguments, policy.keepVersions-1, rowLimit, rowLimit)
 	query := `
-  WITH scoped AS (
-   SELECT r.id, COALESCE(r.common_version, (
+  WITH captured AS (
+   SELECT * FROM jsonb_to_recordset(?::jsonb) AS c(resource_id uuid, retain_from bigint)
+  ), scoped AS (
+   SELECT r.id, c.retain_from, COALESCE(r.common_version, (
     SELECT MAX(cr.version) FROM common_representations cr WHERE cr.resource_id = r.id
    )) AS current_version
-   FROM resource r
-   WHERE r.id IN (?)
+   FROM resource r JOIN captured c ON c.resource_id = r.id
+   WHERE c.retain_from > 0
    AND (r.common_version IS NULL OR EXISTS (
     SELECT 1 FROM common_representations cr
     WHERE cr.resource_id = r.id AND cr.version = r.common_version
@@ -166,7 +175,7 @@ func (repository *gormCommonRepCleanupRepository) DeletePrunableRoots(ctx contex
     WHERE rr.resource_id = r.id AND rr.tombstone IS FALSE
    )` + typeFilter + `
   ), thresholds AS (
-   SELECT s.id, retained.version FROM scoped s
+   SELECT s.id, LEAST(retained.version, s.retain_from) AS version FROM scoped s
    CROSS JOIN LATERAL (
     SELECT cr.version FROM common_representations cr
     WHERE cr.resource_id = s.id AND cr.version <= s.current_version

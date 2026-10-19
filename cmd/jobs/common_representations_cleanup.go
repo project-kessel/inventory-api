@@ -72,6 +72,13 @@ type commonRepRootClassification struct {
 	resourceID   uuid.UUID
 	exclusion    string
 	prunableRows int64
+	retainFrom   int64
+}
+
+// commonRepCleanupRoot freezes the oldest retained version before consumption is awaited.
+type commonRepCleanupRoot struct {
+	ResourceID uuid.UUID `json:"resource_id"`
+	RetainFrom int64     `json:"retain_from"`
 }
 
 type commonRepCleanupReport struct {
@@ -107,7 +114,7 @@ type commonRepCleanupResult struct {
 // inside every delete transaction. Deletion must enforce rowLimit in SQL.
 type commonRepCleanupRepository interface {
 	ReadChunk(context.Context, commonRepCleanupPolicy, uuid.UUID, int) ([]commonRepRootClassification, uuid.UUID, bool, error)
-	DeletePrunableRoots(context.Context, commonRepCleanupPolicy, []uuid.UUID, int) (commonRepCleanupImpact, error)
+	DeletePrunableRoots(context.Context, commonRepCleanupPolicy, []commonRepCleanupRoot, int) (commonRepCleanupImpact, error)
 }
 
 // commonRepCleanupTransaction scopes repository work to serializable transactions.
@@ -156,14 +163,15 @@ func (options commonRepCleanupOptions) Validate() error {
 }
 
 type commonRepCleanupUsecase struct {
-	transactions commonRepCleanupTransaction
+	transactions  commonRepCleanupTransaction
+	awaitBoundary func(context.Context) (func(context.Context) error, error)
 }
 
-func newCommonRepCleanup(transactions commonRepCleanupTransaction) (*commonRepCleanupUsecase, error) {
+func newCommonRepCleanup(transactions commonRepCleanupTransaction, awaitBoundary func(context.Context) (func(context.Context) error, error)) (*commonRepCleanupUsecase, error) {
 	if transactions == nil {
 		return nil, fmt.Errorf("common representation cleanup transactions are required")
 	}
-	return &commonRepCleanupUsecase{transactions: transactions}, nil
+	return &commonRepCleanupUsecase{transactions: transactions, awaitBoundary: awaitBoundary}, nil
 }
 
 // Preview uses the same scan as execution, with read-only transactions and no deletes.
@@ -219,7 +227,7 @@ func (usecase *commonRepCleanupUsecase) run(ctx context.Context, policy commonRe
 		}
 
 		progress := commonRepChunkProgress{chunkNumber: result.report.chunksProcessed + 1, rootsScanned: int64(len(classifications)), cursor: boundary}
-		resourceIDs := make([]uuid.UUID, 0, len(classifications))
+		rootsToPrune := make([]commonRepCleanupRoot, 0, len(classifications))
 		for _, classification := range classifications {
 			switch classification.exclusion {
 			case commonRepExclusionNoActiveReporter:
@@ -230,7 +238,7 @@ func (usecase *commonRepCleanupUsecase) run(ctx context.Context, policy commonRe
 				if classification.prunableRows > 0 {
 					result.report.prunableRoots++
 					progress.prunableRows += classification.prunableRows
-					resourceIDs = append(resourceIDs, classification.resourceID)
+					rootsToPrune = append(rootsToPrune, commonRepCleanupRoot{ResourceID: classification.resourceID, RetainFrom: classification.retainFrom})
 				}
 			}
 		}
@@ -241,10 +249,25 @@ func (usecase *commonRepCleanupUsecase) run(ctx context.Context, policy commonRe
 			onChunk(progress)
 		}
 
+		var validateBoundary func(context.Context) error
+		if execute && len(rootsToPrune) > 0 {
+			if usecase.awaitBoundary == nil {
+				return result, fmt.Errorf("cleanup execution requires a consumption boundary")
+			}
+			var err error
+			validateBoundary, err = usecase.awaitBoundary(ctx)
+			if err != nil {
+				return result, fmt.Errorf("await cleanup consumption boundary: %w", err)
+			}
+			if validateBoundary == nil {
+				return result, fmt.Errorf("consumption boundary validator is required")
+			}
+		}
+
 		// Every root uses the same SQL-limited deletion path, including deep roots.
 		// Re-evaluate until a batch returns fewer rows than its limit. Concurrent
-		// writes cannot expand a transaction beyond that limit.
-		for execute && len(resourceIDs) > 0 {
+		// writes cannot expand a transaction beyond that limit or advance the frozen cutoff.
+		for execute && len(rootsToPrune) > 0 {
 			if err := ctx.Err(); err != nil {
 				return result, err
 			}
@@ -252,10 +275,13 @@ func (usecase *commonRepCleanupUsecase) run(ctx context.Context, policy commonRe
 				result.batchLimitReached = true
 				return result, nil
 			}
+			if err := validateBoundary(ctx); err != nil {
+				return result, fmt.Errorf("cleanup consumption boundary changed: %w", err)
+			}
 			var impact commonRepCleanupImpact
 			err := usecase.withSerializable(ctx, "common_rep_cleanup_batch", false, func(repository commonRepCleanupRepository) error {
 				var err error
-				impact, err = repository.DeletePrunableRoots(ctx, policy, resourceIDs, options.batchSize)
+				impact, err = repository.DeletePrunableRoots(ctx, policy, rootsToPrune, options.batchSize)
 				return err
 			})
 			if err != nil {
@@ -285,7 +311,7 @@ func (usecase *commonRepCleanupUsecase) run(ctx context.Context, policy commonRe
 			result.report.passComplete = true
 			return result, nil
 		}
-		if execute && len(resourceIDs) > 0 {
+		if execute && len(rootsToPrune) > 0 {
 			if err := waitForCommonRepNextBatch(ctx, options.batchDelay); err != nil {
 				return result, err
 			}

@@ -10,22 +10,23 @@ import (
 )
 
 type Options struct {
-	Enabled                 bool           `mapstructure:"enabled"`
-	BootstrapServers        []string       `mapstructure:"bootstrap-servers"`
-	ConsumerGroupID         string         `mapstructure:"consumer-group-id"`
-	Topic                   string         `mapstructure:"topic"`
-	CommitModulo            int            `mapstructure:"commit-modulo"`
-	SessionTimeout          string         `mapstructure:"session-timeout"`
-	HeartbeatInterval       string         `mapstructure:"heartbeat-interval"`
-	MaxPollInterval         string         `mapstructure:"max-poll-interval"`
-	EnableAutoCommit        string         `mapstructure:"enable-auto-commit"`
-	AutoOffsetReset         string         `mapstructure:"auto-offset-reset"`
-	StatisticsInterval      string         `mapstructure:"statistics-interval-ms"`
-	Debug                   string         `mapstructure:"debug"`
-	RetryOptions            *retry.Options `mapstructure:"retry-options"`
-	AuthOptions             *auth.Options  `mapstructure:"auth"`
-	ReadAfterWriteEnabled   bool           `mapstructure:"read-after-write-enabled"`
-	ReadAfterWriteAllowlist []string       `mapstructure:"read-after-write-allowlist"`
+	Enabled                    bool           `mapstructure:"enabled"`
+	BootstrapServers           []string       `mapstructure:"bootstrap-servers"`
+	ConsumerGroupID            string         `mapstructure:"consumer-group-id"`
+	Topic                      string         `mapstructure:"topic"`
+	CommitModulo               int            `mapstructure:"commit-modulo"`
+	SessionTimeout             string         `mapstructure:"session-timeout"`
+	HeartbeatInterval          string         `mapstructure:"heartbeat-interval"`
+	MaxPollInterval            string         `mapstructure:"max-poll-interval"`
+	EnableAutoCommit           string         `mapstructure:"enable-auto-commit"`
+	AutoOffsetReset            string         `mapstructure:"auto-offset-reset"`
+	StatisticsInterval         string         `mapstructure:"statistics-interval-ms"`
+	Debug                      string         `mapstructure:"debug"`
+	RetryOptions               *retry.Options `mapstructure:"retry-options"`
+	AuthOptions                *auth.Options  `mapstructure:"auth"`
+	ReadAfterWriteEnabled      bool           `mapstructure:"read-after-write-enabled"`
+	LoadReporterRepresentation bool           `mapstructure:"load_reporter_representation"`
+	ReadAfterWriteAllowlist    []string       `mapstructure:"read-after-write-allowlist"`
 }
 
 func NewOptions() *Options {
@@ -58,6 +59,7 @@ func (o *Options) AddFlags(fs *pflag.FlagSet, prefix string) {
 	fs.StringVar(&o.Topic, prefix+"topic", o.Topic, "Kafka topic to monitor for events")
 	fs.IntVar(&o.CommitModulo, prefix+"commit-modulo", o.CommitModulo, "defines the modulo used to calculate when to commit offsets (default: 10")
 	fs.BoolVar(&o.ReadAfterWriteEnabled, prefix+"read-after-write-enabled", o.ReadAfterWriteEnabled, "Toggle for enabling or disabling the read after write consistency workflow (default: true)")
+	fs.BoolVar(&o.LoadReporterRepresentation, prefix+"load_reporter_representation", o.LoadReporterRepresentation, "Load reporter representations while processing tuple events (default: false)")
 	fs.StringArrayVar(&o.ReadAfterWriteAllowlist, prefix+"read-after-write-allowlist", o.ReadAfterWriteAllowlist, "List of services that require all requests to be read-after-write enabled (default: [])")
 	fs.StringVar(&o.SessionTimeout, prefix+"session-timeout", o.SessionTimeout, "time a consumer can live without sending heartbeat (default: 45000ms)")
 	fs.StringVar(&o.HeartbeatInterval, prefix+"heartbeat-interval", o.HeartbeatInterval, "interval between heartbeats sent to Kafka (default: 3000ms, must be lower then session-timeout)")

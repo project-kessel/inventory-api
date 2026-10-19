@@ -32,6 +32,7 @@ storage:
     password: "yPsw5e6ab4bvAGe5H"
     dbname: "spicedb"
 consumer:
+  load_reporter_representation: false
   enabled: true
   bootstrap-servers: kafka:9093
   retry-options:

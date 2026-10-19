@@ -294,8 +294,8 @@ func (i *InventoryConsumer) ProcessMessage(headers map[string]string, relationsE
 	case string(model.OperationTypeCreated):
 		if relationsEnabled {
 			return i.processRelationsOperation(operation, txid, msg, operationConfig{
-				fetchRepresentations: func(i *InventoryConsumer, key model.ReporterResourceKey, version *model.Version) (*model.Representations, *model.Representations, error) {
-					return i.ResourceRepository.FindCurrentAndPreviousVersionedRepresentations(nil, key, version, model.OperationTypeCreated)
+				fetchRepresentations: func(i *InventoryConsumer, key model.ReporterResourceKey, versions model.RepresentationVersions) (*model.Representations, *model.Representations, error) {
+					return i.ResourceRepository.FindCurrentAndPreviousVersionedRepresentations(nil, key, versions, model.OperationTypeCreated)
 				},
 				executeSpiceDB: func(i *InventoryConsumer, tuples model.TuplesToReplicate) (string, error) {
 					return i.CreateTuple(context.Background(), tuples.TuplesToCreate())
@@ -307,8 +307,8 @@ func (i *InventoryConsumer) ProcessMessage(headers map[string]string, relationsE
 	case string(model.OperationTypeUpdated):
 		if relationsEnabled {
 			return i.processRelationsOperation(operation, txid, msg, operationConfig{
-				fetchRepresentations: func(i *InventoryConsumer, key model.ReporterResourceKey, version *model.Version) (*model.Representations, *model.Representations, error) {
-					return i.ResourceRepository.FindCurrentAndPreviousVersionedRepresentations(nil, key, version, model.OperationTypeUpdated)
+				fetchRepresentations: func(i *InventoryConsumer, key model.ReporterResourceKey, versions model.RepresentationVersions) (*model.Representations, *model.Representations, error) {
+					return i.ResourceRepository.FindCurrentAndPreviousVersionedRepresentations(nil, key, versions, model.OperationTypeUpdated)
 				},
 				executeSpiceDB: func(i *InventoryConsumer, tuples model.TuplesToReplicate) (string, error) {
 					return i.UpdateTuple(context.Background(), tuples.TuplesToCreate(), tuples.TuplesToDelete())
@@ -319,9 +319,30 @@ func (i *InventoryConsumer) ProcessMessage(headers map[string]string, relationsE
 	case string(model.OperationTypeDeleted):
 		if relationsEnabled {
 			return i.processRelationsOperation(operation, txid, msg, operationConfig{
-				fetchRepresentations: func(i *InventoryConsumer, key model.ReporterResourceKey, version *model.Version) (*model.Representations, *model.Representations, error) {
-					previous, err := i.ResourceRepository.FindLatestRepresentations(nil, key)
-					return nil, previous, err
+				fetchRepresentations: func(i *InventoryConsumer, key model.ReporterResourceKey, versions model.RepresentationVersions) (*model.Representations, *model.Representations, error) {
+					if !i.Config.LoadReporterRepresentation {
+						previous, err := i.ResourceRepository.FindLatestCommonRepresentation(nil, key)
+						return nil, previous, err
+					}
+					// For DELETE operations, fetch the last live state using OperationTypeDeleted.
+					// The delete branch uses upper-bound semantics to tolerate version gaps:
+					// - commonVersion: exact fetch (unchanged during delete, already last-live)
+					// - reporterVersion: upper-bound fetch before tombstone (gap-tolerant, tombstone-filtered)
+					//
+					// The event versions are:
+					// - commonVersion: unchanged during delete (this IS the last live common version)
+					// - reporterVersion: tombstone version (incremented during delete)
+					// - reporterGeneration: unchanged
+					//
+					// OperationTypeDeleted handles the edge case where tombstone version is 0
+					// (no prior reporter data) automatically: the upper bound (gen=0, ver < 0) is
+					// unsatisfiable, so nothing is fetched.
+					lastLiveState, _, err := i.ResourceRepository.FindCurrentAndPreviousVersionedRepresentations(
+						nil, key, versions, model.OperationTypeDeleted)
+					if err != nil {
+						return nil, nil, err
+					}
+					return nil, lastLiveState, nil
 				},
 				executeSpiceDB: func(i *InventoryConsumer, tuples model.TuplesToReplicate) (string, error) {
 					_, err := i.DeleteTuple(context.Background(), *tuples.TuplesToDelete())
@@ -339,7 +360,7 @@ func (i *InventoryConsumer) ProcessMessage(headers map[string]string, relationsE
 }
 
 type operationConfig struct {
-	fetchRepresentations func(i *InventoryConsumer, key model.ReporterResourceKey, version *model.Version) (*model.Representations, *model.Representations, error)
+	fetchRepresentations func(i *InventoryConsumer, key model.ReporterResourceKey, versions model.RepresentationVersions) (*model.Representations, *model.Representations, error)
 	executeSpiceDB       func(i *InventoryConsumer, tuples model.TuplesToReplicate) (string, error)
 	metricName           string
 }
@@ -361,8 +382,17 @@ func (i *InventoryConsumer) processRelationsOperation(
 	}
 
 	key := tupleEvent.ReporterResourceKey()
+	versions := model.NewRepresentationVersionsFromTupleEvent(*tupleEvent)
+	if !i.Config.LoadReporterRepresentation {
+		// Creates and updates without a common version have no common tuples to replicate.
+		// Legacy deletes omit the common version and must still fetch the latest common data.
+		if versions.CommonVersion() == nil && operation != string(model.OperationTypeDeleted) {
+			return "", nil
+		}
+		versions = model.NewRepresentationVersions(versions.CommonVersion(), nil, nil)
+	}
 
-	current, previous, err := config.fetchRepresentations(i, key, tupleEvent.CommonVersion())
+	current, previous, err := config.fetchRepresentations(i, key, versions)
 	if err != nil {
 		metricscollector.Incr(i.MetricsCollector.MsgProcessFailures, "FindRepresentations")
 		i.Logger.Errorf("failed to find representations: %v", err)

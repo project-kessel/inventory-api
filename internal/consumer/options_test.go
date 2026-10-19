@@ -1,13 +1,16 @@
 package consumer
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/project-kessel/inventory-api/internal/consumer/auth"
 	"github.com/project-kessel/inventory-api/internal/consumer/retry"
 	"github.com/project-kessel/inventory-api/internal/helpers"
 	"github.com/spf13/pflag"
+	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestNewOptions(t *testing.T) {
@@ -144,4 +147,24 @@ func TestOptions_Validate(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestLoadReporterRepresentationEnvironmentOverride(t *testing.T) {
+	t.Setenv("INVENTORY_API_CONSUMER_LOAD_REPORTER_REPRESENTATION", "true")
+	options := NewOptions()
+	flags := pflag.NewFlagSet("consumer", pflag.ContinueOnError)
+	options.AddFlags(flags, "consumer")
+	config := viper.New()
+	require.NoError(t, config.BindPFlags(flags))
+	// Match the application's environment mapping, which replaces only dots.
+	config.SetEnvPrefix("INVENTORY_API")
+	config.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
+	config.AutomaticEnv()
+	config.SetConfigType("yaml")
+	require.NoError(t, config.ReadConfig(strings.NewReader("consumer:\n  load_reporter_representation: false\n")))
+	decoded := struct {
+		Consumer *Options `mapstructure:"consumer"`
+	}{Consumer: options}
+	require.NoError(t, config.Unmarshal(&decoded))
+	require.True(t, decoded.Consumer.LoadReporterRepresentation)
 }

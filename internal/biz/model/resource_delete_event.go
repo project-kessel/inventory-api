@@ -12,6 +12,7 @@ type ResourceDeleteEvent struct {
 	reporterId             ReporterId
 	localResourceId        LocalResourceId
 	reporterRepresentation ReporterDeleteRepresentation
+	commonVersion          *Version // Last live common version (for tuple generation)
 	createdAt              time.Time
 	updatedAt              time.Time
 }
@@ -23,6 +24,7 @@ func NewResourceDeleteEvent(
 	reporterInstanceId ReporterInstanceId,
 	localResourceId LocalResourceId,
 	reporterRepresentation ReporterDeleteRepresentation,
+	commonVersion *Version,
 ) (ResourceDeleteEvent, error) {
 	reporterId := NewReporterId(reporterType, reporterInstanceId)
 
@@ -32,6 +34,7 @@ func NewResourceDeleteEvent(
 		reporterId:             reporterId,
 		localResourceId:        localResourceId,
 		reporterRepresentation: reporterRepresentation,
+		commonVersion:          commonVersion,
 	}, nil
 }
 
@@ -71,15 +74,22 @@ func (re ResourceDeleteEvent) WorkspaceId() *string {
 	return nil
 }
 
-// CurrentCommonVersion returns nil for delete events since common version is not applicable
-// Delete events do not have a CommonRepresentation, only a ReporterDeleteRepresentation
+// CurrentCommonVersion returns the common version at deletion time.
+// Since common doesn't get tombstoned, this IS the last live version.
 func (re ResourceDeleteEvent) CurrentCommonVersion() *Version {
-	return nil
+	return re.commonVersion
 }
 
-// CurrentReporterRepresentationVersion returns the version from the ReporterRepresentation
+// CurrentReporterRepresentationVersion returns the tombstone version.
+// Consumer should fetch (version - 1) to get last live reporter data.
 func (re ResourceDeleteEvent) CurrentReporterRepresentationVersion() *Version {
 	return &re.reporterRepresentation.version
+}
+
+// CurrentReporterGeneration returns the generation from the ReporterRepresentation.
+func (re ResourceDeleteEvent) CurrentReporterGeneration() *Generation {
+	gen := re.reporterRepresentation.Generation()
+	return &gen
 }
 
 // ReporterResourceKey constructs and returns the ReporterResourceKey from the event fields

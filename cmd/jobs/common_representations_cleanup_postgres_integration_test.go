@@ -21,7 +21,7 @@ import (
 
 func TestCommonRepCleanupPostgres(t *testing.T) {
 	db, _ := setupCommonRepCleanupPostgres(t)
-	options := commonRepCleanupOptions{keepVersions: 2, batchSize: 3, maxBatches: 100, maxDuration: time.Minute}
+	options := commonRepCleanupOptions{keepVersions: 2, batchSize: 3, maxBatches: 0}
 	base := time.Date(2026, 10, 20, 12, 0, 0, 0, time.UTC)
 	seed := func(versions []uint, ages []int, pointer *uint, resourceType string, active bool) uuid.UUID {
 		t.Helper()

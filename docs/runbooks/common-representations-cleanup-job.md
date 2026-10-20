@@ -77,15 +77,14 @@ Each batch selects up to `--batch-size` entries ordered by `(resource_id, versio
 commit together. A count mismatch aborts and rolls back the batch. Logged deletion
 counts include only committed batches.
 
-Defaults: 1,000 rows/batch, 500ms delay, one batch/invocation, five-minute total
-budget. Override `--batch-size`, `--batch-delay`, `--max-batches`, and
-`--max-duration` for a reviewed run. Cleanup transactions disable PostgreSQL
-statement timeouts, including inherited database/role settings. Selection, preview
-and delete batches are bounded by the overall invocation deadline and cancellation
-instead of a fixed per-statement limit. The five-second lock-acquisition timeout
-remains. Worklist selection scans eligible history once; measure it before production
-execution and allow enough total duration for selection plus deletion. Set the Job
-pod deadline above that duration as described below.
+Defaults: 1,000 rows/batch, 500ms delay, and the entire worklist per invocation.
+`--max-batches=0` processes until the worklist is empty; set a positive value for
+a smaller trial run. Override `--batch-size` and `--batch-delay` as needed.
+Cleanup transactions disable PostgreSQL statement timeouts, including inherited
+database/role settings. There is no job runtime limit or pod execution deadline.
+Stop the job manually when needed; cancellation interrupts active SQL and batch
+pacing. The five-second lock-acquisition timeout remains. Worklist selection scans
+eligible history once; measure selection and deletion before production execution.
 
 At the batch limit the job exits successfully with `complete=false` and reports
 remaining work. Cancellation or SQL failure returns an error; already committed
@@ -119,7 +118,6 @@ oc --context=<stage-context> -n kessel-stage process --local \
   -p JOB_NAME=common-rep-preview-<unique-suffix> \
   -p IMAGE_TAG=<immutable-tag> \
   -p KEEP_VERSIONS=2 \
-  -p MAX_DURATION=30m -p ACTIVE_DEADLINE_SECONDS=2100 \
   > /tmp/common-rep-preview.json
 oc --context=<stage-context> -n kessel-stage apply -f /tmp/common-rep-preview.json
 oc --context=<stage-context> -n kessel-stage logs -f job/common-rep-preview-<unique-suffix>
@@ -127,8 +125,8 @@ oc --context=<stage-context> -n kessel-stage logs -f job/common-rep-preview-<uni
 
 For execution, verify the maintenance preconditions, choose a new Job name, and
 add `-p EXECUTE=true -p WRITERS_PAUSED=true`. Set the reviewed `BATCH_SIZE`,
-`MAX_BATCHES`, and `BATCH_DELAY`. Keep `ACTIVE_DEADLINE_SECONDS` greater than
-`MAX_DURATION` plus image-pull/startup margin. Review logs and Job success/failure;
+`MAX_BATCHES`, and `BATCH_DELAY`. Leave `MAX_BATCHES=0` to finish the whole
+worklist, or set a positive value for a trial. Review logs and Job success/failure;
 a successful but batch-limited Job does not imply cleanup is complete.
 
 For ephemeral, target **ephemeral-kkotzy** explicitly. Deployments that use an

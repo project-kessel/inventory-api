@@ -11,7 +11,6 @@ objects:
         app: kessel-inventory-jobs
         job-type: common-representations-cleanup-job
     spec:
-      activeDeadlineSeconds: ${{ACTIVE_DEADLINE_SECONDS}}
       backoffLimit: 0
       completions: 1
       parallelism: 1
@@ -49,7 +48,6 @@ objects:
                 - --batch-size=${BATCH_SIZE}
                 - --batch-delay=${BATCH_DELAY}
                 - --max-batches=${MAX_BATCHES}
-                - --max-duration=${MAX_DURATION}
                 - --execute=${EXECUTE}
                 - --writers-paused=${WRITERS_PAUSED}
               env:
@@ -114,15 +112,9 @@ parameters:
   - description: Interruptible delay between committed batches (Go duration)
     name: BATCH_DELAY
     value: "500ms"
-  - description: Maximum number of committed batches in one invocation
+  - description: Maximum committed batches; 0 processes the entire worklist
     name: MAX_BATCHES
-    value: "1"
-  - description: Maximum total invocation duration, including startup and batch delays (Go duration)
-    name: MAX_DURATION
-    value: "5m"
-  - description: Pod deadline in seconds; must exceed MAX_DURATION plus image pull and startup margin
-    name: ACTIVE_DEADLINE_SECONDS
-    value: "360"
+    value: "0"
   - description: Clowder application configuration Secret containing cdappconfig.json
     name: CLOWDER_CONFIG_SECRET_NAME
     value: kessel-inventory

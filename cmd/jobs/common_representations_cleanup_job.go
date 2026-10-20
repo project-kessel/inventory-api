@@ -21,7 +21,7 @@ import (
 // NewCommonRepresentationsCleanupJobCommand creates a preview-by-default job
 // for a maintenance window with resource writes fenced and replication drained.
 func NewCommonRepresentationsCleanupJobCommand(storageOptions *storage.Options, loggerOptions common.LoggerOptions) *cobra.Command {
-	options := commonRepCleanupOptions{keepVersions: 2, batchSize: 1000, batchDelay: 500 * time.Millisecond, maxBatches: 1, maxDuration: 5 * time.Minute}
+	options := commonRepCleanupOptions{keepVersions: 2, batchSize: 1000, batchDelay: 500 * time.Millisecond, maxBatches: 0}
 	var execute, writersPaused bool
 	command := &cobra.Command{
 		Use:   "common-representations-cleanup-job",
@@ -41,8 +41,8 @@ bounded batches; rerun after interruption to select the remaining history.`,
 			if err := validateCommonRepCleanupInvocation(options.keepVersions); err != nil {
 				return err
 			}
-			if options.batchSize <= 0 || options.maxBatches <= 0 || options.maxDuration <= 0 || options.batchDelay < 0 {
-				return fmt.Errorf("batch size, maximum batches and duration must be positive; batch delay must not be negative")
+			if options.batchSize <= 0 || options.maxBatches < 0 || options.batchDelay < 0 {
+				return fmt.Errorf("batch size must be positive; maximum batches and batch delay must not be negative")
 			}
 			if options.resourceType != "" {
 				resourceType, err := bizmodel.NewResourceType(options.resourceType)
@@ -63,8 +63,7 @@ bounded batches; rerun after interruption to select the remaining history.`,
 	flags.BoolVar(&writersPaused, "writers-paused", false, "Acknowledge all resource writers are fenced and replication is fully drained; does not establish either condition")
 	flags.IntVar(&options.batchSize, "batch-size", options.batchSize, "Maximum history rows deleted per transaction")
 	flags.DurationVar(&options.batchDelay, "batch-delay", options.batchDelay, "Interruptible delay between committed batches")
-	flags.IntVar(&options.maxBatches, "max-batches", options.maxBatches, "Maximum committed batches per invocation")
-	flags.DurationVar(&options.maxDuration, "max-duration", options.maxDuration, "Maximum invocation duration, including startup and worklist selection")
+	flags.IntVar(&options.maxBatches, "max-batches", options.maxBatches, "Maximum committed batches; 0 processes the entire worklist")
 	return command
 }
 
@@ -76,7 +75,7 @@ func validateCommonRepCleanupInvocation(keepVersions int) error {
 }
 
 // openCommonRepCleanupDatabase opens PostgreSQL with the invocation context so the
-// job deadline bounds connection validation and all subsequent GORM operations.
+// caller can cancel connection validation and all subsequent GORM operations.
 func openCommonRepCleanupDatabase(ctx context.Context, storageConfig storage.CompletedConfig) (*gorm.DB, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, fmt.Errorf("error opening database: %w", err)
@@ -103,12 +102,10 @@ func commonRepCleanupSignalContext(parentContext context.Context) (context.Conte
 	return signal.NotifyContext(parentContext, os.Interrupt, syscall.SIGTERM)
 }
 
-func runCommonRepresentationsCleanupJob(parent context.Context, storageOptions *storage.Options, loggerOptions common.LoggerOptions, options commonRepCleanupOptions, execute bool) error {
+func runCommonRepresentationsCleanupJob(ctx context.Context, storageOptions *storage.Options, loggerOptions common.LoggerOptions, options commonRepCleanupOptions, execute bool) error {
 	if storageOptions == nil || storageOptions.Database != storage.Postgres {
 		return fmt.Errorf("common representation cleanup requires PostgreSQL storage options")
 	}
-	ctx, cancel := context.WithTimeout(parent, options.maxDuration)
-	defer cancel()
 	_, logger := common.InitLogger(common.GetLogLevel(), loggerOptions)
 	logHelper := log.NewHelper(log.With(logger, "job", "common_representations_cleanup"))
 	db, err := openCommonRepCleanupDatabase(ctx, storage.NewConfig(storageOptions).Complete())

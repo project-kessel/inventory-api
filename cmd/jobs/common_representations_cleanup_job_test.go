@@ -24,6 +24,9 @@ func TestRunJobRegistersCommonRepresentationsCleanupAsPreviewByDefault(t *testin
 	keepVersions, err := cleanupCommand.Flags().GetInt("keep-versions")
 	require.NoError(t, err)
 	assert.Equal(t, 2, keepVersions, "the default retention must keep the current version and its predecessor")
+	maxBatches, err := cleanupCommand.Flags().GetInt("max-batches")
+	require.NoError(t, err)
+	assert.Zero(t, maxBatches, "execution must process the entire worklist by default")
 }
 
 func TestCommonRepCleanupCommandRejectsSingleVersionRetention(t *testing.T) {

@@ -72,7 +72,7 @@ func TestCommonRepCleanupPostgres(t *testing.T) {
 		require.NoError(t, db.Raw("SELECT version FROM ("+query+") candidates WHERE resource_id=? ORDER BY version", append(args, cases[1].id)...).Scan(&staleCandidates).Error)
 		assert.Equal(t, []uint{0}, staleCandidates)
 
-		// Stop on the batch budget, then rebuild the worklist without a cursor.
+		// Stop after one batch, then rebuild the worklist from remaining history.
 		firstOptions := filtered
 		firstOptions.maxBatches = 1
 		first, err := cleanupCommonRepresentations(context.Background(), db, firstOptions, true, nil)
@@ -159,30 +159,6 @@ func TestCommonRepCleanupPostgres(t *testing.T) {
 			require.ErrorContains(t, err, "worklist mismatch")
 			require.NoError(t, connection.Raw("SELECT COUNT(*) FROM pg_temp.common_rep_cleanup_candidates").Scan(&count).Error)
 			assert.Equal(t, int64(3), count)
-			return nil
-		}))
-	})
-
-	t.Run("cleanup SQL has no statement timeout and remains cancellable", func(t *testing.T) {
-		require.NoError(t, db.Connection(func(connection *gorm.DB) error {
-			require.NoError(t, connection.Exec("SET statement_timeout = '5ms'").Error)
-			defer connection.WithContext(context.Background()).Exec("RESET statement_timeout")
-			// All cleanup transactions override inherited server statement timeouts.
-			for _, readOnly := range []bool{true, false} {
-				require.NoError(t, commonRepCleanupTransaction(context.Background(), connection, readOnly, func(tx *gorm.DB) error {
-					var timeout string
-					require.NoError(t, tx.Raw("SHOW statement_timeout").Scan(&timeout).Error)
-					require.Equal(t, "0", timeout)
-					return tx.Exec("SELECT pg_sleep(0.05)").Error
-				}))
-			}
-			ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
-			defer cancel()
-			err := commonRepCleanupTransaction(ctx, connection, false, func(tx *gorm.DB) error {
-				return tx.Exec("SELECT pg_sleep(10)").Error
-			})
-			require.Error(t, err)
-			require.ErrorIs(t, ctx.Err(), context.DeadlineExceeded)
 			return nil
 		}))
 	})

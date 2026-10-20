@@ -2,334 +2,125 @@ package jobs
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"strings"
 	"time"
 
-	"github.com/google/uuid"
-	bizmodel "github.com/project-kessel/inventory-api/internal/biz/model"
+	"gorm.io/gorm"
 )
 
-// commonRepCleanupPolicy freezes the per-resource retention rule for one invocation.
-// The rule keeps the authoritative current common representation and its keepVersions-1
-// predecessors for every resource that still has an active (non-tombstoned) reporter.
-type commonRepCleanupPolicy struct {
+type commonRepCleanupOptions struct {
 	keepVersions int
-	resourceType bizmodel.ResourceType
-	hasType      bool
-	valid        bool
-}
-
-// newCommonRepCleanupPolicy constructs a per-resource retention policy. keepVersions
-// must be at least 2 because update consumption reads event version v and v-1.
-func newCommonRepCleanupPolicy(keepVersions int, resourceType string) (commonRepCleanupPolicy, error) {
-	if keepVersions < 2 {
-		return commonRepCleanupPolicy{}, fmt.Errorf("common representation retention must keep at least the current version and its predecessor")
-	}
-	policy := commonRepCleanupPolicy{keepVersions: keepVersions, valid: true}
-	if strings.TrimSpace(resourceType) != "" {
-		validatedResourceType, err := bizmodel.NewResourceType(resourceType)
-		if err != nil {
-			return commonRepCleanupPolicy{}, fmt.Errorf("invalid resource type filter: %w", err)
-		}
-		policy.resourceType = validatedResourceType
-		policy.hasType = true
-	} else if resourceType != "" {
-		return commonRepCleanupPolicy{}, fmt.Errorf("resource type filter cannot contain only whitespace")
-	}
-	return policy, nil
-}
-
-// Validate rejects the zero value, which is not a constructed cleanup policy.
-func (policy commonRepCleanupPolicy) Validate() error {
-	if !policy.valid {
-		return fmt.Errorf("common representation cleanup policy is not initialized")
-	}
-	return nil
-}
-
-// ResourceType returns the normalized resource type filter and whether a filter was selected.
-func (policy commonRepCleanupPolicy) ResourceType() (bizmodel.ResourceType, bool) {
-	return policy.resourceType, policy.hasType
-}
-
-// commonRepCleanupImpact describes rows from one committed batch. Root IDs stay
-// internal so repeated batches of the same root can be counted once.
-type commonRepCleanupImpact struct {
-	representations int64
-	resourceRootIDs []uuid.UUID
-}
-
-const (
-	commonRepExclusionNone                = ""
-	commonRepExclusionNoActiveReporter    = "no_active_reporter"
-	commonRepExclusionInconsistentPointer = "inconsistent_pointer"
-	commonRepDefaultStatementTimeout      = 30 * time.Second
-	commonRepDefaultLockTimeout           = 5 * time.Second
-)
-
-type commonRepRootClassification struct {
-	resourceID   uuid.UUID
-	exclusion    string
-	prunableRows int64
-	retainFrom   int64
-}
-
-// commonRepCleanupRoot freezes the oldest retained version before consumption is awaited.
-type commonRepCleanupRoot struct {
-	ResourceID uuid.UUID `json:"resource_id"`
-	RetainFrom int64     `json:"retain_from"`
-}
-
-type commonRepCleanupReport struct {
-	startedAt                  time.Time
-	finishedAt                 time.Time
-	keepVersions               int
-	chunksProcessed            int64
-	rootsScanned               int64
-	prunableRoots              int64
-	prunableRows               int64
-	rootsWithoutActiveReporter int64
-	excludedInconsistentRoots  int64
-	lastCursor                 uuid.UUID
-	passComplete               bool
-}
-
-type commonRepChunkProgress struct {
-	chunkNumber  int64
-	rootsScanned int64
-	prunableRows int64
-	cursor       uuid.UUID
+	resourceType string
+	batchSize    int
+	batchDelay   time.Duration
+	maxBatches   int
+	maxDuration  time.Duration
 }
 
 type commonRepCleanupResult struct {
-	report            commonRepCleanupReport
+	candidateRows     int64
+	remainingRows     int64
 	deletedRows       int64
-	impactedRoots     int64
 	committedBatches  int
-	batchLimitReached bool
+	selectionDuration time.Duration
+	complete          bool
 }
 
-// commonRepCleanupRepository scans root-aligned chunks and rechecks retention
-// inside every delete transaction. Deletion must enforce rowLimit in SQL.
-type commonRepCleanupRepository interface {
-	ReadChunk(context.Context, commonRepCleanupPolicy, uuid.UUID, int) ([]commonRepRootClassification, uuid.UUID, bool, error)
-	DeletePrunableRoots(context.Context, commonRepCleanupPolicy, []commonRepCleanupRoot, int) (commonRepCleanupImpact, error)
-}
-
-// commonRepCleanupTransaction scopes repository work to serializable transactions.
-// Retried callbacks replace attempted counts; progress is recorded after commit.
-type commonRepCleanupTransaction interface {
-	WithinSerializableCommonRepCleanup(context.Context, string, bool, time.Duration, time.Duration, func(commonRepCleanupRepository) error) error
-}
-
-// commonRepCleanupOptions bounds chunk scan size, delete batch size, pacing, batch
-// count, and total time for one invocation.
-type commonRepCleanupOptions struct {
-	chunkRows   int
-	batchSize   int
-	batchDelay  time.Duration
-	maxBatches  int
-	maxDuration time.Duration
-}
-
-// newCommonRepCleanupOptions validates positive finite execution limits.
-func newCommonRepCleanupOptions(chunkRows int, batchSize int, batchDelay time.Duration, maxBatches int, maxDuration time.Duration) (commonRepCleanupOptions, error) {
-	options := commonRepCleanupOptions{chunkRows: chunkRows, batchSize: batchSize, batchDelay: batchDelay, maxBatches: maxBatches, maxDuration: maxDuration}
-	if err := options.Validate(); err != nil {
-		return commonRepCleanupOptions{}, err
-	}
-	return options, nil
-}
-
-// Validate rejects non-positive limits and negative delay.
-func (options commonRepCleanupOptions) Validate() error {
-	if options.chunkRows <= 0 {
-		return fmt.Errorf("chunk rows must be positive")
-	}
-	if options.batchSize <= 0 {
-		return fmt.Errorf("batch size must be positive")
-	}
-	if options.batchDelay < 0 {
-		return fmt.Errorf("batch delay cannot be negative")
-	}
-	if options.maxBatches <= 0 {
-		return fmt.Errorf("maximum batches must be positive")
-	}
-	if options.maxDuration <= 0 {
-		return fmt.Errorf("maximum duration must be positive")
-	}
-	return nil
-}
-
-type commonRepCleanupUsecase struct {
-	transactions  commonRepCleanupTransaction
-	awaitBoundary func(context.Context) (func(context.Context) error, error)
-}
-
-func newCommonRepCleanup(transactions commonRepCleanupTransaction, awaitBoundary func(context.Context) (func(context.Context) error, error)) (*commonRepCleanupUsecase, error) {
-	if transactions == nil {
-		return nil, fmt.Errorf("common representation cleanup transactions are required")
-	}
-	return &commonRepCleanupUsecase{transactions: transactions, awaitBoundary: awaitBoundary}, nil
-}
-
-// Preview uses the same scan as execution, with read-only transactions and no deletes.
-func (usecase *commonRepCleanupUsecase) Preview(ctx context.Context, policy commonRepCleanupPolicy, options commonRepCleanupOptions, startAfter uuid.UUID, onChunk func(commonRepChunkProgress)) (commonRepCleanupReport, error) {
-	result, err := usecase.run(ctx, policy, options, startAfter, false, nil, onChunk)
-	return result.report, err
-}
-
-// Execute commits bounded deletions and reports progress only after each commit.
-func (usecase *commonRepCleanupUsecase) Execute(ctx context.Context, policy commonRepCleanupPolicy, options commonRepCleanupOptions, startAfter uuid.UUID, onBatch func(int, commonRepCleanupImpact), onChunk func(commonRepChunkProgress)) (commonRepCleanupResult, error) {
-	return usecase.run(ctx, policy, options, startAfter, true, onBatch, onChunk)
-}
-
-// run advances the cursor only after a whole chunk finishes. A budget stop or
-// failure within a chunk therefore resumes by safely reprocessing that chunk.
-func (usecase *commonRepCleanupUsecase) run(ctx context.Context, policy commonRepCleanupPolicy, options commonRepCleanupOptions, startAfter uuid.UUID, execute bool, onBatch func(int, commonRepCleanupImpact), onChunk func(commonRepChunkProgress)) (result commonRepCleanupResult, runErr error) {
-	if usecase == nil || usecase.transactions == nil {
-		return result, fmt.Errorf("common representation cleanup is not configured")
-	}
-	if err := policy.Validate(); err != nil {
-		return result, err
-	}
-	if err := options.Validate(); err != nil {
-		return result, err
-	}
+// cleanupCommonRepresentations pins a connection for the temporary worklist.
+// Resource writers must stay fenced and replication must already be drained.
+// A rerun selects the remaining history afresh; no cursor or persistent state is needed.
+func cleanupCommonRepresentations(ctx context.Context, db *gorm.DB, options commonRepCleanupOptions, execute bool, onBatch func(int, int64, time.Duration)) (result commonRepCleanupResult, err error) {
 	ctx, cancel := context.WithTimeout(ctx, options.maxDuration)
 	defer cancel()
-	result.report = commonRepCleanupReport{startedAt: time.Now().UTC(), keepVersions: policy.keepVersions, lastCursor: startAfter}
-	roots := make(map[uuid.UUID]struct{})
-	defer func() {
-		result.report.finishedAt = time.Now().UTC()
-		result.impactedRoots = int64(len(roots))
-	}()
-
-	for {
-		if err := ctx.Err(); err != nil {
-			return result, err
-		}
-		if execute && result.committedBatches >= options.maxBatches {
-			result.batchLimitReached = true
-			return result, nil
-		}
-		var classifications []commonRepRootClassification
-		var boundary uuid.UUID
-		var found bool
-		err := usecase.withSerializable(ctx, "common_rep_cleanup_scan", true, func(repository commonRepCleanupRepository) error {
-			var err error
-			classifications, boundary, found, err = repository.ReadChunk(ctx, policy, result.report.lastCursor, options.chunkRows)
-			return err
-		})
-		if err != nil {
-			return result, fmt.Errorf("scan common representation history: %w", err)
-		}
-
-		progress := commonRepChunkProgress{chunkNumber: result.report.chunksProcessed + 1, rootsScanned: int64(len(classifications)), cursor: boundary}
-		rootsToPrune := make([]commonRepCleanupRoot, 0, len(classifications))
-		for _, classification := range classifications {
-			switch classification.exclusion {
-			case commonRepExclusionNoActiveReporter:
-				result.report.rootsWithoutActiveReporter++
-			case commonRepExclusionInconsistentPointer:
-				result.report.excludedInconsistentRoots++
-			case commonRepExclusionNone:
-				if classification.prunableRows > 0 {
-					result.report.prunableRoots++
-					progress.prunableRows += classification.prunableRows
-					rootsToPrune = append(rootsToPrune, commonRepCleanupRoot{ResourceID: classification.resourceID, RetainFrom: classification.retainFrom})
-				}
-			}
-		}
-		result.report.chunksProcessed++
-		result.report.rootsScanned += progress.rootsScanned
-		result.report.prunableRows += progress.prunableRows
-		if onChunk != nil {
-			onChunk(progress)
-		}
-
-		var validateBoundary func(context.Context) error
-		if execute && len(rootsToPrune) > 0 {
-			if usecase.awaitBoundary == nil {
-				return result, fmt.Errorf("cleanup execution requires a consumption boundary")
-			}
-			var err error
-			validateBoundary, err = usecase.awaitBoundary(ctx)
-			if err != nil {
-				return result, fmt.Errorf("await cleanup consumption boundary: %w", err)
-			}
-			if validateBoundary == nil {
-				return result, fmt.Errorf("consumption boundary validator is required")
-			}
-		}
-
-		// Every root uses the same SQL-limited deletion path, including deep roots.
-		// Re-evaluate until a batch returns fewer rows than its limit. Concurrent
-		// writes cannot expand a transaction beyond that limit or advance the frozen cutoff.
-		for execute && len(rootsToPrune) > 0 {
-			if err := ctx.Err(); err != nil {
-				return result, err
-			}
-			if result.committedBatches >= options.maxBatches {
-				result.batchLimitReached = true
-				return result, nil
-			}
-			if err := validateBoundary(ctx); err != nil {
-				return result, fmt.Errorf("cleanup consumption boundary changed: %w", err)
-			}
-			var impact commonRepCleanupImpact
-			err := usecase.withSerializable(ctx, "common_rep_cleanup_batch", false, func(repository commonRepCleanupRepository) error {
-				var err error
-				impact, err = repository.DeletePrunableRoots(ctx, policy, rootsToPrune, options.batchSize)
-				return err
+	err = db.WithContext(ctx).Connection(func(connection *gorm.DB) (connectionErr error) {
+		selectionStarted := time.Now()
+		query, arguments := commonRepCleanupCandidateQuery(options)
+		if !execute {
+			connectionErr = commonRepCleanupTransaction(ctx, connection, true, func(tx *gorm.DB) error {
+				return tx.Raw("SELECT COUNT(*) FROM ("+query+") candidates", arguments...).Scan(&result.candidateRows).Error
 			})
-			if err != nil {
-				return result, fmt.Errorf("delete common representation history: %w", err)
-			}
-			if impact.representations > 0 {
-				result.deletedRows += impact.representations
-				for _, rootID := range impact.resourceRootIDs {
-					roots[rootID] = struct{}{}
-				}
-				result.committedBatches++
-				if onBatch != nil {
-					onBatch(result.committedBatches, impact)
-				}
-			}
-			if impact.representations < int64(options.batchSize) {
-				break
-			}
-			if err := waitForCommonRepNextBatch(ctx, options.batchDelay); err != nil {
-				return result, err
-			}
+			result.selectionDuration = time.Since(selectionStarted)
+			result.remainingRows = result.candidateRows
+			result.complete = connectionErr == nil
+			return connectionErr
 		}
-		if found {
-			result.report.lastCursor = boundary
-		}
-		if !found {
-			result.report.passComplete = true
-			return result, nil
-		}
-		if execute && len(rootsToPrune) > 0 {
-			if err := waitForCommonRepNextBatch(ctx, options.batchDelay); err != nil {
-				return result, err
-			}
-		}
-	}
-}
 
-func (usecase *commonRepCleanupUsecase) withSerializable(ctx context.Context, operationName string, readOnly bool, work func(commonRepCleanupRepository) error) error {
-	return usecase.transactions.WithinSerializableCommonRepCleanup(ctx, operationName, readOnly, commonRepDefaultStatementTimeout, commonRepDefaultLockTimeout, work)
-}
+		// Connection.Close returns the session to the pool. Explicitly drop the
+		// worklist even on cancellation so pooled sessions never retain it.
+		defer func() {
+			cleanupContext, cleanupCancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cleanupCancel()
+			dropErr := connection.WithContext(cleanupContext).Exec("DROP TABLE IF EXISTS pg_temp.common_rep_cleanup_candidates").Error
+			connectionErr = errors.Join(connectionErr, dropErr)
+		}()
+		connectionErr = commonRepCleanupTransaction(ctx, connection, false, func(tx *gorm.DB) error {
+			if err := tx.Exec(`CREATE TEMP TABLE common_rep_cleanup_candidates (
+    resource_id uuid NOT NULL, version bigint NOT NULL,
+    PRIMARY KEY (resource_id, version)
+   ) ON COMMIT PRESERVE ROWS`).Error; err != nil {
+				return err
+			}
+			insert := tx.Exec("INSERT INTO pg_temp.common_rep_cleanup_candidates (resource_id, version) "+query, arguments...)
+			result.candidateRows = insert.RowsAffected
+			return insert.Error
+		})
+		result.selectionDuration = time.Since(selectionStarted)
+		result.remainingRows = result.candidateRows
+		if connectionErr != nil {
+			return fmt.Errorf("select cleanup worklist: %w", connectionErr)
+		}
 
-func waitForCommonRepNextBatch(ctx context.Context, delay time.Duration) error {
-	timer := time.NewTimer(delay)
-	defer timer.Stop()
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	case <-timer.C:
+		for result.remainingRows > 0 && result.committedBatches < options.maxBatches {
+			if err := ctx.Err(); err != nil {
+				return err
+			}
+			started := time.Now()
+			var deleted int64
+			if err := commonRepCleanupTransaction(ctx, connection, false, func(tx *gorm.DB) error {
+				var err error
+				deleted, err = deleteCommonRepCleanupBatch(tx, options.batchSize)
+				return err
+			}); err != nil {
+				return fmt.Errorf("delete cleanup batch: %w", err)
+			}
+			result.committedBatches++
+			result.deletedRows += deleted
+			result.remainingRows -= deleted
+			if onBatch != nil {
+				onBatch(result.committedBatches, deleted, time.Since(started))
+			}
+			if result.remainingRows > 0 && result.committedBatches < options.maxBatches {
+				timer := time.NewTimer(options.batchDelay)
+				select {
+				case <-ctx.Done():
+					timer.Stop()
+					return ctx.Err()
+				case <-timer.C:
+				}
+			}
+		}
+		result.complete = result.remainingRows == 0
 		return nil
-	}
+	})
+	return result, err
+}
+
+// commonRepCleanupTransaction bounds every SQL operation and commits a batch's
+// history deletion and worklist removal together. Preview cannot mutate the DB.
+func commonRepCleanupTransaction(ctx context.Context, connection *gorm.DB, readOnly bool, work func(*gorm.DB) error) error {
+	return connection.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if readOnly {
+			if err := tx.Exec("SET TRANSACTION READ ONLY").Error; err != nil {
+				return err
+			}
+		}
+		if err := tx.Exec("SET LOCAL statement_timeout = '30s'").Error; err != nil {
+			return err
+		}
+		if err := tx.Exec("SET LOCAL lock_timeout = '5s'").Error; err != nil {
+			return err
+		}
+		return work(tx)
+	})
 }

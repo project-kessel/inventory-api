@@ -5,98 +5,74 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
 	"github.com/go-kratos/kratos/v2/log"
-	"github.com/google/uuid"
 	"github.com/project-kessel/inventory-api/cmd/common"
-	"github.com/project-kessel/inventory-api/internal/consumer"
-	"github.com/project-kessel/inventory-api/internal/data"
-	"github.com/project-kessel/inventory-api/internal/metricscollector"
+	bizmodel "github.com/project-kessel/inventory-api/internal/biz/model"
 	"github.com/project-kessel/inventory-api/internal/storage"
 	"github.com/spf13/cobra"
-	"go.opentelemetry.io/otel"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
 
-const (
-	commonRepCleanupDefaultKeepVersions = 2
-	commonRepCleanupDefaultChunkRows    = 20000
-	commonRepCleanupDefaultBatchSize    = 1000
-	commonRepCleanupDefaultBatchDelay   = 500 * time.Millisecond
-	commonRepCleanupDefaultMaxBatches   = 1
-	commonRepCleanupDefaultMaxDuration  = 5 * time.Minute
-)
-
-// NewCommonRepresentationsCleanupJobCommand creates a dry-run-by-default common
-// representation history cleanup command.
-func NewCommonRepresentationsCleanupJobCommand(storageOptions *storage.Options, consumerOptions *consumer.Options, loggerOptions common.LoggerOptions) *cobra.Command {
-	var (
-		replicationSlot string
-		execute         bool
-		keepVersions    int
-		resourceType    string
-		startAfter      string
-		chunkRows       int
-		batchSize       int
-		batchDelay      time.Duration
-		maxBatches      int
-		maxDuration     time.Duration
-	)
-
+// NewCommonRepresentationsCleanupJobCommand creates a preview-by-default job
+// for a maintenance window with resource writes fenced and replication drained.
+func NewCommonRepresentationsCleanupJobCommand(storageOptions *storage.Options, loggerOptions common.LoggerOptions) *cobra.Command {
+	options := commonRepCleanupOptions{keepVersions: 2, batchSize: 1000, batchDelay: 500 * time.Millisecond, maxBatches: 1, maxDuration: 5 * time.Minute}
+	var execute, writersPaused bool
 	command := &cobra.Command{
 		Use:   "common-representations-cleanup-job",
-		Short: "Preview or prune prunable common representation history on active resources",
-		Long: `Previews common representation history pruning by default. The pass walks
-common representations in primary-key order and applies a per-resource retention
-rule that keeps the authoritative current common representation and its
-predecessors; only older versions on resources that still have an active reporter
-are pruned. Destructive execution requires --execute. The scan is resumable:
-an interrupted pass reports its last cursor and continues after it with
---start-after. Execution freezes each chunk's retention cutoff, then waits for the Debezium
-checkpoint and Inventory consumer committed offsets before pruning. Reads and
-writes continue; versions written after capture are retained.`,
+		Short: "Preview or batch-delete old common representation history",
+		Long: `Keep each active resource's current representation and its newest existing
+predecessors (two versions by default), regardless of their age.
+Preview is the default. Execution requires --execute --writers-paused: operators
+must block all resource writers and verify replication is fully drained first.
+Reads and the drained consumer may continue. These flags do not establish or
+verify maintenance mode. Execution selects a temporary worklist once and deletes
+bounded batches; rerun after interruption to select the remaining history.`,
 		Args: cobra.NoArgs,
 		RunE: func(command *cobra.Command, _ []string) error {
-			signalContext, stopSignals := commonRepCleanupSignalContext(command.Context())
-			defer stopSignals()
-			if err := validateCommonRepCleanupInvocation(keepVersions); err != nil {
+			if execute && !writersPaused {
+				return fmt.Errorf("--execute requires --writers-paused; fence all resource writers and verify replication has drained before cleanup")
+			}
+			if err := validateCommonRepCleanupInvocation(options.keepVersions); err != nil {
 				return err
 			}
-			return runCommonRepresentationsCleanupJob(
-				signalContext,
-				storageOptions,
-				consumerOptions,
-				replicationSlot,
-				loggerOptions,
-				execute,
-				keepVersions,
-				resourceType,
-				startAfter,
-				chunkRows,
-				batchSize,
-				batchDelay,
-				maxBatches,
-				maxDuration,
-			)
+			if options.batchSize <= 0 || options.maxBatches <= 0 || options.maxDuration <= 0 || options.batchDelay < 0 {
+				return fmt.Errorf("batch size, maximum batches and duration must be positive; batch delay must not be negative")
+			}
+			if options.resourceType != "" {
+				resourceType, err := bizmodel.NewResourceType(options.resourceType)
+				if err != nil || strings.TrimSpace(options.resourceType) == "" {
+					return fmt.Errorf("invalid resource type filter %q", options.resourceType)
+				}
+				options.resourceType = resourceType.Serialize()
+			}
+			ctx, stopSignals := commonRepCleanupSignalContext(command.Context())
+			defer stopSignals()
+			return runCommonRepresentationsCleanupJob(ctx, storageOptions, loggerOptions, options, execute)
 		},
 	}
-
 	flags := command.Flags()
-	flags.StringVar(&replicationSlot, "replication-slot", "", "Debezium logical replication slot for this database; required for execution")
-	flags.BoolVar(&execute, "execute", false, "Commit bounded common representation cleanup batches; default is read-only preview")
-	flags.IntVar(&keepVersions, "keep-versions", commonRepCleanupDefaultKeepVersions, "Number of newest common representations retained per resource; must be at least 2 because update consumption reads version v and v-1 (default 2)")
-	flags.StringVar(&resourceType, "resource-type", "", "Optional resource type filter")
-	flags.StringVar(&startAfter, "start-after", uuid.Nil.String(), "Resume the pass after this resource id, as reported in the last cursor of an interrupted run")
-	flags.IntVar(&chunkRows, "chunk-rows", commonRepCleanupDefaultChunkRows, "Target common representation rows per chunk; the final root is included whole (default 20000)")
-	flags.IntVar(&batchSize, "batch-size", commonRepCleanupDefaultBatchSize, "Maximum common representation rows per transaction (default 1000)")
-	flags.DurationVar(&batchDelay, "batch-delay", commonRepCleanupDefaultBatchDelay, "Interruptible delay between committed batches (default 500ms)")
-	flags.IntVar(&maxBatches, "max-batches", commonRepCleanupDefaultMaxBatches, "Maximum number of destructive batches in one invocation (default 1)")
-	flags.DurationVar(&maxDuration, "max-duration", commonRepCleanupDefaultMaxDuration, "Maximum total invocation duration, including batch delays (default 5m)")
-
+	flags.IntVar(&options.keepVersions, "keep-versions", options.keepVersions, "Newest current/predecessor versions retained regardless of age; minimum 2")
+	flags.StringVar(&options.resourceType, "resource-type", "", "Optional resource type filter")
+	flags.BoolVar(&execute, "execute", false, "Commit bounded deletions; default is read-only preview")
+	flags.BoolVar(&writersPaused, "writers-paused", false, "Acknowledge all resource writers are fenced and replication is fully drained; does not establish either condition")
+	flags.IntVar(&options.batchSize, "batch-size", options.batchSize, "Maximum history rows deleted per transaction")
+	flags.DurationVar(&options.batchDelay, "batch-delay", options.batchDelay, "Interruptible delay between committed batches")
+	flags.IntVar(&options.maxBatches, "max-batches", options.maxBatches, "Maximum committed batches per invocation")
+	flags.DurationVar(&options.maxDuration, "max-duration", options.maxDuration, "Maximum invocation duration, including startup and worklist selection")
 	return command
+}
+
+func validateCommonRepCleanupInvocation(keepVersions int) error {
+	if keepVersions < 2 {
+		return fmt.Errorf("--keep-versions must be at least 2 because update consumption reads version v and v-1")
+	}
+	return nil
 }
 
 // openCommonRepCleanupDatabase opens PostgreSQL with the invocation context so the
@@ -127,173 +103,33 @@ func commonRepCleanupSignalContext(parentContext context.Context) (context.Conte
 	return signal.NotifyContext(parentContext, os.Interrupt, syscall.SIGTERM)
 }
 
-func validateCommonRepCleanupInvocation(keepVersions int) error {
-	if keepVersions < 2 {
-		return fmt.Errorf("--keep-versions must be at least 2 because update consumption reads version v and v-1")
+func runCommonRepresentationsCleanupJob(parent context.Context, storageOptions *storage.Options, loggerOptions common.LoggerOptions, options commonRepCleanupOptions, execute bool) error {
+	if storageOptions == nil || storageOptions.Database != storage.Postgres {
+		return fmt.Errorf("common representation cleanup requires PostgreSQL storage options")
 	}
-	return nil
-}
-
-func runCommonRepresentationsCleanupJob(
-	parentContext context.Context,
-	storageOptions *storage.Options,
-	consumerOptions *consumer.Options,
-	replicationSlot string,
-	loggerOptions common.LoggerOptions,
-	execute bool,
-	keepVersions int,
-	resourceType string,
-	startAfter string,
-	chunkRows int,
-	batchSize int,
-	batchDelay time.Duration,
-	maxBatches int,
-	maxDuration time.Duration,
-) error {
-	if err := parentContext.Err(); err != nil {
-		return fmt.Errorf("common representation cleanup canceled before startup: %w", err)
-	}
-	if storageOptions == nil {
-		return fmt.Errorf("storage options are required")
-	}
-	if storageOptions.Database != storage.Postgres {
-		return fmt.Errorf("common representation cleanup requires PostgreSQL; configured database is %q", storageOptions.Database)
-	}
-	resumeCursor, err := uuid.Parse(startAfter)
-	if err != nil {
-		return fmt.Errorf("--start-after must be a valid resource id: %w", err)
-	}
-	options, err := newCommonRepCleanupOptions(chunkRows, batchSize, batchDelay, maxBatches, maxDuration)
-	if err != nil {
-		return fmt.Errorf("invalid common representation cleanup execution bounds: %w", err)
-	}
-	jobContext, cancel := context.WithTimeout(parentContext, options.maxDuration)
+	ctx, cancel := context.WithTimeout(parent, options.maxDuration)
 	defer cancel()
-	policy, err := newCommonRepCleanupPolicy(keepVersions, resourceType)
-	if err != nil {
-		return err
-	}
-	if storageOptions.MaxSerializationRetries <= 0 {
-		return fmt.Errorf("storage.max-serialization-retries must be positive")
-	}
-	if err := jobContext.Err(); err != nil {
-		return fmt.Errorf("common representation cleanup canceled before database startup: %w", err)
-	}
-
 	_, logger := common.InitLogger(common.GetLogLevel(), loggerOptions)
 	logHelper := log.NewHelper(log.With(logger, "job", "common_representations_cleanup"))
-	storageConfig := storage.NewConfig(storageOptions).Complete()
-	db, err := openCommonRepCleanupDatabase(jobContext, storageConfig)
+	db, err := openCommonRepCleanupDatabase(ctx, storage.NewConfig(storageOptions).Complete())
 	if err != nil {
 		return err
 	}
 	sqlDB, err := db.DB()
 	if err != nil {
-		return fmt.Errorf("get common representation cleanup database handle: %w", err)
-	}
-	defer sqlDB.Close() //nolint:errcheck
-	if err := jobContext.Err(); err != nil {
-		return fmt.Errorf("common representation cleanup canceled during database startup: %w", err)
-	}
-
-	metrics := &metricscollector.MetricsCollector{}
-	if err := metrics.New(otel.Meter("github.com/project-kessel/inventory-api/blob/main/internal/server/otel")); err != nil {
-		return fmt.Errorf("initialize common representation cleanup transaction metrics: %w", err)
-	}
-	transactionManager := data.NewGormTransactionManager(metrics, storageOptions.MaxSerializationRetries)
-	transactions := newCommonRepCleanupTransaction(db, transactionManager)
-	var awaitBoundary func(context.Context) (func(context.Context) error, error)
-	if execute {
-		boundary, err := newCommonRepCleanupBoundary(db, consumerOptions, replicationSlot, logHelper)
-		if err != nil {
-			return err
-		}
-		defer boundary.admin.Close()
-		awaitBoundary = boundary.Await
-	}
-	usecase, err := newCommonRepCleanup(transactions, awaitBoundary)
-	if err != nil {
 		return err
 	}
-
-	onChunk := func(progress commonRepChunkProgress) {
-		logHelper.Infow("msg", "common representation cleanup chunk scanned",
-			"chunk", progress.chunkNumber,
-			"chunk_roots_scanned", progress.rootsScanned,
-			"chunk_prunable_rows", progress.prunableRows,
-			"cursor", progress.cursor.String(),
-		)
+	defer sqlDB.Close() //nolint:errcheck
+	if execute {
+		logHelper.Warn("Cleanup execution enabled; resource writers must remain fenced and replication drained")
 	}
-
-	if !execute {
-		report, previewErr := usecase.Preview(jobContext, policy, options, resumeCursor, onChunk)
-		logCommonRepCleanupReport(logHelper, report, policy, options, false)
-		if previewErr != nil {
-			return previewErr
-		}
-		logHelper.Info("Common representation cleanup preview completed; no database mutations were made")
-		return nil
-	}
-
-	logHelper.Warn("Common representation cleanup execution explicitly enabled; committed batches cannot be undone by cancellation")
-	result, executeErr := usecase.Execute(jobContext, policy, options, resumeCursor, func(batchNumber int, impact commonRepCleanupImpact) {
-		logHelper.Infow("msg", "common representation cleanup batch committed",
-			"batch", batchNumber,
-			"common_representations_deleted", impact.representations,
-			"resource_roots_impacted", countCommonRepRoots(impact.resourceRootIDs),
-		)
-	}, onChunk)
-	logCommonRepCleanupReport(logHelper, result.report, policy, options, true)
-	logCommonRepCleanupResult(logHelper, result)
-	return executeErr
-}
-
-func logCommonRepCleanupReport(
-	logHelper *log.Helper,
-	report commonRepCleanupReport,
-	policy commonRepCleanupPolicy,
-	options commonRepCleanupOptions,
-	executeRequested bool,
-) {
-	resourceTypeFilter := "*"
-	if resourceType, hasFilter := policy.ResourceType(); hasFilter {
-		resourceTypeFilter = resourceType.String()
-	}
-	logHelper.Infow("msg", "common representation cleanup pass report",
-		"execution_requested", executeRequested,
-		"keep_versions", report.keepVersions,
-		"resource_type_filter", resourceTypeFilter,
-		"chunk_rows", options.chunkRows,
-		"batch_size", options.batchSize,
-		"maximum_batches", options.maxBatches,
-		"batch_delay", options.batchDelay.String(),
-		"maximum_duration", options.maxDuration.String(),
-		"scan_started_at_utc", report.startedAt.Format(time.RFC3339Nano),
-		"scan_finished_at_utc", report.finishedAt.Format(time.RFC3339Nano),
-		"chunks_processed", report.chunksProcessed,
-		"roots_scanned", report.rootsScanned,
-		"prunable_common_representations", report.prunableRows,
-		"prunable_resource_roots", report.prunableRoots,
-		"roots_without_active_reporter_out_of_scope", report.rootsWithoutActiveReporter,
-		"excluded_inconsistent_pointer_roots", report.excludedInconsistentRoots,
-		"last_cursor", report.lastCursor.String(),
-		"pass_complete", report.passComplete,
-	)
-}
-
-func logCommonRepCleanupResult(logHelper *log.Helper, result commonRepCleanupResult) {
-	logHelper.Infow("msg", "common representation cleanup execution result",
-		"committed_batches", result.committedBatches,
-		"batch_limit_reached", result.batchLimitReached,
-		"common_representations_deleted", result.deletedRows,
-		"resource_roots_impacted", result.impactedRoots,
-	)
-}
-
-func countCommonRepRoots(rootIDs []uuid.UUID) int {
-	roots := make(map[uuid.UUID]struct{}, len(rootIDs))
-	for _, rootID := range rootIDs {
-		roots[rootID] = struct{}{}
-	}
-	return len(roots)
+	result, cleanupErr := cleanupCommonRepresentations(ctx, db, options, execute, func(batch int, deleted int64, duration time.Duration) {
+		logHelper.Infow("msg", "common representation cleanup batch committed", "batch", batch, "common_representations_deleted", deleted, "duration", duration.String())
+	})
+	logHelper.Infow("msg", "common representation cleanup result",
+		"execution_requested", execute, "keep_versions", options.keepVersions,
+		"resource_type_filter", options.resourceType, "prunable_common_representations", result.candidateRows,
+		"selection_duration", result.selectionDuration.String(), "committed_batches", result.committedBatches,
+		"common_representations_deleted", result.deletedRows, "remaining_worklist_rows", result.remainingRows, "complete", result.complete)
+	return cleanupErr
 }

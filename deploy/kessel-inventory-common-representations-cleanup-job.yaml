@@ -45,15 +45,13 @@ objects:
                 - run-job
                 - common-representations-cleanup-job
                 - --keep-versions=${KEEP_VERSIONS}
-                - --replication-slot=${REPLICATION_SLOT}
                 - --resource-type=${RESOURCE_TYPE}
-                - --start-after=${START_AFTER}
-                - --chunk-rows=${CHUNK_ROWS}
                 - --batch-size=${BATCH_SIZE}
                 - --batch-delay=${BATCH_DELAY}
                 - --max-batches=${MAX_BATCHES}
                 - --max-duration=${MAX_DURATION}
                 - --execute=${EXECUTE}
+                - --writers-paused=${WRITERS_PAUSED}
               env:
                 - name: ACG_CONFIG
                   value: /cdapp/cdappconfig.json
@@ -71,9 +69,6 @@ objects:
                 - name: clowder-config
                   mountPath: /cdapp
                   readOnly: true
-                - name: kafka-ca-certs
-                  mountPath: /kafka-ca-certs
-                  readOnly: true
               resources:
                 requests:
                   memory: ${REQUESTS_MEMORY}
@@ -88,10 +83,6 @@ objects:
             - name: clowder-config
               secret:
                 secretName: ${CLOWDER_CONFIG_SECRET_NAME}
-            - name: kafka-ca-certs
-              secret:
-                secretName: ${CA_CERT_SECRET}
-                optional: true
             - name: tmp
               emptyDir:
                 sizeLimit: 64Mi
@@ -108,20 +99,14 @@ parameters:
   - description: Number of newest common representations retained per resource; must be at least 2
     name: KEEP_VERSIONS
     value: "2"
-  - description: Debezium pgoutput slot for this Inventory database; verify before execution
-    name: REPLICATION_SLOT
-    value: inventory_api_debezium
   - description: Optional resource type filter; empty means all resource types
     name: RESOURCE_TYPE
     value: ""
-  - description: Resume the pass after this resource id (the previous run's last cursor); the zero UUID starts from the beginning
-    name: START_AFTER
-    value: "00000000-0000-0000-0000-000000000000"
-  - description: Target common representation rows per chunk; the boundary resource is included whole
-    name: CHUNK_ROWS
-    value: "20000"
   - description: Enable deletion only after the runbook's operational preconditions are verified; false is a read-only preview
     name: EXECUTE
+    value: "false"
+  - description: Acknowledge all resource writers are fenced and replication has fully drained; does not establish either condition
+    name: WRITERS_PAUSED
     value: "false"
   - description: Maximum common representation rows deleted per transaction
     name: BATCH_SIZE
@@ -147,9 +132,6 @@ parameters:
   - description: Name of the Inventory API Config Secret
     name: INVENTORY_API_CONFIG_NAME
     value: inventory-api-config
-  - description: Name of Secret that contains the Kafka cluster CA certificate, matching the Inventory API deployment when required
-    name: CA_CERT_SECRET
-    value: kessel-kafka-connect-config
   - description: Memory request for job
     name: REQUESTS_MEMORY
     value: '384Mi'

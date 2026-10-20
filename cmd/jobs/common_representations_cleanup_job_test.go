@@ -10,13 +10,16 @@ import (
 )
 
 func TestRunJobRegistersCommonRepresentationsCleanupAsPreviewByDefault(t *testing.T) {
-	command := NewRunJobCommand(storage.NewOptions(), nil, common.LoggerOptions{})
+	command := NewRunJobCommand(storage.NewOptions(), common.LoggerOptions{})
 	cleanupCommand, _, err := command.Find([]string{"common-representations-cleanup-job"})
 	require.NoError(t, err)
 
 	previewFlag, err := cleanupCommand.Flags().GetBool("execute")
 	require.NoError(t, err)
 	assert.False(t, previewFlag, "the common representation cleanup command must preview by default")
+	writersPaused, err := cleanupCommand.Flags().GetBool("writers-paused")
+	require.NoError(t, err)
+	assert.False(t, writersPaused, "the command must not assume an external write fence")
 
 	keepVersions, err := cleanupCommand.Flags().GetInt("keep-versions")
 	require.NoError(t, err)
@@ -28,4 +31,10 @@ func TestCommonRepCleanupCommandRejectsSingleVersionRetention(t *testing.T) {
 	require.Error(t, validateCommonRepCleanupInvocation(0))
 	require.NoError(t, validateCommonRepCleanupInvocation(2))
 	require.NoError(t, validateCommonRepCleanupInvocation(3))
+}
+
+func TestCommonRepCleanupExecutionRequiresWriteFenceAcknowledgment(t *testing.T) {
+	command := NewCommonRepresentationsCleanupJobCommand(storage.NewOptions(), common.LoggerOptions{})
+	command.SetArgs([]string{"--execute"})
+	require.ErrorContains(t, command.Execute(), "--execute requires --writers-paused")
 }

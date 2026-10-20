@@ -163,6 +163,30 @@ func TestCommonRepCleanupPostgres(t *testing.T) {
 		}))
 	})
 
+	t.Run("cleanup SQL has no statement timeout and remains cancellable", func(t *testing.T) {
+		require.NoError(t, db.Connection(func(connection *gorm.DB) error {
+			require.NoError(t, connection.Exec("SET statement_timeout = '5ms'").Error)
+			defer connection.WithContext(context.Background()).Exec("RESET statement_timeout")
+			// All cleanup transactions override inherited server statement timeouts.
+			for _, readOnly := range []bool{true, false} {
+				require.NoError(t, commonRepCleanupTransaction(context.Background(), connection, readOnly, func(tx *gorm.DB) error {
+					var timeout string
+					require.NoError(t, tx.Raw("SHOW statement_timeout").Scan(&timeout).Error)
+					require.Equal(t, "0", timeout)
+					return tx.Exec("SELECT pg_sleep(0.05)").Error
+				}))
+			}
+			ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+			defer cancel()
+			err := commonRepCleanupTransaction(ctx, connection, false, func(tx *gorm.DB) error {
+				return tx.Exec("SELECT pg_sleep(10)").Error
+			})
+			require.Error(t, err)
+			require.ErrorIs(t, ctx.Err(), context.DeadlineExceeded)
+			return nil
+		}))
+	})
+
 	t.Run("deep and multi-resource selection timing", func(t *testing.T) {
 		isolateCommonRepCleanupPostgresSubtest(t, db)
 		deep := uuid.New()

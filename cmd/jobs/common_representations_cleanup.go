@@ -106,8 +106,9 @@ func cleanupCommonRepresentations(ctx context.Context, db *gorm.DB, options comm
 	return result, err
 }
 
-// commonRepCleanupTransaction bounds every SQL operation and commits a batch's
-// history deletion and worklist removal together. Preview cannot mutate the DB.
+// commonRepCleanupTransaction commits history deletion and worklist removal
+// together. SQL execution is bounded by the invocation context, not a separate
+// statement timeout. Preview cannot mutate the DB.
 func commonRepCleanupTransaction(ctx context.Context, connection *gorm.DB, readOnly bool, work func(*gorm.DB) error) error {
 	return connection.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		if readOnly {
@@ -115,7 +116,8 @@ func commonRepCleanupTransaction(ctx context.Context, connection *gorm.DB, readO
 				return err
 			}
 		}
-		if err := tx.Exec("SET LOCAL statement_timeout = '30s'").Error; err != nil {
+		// Override inherited database/role statement timeouts for this transaction.
+		if err := tx.Exec("SET LOCAL statement_timeout = 0").Error; err != nil {
 			return err
 		}
 		if err := tx.Exec("SET LOCAL lock_timeout = '5s'").Error; err != nil {

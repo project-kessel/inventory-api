@@ -79,11 +79,13 @@ counts include only committed batches.
 
 Defaults: 1,000 rows/batch, 500ms delay, one batch/invocation, five-minute total
 budget. Override `--batch-size`, `--batch-delay`, `--max-batches`, and
-`--max-duration` for a reviewed run. Each SQL statement has a 30-second timeout and
-five-second lock timeout. Increasing the invocation duration does not increase
-the SQL statement timeout. Worklist selection scans the eligible history once;
-large tables or deep histories can still exceed that limit. Measure selection
-before production execution; no unbounded or silent fallback is provided.
+`--max-duration` for a reviewed run. Cleanup transactions disable PostgreSQL
+statement timeouts, including inherited database/role settings. Selection, preview
+and delete batches are bounded by the overall invocation deadline and cancellation
+instead of a fixed per-statement limit. The five-second lock-acquisition timeout
+remains. Worklist selection scans eligible history once; measure it before production
+execution and allow enough total duration for selection plus deletion. Set the Job
+pod deadline above that duration as described below.
 
 At the batch limit the job exits successfully with `complete=false` and reports
 remaining work. Cancellation or SQL failure returns an error; already committed

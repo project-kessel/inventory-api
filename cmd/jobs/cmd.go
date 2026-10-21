@@ -2,6 +2,7 @@ package jobs
 
 import (
 	"github.com/project-kessel/inventory-api/cmd/common"
+	"github.com/project-kessel/inventory-api/cmd/jobs/commonrepcleanup"
 	"github.com/project-kessel/inventory-api/internal/storage"
 	"github.com/spf13/cobra"
 )
@@ -19,7 +20,7 @@ func NewRunJobCommand(storageOptions *storage.Options, loggerOptions common.Logg
 	cmds := []*cobra.Command{
 		NewResourceDeleteJobCommand(storageOptions, loggerOptions),
 		NewMetricsCollectJobCommand(storageOptions, loggerOptions),
-		NewCommonRepresentationsCleanupJobCommand(storageOptions, loggerOptions),
+		commonrepcleanup.NewCommand(storageOptions, loggerOptions),
 	}
 
 	for _, c := range cmds {

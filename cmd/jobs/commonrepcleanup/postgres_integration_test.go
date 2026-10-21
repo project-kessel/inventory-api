@@ -1,6 +1,6 @@
 //go:build integration
 
-package jobs
+package commonrepcleanup
 
 import (
 	"context"
@@ -62,8 +62,13 @@ func TestCommonRepCleanupPostgres(t *testing.T) {
 		otherType := seed([]uint{0, 1, 2}, []int{40, 30, 0}, uintPointer(2), "other", true)
 		filtered := options
 		filtered.resourceType = "host"
-		preview, err := cleanupCommonRepresentations(context.Background(), db, filtered, false, nil)
+		selectionReported := false
+		preview, err := cleanupCommonRepresentations(context.Background(), db, filtered, false, func(rows int64, _ time.Duration) {
+			selectionReported = true
+			assert.Equal(t, int64(16), rows)
+		}, nil)
 		require.NoError(t, err)
+		assert.True(t, selectionReported, "preview must report its selection for logging")
 		require.Equal(t, int64(16), preview.candidateRows)
 		require.Zero(t, preview.deletedRows)
 		assertCommonRepVersions(t, db, cases[0].id, []uint{0, 1, 2, 3, 4, 5, 6, 7})
@@ -77,12 +82,12 @@ func TestCommonRepCleanupPostgres(t *testing.T) {
 		// Stop after one batch, then rebuild the worklist from remaining history.
 		firstOptions := filtered
 		firstOptions.maxBatches = 1
-		first, err := cleanupCommonRepresentations(context.Background(), db, firstOptions, true, nil)
+		first, err := cleanupCommonRepresentations(context.Background(), db, firstOptions, true, nil, nil)
 		require.NoError(t, err)
 		assert.Equal(t, int64(3), first.deletedRows)
 		assert.Equal(t, int64(13), first.remainingRows)
 		assert.False(t, first.complete)
-		second, err := cleanupCommonRepresentations(context.Background(), db, filtered, true, func(_ int, rows int64, _ time.Duration) { assert.LessOrEqual(t, rows, int64(3)) })
+		second, err := cleanupCommonRepresentations(context.Background(), db, filtered, true, nil, func(_ int, rows int64, _ time.Duration) { assert.LessOrEqual(t, rows, int64(3)) })
 		require.NoError(t, err)
 		assert.Equal(t, int64(13), second.deletedRows)
 		assert.True(t, second.complete)
@@ -91,7 +96,7 @@ func TestCommonRepCleanupPostgres(t *testing.T) {
 		}
 		assertCommonRepVersions(t, db, noReporter, []uint{0, 1, 2})
 		assertCommonRepVersions(t, db, otherType, []uint{0, 1, 2})
-		final, err := cleanupCommonRepresentations(context.Background(), db, filtered, true, nil)
+		final, err := cleanupCommonRepresentations(context.Background(), db, filtered, true, nil, nil)
 		require.NoError(t, err)
 		assert.Zero(t, final.deletedRows)
 		assert.True(t, final.complete)
@@ -106,13 +111,13 @@ func TestCommonRepCleanupPostgres(t *testing.T) {
 		id := seed([]uint{0, 1, 2, 3, 4, 5, 6}, []int{40, 39, 38, 37, 36, 35, 0}, uintPointer(6), "host", true)
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
-		result, err := cleanupCommonRepresentations(ctx, db, options, true, func(_ int, _ int64, _ time.Duration) { cancel() })
+		result, err := cleanupCommonRepresentations(ctx, db, options, true, nil, func(_ int, _ int64, _ time.Duration) { cancel() })
 		require.ErrorIs(t, err, context.Canceled)
 		assert.Equal(t, int64(3), result.deletedRows)
 		assert.Equal(t, 1, result.committedBatches)
 		assertCommonRepVersions(t, db, id, []uint{3, 4, 5, 6})
 		// Force reuse of the same pool: no abandoned temporary table may remain.
-		rest, err := cleanupCommonRepresentations(context.Background(), db, options, true, nil)
+		rest, err := cleanupCommonRepresentations(context.Background(), db, options, true, nil, nil)
 		require.NoError(t, err)
 		assert.Equal(t, int64(2), rest.deletedRows)
 		assertCommonRepVersions(t, db, id, []uint{5, 6})
@@ -128,7 +133,7 @@ func TestCommonRepCleanupPostgres(t *testing.T) {
 			_ = db.Exec("DROP TRIGGER IF EXISTS common_rep_test_rollback_trigger ON common_representations").Error
 			_ = db.Exec("DROP FUNCTION IF EXISTS common_rep_test_fail_delete()").Error
 		})
-		result, err := cleanupCommonRepresentations(context.Background(), db, options, true, nil)
+		result, err := cleanupCommonRepresentations(context.Background(), db, options, true, nil, nil)
 		require.ErrorContains(t, err, "injected cleanup failure")
 		assert.Equal(t, int64(3), result.deletedRows)
 		assert.Equal(t, 1, result.committedBatches)
@@ -183,7 +188,7 @@ func TestCommonRepCleanupPostgres(t *testing.T) {
 		perf := options
 		perf.batchSize = 1000
 		perf.maxBatches = 1
-		result, err := cleanupCommonRepresentations(context.Background(), db, perf, true, func(_ int, _ int64, duration time.Duration) {
+		result, err := cleanupCommonRepresentations(context.Background(), db, perf, true, nil, func(_ int, _ int64, duration time.Duration) {
 			t.Logf("100,000 rows: first 1,000-row deletion=%s", duration)
 		})
 		require.NoError(t, err)

@@ -2,7 +2,8 @@
 
 This one-time, database-only job prunes history during a maintenance window.
 It defaults to a read-only preview. All implementation and focused tests live in
-`cmd/jobs`; this is an intentional exception for disposable maintenance tooling.
+`cmd/jobs/commonrepcleanup`; command registration remains in `cmd/jobs`. This is
+an intentional exception for disposable maintenance tooling.
 No permanent table, migration, Kafka client, or Kubernetes permission is added.
 
 ## Retention and scope
@@ -102,6 +103,15 @@ committed deletions, remaining worklist rows, and completion. A preview's remain
 count is its candidate count; `complete=true` means the preview finished, not that
 history was deleted. Worklists are not durable artifacts after the invocation.
 
+Preview logs explicitly announce that no history will be deleted, and all job
+logs include `dry_run=true` for preview or `dry_run=false` for execution. Startup
+logs show `batch_size`, `batch_delay`, and `max_batches`. After successful
+selection, both modes report `projected_batches` and `minimum_duration_seconds`.
+The projection respects `max_batches`; the minimum counts only pauses between
+those batches, `(projected_batches - 1) * batch_delay`, or zero for no batches.
+It excludes SQL/commit time and is not an estimate of the maintenance window.
+Preview does not actually sleep or delete any rows.
+
 ## Apply the Job
 
 The template uses existing Inventory YAML and Clowder Secrets for PostgreSQL
@@ -166,8 +176,8 @@ and drain evidence for every configured downstream replication stream.
 ## Verification
 
 ```sh
-go test ./cmd/jobs ./cmd -count=1
-go test -race -tags=integration ./cmd/jobs -run '^TestCommonRepCleanupPostgres$' -count=1 -v
+go test ./cmd/jobs/... ./cmd -count=1
+go test -race -tags=integration ./cmd/jobs/commonrepcleanup -run '^TestCommonRepCleanupPostgres$' -count=1 -v
 ```
 
 The focused PostgreSQL suite covers version-count retention regardless of age or timestamp disorder,

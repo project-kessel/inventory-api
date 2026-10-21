@@ -1,4 +1,4 @@
-package jobs
+package commonrepcleanup
 
 import (
 	"fmt"

@@ -1,4 +1,4 @@
-package jobs
+package commonrepcleanup
 
 import (
 	"context"
@@ -18,9 +18,9 @@ import (
 	"gorm.io/gorm"
 )
 
-// NewCommonRepresentationsCleanupJobCommand creates a preview-by-default job
+// NewCommand creates a preview-by-default job
 // for a maintenance window with resource writes fenced and replication drained.
-func NewCommonRepresentationsCleanupJobCommand(storageOptions *storage.Options, loggerOptions common.LoggerOptions) *cobra.Command {
+func NewCommand(storageOptions *storage.Options, loggerOptions common.LoggerOptions) *cobra.Command {
 	options := commonRepCleanupOptions{keepVersions: 2, batchSize: 1000, batchDelay: 500 * time.Millisecond, maxBatches: 0}
 	var execute, writersPaused bool
 	command := &cobra.Command{
@@ -110,7 +110,15 @@ func runCommonRepresentationsCleanupJob(ctx context.Context, storageOptions *sto
 		return fmt.Errorf("common representation cleanup requires PostgreSQL storage options")
 	}
 	_, logger := common.InitLogger(common.GetLogLevel(), loggerOptions)
-	logHelper := log.NewHelper(log.With(logger, "job", "common_representations_cleanup"))
+	logHelper := log.NewHelper(log.With(logger, "job", "common_representations_cleanup", "dry_run", !execute))
+	if execute {
+		logHelper.Warn("Cleanup execution enabled; resource writers must remain fenced and replication drained")
+	} else {
+		logHelper.Info("Cleanup dry-run preview started; no history will be deleted")
+	}
+	logHelper.Infow("msg", "common representation cleanup configuration",
+		"keep_versions", options.keepVersions, "resource_type_filter", options.resourceType,
+		"batch_size", options.batchSize, "batch_delay", options.batchDelay.String(), "max_batches", options.maxBatches)
 	db, err := openCommonRepCleanupDatabase(ctx, storage.NewConfig(storageOptions).Complete())
 	if err != nil {
 		return err
@@ -120,10 +128,9 @@ func runCommonRepresentationsCleanupJob(ctx context.Context, storageOptions *sto
 		return err
 	}
 	defer sqlDB.Close() //nolint:errcheck
-	if execute {
-		logHelper.Warn("Cleanup execution enabled; resource writers must remain fenced and replication drained")
-	}
-	result, cleanupErr := cleanupCommonRepresentations(ctx, db, options, execute, func(batch int, deleted int64, duration time.Duration) {
+	result, cleanupErr := cleanupCommonRepresentations(ctx, db, options, execute, func(rows int64, duration time.Duration) {
+		logCommonRepCleanupSelection(logHelper, options, rows, duration)
+	}, func(batch int, deleted int64, duration time.Duration) {
 		logHelper.Infow("msg", "common representation cleanup batch committed", "batch", batch, "common_representations_deleted", deleted, "duration", duration.String())
 	})
 	logHelper.Infow("msg", "common representation cleanup result",
@@ -132,4 +139,25 @@ func runCommonRepresentationsCleanupJob(ctx context.Context, storageOptions *sto
 		"selection_duration", result.selectionDuration.String(), "committed_batches", result.committedBatches,
 		"common_representations_deleted", result.deletedRows, "remaining_worklist_rows", result.remainingRows, "complete", result.complete)
 	return cleanupErr
+}
+
+// logCommonRepCleanupSelection reports the planned invocation's batch count and
+// delay-only lower bound. Selection, deletion, and commit times are additional.
+func logCommonRepCleanupSelection(logger *log.Helper, options commonRepCleanupOptions, rows int64, duration time.Duration) {
+	batches := rows / int64(options.batchSize)
+	if rows%int64(options.batchSize) != 0 {
+		batches++
+	}
+	if options.maxBatches > 0 && batches > int64(options.maxBatches) {
+		batches = int64(options.maxBatches)
+	}
+	var minimumDurationSeconds float64
+	if batches > 1 {
+		minimumDurationSeconds = float64(batches-1) * options.batchDelay.Seconds()
+	}
+	logger.Infow("msg", "common representation cleanup selection complete",
+		"prunable_common_representations", rows, "selection_duration", duration.String(),
+		"batch_size", options.batchSize, "batch_delay", options.batchDelay.String(),
+		"projected_batches", batches, "minimum_duration_seconds", minimumDurationSeconds,
+		"minimum_duration_basis", "batch_delays_only_excludes_sql")
 }

@@ -1,4 +1,4 @@
-package jobs
+package commonrepcleanup
 
 import (
 	"context"
@@ -29,7 +29,7 @@ type commonRepCleanupResult struct {
 // cleanupCommonRepresentations pins a connection for the temporary worklist.
 // Resource writers must stay fenced and replication must already be drained.
 // A rerun selects the remaining history afresh; no cursor or persistent state is needed.
-func cleanupCommonRepresentations(ctx context.Context, db *gorm.DB, options commonRepCleanupOptions, execute bool, onBatch func(int, int64, time.Duration)) (result commonRepCleanupResult, err error) {
+func cleanupCommonRepresentations(ctx context.Context, db *gorm.DB, options commonRepCleanupOptions, execute bool, onSelection func(int64, time.Duration), onBatch func(int, int64, time.Duration)) (result commonRepCleanupResult, err error) {
 	err = db.WithContext(ctx).Connection(func(connection *gorm.DB) (connectionErr error) {
 		selectionStarted := time.Now()
 		query, arguments := commonRepCleanupCandidateQuery(options)
@@ -40,6 +40,9 @@ func cleanupCommonRepresentations(ctx context.Context, db *gorm.DB, options comm
 			result.selectionDuration = time.Since(selectionStarted)
 			result.remainingRows = result.candidateRows
 			result.complete = connectionErr == nil
+			if connectionErr == nil && onSelection != nil {
+				onSelection(result.candidateRows, result.selectionDuration)
+			}
 			return connectionErr
 		}
 
@@ -66,6 +69,9 @@ func cleanupCommonRepresentations(ctx context.Context, db *gorm.DB, options comm
 		result.remainingRows = result.candidateRows
 		if connectionErr != nil {
 			return fmt.Errorf("select cleanup worklist: %w", connectionErr)
+		}
+		if onSelection != nil {
+			onSelection(result.candidateRows, result.selectionDuration)
 		}
 
 		for result.remainingRows > 0 && (options.maxBatches == 0 || result.committedBatches < options.maxBatches) {

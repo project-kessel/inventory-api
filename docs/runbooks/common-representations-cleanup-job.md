@@ -32,6 +32,11 @@ current pointer and its newest existing predecessors.
 `--execute --writers-paused` acknowledges these **operator-verified** preconditions.
 The job does not enable read-only mode or check pipeline progress.
 
+Use the same maintenance procedure in stage and production: put all resource
+write paths into read-only mode, then let pending tuple replication finish before
+cleanup. Read-only mode here blocks resource changes; PostgreSQL must remain
+writable for consumer consistency-token updates and cleanup deletions.
+
 1. Enable `--server.read-only=true` on every API/worker deployment that can accept
    resource writes. Wait for rollout and old writable pods/in-flight requests to
    finish. Fence alternate endpoints, backfill jobs, and direct resource writers.
@@ -135,11 +140,28 @@ this template; override `INVENTORY_API_CONFIG_NAME`, `CLOWDER_CONFIG_SECRET_NAME
 and image as appropriate. Use an isolated test database/pipeline; preserve the
 walkthrough fixture and do not reset shared Kafka topics or consumer offsets.
 
-Stage pipeline discovery remains an operator concern: the connector
-`kessel-inventory-api-connector` runs in `kessel-kafka-connect-stage` on hccs01ue1,
-uses slot `inventory_api_debezium`, and publishes `outbox.event.kessel.tuples`.
-The Inventory group is `inventory-consumer`. Verify live configuration rather
-than assuming these names or partition counts are unchanged.
+### Read-only mode and pipeline drain (stage and production)
+
+- Kessel Inventory Consumer (KIC) consumes `outbox.event.hbi.hosts` and
+  `host-inventory.hbi.hosts` and writes resources through Inventory's API.
+  Inventory's read-only mode must block writes from both streams, along with
+  every other resource writer. Wait for old writable pods and in-flight writes
+  to finish. The upstream HBI topics do not need to drain for cleanup once these
+  writes are blocked; preserve pending events for processing after maintenance.
+- Inventory's internal consumer processes `outbox.event.kessel.tuples` after
+  resource writes stop. Leave Debezium and this consumer running until every
+  resource change accepted before read-only mode has been published and
+  successfully processed. Verify the source checkpoint and processing through
+  every partition's resulting end position before cleanup. Leave this drained
+  consumer running throughout cleanup.
+
+In stage, the connector `kessel-inventory-api-connector` runs in
+`kessel-kafka-connect-stage` on hccs01ue1, uses slot `inventory_api_debezium`, and
+publishes `outbox.event.kessel.tuples`. The internal consumer defaults to group
+`inventory-consumer`. Verify live connector/slot names, subscriptions, consumer
+group IDs, and partition counts in the target environment; do not assume stage
+names apply to production. Record the read-only coverage for all resource writers
+and drain evidence for every configured downstream replication stream.
 
 ## Verification
 

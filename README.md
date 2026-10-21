@@ -135,6 +135,11 @@ make inventory-down  # stop
 
 There are numerous ways to run Inventory API using Docker Compose for various testing and debugging needs. For more options, see our [guide](./docs/dev-guides/docker-compose-options.md)
 
+The one-time common representations cleanup job is run separately from Compose.
+See its [runbook](./docs/runbooks/common-representations-cleanup-job.md) for
+database configuration, CLI options, the OpenShift Job template, and required
+writer fencing and replication drain checks.
+
 ### Running in Ephemeral Cluster using Bonfire
 
 See [Testing Inventory in Ephemeral](./docs/dev-guides/ephemeral-testing.md) for instructions on how to deploy Kessel Inventory in the ephemeral cluster.

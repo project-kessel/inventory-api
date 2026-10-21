@@ -21,6 +21,11 @@ All setups are stopped with `make inventory-down` except Full Kessel which uses 
 
 > NOTE: Setups that include Kafka infrastructure can take about a minute before the full Kafka stack is ready.
 
+The one-time common representations cleanup job is run separately from these
+Compose targets. Its [runbook](../runbooks/common-representations-cleanup-job.md)
+documents database configuration, CLI options, the OpenShift Job template, and
+required writer fencing and replication drain checks.
+
 ---
 
 ## Full Kessel Stack (Recommended)

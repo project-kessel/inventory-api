@@ -7,7 +7,7 @@ This file covers the Kafka consumer under `internal/consumer/`. For cross-cuttin
 ### Message Processing Pattern
 - Use **structured operation handlers** with `operationConfig` for consistent create/update/delete operations
 - Process messages using **Debezium CDC events** with required headers: `operation`, `txid`
-- Implement **fencing tokens** via Relations API for consumer lock management during rebalancing
+- Implement **fencing tokens** via SpiceDB for consumer lock management during rebalancing
 - Follow **batch offset commits** using `commitModulo` configuration for performance
 
 ### Consumer Configuration

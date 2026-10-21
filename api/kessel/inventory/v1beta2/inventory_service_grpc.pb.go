@@ -19,16 +19,18 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	KesselInventoryService_Check_FullMethodName                = "/kessel.inventory.v1beta2.KesselInventoryService/Check"
-	KesselInventoryService_CheckSelf_FullMethodName            = "/kessel.inventory.v1beta2.KesselInventoryService/CheckSelf"
-	KesselInventoryService_CheckForUpdate_FullMethodName       = "/kessel.inventory.v1beta2.KesselInventoryService/CheckForUpdate"
-	KesselInventoryService_CheckForUpdateBulk_FullMethodName   = "/kessel.inventory.v1beta2.KesselInventoryService/CheckForUpdateBulk"
-	KesselInventoryService_CheckBulk_FullMethodName            = "/kessel.inventory.v1beta2.KesselInventoryService/CheckBulk"
-	KesselInventoryService_CheckSelfBulk_FullMethodName        = "/kessel.inventory.v1beta2.KesselInventoryService/CheckSelfBulk"
-	KesselInventoryService_ReportResource_FullMethodName       = "/kessel.inventory.v1beta2.KesselInventoryService/ReportResource"
-	KesselInventoryService_DeleteResource_FullMethodName       = "/kessel.inventory.v1beta2.KesselInventoryService/DeleteResource"
-	KesselInventoryService_StreamedListObjects_FullMethodName  = "/kessel.inventory.v1beta2.KesselInventoryService/StreamedListObjects"
-	KesselInventoryService_StreamedListSubjects_FullMethodName = "/kessel.inventory.v1beta2.KesselInventoryService/StreamedListSubjects"
+	KesselInventoryService_Check_FullMethodName                       = "/kessel.inventory.v1beta2.KesselInventoryService/Check"
+	KesselInventoryService_CheckSelf_FullMethodName                   = "/kessel.inventory.v1beta2.KesselInventoryService/CheckSelf"
+	KesselInventoryService_CheckForUpdate_FullMethodName              = "/kessel.inventory.v1beta2.KesselInventoryService/CheckForUpdate"
+	KesselInventoryService_CheckForUpdateBulk_FullMethodName          = "/kessel.inventory.v1beta2.KesselInventoryService/CheckForUpdateBulk"
+	KesselInventoryService_CheckBulk_FullMethodName                   = "/kessel.inventory.v1beta2.KesselInventoryService/CheckBulk"
+	KesselInventoryService_CheckSelfBulk_FullMethodName               = "/kessel.inventory.v1beta2.KesselInventoryService/CheckSelfBulk"
+	KesselInventoryService_ReportResource_FullMethodName              = "/kessel.inventory.v1beta2.KesselInventoryService/ReportResource"
+	KesselInventoryService_DeleteResource_FullMethodName              = "/kessel.inventory.v1beta2.KesselInventoryService/DeleteResource"
+	KesselInventoryService_AddResourceRelationships_FullMethodName    = "/kessel.inventory.v1beta2.KesselInventoryService/AddResourceRelationships"
+	KesselInventoryService_RemoveResourceRelationships_FullMethodName = "/kessel.inventory.v1beta2.KesselInventoryService/RemoveResourceRelationships"
+	KesselInventoryService_StreamedListObjects_FullMethodName         = "/kessel.inventory.v1beta2.KesselInventoryService/StreamedListObjects"
+	KesselInventoryService_StreamedListSubjects_FullMethodName        = "/kessel.inventory.v1beta2.KesselInventoryService/StreamedListSubjects"
 )
 
 // KesselInventoryServiceClient is the client API for KesselInventoryService service.
@@ -141,6 +143,48 @@ type KesselInventoryServiceClient interface {
 	//
 	// As an example, it can revoke previously granted access across the system.
 	DeleteResource(ctx context.Context, in *DeleteResourceRequest, opts ...grpc.CallOption) (*DeleteResourceResponse, error)
+	// Adds one or more relationships to an existing *Resource*.
+	//
+	// If the *Resource* does not yet exist for this *Reporter*, it is created with
+	// the provided relationship fields as its initial representation. All other
+	// relationships already reported for that *Resource* are unaffected.
+	//
+	// Unlike `ReportResource`, which asserts the complete state of a *Resource*,
+	// this operation is a targeted mutation: it only touches the specific
+	// relationship fields and values named in the request. Attribute fields,
+	// other relationship fields, and metadata are left exactly as they were.
+	//
+	// Only relationship-typed fields from the *Resource's* schema are accepted;
+	// attribute fields are rejected.
+	//
+	// The relationships added through this API are used to determine relationship
+	// check outcomes via the Check and CheckForUpdate APIs.
+	//
+	// This API does **not** guarantee immediate read-your-writes consistency by default.
+	// If a reporter requires newly added relationships to be visible in subsequent
+	// checks (e.g., `Check`), the request must explicitly set `write_visibility = IMMEDIATE`.
+	AddResourceRelationships(ctx context.Context, in *AddResourceRelationshipsRequest, opts ...grpc.CallOption) (*AddResourceRelationshipsResponse, error)
+	// Removes one or more specific relationships from an existing *Resource*.
+	//
+	// All other relationships for the *Resource* are unaffected. If the *Resource*
+	// does not exist, this operation returns `NOT_FOUND` — matching the behaviour
+	// of `DeleteResource`.
+	//
+	// Unlike `ReportResource`, which asserts the complete state of a *Resource*,
+	// this operation is a targeted mutation: it only removes the specific
+	// relationship values named in the request. Attribute fields and other
+	// relationship fields are left exactly as they were.
+	//
+	// Only relationship-typed fields from the *Resource's* schema are accepted;
+	// attribute fields are rejected.
+	//
+	// The relationships removed through this API are used to determine relationship
+	// check outcomes via the Check and CheckForUpdate APIs.
+	//
+	// This API does **not** guarantee immediate read-your-writes consistency by default.
+	// If a reporter requires removed relationships to no longer be visible in subsequent
+	// checks (e.g., `Check`), the request must explicitly set `write_visibility = IMMEDIATE`.
+	RemoveResourceRelationships(ctx context.Context, in *RemoveResourceRelationshipsRequest, opts ...grpc.CallOption) (*RemoveResourceRelationshipsResponse, error)
 	// Streams a list of objects where the given subject has the specified relation.
 	//
 	// This relationship query answers the question:
@@ -247,6 +291,26 @@ func (c *kesselInventoryServiceClient) DeleteResource(ctx context.Context, in *D
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(DeleteResourceResponse)
 	err := c.cc.Invoke(ctx, KesselInventoryService_DeleteResource_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *kesselInventoryServiceClient) AddResourceRelationships(ctx context.Context, in *AddResourceRelationshipsRequest, opts ...grpc.CallOption) (*AddResourceRelationshipsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(AddResourceRelationshipsResponse)
+	err := c.cc.Invoke(ctx, KesselInventoryService_AddResourceRelationships_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *kesselInventoryServiceClient) RemoveResourceRelationships(ctx context.Context, in *RemoveResourceRelationshipsRequest, opts ...grpc.CallOption) (*RemoveResourceRelationshipsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RemoveResourceRelationshipsResponse)
+	err := c.cc.Invoke(ctx, KesselInventoryService_RemoveResourceRelationships_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -401,6 +465,48 @@ type KesselInventoryServiceServer interface {
 	//
 	// As an example, it can revoke previously granted access across the system.
 	DeleteResource(context.Context, *DeleteResourceRequest) (*DeleteResourceResponse, error)
+	// Adds one or more relationships to an existing *Resource*.
+	//
+	// If the *Resource* does not yet exist for this *Reporter*, it is created with
+	// the provided relationship fields as its initial representation. All other
+	// relationships already reported for that *Resource* are unaffected.
+	//
+	// Unlike `ReportResource`, which asserts the complete state of a *Resource*,
+	// this operation is a targeted mutation: it only touches the specific
+	// relationship fields and values named in the request. Attribute fields,
+	// other relationship fields, and metadata are left exactly as they were.
+	//
+	// Only relationship-typed fields from the *Resource's* schema are accepted;
+	// attribute fields are rejected.
+	//
+	// The relationships added through this API are used to determine relationship
+	// check outcomes via the Check and CheckForUpdate APIs.
+	//
+	// This API does **not** guarantee immediate read-your-writes consistency by default.
+	// If a reporter requires newly added relationships to be visible in subsequent
+	// checks (e.g., `Check`), the request must explicitly set `write_visibility = IMMEDIATE`.
+	AddResourceRelationships(context.Context, *AddResourceRelationshipsRequest) (*AddResourceRelationshipsResponse, error)
+	// Removes one or more specific relationships from an existing *Resource*.
+	//
+	// All other relationships for the *Resource* are unaffected. If the *Resource*
+	// does not exist, this operation returns `NOT_FOUND` — matching the behaviour
+	// of `DeleteResource`.
+	//
+	// Unlike `ReportResource`, which asserts the complete state of a *Resource*,
+	// this operation is a targeted mutation: it only removes the specific
+	// relationship values named in the request. Attribute fields and other
+	// relationship fields are left exactly as they were.
+	//
+	// Only relationship-typed fields from the *Resource's* schema are accepted;
+	// attribute fields are rejected.
+	//
+	// The relationships removed through this API are used to determine relationship
+	// check outcomes via the Check and CheckForUpdate APIs.
+	//
+	// This API does **not** guarantee immediate read-your-writes consistency by default.
+	// If a reporter requires removed relationships to no longer be visible in subsequent
+	// checks (e.g., `Check`), the request must explicitly set `write_visibility = IMMEDIATE`.
+	RemoveResourceRelationships(context.Context, *RemoveResourceRelationshipsRequest) (*RemoveResourceRelationshipsResponse, error)
 	// Streams a list of objects where the given subject has the specified relation.
 	//
 	// This relationship query answers the question:
@@ -456,6 +562,12 @@ func (UnimplementedKesselInventoryServiceServer) ReportResource(context.Context,
 }
 func (UnimplementedKesselInventoryServiceServer) DeleteResource(context.Context, *DeleteResourceRequest) (*DeleteResourceResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method DeleteResource not implemented")
+}
+func (UnimplementedKesselInventoryServiceServer) AddResourceRelationships(context.Context, *AddResourceRelationshipsRequest) (*AddResourceRelationshipsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method AddResourceRelationships not implemented")
+}
+func (UnimplementedKesselInventoryServiceServer) RemoveResourceRelationships(context.Context, *RemoveResourceRelationshipsRequest) (*RemoveResourceRelationshipsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method RemoveResourceRelationships not implemented")
 }
 func (UnimplementedKesselInventoryServiceServer) StreamedListObjects(*StreamedListObjectsRequest, grpc.ServerStreamingServer[StreamedListObjectsResponse]) error {
 	return status.Errorf(codes.Unimplemented, "method StreamedListObjects not implemented")
@@ -629,6 +741,42 @@ func _KesselInventoryService_DeleteResource_Handler(srv interface{}, ctx context
 	return interceptor(ctx, in, info, handler)
 }
 
+func _KesselInventoryService_AddResourceRelationships_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AddResourceRelationshipsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(KesselInventoryServiceServer).AddResourceRelationships(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: KesselInventoryService_AddResourceRelationships_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(KesselInventoryServiceServer).AddResourceRelationships(ctx, req.(*AddResourceRelationshipsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _KesselInventoryService_RemoveResourceRelationships_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RemoveResourceRelationshipsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(KesselInventoryServiceServer).RemoveResourceRelationships(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: KesselInventoryService_RemoveResourceRelationships_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(KesselInventoryServiceServer).RemoveResourceRelationships(ctx, req.(*RemoveResourceRelationshipsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _KesselInventoryService_StreamedListObjects_Handler(srv interface{}, stream grpc.ServerStream) error {
 	m := new(StreamedListObjectsRequest)
 	if err := stream.RecvMsg(m); err != nil {
@@ -689,6 +837,14 @@ var KesselInventoryService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "DeleteResource",
 			Handler:    _KesselInventoryService_DeleteResource_Handler,
+		},
+		{
+			MethodName: "AddResourceRelationships",
+			Handler:    _KesselInventoryService_AddResourceRelationships_Handler,
+		},
+		{
+			MethodName: "RemoveResourceRelationships",
+			Handler:    _KesselInventoryService_RemoveResourceRelationships_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{

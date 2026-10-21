@@ -334,6 +334,95 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/google.rpc.Status'
+    /api/kessel/v1beta2/resources/relationships:
+        post:
+            tags:
+                - KesselInventoryService
+            description: |-
+                Adds one or more relationships to an existing *Resource*.
+
+                 If the *Resource* does not yet exist for this *Reporter*, it is created with
+                 the provided relationship fields as its initial representation. All other
+                 relationships already reported for that *Resource* are unaffected.
+
+                 Unlike `ReportResource`, which asserts the complete state of a *Resource*,
+                 this operation is a targeted mutation: it only touches the specific
+                 relationship fields and values named in the request. Attribute fields,
+                 other relationship fields, and metadata are left exactly as they were.
+
+                 Only relationship-typed fields from the *Resource's* schema are accepted;
+                 attribute fields are rejected.
+
+                 The relationships added through this API are used to determine relationship
+                 check outcomes via the Check and CheckForUpdate APIs.
+
+                 This API does **not** guarantee immediate read-your-writes consistency by default.
+                 If a reporter requires newly added relationships to be visible in subsequent
+                 checks (e.g., `Check`), the request must explicitly set `write_visibility = IMMEDIATE`.
+            operationId: KesselInventoryService_AddResourceRelationships
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/kessel.inventory.v1beta2.AddResourceRelationshipsRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/kessel.inventory.v1beta2.AddResourceRelationshipsResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/google.rpc.Status'
+        delete:
+            tags:
+                - KesselInventoryService
+            description: |-
+                Removes one or more specific relationships from an existing *Resource*.
+
+                 All other relationships for the *Resource* are unaffected. If the *Resource*
+                 does not exist, this operation returns `NOT_FOUND` — matching the behaviour
+                 of `DeleteResource`.
+
+                 Unlike `ReportResource`, which asserts the complete state of a *Resource*,
+                 this operation is a targeted mutation: it only removes the specific
+                 relationship values named in the request. Attribute fields and other
+                 relationship fields are left exactly as they were.
+
+                 Only relationship-typed fields from the *Resource's* schema are accepted;
+                 attribute fields are rejected.
+
+                 The relationships removed through this API are used to determine relationship
+                 check outcomes via the Check and CheckForUpdate APIs.
+
+                 This API does **not** guarantee immediate read-your-writes consistency by default.
+                 If a reporter requires removed relationships to no longer be visible in subsequent
+                 checks (e.g., `Check`), the request must explicitly set `write_visibility = IMMEDIATE`.
+            operationId: KesselInventoryService_RemoveResourceRelationships
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/kessel.inventory.v1beta2.RemoveResourceRelationshipsRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/kessel.inventory.v1beta2.RemoveResourceRelationshipsResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/google.rpc.Status'
 components:
     schemas:
         google.protobuf.Any:
@@ -376,6 +465,46 @@ components:
                 code:
                     type: integer
                     format: uint32
+        kessel.inventory.v1beta2.AddResourceRelationshipsRequest:
+            type: object
+            properties:
+                inventoryId:
+                    type: string
+                type:
+                    type: string
+                reporterType:
+                    type: string
+                reporterInstanceId:
+                    type: string
+                localResourceId:
+                    type: string
+                reporter:
+                    type: object
+                    description: |-
+                        Partial reporter representation containing only relationship fields.
+                         Merged additively into existing reporter relationships.
+                         At least one of `reporter` or `common` must be provided.
+                common:
+                    type: object
+                    description: |-
+                        Partial common representation containing only relationship fields.
+                         At least one of `reporter` or `common` must be provided.
+                transactionId:
+                    type: string
+                writeVisibility:
+                    enum:
+                        - WRITE_VISIBILITY_UNSPECIFIED
+                        - MINIMIZE_LATENCY
+                        - IMMEDIATE
+                    type: string
+                    format: enum
+            description: |-
+                Request to add one or more relationships to a Resource without reporting
+                 the complete set of relationships. Only relationship-typed fields are
+                 accepted; attribute fields are rejected.
+        kessel.inventory.v1beta2.AddResourceRelationshipsResponse:
+            type: object
+            properties: {}
         kessel.inventory.v1beta2.CheckBulkRequest:
             type: object
             properties:
@@ -668,6 +797,46 @@ components:
                 reference:
                     $ref: '#/components/schemas/kessel.inventory.v1beta2.ResourceReference'
         kessel.inventory.v1beta2.DeleteResourceResponse:
+            type: object
+            properties: {}
+        kessel.inventory.v1beta2.RemoveResourceRelationshipsRequest:
+            type: object
+            properties:
+                inventoryId:
+                    type: string
+                type:
+                    type: string
+                reporterType:
+                    type: string
+                reporterInstanceId:
+                    type: string
+                localResourceId:
+                    type: string
+                reporter:
+                    type: object
+                    description: |-
+                        Partial reporter representation naming the relationship values to remove
+                         from existing reporter relationships.
+                         At least one of `reporter` or `common` must be provided.
+                common:
+                    type: object
+                    description: |-
+                        Partial common representation naming the relationship values to remove.
+                         At least one of `reporter` or `common` must be provided.
+                transactionId:
+                    type: string
+                writeVisibility:
+                    enum:
+                        - WRITE_VISIBILITY_UNSPECIFIED
+                        - MINIMIZE_LATENCY
+                        - IMMEDIATE
+                    type: string
+                    format: enum
+            description: |-
+                Request to remove one or more specific relationships from a Resource
+                 without reporting the complete remaining set of relationships. Only
+                 relationship-typed fields are accepted; attribute fields are rejected.
+        kessel.inventory.v1beta2.RemoveResourceRelationshipsResponse:
             type: object
             properties: {}
         kessel.inventory.v1beta2.ReportResourceRequest:

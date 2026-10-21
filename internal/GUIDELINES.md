@@ -55,7 +55,7 @@ Include relevant identifiers in errors:
 - **Resource attributes** using semantic conventions
 
 ### Metrics Collection
-- **Relations API calls** tracked with success/failure counters per method
+- **SpiceDB relations calls** tracked with success/failure counters per method
 - **Custom metrics** using `kessel_inventory_*` prefix for application-specific metrics
 - **Label consistency**: Use structured attributes for partition, topic, operation
 

@@ -46,7 +46,7 @@ oc process --local \
 ## Schema Related Issues
 
 There are two known distinct reasons tuple creation could fail due to schema issues:
-1. The schema definitions between Inventory API and Relations API are not in sync
+1. The schema definitions between Inventory API and SpiceDB are not in sync
 2. The schema is valid but the tuple request values are malformed by Inventory API
 
 ### Inventory Consumer fails to Create/Modify a Relationship due to schema mismatch
@@ -59,13 +59,13 @@ msg=request failed: error creating tuple: rpc error: code = FailedPrecondition d
 
 **Reason**
 
-The error `object definition "OBJECT" not found` indicates the schema loaded by SpiceDB does not contain a defintion for the tuple request. This is likely due to a mismatch between Inventory API and Relations API schema definitions
+The error `object definition "OBJECT" not found` indicates the schema loaded by SpiceDB does not contain a defintion for the tuple request. This is likely due to a mismatch between the Inventory API schema definitions and the schema loaded in SpiceDB
 
 **Verify and Remediate**
 
 You can verify if there is a schema mismatch one of two ways:
 
-1. Check the loaded schema in Relations API for the object from the Kessel Debug container
+1. Check the loaded schema in SpiceDB for the object from the Kessel Debug container
 
 ```shell
 zed schema read | grep <OBJECT>
@@ -118,7 +118,7 @@ If the downloaded schema and configmap schema dont match:
 * there is an issue with the deployed configmap and the configmap must be redeployed with the correct hash via App Interface
 
 If the downloaded schema and configmap match but the loaded schema doesnt:
-* SpiceDB has not properly loaded the configmap, restarting the Relations API pods should reload the configmap
+* SpiceDB has not properly loaded the configmap, restarting the SpiceDB pods should reload the configmap
 
 If all schema definitions match and the expected object from the error log does not exist in any of them, its possible the schema defintion for Relations has not been updated yet for the resource, or its possible Inventory has created a malformed request. See [Inventory Consumer fails due to malformed Tuple request](#inventory-consumer-fails-due-to-malformed-tuple-request) on how to check Inventory schema definitions for issues.
 
@@ -136,7 +136,7 @@ The error `object definition "OBJECT" not found` indicates the schema loaded by 
 
 **Verify and Remediate**
 
-Inventory resource schemas are defined for each resource type supported by Kessel. If the Inventory Consumer fails to create/modify tuples due to schema definition issues, and no issues are found with the Relations API schemas, its possible Inventory is somehow creating malformed tuple requests. A review of the schema definitions can confirm if a resource type and reporter type is supported.
+Inventory resource schemas are defined for each resource type supported by Kessel. If the Inventory Consumer fails to create/modify tuples due to schema definition issues, and no issues are found with the SpiceDB schemas, its possible Inventory is somehow creating malformed tuple requests. A review of the schema definitions can confirm if a resource type and reporter type is supported.
 
 The supported resource types can be found in the [schemas folder](https://github.com/project-kessel/inventory-api/tree/main/data/schema/resources)
 

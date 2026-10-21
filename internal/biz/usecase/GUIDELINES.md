@@ -23,11 +23,11 @@ This file covers the application services (usecases) under `internal/biz/usecase
 ### Authorization Error Handling
 - Increment failure metrics on authorization errors
 - Log authorization decisions with resource context
-- Handle gRPC errors from relations-api gracefully
+- Handle gRPC errors from the relations subsystem (SpiceDB) gracefully
 - Provide meaningful error messages without exposing internal details
 
 ### Authorization Patterns
-- **Kessel authz** for production with Relations API integration
+- **Kessel authz** for production with SpiceDB integration
 - **Allow-all authz** for testing and development scenarios only
   - ⚠️ **Security Warning**: `allow-all` bypasses all authorization checks
   - Should never be used in production environments  
@@ -38,8 +38,8 @@ This file covers the application services (usecases) under `internal/biz/usecase
 
 ### Service Health Patterns
 - **Livez endpoint**: Simple OK response, configurable logging via `log.livez`
-- **Readyz endpoint**: Check backend availability (database, relations-api)
-- **Relations health**: Call Relations API `/readyz` endpoint with proper auth
+- **Readyz endpoint**: Check backend availability (database, SpiceDB)
+- **Relations health**: Call the relations subsystem `/readyz` endpoint with proper auth
 - Use **helper logging** to avoid spam: log disable messages only once
 
 ### Database Health

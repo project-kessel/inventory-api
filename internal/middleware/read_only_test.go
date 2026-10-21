@@ -32,8 +32,23 @@ func TestIsWriteEndpoint(t *testing.T) {
 			expected: true,
 		},
 		{
+			name:     "AddResourceRelationships is a write endpoint",
+			method:   "/kessel.inventory.v1beta2.KesselInventoryService/AddResourceRelationships",
+			expected: true,
+		},
+		{
+			name:     "RemoveResourceRelationships is a write endpoint",
+			method:   "/kessel.inventory.v1beta2.KesselInventoryService/RemoveResourceRelationships",
+			expected: true,
+		},
+		{
 			name:     "HTTP resources endpoint is a write endpoint",
 			method:   "/api/kessel/v1beta2/resources",
+			expected: true,
+		},
+		{
+			name:     "HTTP resources relationships endpoint is a write endpoint",
+			method:   "/api/kessel/v1beta2/resources/relationships",
 			expected: true,
 		},
 		{
@@ -79,6 +94,18 @@ func TestUnaryReadOnlyInterceptor_BlocksWriteEndpoints(t *testing.T) {
 		{
 			name:         "blocks DeleteResource",
 			fullMethod:   "/kessel.inventory.v1beta2.KesselInventoryService/DeleteResource",
+			expectErr:    true,
+			expectedCode: codes.Unavailable,
+		},
+		{
+			name:         "blocks AddResourceRelationships",
+			fullMethod:   "/kessel.inventory.v1beta2.KesselInventoryService/AddResourceRelationships",
+			expectErr:    true,
+			expectedCode: codes.Unavailable,
+		},
+		{
+			name:         "blocks RemoveResourceRelationships",
+			fullMethod:   "/kessel.inventory.v1beta2.KesselInventoryService/RemoveResourceRelationships",
 			expectErr:    true,
 			expectedCode: codes.Unavailable,
 		},
@@ -135,6 +162,13 @@ func TestHTTPReadOnlyMiddleware_BlocksWriteEndpoints(t *testing.T) {
 		{
 			name:         "blocks HTTP resources endpoint",
 			operation:    "/api/kessel/v1beta2/resources",
+			hasTransport: true,
+			expectErr:    true,
+			expectedCode: http.StatusServiceUnavailable,
+		},
+		{
+			name:         "blocks HTTP resources relationships endpoint",
+			operation:    "/api/kessel/v1beta2/resources/relationships",
 			hasTransport: true,
 			expectErr:    true,
 			expectedCode: http.StatusServiceUnavailable,

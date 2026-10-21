@@ -94,7 +94,7 @@ To Deploy:
 
 The full deployment will include:
 * Inventory API
-* Relations API
+* SpiceDB
 * Kafka Cluster
 * Kafka Connect cluster with Debezium plugin
 * Kafka Connector to configure Debezium
@@ -117,7 +117,7 @@ When creating a resource (in this setup, a notifications integration) in Invento
 * Resource is added to Inventory via API and reflected in Inventory DB
 * Resource write emits a WAL logical decoding message via `pg_logical_emit_message`
 * Debezium captures the WAL message and produces a message to the resources and tuples outboxes
-* The Inventory Consumer process captures the message in the tuples topic, and created the relationship in SpiceDB via Relations API
+* The Inventory Consumer process captures the message in the tuples topic and creates the relationship in SpiceDB
 * The consumer captures the consistency token in the response and updates the resource in Inventory DB with the token
 
 
@@ -159,8 +159,8 @@ INFO ts=2025-03-24T16:01:11Z caller=log/log.go:30 service.name=inventory-api ser
 4) Validate the relation has been created in SpiceDB
 
 ```shell
-# port-forward the relations api
-oc port-forward svc/kessel-relations-api 9000:9000
+# port-forward the inventory api gRPC port (relations functionality is now in inventory-api)
+oc port-forward svc/kessel-inventory-api 9000:9000
 
 # Read the tuple
 make check-tuple

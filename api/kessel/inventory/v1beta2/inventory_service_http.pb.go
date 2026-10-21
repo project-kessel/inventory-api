@@ -19,6 +19,7 @@ var _ = binding.EncodeURL
 
 const _ = http.SupportPackageIsVersion1
 
+const OperationKesselInventoryServiceAddResourceRelationships = "/kessel.inventory.v1beta2.KesselInventoryService/AddResourceRelationships"
 const OperationKesselInventoryServiceCheck = "/kessel.inventory.v1beta2.KesselInventoryService/Check"
 const OperationKesselInventoryServiceCheckBulk = "/kessel.inventory.v1beta2.KesselInventoryService/CheckBulk"
 const OperationKesselInventoryServiceCheckForUpdate = "/kessel.inventory.v1beta2.KesselInventoryService/CheckForUpdate"
@@ -26,9 +27,31 @@ const OperationKesselInventoryServiceCheckForUpdateBulk = "/kessel.inventory.v1b
 const OperationKesselInventoryServiceCheckSelf = "/kessel.inventory.v1beta2.KesselInventoryService/CheckSelf"
 const OperationKesselInventoryServiceCheckSelfBulk = "/kessel.inventory.v1beta2.KesselInventoryService/CheckSelfBulk"
 const OperationKesselInventoryServiceDeleteResource = "/kessel.inventory.v1beta2.KesselInventoryService/DeleteResource"
+const OperationKesselInventoryServiceRemoveResourceRelationships = "/kessel.inventory.v1beta2.KesselInventoryService/RemoveResourceRelationships"
 const OperationKesselInventoryServiceReportResource = "/kessel.inventory.v1beta2.KesselInventoryService/ReportResource"
 
 type KesselInventoryServiceHTTPServer interface {
+	// AddResourceRelationships Adds one or more relationships to an existing *Resource*.
+	//
+	// If the *Resource* does not yet exist for this *Reporter*, it is created with
+	// the provided relationship fields as its initial representation. All other
+	// relationships already reported for that *Resource* are unaffected.
+	//
+	// Unlike `ReportResource`, which asserts the complete state of a *Resource*,
+	// this operation is a targeted mutation: it only touches the specific
+	// relationship fields and values named in the request. Attribute fields,
+	// other relationship fields, and metadata are left exactly as they were.
+	//
+	// Only relationship-typed fields from the *Resource's* schema are accepted;
+	// attribute fields are rejected.
+	//
+	// The relationships added through this API are used to determine relationship
+	// check outcomes via the Check and CheckForUpdate APIs.
+	//
+	// This API does **not** guarantee immediate read-your-writes consistency by default.
+	// If a reporter requires newly added relationships to be visible in subsequent
+	// checks (e.g., `Check`), the request must explicitly set `write_visibility = IMMEDIATE`.
+	AddResourceRelationships(context.Context, *AddResourceRelationshipsRequest) (*AddResourceRelationshipsResponse, error)
 	// Check Performs an relationship check to determine whether a subject has a specific
 	// permission or relationship on a resource.
 	//
@@ -103,6 +126,27 @@ type KesselInventoryServiceHTTPServer interface {
 	//
 	// As an example, it can revoke previously granted access across the system.
 	DeleteResource(context.Context, *DeleteResourceRequest) (*DeleteResourceResponse, error)
+	// RemoveResourceRelationships Removes one or more specific relationships from an existing *Resource*.
+	//
+	// All other relationships for the *Resource* are unaffected. If the *Resource*
+	// does not exist, this operation returns `NOT_FOUND` — matching the behaviour
+	// of `DeleteResource`.
+	//
+	// Unlike `ReportResource`, which asserts the complete state of a *Resource*,
+	// this operation is a targeted mutation: it only removes the specific
+	// relationship values named in the request. Attribute fields and other
+	// relationship fields are left exactly as they were.
+	//
+	// Only relationship-typed fields from the *Resource's* schema are accepted;
+	// attribute fields are rejected.
+	//
+	// The relationships removed through this API are used to determine relationship
+	// check outcomes via the Check and CheckForUpdate APIs.
+	//
+	// This API does **not** guarantee immediate read-your-writes consistency by default.
+	// If a reporter requires removed relationships to no longer be visible in subsequent
+	// checks (e.g., `Check`), the request must explicitly set `write_visibility = IMMEDIATE`.
+	RemoveResourceRelationships(context.Context, *RemoveResourceRelationshipsRequest) (*RemoveResourceRelationshipsResponse, error)
 	// ReportResource Reports to Kessel Inventory that a Resource has been created or has been updated.
 	//
 	// Reporters can use this API to report facts about their resources in order to
@@ -144,6 +188,8 @@ func RegisterKesselInventoryServiceHTTPServer(s *http.Server, srv KesselInventor
 	r.POST("/api/kessel/v1beta2/checkselfbulk", _KesselInventoryService_CheckSelfBulk0_HTTP_Handler(srv))
 	r.POST("/api/kessel/v1beta2/resources", _KesselInventoryService_ReportResource0_HTTP_Handler(srv))
 	r.DELETE("/api/kessel/v1beta2/resources", _KesselInventoryService_DeleteResource0_HTTP_Handler(srv))
+	r.POST("/api/kessel/v1beta2/resources/relationships", _KesselInventoryService_AddResourceRelationships0_HTTP_Handler(srv))
+	r.DELETE("/api/kessel/v1beta2/resources/relationships", _KesselInventoryService_RemoveResourceRelationships0_HTTP_Handler(srv))
 }
 
 func _KesselInventoryService_Check0_HTTP_Handler(srv KesselInventoryServiceHTTPServer) func(ctx http.Context) error {
@@ -322,7 +368,52 @@ func _KesselInventoryService_DeleteResource0_HTTP_Handler(srv KesselInventorySer
 	}
 }
 
+func _KesselInventoryService_AddResourceRelationships0_HTTP_Handler(srv KesselInventoryServiceHTTPServer) func(ctx http.Context) error {
+	return func(ctx http.Context) error {
+		var in AddResourceRelationshipsRequest
+		if err := ctx.Bind(&in); err != nil {
+			return err
+		}
+		if err := ctx.BindQuery(&in); err != nil {
+			return err
+		}
+		http.SetOperation(ctx, OperationKesselInventoryServiceAddResourceRelationships)
+		h := ctx.Middleware(func(ctx context.Context, req interface{}) (interface{}, error) {
+			return srv.AddResourceRelationships(ctx, req.(*AddResourceRelationshipsRequest))
+		})
+		out, err := h(ctx, &in)
+		if err != nil {
+			return err
+		}
+		reply := out.(*AddResourceRelationshipsResponse)
+		return ctx.Result(200, reply)
+	}
+}
+
+func _KesselInventoryService_RemoveResourceRelationships0_HTTP_Handler(srv KesselInventoryServiceHTTPServer) func(ctx http.Context) error {
+	return func(ctx http.Context) error {
+		var in RemoveResourceRelationshipsRequest
+		if err := ctx.Bind(&in); err != nil {
+			return err
+		}
+		if err := ctx.BindQuery(&in); err != nil {
+			return err
+		}
+		http.SetOperation(ctx, OperationKesselInventoryServiceRemoveResourceRelationships)
+		h := ctx.Middleware(func(ctx context.Context, req interface{}) (interface{}, error) {
+			return srv.RemoveResourceRelationships(ctx, req.(*RemoveResourceRelationshipsRequest))
+		})
+		out, err := h(ctx, &in)
+		if err != nil {
+			return err
+		}
+		reply := out.(*RemoveResourceRelationshipsResponse)
+		return ctx.Result(200, reply)
+	}
+}
+
 type KesselInventoryServiceHTTPClient interface {
+	AddResourceRelationships(ctx context.Context, req *AddResourceRelationshipsRequest, opts ...http.CallOption) (rsp *AddResourceRelationshipsResponse, err error)
 	Check(ctx context.Context, req *CheckRequest, opts ...http.CallOption) (rsp *CheckResponse, err error)
 	CheckBulk(ctx context.Context, req *CheckBulkRequest, opts ...http.CallOption) (rsp *CheckBulkResponse, err error)
 	CheckForUpdate(ctx context.Context, req *CheckForUpdateRequest, opts ...http.CallOption) (rsp *CheckForUpdateResponse, err error)
@@ -330,6 +421,7 @@ type KesselInventoryServiceHTTPClient interface {
 	CheckSelf(ctx context.Context, req *CheckSelfRequest, opts ...http.CallOption) (rsp *CheckSelfResponse, err error)
 	CheckSelfBulk(ctx context.Context, req *CheckSelfBulkRequest, opts ...http.CallOption) (rsp *CheckSelfBulkResponse, err error)
 	DeleteResource(ctx context.Context, req *DeleteResourceRequest, opts ...http.CallOption) (rsp *DeleteResourceResponse, err error)
+	RemoveResourceRelationships(ctx context.Context, req *RemoveResourceRelationshipsRequest, opts ...http.CallOption) (rsp *RemoveResourceRelationshipsResponse, err error)
 	ReportResource(ctx context.Context, req *ReportResourceRequest, opts ...http.CallOption) (rsp *ReportResourceResponse, err error)
 }
 
@@ -339,6 +431,19 @@ type KesselInventoryServiceHTTPClientImpl struct {
 
 func NewKesselInventoryServiceHTTPClient(client *http.Client) KesselInventoryServiceHTTPClient {
 	return &KesselInventoryServiceHTTPClientImpl{client}
+}
+
+func (c *KesselInventoryServiceHTTPClientImpl) AddResourceRelationships(ctx context.Context, in *AddResourceRelationshipsRequest, opts ...http.CallOption) (*AddResourceRelationshipsResponse, error) {
+	var out AddResourceRelationshipsResponse
+	pattern := "/api/kessel/v1beta2/resources/relationships"
+	path := binding.EncodeURL(pattern, in, false)
+	opts = append(opts, http.Operation(OperationKesselInventoryServiceAddResourceRelationships))
+	opts = append(opts, http.PathTemplate(pattern))
+	err := c.cc.Invoke(ctx, "POST", path, in, &out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return &out, nil
 }
 
 func (c *KesselInventoryServiceHTTPClientImpl) Check(ctx context.Context, in *CheckRequest, opts ...http.CallOption) (*CheckResponse, error) {
@@ -424,6 +529,19 @@ func (c *KesselInventoryServiceHTTPClientImpl) DeleteResource(ctx context.Contex
 	pattern := "/api/kessel/v1beta2/resources"
 	path := binding.EncodeURL(pattern, in, false)
 	opts = append(opts, http.Operation(OperationKesselInventoryServiceDeleteResource))
+	opts = append(opts, http.PathTemplate(pattern))
+	err := c.cc.Invoke(ctx, "DELETE", path, in, &out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+func (c *KesselInventoryServiceHTTPClientImpl) RemoveResourceRelationships(ctx context.Context, in *RemoveResourceRelationshipsRequest, opts ...http.CallOption) (*RemoveResourceRelationshipsResponse, error) {
+	var out RemoveResourceRelationshipsResponse
+	pattern := "/api/kessel/v1beta2/resources/relationships"
+	path := binding.EncodeURL(pattern, in, false)
+	opts = append(opts, http.Operation(OperationKesselInventoryServiceRemoveResourceRelationships))
 	opts = append(opts, http.PathTemplate(pattern))
 	err := c.cc.Invoke(ctx, "DELETE", path, in, &out, opts...)
 	if err != nil {

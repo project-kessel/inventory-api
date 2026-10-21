@@ -10,11 +10,10 @@ import (
 // Only version order determines retention; timestamps are not consulted.
 // Above-pointer rows are never eligible for pruning.
 func commonRepCleanupCandidateQuery(options commonRepCleanupOptions) (string, []any) {
-	typeFilter := ""
-	arguments := []any{}
+	// GORM expands this trusted SQL expression and binds any resource type value.
+	typeFilter := gorm.Expr("")
 	if options.resourceType != "" {
-		typeFilter = " AND resource.type = ?"
-		arguments = append(arguments, options.resourceType)
+		typeFilter = gorm.Expr("AND resource.type = ?", options.resourceType)
 	}
 	query := `
   WITH resource_history AS (
@@ -26,7 +25,7 @@ func commonRepCleanupCandidateQuery(options commonRepCleanupOptions) (string, []
    WHERE EXISTS (
     SELECT 1 FROM reporter_resources reporter
     WHERE reporter.resource_id = resource.id AND reporter.tombstone IS FALSE
-   )` + typeFilter + `
+   ) ?
    GROUP BY resource.id, resource.common_version
    HAVING resource.common_version IS NULL OR BOOL_OR(history.version = resource.common_version)
   ), ranked_history AS (
@@ -39,7 +38,7 @@ func commonRepCleanupCandidateQuery(options commonRepCleanupOptions) (string, []
   )
   SELECT resource_id, version FROM ranked_history
   WHERE version_rank > ?`
-	return query, append(arguments, options.keepVersions)
+	return query, []any{typeFilter, options.keepVersions}
 }
 
 // deleteCommonRepCleanupBatch drains exactly the selected worklist entries and

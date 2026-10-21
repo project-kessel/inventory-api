@@ -35,7 +35,7 @@ func cleanupCommonRepresentations(ctx context.Context, db *gorm.DB, options comm
 		query, arguments := commonRepCleanupCandidateQuery(options)
 		if !execute {
 			connectionErr = commonRepCleanupTransaction(ctx, connection, true, func(tx *gorm.DB) error {
-				return tx.Raw("SELECT COUNT(*) FROM ("+query+") candidates", arguments...).Scan(&result.candidateRows).Error
+				return tx.Raw("SELECT COUNT(*) FROM (?) candidates", gorm.Expr(query, arguments...)).Scan(&result.candidateRows).Error
 			})
 			result.selectionDuration = time.Since(selectionStarted)
 			result.remainingRows = result.candidateRows
@@ -58,7 +58,7 @@ func cleanupCommonRepresentations(ctx context.Context, db *gorm.DB, options comm
    ) ON COMMIT PRESERVE ROWS`).Error; err != nil {
 				return err
 			}
-			insert := tx.Exec("INSERT INTO pg_temp.common_rep_cleanup_candidates (resource_id, version) "+query, arguments...)
+			insert := tx.Exec("INSERT INTO pg_temp.common_rep_cleanup_candidates (resource_id, version) ?", gorm.Expr(query, arguments...))
 			result.candidateRows = insert.RowsAffected
 			return insert.Error
 		})

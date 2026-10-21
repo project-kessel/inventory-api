@@ -19,6 +19,8 @@ import (
 	"gorm.io/gorm"
 )
 
+// TestCommonRepCleanupPostgres verifies retention and transactional worklist behavior
+// against real PostgreSQL, including cancellation, rollback, and deep histories.
 func TestCommonRepCleanupPostgres(t *testing.T) {
 	db, _ := setupCommonRepCleanupPostgres(t)
 	options := commonRepCleanupOptions{keepVersions: 2, batchSize: 3, maxBatches: 0}
@@ -69,7 +71,7 @@ func TestCommonRepCleanupPostgres(t *testing.T) {
 		keepThree.keepVersions = 3
 		query, args := commonRepCleanupCandidateQuery(keepThree)
 		var staleCandidates []uint
-		require.NoError(t, db.Raw("SELECT version FROM ("+query+") candidates WHERE resource_id=? ORDER BY version", append(args, cases[1].id)...).Scan(&staleCandidates).Error)
+		require.NoError(t, db.Raw("SELECT version FROM (?) candidates WHERE resource_id=? ORDER BY version", gorm.Expr(query, args...), cases[1].id).Scan(&staleCandidates).Error)
 		assert.Equal(t, []uint{0}, staleCandidates)
 
 		// Stop after one batch, then rebuild the worklist from remaining history.
@@ -140,7 +142,7 @@ func TestCommonRepCleanupPostgres(t *testing.T) {
 			require.NoError(t, connection.Exec("CREATE TEMP TABLE common_rep_cleanup_candidates (resource_id uuid, version bigint, PRIMARY KEY(resource_id, version))").Error)
 			defer connection.Exec("DROP TABLE pg_temp.common_rep_cleanup_candidates")
 			query, args := commonRepCleanupCandidateQuery(options)
-			require.NoError(t, connection.Exec("INSERT INTO pg_temp.common_rep_cleanup_candidates "+query, args...).Error)
+			require.NoError(t, connection.Exec("INSERT INTO pg_temp.common_rep_cleanup_candidates ?", gorm.Expr(query, args...)).Error)
 			rollback := errors.New("rollback batch")
 			err := commonRepCleanupTransaction(context.Background(), connection, false, func(tx *gorm.DB) error {
 				deleted, err := deleteCommonRepCleanupBatch(tx, 1)
@@ -172,11 +174,11 @@ func TestCommonRepCleanupPostgres(t *testing.T) {
    SELECT ?, n, '{}'::jsonb, 'hbi', 'cleanup-instance', 'deep-'||n,
    CASE WHEN n=49999 THEN now() ELSE now()-INTERVAL '30 days' END FROM generate_series(0,49999) n`, deep).Error)
 		require.NoError(t, db.Exec(`INSERT INTO resource(id,type,common_version)
-   SELECT md5('cleanup-perf-'||n)::uuid,'host',4 FROM generate_series(1,10000) n`).Error)
+   SELECT ('00000000-0000-4000-8000-'||lpad(n::text,12,'0'))::uuid,'host',4 FROM generate_series(1,10000) n`).Error)
 		require.NoError(t, db.Exec(`INSERT INTO reporter_resources(id,local_resource_id,reporter_type,resource_type,reporter_instance_id,resource_id,tombstone,api_href,representation_version,generation)
-   SELECT md5('cleanup-reporter-'||n)::uuid,'perf-'||n,'hbi','host','cleanup-instance',md5('cleanup-perf-'||n)::uuid,FALSE,'https://example.test',0,0 FROM generate_series(1,10000) n`).Error)
+   SELECT ('00000000-0000-4000-9000-'||lpad(n::text,12,'0'))::uuid,'perf-'||n,'hbi','host','cleanup-instance',('00000000-0000-4000-8000-'||lpad(n::text,12,'0'))::uuid,FALSE,'https://example.test',0,0 FROM generate_series(1,10000) n`).Error)
 		require.NoError(t, db.Exec(`INSERT INTO common_representations(resource_id,version,data,reported_by_reporter_type,reported_by_reporter_instance,transaction_id,created_at)
-   SELECT md5('cleanup-perf-'||r)::uuid,v,'{}'::jsonb,'hbi','cleanup-instance','perf-'||r||'-'||v,
+   SELECT ('00000000-0000-4000-8000-'||lpad(r::text,12,'0'))::uuid,v,'{}'::jsonb,'hbi','cleanup-instance','perf-'||r||'-'||v,
    CASE WHEN v=4 THEN now() ELSE now()-INTERVAL '30 days' END FROM generate_series(1,10000) r CROSS JOIN generate_series(0,4) v`).Error)
 		perf := options
 		perf.batchSize = 1000
@@ -191,6 +193,8 @@ func TestCommonRepCleanupPostgres(t *testing.T) {
 	})
 }
 
+// setupCommonRepCleanupPostgres starts an isolated database with the real schema
+// and registers container and connection cleanup with the test.
 func setupCommonRepCleanupPostgres(t *testing.T) (*gorm.DB, testcontainers.Container) {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Minute)
@@ -240,11 +244,13 @@ func setupCommonRepCleanupPostgres(t *testing.T) (*gorm.DB, testcontainers.Conta
 	return db, postgresContainer
 }
 
+// isolateCommonRepCleanupPostgresSubtest clears resource fixtures between subtests.
 func isolateCommonRepCleanupPostgresSubtest(t *testing.T, db *gorm.DB) {
 	t.Helper()
 	require.NoError(t, db.Exec("TRUNCATE TABLE reporter_representations, reporter_resources, common_representations, resource CASCADE").Error)
 }
 
+// uintPointer supplies a nullable current-version value for test fixtures.
 func uintPointer(value uint) *uint { return &value }
 
 // seedCommonRepRoot creates a resource root and its common representation history.
@@ -257,11 +263,13 @@ func seedCommonRepRoot(t *testing.T, db *gorm.DB, resourceID uuid.UUID, resource
 	}
 }
 
+// insertCommonRepRow inserts a history version reported at the current time.
 func insertCommonRepRow(t *testing.T, db *gorm.DB, resourceID uuid.UUID, version uint, transactionID string) *gorm.DB {
 	t.Helper()
 	return insertCommonRepRowAt(t, db, resourceID, version, transactionID, time.Now())
 }
 
+// insertCommonRepRowAt inserts a history version with a controlled timestamp.
 func insertCommonRepRowAt(t *testing.T, db *gorm.DB, resourceID uuid.UUID, version uint, transactionID string, createdAt time.Time) *gorm.DB {
 	t.Helper()
 	return db.Exec(
@@ -271,6 +279,7 @@ func insertCommonRepRowAt(t *testing.T, db *gorm.DB, resourceID uuid.UUID, versi
 	)
 }
 
+// insertCommonRepReporter associates an active or tombstoned reporter with a root.
 func insertCommonRepReporter(t *testing.T, db *gorm.DB, resourceID uuid.UUID, localResourceID string, resourceType string, reporterType string, tombstone bool) *gorm.DB {
 	t.Helper()
 	return db.Exec(
@@ -280,6 +289,7 @@ func insertCommonRepReporter(t *testing.T, db *gorm.DB, resourceID uuid.UUID, lo
 	)
 }
 
+// assertCommonRepVersions checks the exact retained history in version order.
 func assertCommonRepVersions(t *testing.T, db *gorm.DB, resourceID uuid.UUID, expected []uint) {
 	t.Helper()
 	var versions []uint

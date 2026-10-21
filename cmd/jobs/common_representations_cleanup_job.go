@@ -67,6 +67,7 @@ bounded batches; rerun after interruption to select the remaining history.`,
 	return command
 }
 
+// validateCommonRepCleanupInvocation protects the history needed for update consumption.
 func validateCommonRepCleanupInvocation(keepVersions int) error {
 	if keepVersions < 2 {
 		return fmt.Errorf("--keep-versions must be at least 2 because update consumption reads version v and v-1")
@@ -98,10 +99,12 @@ func openCommonRepCleanupDatabase(ctx context.Context, storageConfig storage.Com
 	return db.WithContext(ctx), nil
 }
 
+// commonRepCleanupSignalContext lets process termination cancel active SQL and pacing.
 func commonRepCleanupSignalContext(parentContext context.Context) (context.Context, context.CancelFunc) {
 	return signal.NotifyContext(parentContext, os.Interrupt, syscall.SIGTERM)
 }
 
+// runCommonRepresentationsCleanupJob opens PostgreSQL and logs committed cleanup progress.
 func runCommonRepresentationsCleanupJob(ctx context.Context, storageOptions *storage.Options, loggerOptions common.LoggerOptions, options commonRepCleanupOptions, execute bool) error {
 	if storageOptions == nil || storageOptions.Database != storage.Postgres {
 		return fmt.Errorf("common representation cleanup requires PostgreSQL storage options")

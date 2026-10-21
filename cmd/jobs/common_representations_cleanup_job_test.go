@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// TestRunJobRegistersCommonRepresentationsCleanupAsPreviewByDefault checks safe CLI defaults.
 func TestRunJobRegistersCommonRepresentationsCleanupAsPreviewByDefault(t *testing.T) {
 	command := NewRunJobCommand(storage.NewOptions(), common.LoggerOptions{})
 	cleanupCommand, _, err := command.Find([]string{"common-representations-cleanup-job"})
@@ -29,6 +30,7 @@ func TestRunJobRegistersCommonRepresentationsCleanupAsPreviewByDefault(t *testin
 	assert.Zero(t, maxBatches, "execution must process the entire worklist by default")
 }
 
+// TestCommonRepCleanupCommandRejectsSingleVersionRetention protects the required predecessor.
 func TestCommonRepCleanupCommandRejectsSingleVersionRetention(t *testing.T) {
 	require.Error(t, validateCommonRepCleanupInvocation(1), "keep-versions below two must be rejected")
 	require.Error(t, validateCommonRepCleanupInvocation(0))
@@ -36,6 +38,7 @@ func TestCommonRepCleanupCommandRejectsSingleVersionRetention(t *testing.T) {
 	require.NoError(t, validateCommonRepCleanupInvocation(3))
 }
 
+// TestCommonRepCleanupExecutionRequiresWriteFenceAcknowledgment checks the execution gate.
 func TestCommonRepCleanupExecutionRequiresWriteFenceAcknowledgment(t *testing.T) {
 	command := NewCommonRepresentationsCleanupJobCommand(storage.NewOptions(), common.LoggerOptions{})
 	command.SetArgs([]string{"--execute"})

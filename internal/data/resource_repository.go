@@ -314,7 +314,7 @@ func (r *resourceRepository) FindCurrentAndPreviousVersionedRepresentations(tx *
 	if operationType.OperationType() == bizmodel.OperationTypeCreated {
 		query = query.Where("cr.version = ?", cv)
 	} else {
-		query = query.Where("(cr.version = ? OR cr.version = ?)", cv, cv-1)
+		query = query.Where("cr.version IN ?", []uint{cv, cv - 1})
 	}
 
 	err := query.Find(&results).Error

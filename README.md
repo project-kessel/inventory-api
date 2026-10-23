@@ -140,6 +140,10 @@ See its [runbook](./docs/runbooks/common-representations-cleanup-job.md) for
 database configuration, CLI options, the OpenShift Job template, and required
 writer fencing and replication drain checks.
 
+The separate one-time [reporter representations cleanup job](./docs/runbooks/reporter-representations-cleanup-job.md)
+keeps the newest two existing versions per active reporter-resource during a
+read-only maintenance window. It is not part of the Compose startup targets.
+
 ### Running in Ephemeral Cluster using Bonfire
 
 See [Testing Inventory in Ephemeral](./docs/dev-guides/ephemeral-testing.md) for instructions on how to deploy Kessel Inventory in the ephemeral cluster.

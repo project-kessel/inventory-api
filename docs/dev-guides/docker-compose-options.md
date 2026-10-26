@@ -27,8 +27,9 @@ documents database configuration, CLI options, the OpenShift Job template, and
 required writer fencing and replication drain checks.
 
 The separate one-time [reporter representations cleanup job](../runbooks/reporter-representations-cleanup-job.md)
-keeps the newest two existing versions per active reporter-resource during a
-read-only maintenance window. It is not part of the Compose startup targets.
+keeps the newest two existing versions per active reporter-resource. Execution
+requires fenced resource writers and drained replication. It is not part of the
+Compose startup targets.
 
 ---
 

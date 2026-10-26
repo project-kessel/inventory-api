@@ -4462,16 +4462,27 @@ data:
             "type": "datasource"
           },
           {
-            "current": {
-              "text": "openshift-customer-monitoring/kessel-kafka-connect-podmonitor",
-              "value": "openshift-customer-monitoring/kessel-kafka-connect-podmonitor"
+            "current": {},
+            "datasource": {
+              "type": "prometheus",
+              "uid": "${datasource}"
             },
+            "definition": "label_values(kafka_connect_connector_status, job)",
             "hide": 2,
+            "includeAll": false,
             "label": "job",
+            "multi": false,
             "name": "job",
-            "query": "openshift-customer-monitoring/kessel-kafka-connect-podmonitor",
+            "options": [],
+            "query": {
+              "qryType": 1,
+              "query": "label_values(kafka_connect_connector_status, job)",
+              "refId": "PrometheusVariableQueryEditor-VariableQuery"
+            },
+            "refresh": 1,
+            "regex": "/kessel-kafka-connect-podmonitor/",
             "skipUrlSync": true,
-            "type": "constant"
+            "type": "query"
           },
           {
             "current": {
@@ -4563,7 +4574,7 @@ data:
       "timezone": "",
       "title": "Kessel Inventory - Kafka Connect",
       "uid": "AEaSQ97mq",
-      "version": 5
+      "version": 6
     }
 kind: ConfigMap
 metadata:

@@ -35,13 +35,6 @@ func NewCommonRepresentation(
 	if strings.TrimSpace(string(reporterInstanceId)) == "" {
 		return CommonRepresentation{}, fmt.Errorf("%w: ReporterInstanceId", ErrEmpty)
 	}
-	if len(data) == 0 {
-		return CommonRepresentation{}, fmt.Errorf("%w: CommonRepresentation data", ErrInvalidData)
-	}
-
-	if data.Data() == nil {
-		return CommonRepresentation{}, fmt.Errorf("CommonRepresentation requires non-empty data")
-	}
 
 	reporter := NewReporterId(reporterType, reporterInstanceId)
 

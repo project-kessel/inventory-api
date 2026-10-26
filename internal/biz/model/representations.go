@@ -6,8 +6,9 @@ import (
 
 // Representations encapsulates common and reporter representations with their respective versions
 // for a specific point in time (e.g., current or previous).
-// At least one of common or reporter representation must be present, but not both can be nil.
-// If a representation is present, its version must also be present (and vice versa).
+// At least one version must be present (indicating that stream advanced).
+// A version can exist without data (tombstone case - nil/empty data with version).
+// Non-empty data requires a version.
 type Representations struct {
 	commonData                    Representation
 	commonVersion                 *Version
@@ -16,30 +17,28 @@ type Representations struct {
 }
 
 // NewRepresentations creates a Representations with optional common and reporter data.
-// At least one of common or reporter representation must be provided.
-// If a representation is provided, its version must also be provided.
+// At least one version must be provided (indicating that stream advanced).
+// Tombstones are represented as nil/empty data with a version.
+// Non-empty data requires a version.
 func NewRepresentations(
 	commonData Representation,
 	commonVersion *Version,
 	reporterData Representation,
 	reporterRepresentationVersion *Version,
 ) (*Representations, error) {
-	// Validate that at least one representation is present
-	hasCommon := len(commonData) > 0 && commonVersion != nil
-	hasReporter := len(reporterData) > 0 && reporterRepresentationVersion != nil
-
-	if !hasCommon && !hasReporter {
-		return nil, fmt.Errorf("at least one of common or reporter representation must be present")
+	// Validate that at least one version is present (at least one stream advanced)
+	if commonVersion == nil && reporterRepresentationVersion == nil {
+		return nil, fmt.Errorf("at least one version must be present")
 	}
 
-	// Validate that if common data is present, version must be present (and vice versa)
-	if (len(commonData) > 0) != (commonVersion != nil) {
-		return nil, fmt.Errorf("common data and common version must both be present or both be absent")
+	// Validate that non-empty data requires a version
+	// Note: A version can exist without data (tombstone case - empty/nil data with version)
+	if len(commonData) > 0 && commonVersion == nil {
+		return nil, fmt.Errorf("common data requires common version")
 	}
 
-	// Validate that if reporter data is present, version must be present (and vice versa)
-	if (len(reporterData) > 0) != (reporterRepresentationVersion != nil) {
-		return nil, fmt.Errorf("reporter data and reporter representation version must both be present or both be absent")
+	if len(reporterData) > 0 && reporterRepresentationVersion == nil {
+		return nil, fmt.Errorf("reporter data requires reporter version")
 	}
 
 	return &Representations{
@@ -78,6 +77,11 @@ func (r *Representations) HasReporter() bool {
 	return r != nil && len(r.reporterData) > 0 && r.reporterRepresentationVersion != nil
 }
 
+// ReporterVersion returns a pointer to the reporter representation version, or nil if not present.
+func (r *Representations) ReporterVersion() *Version {
+	return r.reporterRepresentationVersion
+}
+
 // WorkspaceID returns the workspace_id from the common representation data.
 // Returns empty string if not present or if common representation is not available.
 func (r *Representations) WorkspaceID() string {
@@ -103,6 +107,44 @@ func (r *Representations) StringSliceField(fieldName string) []string {
 		return nil
 	}
 	raw, ok := r.commonData[fieldName]
+	if !ok || raw == nil {
+		return nil
+	}
+	arr, ok := raw.([]interface{})
+	if !ok {
+		return nil
+	}
+	result := make([]string, 0, len(arr))
+	for _, item := range arr {
+		if s, ok := item.(string); ok {
+			result = append(result, s)
+		}
+	}
+	if len(result) == 0 {
+		return nil
+	}
+	return result
+}
+
+// ReporterStringField returns a single string value from the reporter representation.
+// Returns empty string if not present, not a string, or if reporter representation is unavailable.
+func (r *Representations) ReporterStringField(fieldName string) string {
+	if r != nil && r.HasReporter() {
+		if value, ok := r.reporterData[fieldName].(string); ok {
+			return value
+		}
+	}
+	return ""
+}
+
+// ReporterStringSliceField returns a string slice from the reporter representation.
+// Returns nil if not present, not an array, or if reporter representation is unavailable.
+// Non-string elements within the array are silently skipped.
+func (r *Representations) ReporterStringSliceField(fieldName string) []string {
+	if r == nil || !r.HasReporter() {
+		return nil
+	}
+	raw, ok := r.reporterData[fieldName]
 	if !ok || raw == nil {
 		return nil
 	}

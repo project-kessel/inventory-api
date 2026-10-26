@@ -32,6 +32,7 @@ storage:
     password: postgres
     dbname: inventory
 consumer:
+  load_reporter_representation: false
   enabled: false
 schema:
   repository: in-memory

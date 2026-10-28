@@ -1,0 +1,134 @@
+apiVersion: template.openshift.io/v1
+kind: Template
+metadata:
+  name: kessel-inventory-tombstoned-resources-cleanup-job
+objects:
+  - apiVersion: batch/v1
+    kind: Job
+    metadata:
+      name: ${JOB_NAME}
+      labels:
+        app: kessel-inventory-jobs
+        job-type: tombstoned-resources-cleanup-job
+    spec:
+      backoffLimit: 0
+      completions: 1
+      parallelism: 1
+      template:
+        metadata:
+          labels:
+            app: kessel-inventory-jobs
+            job-type: tombstoned-resources-cleanup-job
+        spec:
+          restartPolicy: Never
+          serviceAccountName: ${SERVICE_ACCOUNT_NAME}
+          automountServiceAccountToken: false
+          terminationGracePeriodSeconds: 30
+          securityContext:
+            runAsNonRoot: true
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: ${JOB_NAME}
+              image: ${INVENTORY_IMAGE}:${IMAGE_TAG}
+              imagePullPolicy: Always
+              securityContext:
+                runAsNonRoot: true
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop:
+                    - ALL
+              command:
+                - inventory-api
+                - run-job
+                - tombstoned-resources-cleanup-job
+                - --tombstone-days=${TOMBSTONE_DAYS}
+                - --batch-size=${BATCH_SIZE}
+                - --batch-delay=${BATCH_DELAY}
+                - --max-batches=${MAX_BATCHES}
+                - --execute=${EXECUTE}
+                - --consumer-boundary-verified=${CONSUMER_BOUNDARY_VERIFIED}
+              env:
+                - name: ACG_CONFIG
+                  value: /cdapp/cdappconfig.json
+                - name: INVENTORY_API_CONFIG
+                  value: "/inventory/inventory-api-config.yaml"
+                - name: INVENTORY_API_STORAGE_DATABASE
+                  value: postgres
+                - name: TMPDIR
+                  value: /tmp
+              volumeMounts:
+                - name: config-volume
+                  mountPath: "/inventory"
+                - name: tmp
+                  mountPath: "/tmp"
+                - name: clowder-config
+                  mountPath: /cdapp
+                  readOnly: true
+              resources:
+                requests:
+                  memory: ${REQUESTS_MEMORY}
+                  cpu: ${REQUESTS_CPU}
+                limits:
+                  memory: ${LIMITS_MEMORY}
+                  cpu: ${LIMITS_CPU}
+          volumes:
+            - name: config-volume
+              secret:
+                secretName: ${INVENTORY_API_CONFIG_NAME}
+            - name: clowder-config
+              secret:
+                secretName: ${CLOWDER_CONFIG_SECRET_NAME}
+            - name: tmp
+              emptyDir:
+                sizeLimit: 64Mi
+parameters:
+  - description: Job name (e.g., tombstone-cleanup-20261016)
+    name: JOB_NAME
+    required: true
+  - description: App Image
+    name: INVENTORY_IMAGE
+    value: quay.io/redhat-services-prod/project-kessel-tenant/kessel-inventory/inventory-api
+  - description: Image Tag; use a unique immutable tag, never latest
+    name: IMAGE_TAG
+    required: true
+  - description: Days since a tombstoned reporter was last updated; must be positive
+    name: TOMBSTONE_DAYS
+    value: "30"
+  - description: Enable deletion only after the runbook's operational preconditions are verified; false is a read-only preview
+    name: EXECUTE
+    value: "false"
+  - description: Acknowledge publication, successful consumption and restart-safe offsets through the runbook boundary; does not verify them
+    name: CONSUMER_BOUNDARY_VERIFIED
+    value: "false"
+  - description: Maximum reporter parents deleted per transaction; cascading history is additional
+    name: BATCH_SIZE
+    value: "1000"
+  - description: Interruptible delay between committed batches (Go duration)
+    name: BATCH_DELAY
+    value: "500ms"
+  - description: Maximum committed batches; 0 processes the entire worklist
+    name: MAX_BATCHES
+    value: "0"
+  - description: Clowder application configuration Secret containing cdappconfig.json
+    name: CLOWDER_CONFIG_SECRET_NAME
+    value: kessel-inventory
+  - description: Existing Inventory API service account, including its image pull credentials; no API token is mounted
+    name: SERVICE_ACCOUNT_NAME
+    value: kessel-inventory-api
+  - description: Name of the Inventory API Config Secret
+    name: INVENTORY_API_CONFIG_NAME
+    value: inventory-api-config
+  - description: Memory request for job
+    name: REQUESTS_MEMORY
+    value: '384Mi'
+  - description: CPU request for job
+    name: REQUESTS_CPU
+    value: '100m'
+  - description: Memory limit for job
+    name: LIMITS_MEMORY
+    value: '512Mi'
+  - description: CPU limit for job
+    name: LIMITS_CPU
+    value: '500m'

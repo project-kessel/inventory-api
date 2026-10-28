@@ -2,6 +2,7 @@ package tombstonecleanup
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/signal"
@@ -68,8 +69,11 @@ func openTombstoneCleanupDatabase(ctx context.Context, storageConfig storage.Com
 		return nil, fmt.Errorf("error accessing database connection: %w", err)
 	}
 	if err := sqlDB.PingContext(ctx); err != nil {
-		_ = sqlDB.Close()
-		return nil, fmt.Errorf("error pinging database: %w", err)
+		pingErr := fmt.Errorf("error pinging database: %w", err)
+		if closeErr := sqlDB.Close(); closeErr != nil {
+			return nil, errors.Join(pingErr, fmt.Errorf("error closing database: %w", closeErr))
+		}
+		return nil, pingErr
 	}
 	return db.WithContext(ctx), nil
 }
@@ -80,7 +84,7 @@ func tombstoneCleanupSignalContext(parentContext context.Context) (context.Conte
 }
 
 // runTombstoneCleanupJob opens PostgreSQL and reports only committed deletion counts.
-func runTombstoneCleanupJob(ctx context.Context, storageOptions *storage.Options, loggerOptions common.LoggerOptions, options options, execute bool) error {
+func runTombstoneCleanupJob(ctx context.Context, storageOptions *storage.Options, loggerOptions common.LoggerOptions, options options, execute bool) (jobErr error) {
 	if storageOptions == nil || storageOptions.Database != storage.Postgres {
 		return fmt.Errorf("tombstone cleanup requires PostgreSQL storage options")
 	}
@@ -94,7 +98,11 @@ func runTombstoneCleanupJob(ctx context.Context, storageOptions *storage.Options
 	if err != nil {
 		return err
 	}
-	defer sqlDB.Close() //nolint:errcheck
+	defer func() {
+		if closeErr := sqlDB.Close(); closeErr != nil {
+			jobErr = errors.Join(jobErr, fmt.Errorf("error closing database: %w", closeErr))
+		}
+	}()
 	helper.Infow("msg", "tombstone cleanup configuration", "tombstone_days", options.tombstoneDays, "batch_size", options.batchSize, "batch_delay", options.batchDelay.String(), "max_batches", options.maxBatches)
 	report := func(message string, r result) {
 		fields := []any{

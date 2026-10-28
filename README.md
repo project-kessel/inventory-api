@@ -350,3 +350,6 @@ openssl list -providers | grep -A 3 fips
     version: 3.0.7-395c1a240fbfffd8
     status: active
 ```
+
+For online cleanup of expired tombstoned reporters and their newly orphaned data,
+see the [tombstone cleanup runbook](docs/runbooks/tombstone-cleanup-job.md). The job is preview-only by default and is not started by Compose.

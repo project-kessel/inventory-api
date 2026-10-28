@@ -321,3 +321,6 @@ Applies to all setups that include the monitoring stack.
 | Alertmanager | http://localhost:9093 |
 
 > Grafana default login: username `admin`, password `admin`. You will be prompted to change it on first login.
+
+For online cleanup of expired tombstoned reporters and their newly orphaned data,
+see the [tombstone cleanup runbook](../runbooks/tombstone-cleanup-job.md). The job is preview-only by default and is not started by Compose.

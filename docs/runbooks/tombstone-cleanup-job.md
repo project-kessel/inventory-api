@@ -67,9 +67,12 @@ inventory-api run-job tombstoned-resources-cleanup-job --tombstone-days=30 \
 ```
 
 Omit `--max-batches` or set it to 0 to process the whole frozen worklist. Default
-batch delay is 500ms. There is no job duration or statement-runtime limit. The
-initial database ping has a 30-second connection-check timeout; cleanup SQL uses
-the original invocation context. Batch size cannot exceed 65,534 parents because each statement reserves
+batch delay is 500ms. Cleanup transactions set `statement_timeout=0`, disabling
+PostgreSQL statement timeouts, including inherited database/role settings. The
+supplied OpenShift Job template sets no `activeDeadlineSeconds` on the Job or Pod.
+The initial database ping has a 30-second connection-check timeout; subsequent SQL
+uses the original invocation context. Delete batches retain a 5-second lock
+timeout. Batch size cannot exceed 65,534 parents because each statement reserves
 one PostgreSQL bind parameter for the cutoff. Capped-preview arithmetic must fit
 a signed 64-bit row count; retention must produce a cutoff no earlier than year 1.
 

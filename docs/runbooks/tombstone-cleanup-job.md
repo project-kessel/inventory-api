@@ -67,7 +67,12 @@ inventory-api run-job tombstoned-resources-cleanup-job --tombstone-days=30 \
 ```
 
 Omit `--max-batches` or set it to 0 to process the whole frozen worklist. Default
-batch delay is 500ms. There is no job duration or statement-runtime limit.
+batch delay is 500ms. There is no job duration or statement-runtime limit. The
+initial database ping has a 30-second connection-check timeout; cleanup SQL uses
+the original invocation context. Batch size cannot exceed 65,534 parents because each statement reserves
+one PostgreSQL bind parameter for the cutoff. Capped-preview arithmetic must fit
+a signed 64-bit row count; retention must produce a cutoff no earlier than year 1.
+
 Parents are processed oldest updated_at first, with parent ID as the deterministic
 tie-breaker. Worklist selection reads reporter parents only; it does not count or
 rank their history. History sizes do not affect processing order.

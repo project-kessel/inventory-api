@@ -102,7 +102,7 @@ parameters:
   - description: Acknowledge publication, successful consumption and restart-safe offsets through the runbook boundary; does not verify them
     name: CONSUMER_BOUNDARY_VERIFIED
     value: "false"
-  - description: Maximum reporter parents deleted per transaction; cascading history is additional
+  - description: Maximum reporter parents deleted per transaction (1-65534); cascading history is additional
     name: BATCH_SIZE
     value: "1000"
   - description: Interruptible delay between committed batches (Go duration)

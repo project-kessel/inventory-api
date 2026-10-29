@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"os"
 	"os/signal"
 	"syscall"
@@ -17,6 +18,9 @@ import (
 	"gorm.io/gorm"
 )
 
+// The eligibility and parent-delete statements also bind the cutoff timestamp.
+const maxBatchSize = 65535 - 1
+
 // NewCommand creates an online, preview-by-default tombstone cleanup command.
 func NewCommand(storageOptions *storage.Options, loggerOptions common.LoggerOptions) *cobra.Command {
 	options := options{tombstoneDays: 30, batchSize: 1000, batchDelay: 500 * time.Millisecond}
@@ -27,11 +31,8 @@ func NewCommand(storageOptions *storage.Options, loggerOptions common.LoggerOpti
 		Long:  "Remove reporters tombstoned before a fixed age cutoff, then their newly orphaned common history and roots. Writes may continue. Execution requires manual verification of publication, successful consumption and restart-safe offsets through a pre-cleanup boundary; the acknowledgment does not verify it.",
 		Args:  cobra.NoArgs,
 		RunE: func(command *cobra.Command, _ []string) error {
-			if options.tombstoneDays <= 0 {
-				return fmt.Errorf("tombstone-days must be positive")
-			}
-			if options.batchSize <= 0 || options.maxBatches < 0 || options.batchDelay < 0 {
-				return fmt.Errorf("batch size must be positive; maximum batches and batch delay must not be negative")
+			if err := validateInvocation(options); err != nil {
+				return err
 			}
 			if execute && !boundaryVerified {
 				return fmt.Errorf("--execute requires --consumer-boundary-verified; verify publication, successful consumption and restart-safe offsets first")
@@ -51,6 +52,26 @@ func NewCommand(storageOptions *storage.Options, loggerOptions common.LoggerOpti
 	return command
 }
 
+// validateInvocation rejects values that cannot be represented safely before
+// opening PostgreSQL. Unlimited batches (zero) remain supported.
+func validateInvocation(options options) error {
+	earliestCutoff := time.Date(1, time.January, 1, 0, 0, 0, 0, time.UTC)
+	maxDays := (time.Now().UTC().Unix() - earliestCutoff.Unix()) / 86400
+	if options.tombstoneDays <= 0 || int64(options.tombstoneDays) > maxDays {
+		return fmt.Errorf("tombstone-days must be between 1 and %d so the cutoff does not predate year 1", maxDays)
+	}
+	if options.batchSize <= 0 || options.batchSize > maxBatchSize {
+		return fmt.Errorf("batch-size must be between 1 and %d (PostgreSQL bind parameter limit)", maxBatchSize)
+	}
+	if options.maxBatches < 0 || options.batchDelay < 0 {
+		return fmt.Errorf("maximum batches and batch delay must not be negative")
+	}
+	if options.maxBatches > 0 && int64(options.maxBatches) > math.MaxInt64/int64(options.batchSize) {
+		return fmt.Errorf("batch-size multiplied by max-batches would overflow the preview row limit")
+	}
+	return nil
+}
+
 // openTombstoneCleanupDatabase opens PostgreSQL with the invocation context so the
 // caller can cancel connection validation and all subsequent GORM operations.
 func openTombstoneCleanupDatabase(ctx context.Context, storageConfig storage.CompletedConfig) (*gorm.DB, error) {
@@ -68,8 +89,13 @@ func openTombstoneCleanupDatabase(ctx context.Context, storageConfig storage.Com
 	if err != nil {
 		return nil, fmt.Errorf("error accessing database connection: %w", err)
 	}
-	if err := sqlDB.PingContext(ctx); err != nil {
-		pingErr := fmt.Errorf("error pinging database: %w", err)
+	// Bound connection establishment only; all cleanup SQL retains the original
+	// invocation context and has no job/statement runtime deadline.
+	pingContext, cancelPing := context.WithTimeout(ctx, 30*time.Second)
+	pingErr := sqlDB.PingContext(pingContext)
+	cancelPing()
+	if pingErr != nil {
+		pingErr = fmt.Errorf("error pinging database: %w", pingErr)
 		if closeErr := sqlDB.Close(); closeErr != nil {
 			return nil, errors.Join(pingErr, fmt.Errorf("error closing database: %w", closeErr))
 		}

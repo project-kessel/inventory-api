@@ -16,23 +16,15 @@ type candidate struct {
 	RepresentationVersion uint
 }
 
-const candidateSQL = `SELECT id,resource_id,updated_at,generation,representation_version
+// SQL statements are fixed literals; runtime values use bind parameters only.
+const insertCandidatesSQL = `INSERT INTO pg_temp.tombstone_cleanup_candidates SELECT id,resource_id,updated_at,generation,representation_version
  FROM reporter_resources WHERE tombstone IS TRUE AND updated_at < ?`
+const selectBatchSQL = `SELECT * FROM pg_temp.tombstone_cleanup_candidates
+ ORDER BY updated_at ASC, id ASC LIMIT ?`
 
-const candidateOrder = "updated_at ASC, id ASC"
-
-// impact counts reporter cascades and only roots whose every reporter is selected.
-// The prefix limit bounds parents, not the number of cascading history rows.
-func impact(tx *gorm.DB, cutoff time.Time, limit int64) (r result, err error) {
-	var counts struct{ Candidates, ReporterResources, Affected, ReporterHistory, CommonHistory, Roots int64 }
-	selection := "SELECT * FROM eligible"
-	arguments := []any{cutoff}
-	if limit > 0 {
-		selection += " ORDER BY " + candidateOrder + " LIMIT ?"
-		arguments = append(arguments, limit)
-	}
-	err = tx.Raw(`WITH eligible AS (`+candidateSQL+`), selected AS (
- `+selection+`
+const impactAllSQL = `WITH eligible AS (SELECT id,resource_id,updated_at,generation,representation_version
+ FROM reporter_resources WHERE tombstone IS TRUE AND updated_at < ?), selected AS (
+ SELECT * FROM eligible
  ), removable AS (
  SELECT DISTINCT selected.resource_id FROM selected WHERE NOT EXISTS (
  SELECT 1 FROM reporter_resources remaining WHERE remaining.resource_id=selected.resource_id
@@ -42,7 +34,33 @@ func impact(tx *gorm.DB, cutoff time.Time, limit int64) (r result, err error) {
  (SELECT COUNT(DISTINCT resource_id) FROM selected) AS affected,
  (SELECT COUNT(*) FROM reporter_representations h JOIN selected ON selected.id=h.reporter_resource_id) AS reporter_history,
  (SELECT COUNT(*) FROM common_representations h JOIN removable USING(resource_id)) AS common_history,
- (SELECT COUNT(*) FROM resource r JOIN removable ON removable.resource_id=r.id) AS roots`, arguments...).Scan(&counts).Error
+ (SELECT COUNT(*) FROM resource r JOIN removable ON removable.resource_id=r.id) AS roots`
+
+const impactLimitedSQL = `WITH eligible AS (SELECT id,resource_id,updated_at,generation,representation_version
+ FROM reporter_resources WHERE tombstone IS TRUE AND updated_at < ?), selected AS (
+ SELECT * FROM eligible ORDER BY updated_at ASC, id ASC LIMIT ?
+ ), removable AS (
+ SELECT DISTINCT selected.resource_id FROM selected WHERE NOT EXISTS (
+ SELECT 1 FROM reporter_resources remaining WHERE remaining.resource_id=selected.resource_id
+ AND NOT EXISTS (SELECT 1 FROM selected WHERE selected.id=remaining.id)))
+ SELECT (SELECT COUNT(*) FROM eligible) AS candidates,
+ (SELECT COUNT(*) FROM selected) AS reporter_resources,
+ (SELECT COUNT(DISTINCT resource_id) FROM selected) AS affected,
+ (SELECT COUNT(*) FROM reporter_representations h JOIN selected ON selected.id=h.reporter_resource_id) AS reporter_history,
+ (SELECT COUNT(*) FROM common_representations h JOIN removable USING(resource_id)) AS common_history,
+ (SELECT COUNT(*) FROM resource r JOIN removable ON removable.resource_id=r.id) AS roots`
+
+// impact counts reporter cascades and only roots whose every reporter is selected.
+// The prefix limit bounds parents, not the number of cascading history rows.
+func impact(tx *gorm.DB, cutoff time.Time, limit int64) (r result, err error) {
+	var counts struct{ Candidates, ReporterResources, Affected, ReporterHistory, CommonHistory, Roots int64 }
+	query := impactAllSQL
+	arguments := []any{cutoff}
+	if limit > 0 {
+		query = impactLimitedSQL
+		arguments = append(arguments, limit)
+	}
+	err = tx.Raw(query, arguments...).Scan(&counts).Error
 	r.candidates = counts.Candidates
 	r.reporterResources = counts.ReporterResources
 	r.affected = counts.Affected
@@ -56,7 +74,7 @@ func impact(tx *gorm.DB, cutoff time.Time, limit int64) (r result, err error) {
 // ensure orphan checks see the reporter deletions within this transaction.
 func deleteBatch(tx *gorm.DB, batchSize int, cutoff time.Time) (r result, err error) {
 	var batch []candidate
-	if err = tx.Raw("SELECT * FROM pg_temp.tombstone_cleanup_candidates ORDER BY "+candidateOrder+" LIMIT ?", batchSize).Scan(&batch).Error; err != nil {
+	if err = tx.Raw(selectBatchSQL, batchSize).Scan(&batch).Error; err != nil {
 		return
 	}
 	r.selected = int64(len(batch))

@@ -39,10 +39,10 @@ func TestTombstoneCleanupPostgres(t *testing.T) {
 		}
 		return id
 	}
-	count := func(table, predicate string, arguments ...any) int64 {
+	count := func(query string, arguments ...any) int64 {
 		t.Helper()
 		var count int64
-		require.NoError(t, db.Raw("SELECT COUNT(*) FROM "+table+" WHERE "+predicate, arguments...).Scan(&count).Error)
+		require.NoError(t, db.Raw(query, arguments...).Scan(&count).Error)
 		return count
 	}
 	reset := func(t *testing.T) {
@@ -74,7 +74,7 @@ func TestTombstoneCleanupPostgres(t *testing.T) {
 		require.Equal(t, int64(3), preview.commonHistory)
 		require.Equal(t, int64(1), preview.roots)
 		require.Zero(t, preview.batches)
-		require.Equal(t, int64(1), count("reporter_resources", "id=?", deleted))
+		require.Equal(t, int64(1), count("SELECT COUNT(*) FROM reporter_resources WHERE id=?", deleted))
 		run, err := cleanup(context.Background(), db, options, true, nil, nil)
 		require.NoError(t, err)
 		require.True(t, run.complete)
@@ -83,18 +83,18 @@ func TestTombstoneCleanupPostgres(t *testing.T) {
 		require.Equal(t, int64(3), run.commonHistory)
 		require.Equal(t, int64(1), run.roots)
 		for _, id := range []uuid.UUID{deleted, sharedDeleted, recentSharedDeleted} {
-			require.Zero(t, count("reporter_resources", "id=?", id))
-			require.Zero(t, count("reporter_representations", "reporter_resource_id=?", id))
+			require.Zero(t, count("SELECT COUNT(*) FROM reporter_resources WHERE id=?", id))
+			require.Zero(t, count("SELECT COUNT(*) FROM reporter_representations WHERE reporter_resource_id=?", id))
 		}
 		for _, id := range []uuid.UUID{sharedActive, recentSharedKept, boundary, active} {
-			require.Equal(t, int64(1), count("reporter_resources", "id=?", id))
+			require.Equal(t, int64(1), count("SELECT COUNT(*) FROM reporter_resources WHERE id=?", id))
 		}
-		require.Zero(t, count("resource", "id=?", deletedRoot))
-		require.Equal(t, int64(5), count("common_representations", "resource_id=?", sharedRoot))
-		require.Equal(t, int64(2), count("common_representations", "resource_id=?", recentRoot))
-		require.Equal(t, int64(1), count("resource", "id=?", orphanRoot))
+		require.Zero(t, count("SELECT COUNT(*) FROM resource WHERE id=?", deletedRoot))
+		require.Equal(t, int64(5), count("SELECT COUNT(*) FROM common_representations WHERE resource_id=?", sharedRoot))
+		require.Equal(t, int64(2), count("SELECT COUNT(*) FROM common_representations WHERE resource_id=?", recentRoot))
+		require.Equal(t, int64(1), count("SELECT COUNT(*) FROM resource WHERE id=?", orphanRoot))
 		for _, root := range []uuid.UUID{orphanRoot, missingRoot} {
-			require.Equal(t, int64(1), count("common_representations", "resource_id=?", root))
+			require.Equal(t, int64(1), count("SELECT COUNT(*) FROM common_representations WHERE resource_id=?", root))
 		}
 	})
 	t.Run("oldest first regardless of history size with deterministic ID ties", func(t *testing.T) {
@@ -116,7 +116,7 @@ func TestTombstoneCleanupPostgres(t *testing.T) {
 		require.Zero(t, preview.reporterHistory)
 		require.Zero(t, preview.commonHistory)
 		require.Equal(t, int64(15), preview.totalReporterHistory)
-		require.Equal(t, int64(1), count("reporter_resources", "id=?", large))
+		require.Equal(t, int64(1), count("SELECT COUNT(*) FROM reporter_resources WHERE id=?", large))
 		all := capped
 		all.maxBatches = 0
 		expected := []uuid.UUID{empty, small, tieOlder, tieA, tieB, large}
@@ -126,7 +126,7 @@ func TestTombstoneCleanupPostgres(t *testing.T) {
 				if index < progress.batches {
 					remaining = 0
 				}
-				require.Equal(t, remaining, count("reporter_resources", "id=?", id))
+				require.Equal(t, remaining, count("SELECT COUNT(*) FROM reporter_resources WHERE id=?", id))
 			}
 		})
 		require.NoError(t, err)
@@ -144,8 +144,8 @@ func TestTombstoneCleanupPostgres(t *testing.T) {
 		require.True(t, run.complete)
 		require.Equal(t, int64(1), run.skipped)
 		require.Zero(t, run.reporterResources)
-		require.Equal(t, int64(3), count("reporter_representations", "reporter_resource_id=?", id))
-		require.Equal(t, int64(2), count("common_representations", "resource_id=?", root))
+		require.Equal(t, int64(3), count("SELECT COUNT(*) FROM reporter_representations WHERE reporter_resource_id=?", id))
+		require.Equal(t, int64(2), count("SELECT COUNT(*) FROM common_representations WHERE resource_id=?", root))
 	})
 	t.Run("batch cap cancellation and rerun count only committed work", func(t *testing.T) {
 		reset(t)
@@ -175,7 +175,7 @@ func TestTombstoneCleanupPostgres(t *testing.T) {
 		require.ErrorIs(t, err, context.Canceled)
 		require.Equal(t, 1, second.batches)
 		require.Equal(t, int64(2), second.reporterResources)
-		require.Equal(t, int64(1), count("reporter_resources", "TRUE"))
+		require.Equal(t, int64(1), count("SELECT COUNT(*) FROM reporter_resources WHERE TRUE"))
 		third, err := cleanup(context.Background(), db, uncapped, true, nil, nil)
 		require.NoError(t, err)
 		require.True(t, third.complete)
@@ -199,9 +199,9 @@ func TestTombstoneCleanupPostgres(t *testing.T) {
 		require.ErrorContains(t, err, "injected root failure")
 		require.Zero(t, run.batches)
 		require.Zero(t, run.reporterResources)
-		require.Equal(t, int64(1), count("reporter_resources", "id=?", id))
-		require.Equal(t, int64(3), count("reporter_representations", "reporter_resource_id=?", id))
-		require.Equal(t, int64(2), count("common_representations", "resource_id=?", root))
+		require.Equal(t, int64(1), count("SELECT COUNT(*) FROM reporter_resources WHERE id=?", id))
+		require.Equal(t, int64(3), count("SELECT COUNT(*) FROM reporter_representations WHERE reporter_resource_id=?", id))
+		require.Equal(t, int64(2), count("SELECT COUNT(*) FROM common_representations WHERE resource_id=?", root))
 	})
 	t.Run("revival committed during a batch is preserved after serialization retry", func(t *testing.T) {
 		reset(t)
@@ -250,9 +250,9 @@ func TestTombstoneCleanupPostgres(t *testing.T) {
 		case <-ctx.Done():
 			t.Fatal(ctx.Err())
 		}
-		require.Equal(t, int64(1), count("reporter_resources", "id=? AND tombstone IS FALSE", id))
-		require.Equal(t, int64(3), count("reporter_representations", "reporter_resource_id=?", id))
-		require.Equal(t, int64(2), count("common_representations", "resource_id=?", root))
+		require.Equal(t, int64(1), count("SELECT COUNT(*) FROM reporter_resources WHERE id=? AND tombstone IS FALSE", id))
+		require.Equal(t, int64(3), count("SELECT COUNT(*) FROM reporter_representations WHERE reporter_resource_id=?", id))
+		require.Equal(t, int64(2), count("SELECT COUNT(*) FROM common_representations WHERE resource_id=?", root))
 	})
 	t.Run("affected roots are unique across batches", func(t *testing.T) {
 		reset(t)

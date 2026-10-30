@@ -101,7 +101,7 @@ func cleanup(ctx context.Context, db *gorm.DB, o options, execute bool, onSelect
 			if err := tx.Exec("CREATE TEMP TABLE tombstone_cleanup_affected (resource_id uuid PRIMARY KEY) ON COMMIT PRESERVE ROWS").Error; err != nil {
 				return err
 			}
-			inserted := tx.Exec("INSERT INTO pg_temp.tombstone_cleanup_candidates "+candidateSQL, r.cutoff)
+			inserted := tx.Exec(insertCandidatesSQL, r.cutoff)
 			r.candidates = inserted.RowsAffected
 			return inserted.Error
 		})

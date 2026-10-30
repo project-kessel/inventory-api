@@ -419,7 +419,7 @@ func mergeRelationshipFields(stored model.Representation, incoming *model.Repres
 
 	for field, value := range *incoming {
 		if value == nil {
-			return nil, fmt.Errorf("relationship field has a null value")
+			return nil, fmt.Errorf("relationship field %q has a null value", field)
 		}
 
 		switch incomingValues := value.(type) {
@@ -428,7 +428,7 @@ func mergeRelationshipFields(stored model.Representation, incoming *model.Repres
 			if exists {
 				storedValues, ok := storedValue.([]interface{})
 				if !ok {
-					return nil, fmt.Errorf("relationship field is single-valued and cannot accept an array")
+					return nil, fmt.Errorf("relationship field %q is single-valued and cannot accept an array", field)
 				}
 				merged[field] = unionValues(storedValues, incomingValues)
 				continue
@@ -438,10 +438,10 @@ func mergeRelationshipFields(stored model.Representation, incoming *model.Repres
 			storedValue, exists := merged[field]
 			if exists {
 				if _, ok := storedValue.([]interface{}); ok {
-					return nil, fmt.Errorf("relationship field is multi-valued and cannot accept a single value")
+					return nil, fmt.Errorf("relationship field %q is multi-valued and cannot accept a single value", field)
 				}
 				if !valuesEqual(storedValue, value) {
-					return nil, fmt.Errorf("relationship field already has a value and cannot hold an additional value")
+					return nil, fmt.Errorf("relationship field %q already has a value and cannot hold an additional value", field)
 				}
 				// Same value: idempotent, keep the stored one.
 				continue
@@ -475,14 +475,11 @@ func unionValues(stored, incoming []interface{}) []interface{} {
 	return union
 }
 
-// valueKey produces a comparison key for a relationship value. Relationship
-// values are strings in practice; other JSON types fall back to their
-// formatted representation.
+// valueKey produces a comparison key for a relationship value. The value's
+// type is included so values of different JSON types (e.g. a string "123" and
+// a number 123) remain distinct during equality checks and array unions.
 func valueKey(value interface{}) string {
-	if s, ok := value.(string); ok {
-		return s
-	}
-	return fmt.Sprintf("%v", value)
+	return fmt.Sprintf("%T:%v", value, value)
 }
 
 // valuesEqual compares two single-valued relationship values for equality.

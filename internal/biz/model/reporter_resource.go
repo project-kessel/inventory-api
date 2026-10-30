@@ -148,6 +148,9 @@ func (rr ReporterResource) ApiHref() ApiHref { return rr.apiHref }
 // ConsoleHref returns the console href for this reporter resource.
 func (rr ReporterResource) ConsoleHref() *ConsoleHref { return rr.consoleHref }
 
+// Tombstoned reports whether this reporter resource has been tombstoned (deleted).
+func (rr ReporterResource) Tombstoned() bool { return rr.tombstone.Serialize() }
+
 // Add timestamp getters
 func (rr ReporterResource) CreatedAt() time.Time {
 	return rr.createdAt

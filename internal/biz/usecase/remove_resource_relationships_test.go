@@ -10,12 +10,137 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	authnapi "github.com/project-kessel/inventory-api/internal/authn/api"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
 	"github.com/project-kessel/inventory-api/internal/biz/usecase/metaauthorizer"
 	"github.com/project-kessel/inventory-api/internal/biz/usecase/resources"
 	"github.com/project-kessel/inventory-api/internal/data"
 	"github.com/project-kessel/inventory-api/internal/metricscollector"
 )
+
+// --- Test helpers shared with the AddResourceRelationships use case tests ---
+// Duplicated here so this branch is self-contained; delete one copy when both
+// use cases coexist on a single branch.
+
+// testAuthzContext returns a context carrying a test identity for authz checks.
+func testAuthzContext() context.Context {
+	claims := &authnapi.Claims{
+		SubjectId: authnapi.SubjectId("test-user"),
+		AuthType:  authnapi.AuthTypeXRhIdentity,
+	}
+	return authnapi.NewAuthzContext(context.Background(), authnapi.AuthzContext{
+		Protocol: authnapi.ProtocolGRPC,
+		Subject:  claims,
+	})
+}
+
+type recordingMetaAuthorizer struct {
+	allowed   bool
+	err       error
+	relations []metaauthorizer.Relation
+	calls     int
+}
+
+// Check records the relation and returns the configured allow/deny decision.
+func (r *recordingMetaAuthorizer) Check(_ context.Context, _ metaauthorizer.MetaObject, relation metaauthorizer.Relation, _ authnapi.AuthzContext) (bool, error) {
+	r.calls++
+	r.relations = append(r.relations, relation)
+	return r.allowed, r.err
+}
+
+// newFakeSchemaRepository registers schemas for the resource types used by the
+// remove-relationships tests.
+func newFakeSchemaRepository(t *testing.T) model.SchemaRepository {
+	t.Helper()
+	schemaRepository := data.NewInMemorySchemaRepository()
+
+	optionalWorkspaceCommonSchema := data.NewJsonSchemaWithWorkspacesFromString(`{
+		"$schema": "http://json-schema.org/draft-07/schema#",
+		"type": "object",
+		"properties": {
+			"workspace_id": { "type": "string" }
+		},
+		"required": []
+	}`)
+
+	featuresWorkspaceReporterSchema := data.NewJsonSchemaWithWorkspacesFromString(`{
+		"$schema": "http://json-schema.org/draft-07/schema#",
+		"type": "object",
+		"properties": {
+			"direct_service_preferences": {
+				"type": "array",
+				"items": { "type": "string" }
+			},
+			"direct_billing_account": { "type": "string" }
+		},
+		"required": []
+	}`)
+
+	workspace, err := model.NewResourceType("workspace")
+	require.NoError(t, err)
+	features, err := model.NewReporterType("features")
+	require.NoError(t, err)
+
+	workspaceSchema, err := model.NewResourceSchemaRepresentation(workspace, optionalWorkspaceCommonSchema)
+	require.NoError(t, err)
+	require.NoError(t, schemaRepository.CreateResourceSchema(context.Background(), workspaceSchema))
+
+	featuresWorkspace, err := model.NewReporterSchemaRepresentation(workspace, features, featuresWorkspaceReporterSchema)
+	require.NoError(t, err)
+	require.NoError(t, schemaRepository.CreateReporterSchema(context.Background(), featuresWorkspace))
+
+	return schemaRepository
+}
+
+// createReporterResourceKey builds a ReporterResourceKey from test parameters.
+func createReporterResourceKey(t *testing.T, localResourceId, resourceType, reporterType, reporterInstance string) model.ReporterResourceKey {
+	t.Helper()
+	localId, err := model.NewLocalResourceId(localResourceId)
+	require.NoError(t, err)
+	resType, err := model.NewResourceType(resourceType)
+	require.NoError(t, err)
+	repType, err := model.NewReporterType(reporterType)
+	require.NoError(t, err)
+	instanceId, err := model.NewReporterInstanceId(reporterInstance)
+	require.NoError(t, err)
+	key, err := model.NewReporterResourceKey(localId, resType, repType, instanceId)
+	require.NoError(t, err)
+	return key
+}
+
+// reportCommand builds a ReportResourceCommand used to seed state.
+func reportCommand(t *testing.T, localResourceId string, reporterData, commonData map[string]interface{}) resources.ReportResourceCommand {
+	t.Helper()
+	localId, err := model.NewLocalResourceId(localResourceId)
+	require.NoError(t, err)
+	resType, err := model.NewResourceType("workspace")
+	require.NoError(t, err)
+	repType, err := model.NewReporterType("features")
+	require.NoError(t, err)
+	instanceId, err := model.NewReporterInstanceId("features-instance-1")
+	require.NoError(t, err)
+	apiHref, err := model.NewApiHref("https://api.example.com/resource/123")
+	require.NoError(t, err)
+
+	cmd := resources.ReportResourceCommand{
+		LocalResourceId:    localId,
+		ResourceType:       resType,
+		ReporterType:       repType,
+		ReporterInstanceId: instanceId,
+		ApiHref:            apiHref,
+	}
+	if reporterData != nil {
+		rep, err := model.NewRepresentation(reporterData)
+		require.NoError(t, err)
+		cmd.ReporterRepresentation = &rep
+	}
+	if commonData != nil {
+		rep, err := model.NewRepresentation(commonData)
+		require.NoError(t, err)
+		cmd.CommonRepresentation = &rep
+	}
+	return cmd
+}
 
 // --- Test harness ---
 
@@ -34,6 +159,7 @@ type removeHarnessConfig struct {
 	meta *recordingMetaAuthorizer
 }
 
+// newRemoveTestHarness creates a test harness with fake repositories for the Remove use case.
 func newRemoveTestHarness(t *testing.T, opts ...removeHarnessOption) *removeTestHarness {
 	t.Helper()
 	cfg := &removeHarnessConfig{}
@@ -70,6 +196,7 @@ func newRemoveTestHarness(t *testing.T, opts ...removeHarnessOption) *removeTest
 	}
 }
 
+// withRemoveMeta returns a harness option that sets the meta-authorizer decision.
 func withRemoveMeta(allowed bool) removeHarnessOption {
 	return func(c *removeHarnessConfig) {
 		c.meta = &recordingMetaAuthorizer{allowed: allowed}
@@ -128,6 +255,7 @@ func removeCommand(t *testing.T, localResourceId string, reporterData, commonDat
 	return cmd
 }
 
+// reporterPreferencesAt reads current direct_service_preferences values for assertions.
 func reporterPreferencesAt(t *testing.T, h *removeTestHarness, localResourceId string) []interface{} {
 	t.Helper()
 	key := createReporterResourceKey(t, localResourceId, "workspace", "features", "features-instance-1")
@@ -154,6 +282,7 @@ func (h *removeTestHarness) resetMeta() {
 
 // --- Tests ---
 
+// TestRemoveResourceRelationships_RemovesFromExisting validates the corresponding user-story scenario.
 func TestRemoveResourceRelationships_RemovesFromExisting(t *testing.T) {
 	h := newRemoveTestHarness(t, withRemoveMeta(true))
 
@@ -179,6 +308,7 @@ func TestRemoveResourceRelationships_RemovesFromExisting(t *testing.T) {
 	assert.Equal(t, "ws-1", reps.CommonData()["workspace_id"])
 }
 
+// TestRemoveResourceRelationships_RemovesMultipleValues validates the corresponding user-story scenario.
 func TestRemoveResourceRelationships_RemovesMultipleValues(t *testing.T) {
 	h := newRemoveTestHarness(t, withRemoveMeta(true))
 
@@ -195,6 +325,7 @@ func TestRemoveResourceRelationships_RemovesMultipleValues(t *testing.T) {
 	assert.ElementsMatch(t, []interface{}{"RHEL", "Insights"}, reporterPreferencesAt(t, h, "root"))
 }
 
+// TestRemoveResourceRelationships_RemovesAllValues validates the corresponding user-story scenario.
 func TestRemoveResourceRelationships_RemovesAllValues(t *testing.T) {
 	h := newRemoveTestHarness(t, withRemoveMeta(true))
 
@@ -224,6 +355,7 @@ func TestRemoveResourceRelationships_RemovesAllValues(t *testing.T) {
 	assert.Equal(t, "ws-1", reps.CommonData()["workspace_id"])
 }
 
+// TestRemoveResourceRelationships_NonExistentValueIsIdempotent validates the corresponding user-story scenario.
 func TestRemoveResourceRelationships_NonExistentValueIsIdempotent(t *testing.T) {
 	h := newRemoveTestHarness(t, withRemoveMeta(true))
 
@@ -232,14 +364,20 @@ func TestRemoveResourceRelationships_NonExistentValueIsIdempotent(t *testing.T) 
 	}, nil)
 	require.NoError(t, h.reportResource(t, seed))
 
+	// Capture the outbox event count before the no-op removal so we can
+	// verify no new version was persisted.
+	beforeCount := metricscollector.GetOutboxEventWriteCount()
+
 	cmd := removeCommand(t, "root", map[string]interface{}{
 		"direct_service_preferences": []interface{}{"OpenShift"},
 	}, nil)
 	require.NoError(t, h.usecase.RemoveResourceRelationships(h.ctx, cmd))
 
 	assert.ElementsMatch(t, []interface{}{"RHEL", "Insights"}, reporterPreferencesAt(t, h, "root"))
+	assert.Equal(t, beforeCount, metricscollector.GetOutboxEventWriteCount(), "no-op removal should not emit an outbox event")
 }
 
+// TestRemoveResourceRelationships_NoExistingRelationshipsOfType validates the corresponding user-story scenario.
 func TestRemoveResourceRelationships_NoExistingRelationshipsOfType(t *testing.T) {
 	h := newRemoveTestHarness(t, withRemoveMeta(true))
 
@@ -257,6 +395,7 @@ func TestRemoveResourceRelationships_NoExistingRelationshipsOfType(t *testing.T)
 	assert.Nil(t, reporterPreferencesAt(t, h, "root"))
 }
 
+// TestRemoveResourceRelationships_ResourceNotFound validates the corresponding user-story scenario.
 func TestRemoveResourceRelationships_ResourceNotFound(t *testing.T) {
 	h := newRemoveTestHarness(t, withRemoveMeta(true))
 
@@ -268,6 +407,7 @@ func TestRemoveResourceRelationships_ResourceNotFound(t *testing.T) {
 	assert.ErrorIs(t, err, model.ErrResourceNotFound)
 }
 
+// TestRemoveResourceRelationships_TombstonedResourceReturnsNotFound validates the corresponding user-story scenario.
 func TestRemoveResourceRelationships_TombstonedResourceReturnsNotFound(t *testing.T) {
 	h := newRemoveTestHarness(t, withRemoveMeta(true))
 
@@ -300,6 +440,7 @@ func TestRemoveResourceRelationships_TombstonedResourceReturnsNotFound(t *testin
 	assert.ErrorIs(t, err, model.ErrResourceNotFound)
 }
 
+// TestRemoveResourceRelationships_SingleValuedFieldRemoved validates the corresponding user-story scenario.
 func TestRemoveResourceRelationships_SingleValuedFieldRemoved(t *testing.T) {
 	h := newRemoveTestHarness(t, withRemoveMeta(true))
 
@@ -322,6 +463,7 @@ func TestRemoveResourceRelationships_SingleValuedFieldRemoved(t *testing.T) {
 	require.NotNil(t, found)
 }
 
+// TestRemoveResourceRelationships_SingleValuedNonMatchingValueNoOp validates the corresponding user-story scenario.
 func TestRemoveResourceRelationships_SingleValuedNonMatchingValueNoOp(t *testing.T) {
 	h := newRemoveTestHarness(t, withRemoveMeta(true))
 
@@ -333,6 +475,8 @@ func TestRemoveResourceRelationships_SingleValuedNonMatchingValueNoOp(t *testing
 	// Removing a value that is not the stored one is an idempotent no-op;
 	// changing a single-valued relationship requires removing the stored
 	// value first, then adding the new one.
+	beforeCount := metricscollector.GetOutboxEventWriteCount()
+
 	cmd := removeCommand(t, "root", map[string]interface{}{
 		"direct_billing_account": "acct-2",
 	}, nil)
@@ -342,8 +486,10 @@ func TestRemoveResourceRelationships_SingleValuedNonMatchingValueNoOp(t *testing
 	reps, err := h.resourceRepo.FindLatestRepresentations(nil, key)
 	require.NoError(t, err)
 	assert.Equal(t, "acct-1", reps.ReporterData()["direct_billing_account"])
+	assert.Equal(t, beforeCount, metricscollector.GetOutboxEventWriteCount(), "no-op removal should not emit an outbox event")
 }
 
+// TestRemoveResourceRelationships_CommonScopedRemoval validates the corresponding user-story scenario.
 func TestRemoveResourceRelationships_CommonScopedRemoval(t *testing.T) {
 	h := newRemoveTestHarness(t, withRemoveMeta(true))
 
@@ -367,6 +513,7 @@ func TestRemoveResourceRelationships_CommonScopedRemoval(t *testing.T) {
 	assert.ElementsMatch(t, []interface{}{"RHEL"}, reporterPreferencesAt(t, h, "root"))
 }
 
+// TestRemoveResourceRelationships_TransactionIdAlreadyProcessedSkipsWrite validates the corresponding user-story scenario.
 func TestRemoveResourceRelationships_TransactionIdAlreadyProcessedSkipsWrite(t *testing.T) {
 	h := newRemoveTestHarness(t, withRemoveMeta(true))
 
@@ -389,6 +536,7 @@ func TestRemoveResourceRelationships_TransactionIdAlreadyProcessedSkipsWrite(t *
 	assert.ElementsMatch(t, []interface{}{"RHEL", "Insights"}, reporterPreferencesAt(t, h, "root"))
 }
 
+// TestRemoveResourceRelationships_BothRepresentationsAbsentRejected validates the corresponding user-story scenario.
 func TestRemoveResourceRelationships_BothRepresentationsAbsentRejected(t *testing.T) {
 	h := newRemoveTestHarness(t, withRemoveMeta(true))
 
@@ -398,6 +546,7 @@ func TestRemoveResourceRelationships_BothRepresentationsAbsentRejected(t *testin
 	assert.Equal(t, codes.InvalidArgument, status.Code(err))
 }
 
+// TestRemoveResourceRelationships_MissingAuthzContext validates the corresponding user-story scenario.
 func TestRemoveResourceRelationships_MissingAuthzContext(t *testing.T) {
 	h := newRemoveTestHarness(t, withRemoveMeta(true))
 
@@ -410,6 +559,7 @@ func TestRemoveResourceRelationships_MissingAuthzContext(t *testing.T) {
 	assert.Equal(t, codes.Unauthenticated, status.Code(err))
 }
 
+// TestRemoveResourceRelationships_MetaAuthzDenied validates the corresponding user-story scenario.
 func TestRemoveResourceRelationships_MetaAuthzDenied(t *testing.T) {
 	h := newRemoveTestHarness(t, withRemoveMeta(false))
 
@@ -422,6 +572,7 @@ func TestRemoveResourceRelationships_MetaAuthzDenied(t *testing.T) {
 	assert.ErrorIs(t, err, metaauthorizer.ErrMetaAuthorizationDenied)
 }
 
+// TestRemoveResourceRelationships_UsesReportResourceRelation validates the corresponding user-story scenario.
 func TestRemoveResourceRelationships_UsesReportResourceRelation(t *testing.T) {
 	h := newRemoveTestHarness(t, withRemoveMeta(true))
 

@@ -4,8 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
+	"time"
 
+	kratosErrors "github.com/go-kratos/kratos/v2/errors"
 	"github.com/go-kratos/kratos/v2/log"
+	"github.com/google/uuid"
 	"github.com/project-kessel/inventory-api/cmd/common"
 	authnapi "github.com/project-kessel/inventory-api/internal/authn/api"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
@@ -22,6 +26,86 @@ import (
 // RemoveResourceRelationshipsOperationName identifies the serializable
 // transaction used by the RemoveResourceRelationships use case.
 const RemoveResourceRelationshipsOperationName = "RemoveResourceRelationships"
+
+const listenTimeout = 10 * time.Second
+
+// Domain errors re-exported from the model package.
+var ErrResourceNotFound = model.ErrResourceNotFound
+
+// --- Helpers shared with the AddResourceRelationships use case ---
+// These are duplicated here so this branch is self-contained without the Add
+// use case. When both use cases coexist on a single branch, delete one copy
+// (they are identical) and keep the other.
+
+// representationIsEmpty reports whether a partial representation is absent or
+// carries no fields.
+func representationIsEmpty(rep *model.Representation) bool {
+	return rep == nil || len(*rep) == 0
+}
+
+// findReporterResource locates the reporter resource matching the key, using
+// the same case-insensitive matching semantics as the model's update path.
+func findReporterResource(reporterResources []model.ReporterResource, key model.ReporterResourceKey) (model.ReporterResource, error) {
+	for _, reporterResource := range reporterResources {
+		storedKey := reporterResource.Key()
+
+		if strings.EqualFold(storedKey.LocalResourceId().Serialize(), key.LocalResourceId().Serialize()) &&
+			strings.EqualFold(storedKey.ResourceType().Serialize(), key.ResourceType().Serialize()) &&
+			strings.EqualFold(storedKey.ReporterType().Serialize(), key.ReporterType().Serialize()) {
+
+			searchReporterInstanceId := key.ReporterInstanceId().Serialize()
+			storedReporterInstanceId := storedKey.ReporterInstanceId().Serialize()
+
+			if searchReporterInstanceId == "" || strings.EqualFold(storedReporterInstanceId, searchReporterInstanceId) {
+				return reporterResource, nil
+			}
+		}
+	}
+
+	return model.ReporterResource{}, fmt.Errorf("reporter resource matching the requested key was not found in resource")
+}
+
+// valueKey produces a comparison key for a relationship value. The value's
+// type is included so values of different JSON types (e.g. a string "123" and
+// a number 123) remain distinct during equality checks and array operations.
+func valueKey(value interface{}) string {
+	return fmt.Sprintf("%T:%v", value, value)
+}
+
+// valuesEqual compares two single-valued relationship values for equality.
+func valuesEqual(a, b interface{}) bool {
+	return valueKey(a) == valueKey(b)
+}
+
+// isSPInAllowlist checks if the caller subject is in the allowlist.
+func isSPInAllowlist(callerSubject authnapi.SubjectId, allowlist []string) bool {
+	for _, sp := range allowlist {
+		if sp == string(callerSubject) || sp == "*" {
+			return true
+		}
+	}
+
+	return false
+}
+
+// isDuplicateTransactionError reports whether the error indicates a
+// non-unique transaction ID constraint violation.
+func isDuplicateTransactionError(err error) bool {
+	var kratosErr *kratosErrors.Error
+	if errors.As(err, &kratosErr) {
+		return kratosErr.Reason == model.ReasonNonUniqueTransactionID
+	}
+	return false
+}
+
+// getNextTransactionID generates a new UUIDv7-based transaction ID.
+func getNextTransactionID() (model.TransactionId, error) {
+	txid, err := uuid.NewV7()
+	if err != nil {
+		return "", err
+	}
+	return model.NewTransactionId(txid.String()), nil
+}
 
 // RemoveResourceRelationshipsCommand contains the data needed to remove one or
 // more relationships from a resource. This is the domain command used by the
@@ -159,7 +243,7 @@ func (uc *RemoveResourceRelationshipsUseCase) RemoveResourceRelationships(ctx co
 			return fmt.Errorf("failed to check transaction ID: %w", err)
 		}
 		if alreadyProcessed {
-			uc.Log.Infof("Transaction already processed, skipping update: transaction_id=%s", cmd.TransactionId.String())
+			uc.Log.Info("Transaction already processed, skipping update")
 			return nil
 		}
 	}
@@ -170,6 +254,10 @@ func (uc *RemoveResourceRelationshipsUseCase) RemoveResourceRelationships(ctx co
 			RemoveResourceRelationshipsOperationName,
 			uc.resourceRepository.GetDB(),
 			func(tx *gorm.DB) error {
+				// Reset per attempt so retries cannot retain stale state from
+				// a previous failed transaction closure.
+				operationType = nil
+
 				res, err := uc.resourceRepository.FindResourceByKeys(tx, reporterResourceKey)
 				if err != nil {
 					// A missing resource matches the behaviour of DeleteResource.
@@ -182,15 +270,20 @@ func (uc *RemoveResourceRelationshipsUseCase) RemoveResourceRelationships(ctx co
 					return ErrResourceNotFound
 				}
 
+				if err := uc.removeRelationshipsFromExistingResource(ctx, tx, cmd, res, reporterResourceKey, txid); err != nil {
+					return err
+				}
+				// Set only when a write was persisted; no-op removals leave
+				// operationType nil so metrics and read-after-write are skipped.
 				operationType = model.OperationTypeUpdated
-				return uc.removeRelationshipsFromExistingResource(ctx, tx, cmd, res, reporterResourceKey, txid)
+				return nil
 			},
 		)
 	}
 
 	err = removeRelationships()
 	if err != nil && !uc.Config.IdempotencyCheckEnabled && isDuplicateTransactionError(err) {
-		uc.Log.Debugf("Idempotency check disabled and duplicate transaction ID detected, retrying with new transaction ID: %s", cmd.TransactionId.String())
+		uc.Log.Debug("Idempotency check disabled and duplicate transaction ID detected, retrying with new transaction ID")
 		retryTxid, retryErr := getNextTransactionID()
 		if retryErr != nil {
 			return retryErr
@@ -200,35 +293,21 @@ func (uc *RemoveResourceRelationshipsUseCase) RemoveResourceRelationships(ctx co
 	}
 
 	if err != nil {
-		// Extract principal for failure logging
-		principal := authzCtx.ExtractPrincipal()
-
-		// CRUD operation failed - SEC-MON-REQ-1 compliance (EOI-1 pii_manipulation, EOI-11 warnings_or_errors)
 		uc.Log.Warnw("msg", "Resource operation failed",
 			"action", "REMOVE_RESOURCE_RELATIONSHIPS",
 			"resource_type", cmd.ResourceType.String(),
-			"resource_id", cmd.LocalResourceId,
 			"reporter_type", cmd.ReporterType.String(),
-			"reporter_instance_id", cmd.ReporterInstanceId.String(),
-			"principal", principal,
 			"outcome", "failure",
-			"reason", err.Error(),
+			"error_code", status.Code(err).String(),
 		)
 
 		return err
 	}
 
-	// Extract principal for success logging
-	principal := authzCtx.ExtractPrincipal()
-
-	// CRUD operation - SEC-MON-REQ-1 compliance (EOI-1 pii_manipulation)
 	uc.Log.Infow("msg", "Resource operation completed",
 		"action", "UPDATE",
 		"resource_type", cmd.ResourceType.String(),
-		"resource_id", cmd.LocalResourceId,
 		"reporter_type", cmd.ReporterType.String(),
-		"reporter_instance_id", cmd.ReporterInstanceId.String(),
-		"principal", principal,
 		"outcome", "success",
 	)
 
@@ -237,7 +316,9 @@ func (uc *RemoveResourceRelationshipsUseCase) RemoveResourceRelationships(ctx co
 		metricscollector.Incr(uc.MetricsCollector.OutboxEventWrites, string(operationType.OperationType()))
 	}
 
-	if readAfterWriteEnabled && uc.Config.ConsumerEnabled {
+	// Only wait for the read-after-write notification when a write was
+	// actually persisted; no-op removals emit no outbox event.
+	if readAfterWriteEnabled && uc.Config.ConsumerEnabled && operationType != nil {
 		timeoutCtx, cancel := context.WithTimeout(ctx, listenTimeout)
 		defer cancel()
 
@@ -312,7 +393,7 @@ func (uc *RemoveResourceRelationshipsUseCase) removeRelationshipsFromExistingRes
 	// Removing values that are not present is an idempotent no-op: no new
 	// representation version is persisted and no outbox event is emitted.
 	if !reporterChanged && !commonChanged {
-		uc.Log.Infof("No relationships to remove, skipping update: resource_id=%s", cmd.LocalResourceId)
+		uc.Log.Info("No relationships to remove, skipping update")
 		return nil
 	}
 
@@ -389,13 +470,17 @@ func removeRelationshipFields(stored model.Representation, removals *model.Repre
 				return nil, false, fmt.Errorf("relationship field %q is single-valued and cannot remove an array", field)
 			}
 			remaining := subtractValues(storedValues, removalValues)
-			if len(remaining) == 0 {
-				// All values removed: the field itself is removed.
-				delete(result, field)
-			} else {
-				result[field] = remaining
+			if len(remaining) < len(storedValues) {
+				// At least one value was removed.
+				if len(remaining) == 0 {
+					// All values removed: the field itself is removed.
+					delete(result, field)
+				} else {
+					result[field] = remaining
+				}
+				changed = true
 			}
-			changed = true
+			// None of the requested values were present: idempotent no-op.
 		default:
 			// Single-valued: remove only when the stored value matches.
 			if valuesEqual(storedValue, value) {

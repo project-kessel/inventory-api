@@ -210,26 +210,16 @@ func (uc *AddResourceRelationshipsUseCase) AddResourceRelationships(ctx context.
 	}
 
 	if err != nil {
-		// Extract principal for failure logging
-		principal := authzCtx.ExtractPrincipal()
-
-		// CRUD operation failed - SEC-MON-REQ-1 compliance (EOI-1 pii_manipulation, EOI-11 warnings_or_errors)
 		uc.Log.Warnw("msg", "Resource operation failed",
 			"action", "ADD_RESOURCE_RELATIONSHIPS",
 			"resource_type", cmd.ResourceType.String(),
-			"resource_id", cmd.LocalResourceId,
 			"reporter_type", cmd.ReporterType.String(),
-			"reporter_instance_id", cmd.ReporterInstanceId.String(),
-			"principal", principal,
 			"outcome", "failure",
-			"reason", err.Error(),
+			"error_code", status.Code(err).String(),
 		)
 
 		return err
 	}
-
-	// Extract principal for success logging
-	principal := authzCtx.ExtractPrincipal()
 
 	// Determine action based on operation type
 	var action string
@@ -242,14 +232,10 @@ func (uc *AddResourceRelationshipsUseCase) AddResourceRelationships(ctx context.
 		action = "ADD_RESOURCE_RELATIONSHIPS"
 	}
 
-	// CRUD operation - SEC-MON-REQ-1 compliance (EOI-1 pii_manipulation)
 	uc.Log.Infow("msg", "Resource operation completed",
 		"action", action,
 		"resource_type", cmd.ResourceType.String(),
-		"resource_id", cmd.LocalResourceId,
 		"reporter_type", cmd.ReporterType.String(),
-		"reporter_instance_id", cmd.ReporterInstanceId.String(),
-		"principal", principal,
 		"outcome", "success",
 	)
 
@@ -433,7 +419,7 @@ func mergeRelationshipFields(stored model.Representation, incoming *model.Repres
 
 	for field, value := range *incoming {
 		if value == nil {
-			return nil, fmt.Errorf("relationship field %q has a null value", field)
+			return nil, fmt.Errorf("relationship field has a null value")
 		}
 
 		switch incomingValues := value.(type) {
@@ -442,7 +428,7 @@ func mergeRelationshipFields(stored model.Representation, incoming *model.Repres
 			if exists {
 				storedValues, ok := storedValue.([]interface{})
 				if !ok {
-					return nil, fmt.Errorf("relationship field %q is single-valued and cannot accept an array", field)
+					return nil, fmt.Errorf("relationship field is single-valued and cannot accept an array")
 				}
 				merged[field] = unionValues(storedValues, incomingValues)
 				continue
@@ -452,10 +438,10 @@ func mergeRelationshipFields(stored model.Representation, incoming *model.Repres
 			storedValue, exists := merged[field]
 			if exists {
 				if _, ok := storedValue.([]interface{}); ok {
-					return nil, fmt.Errorf("relationship field %q is multi-valued and cannot accept a single value", field)
+					return nil, fmt.Errorf("relationship field is multi-valued and cannot accept a single value")
 				}
 				if !valuesEqual(storedValue, value) {
-					return nil, fmt.Errorf("relationship field %q already has value %v and cannot hold an additional value", field, storedValue)
+					return nil, fmt.Errorf("relationship field already has a value and cannot hold an additional value")
 				}
 				// Same value: idempotent, keep the stored one.
 				continue
@@ -529,8 +515,7 @@ func findReporterResource(reporterResources []model.ReporterResource, key model.
 		}
 	}
 
-	return model.ReporterResource{}, fmt.Errorf("reporter resource with key (localResourceId=%s, resourceType=%s, reporterType=%s, reporterInstanceId=%s) not found in resource",
-		key.LocalResourceId(), key.ResourceType(), key.ReporterType(), key.ReporterInstanceId())
+	return model.ReporterResource{}, fmt.Errorf("reporter resource matching the requested key was not found in resource")
 }
 
 // enforceMetaAuthzObject calls the MetaAuthorizer to validate access using a MetaObject.
@@ -559,6 +544,8 @@ func isSPInAllowlist(callerSubject authnapi.SubjectId, allowlist []string) bool 
 	return false
 }
 
+// isDuplicateTransactionError reports whether the error indicates a
+// non-unique transaction ID constraint violation.
 func isDuplicateTransactionError(err error) bool {
 	var kratosErr *kratosErrors.Error
 	if errors.As(err, &kratosErr) {
@@ -567,6 +554,7 @@ func isDuplicateTransactionError(err error) bool {
 	return false
 }
 
+// getNextTransactionID generates a new UUIDv7-based transaction ID.
 func getNextTransactionID() (model.TransactionId, error) {
 	txid, err := uuid.NewV7()
 	if err != nil {

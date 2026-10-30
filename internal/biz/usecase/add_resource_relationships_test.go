@@ -36,6 +36,9 @@ type harnessConfig struct {
 	meta *recordingMetaAuthorizer
 }
 
+// newTestHarness creates a test harness with a fake resource repository,
+// in-memory schema repository, and configurable meta-authorizer for exercising
+// the AddResourceRelationships use case in isolation.
 func newTestHarness(t *testing.T, opts ...harnessOption) *testHarness {
 	t.Helper()
 	cfg := &harnessConfig{}
@@ -72,6 +75,8 @@ func newTestHarness(t *testing.T, opts ...harnessOption) *testHarness {
 	}
 }
 
+// withMeta returns a harness option that sets the recording meta-authorizer's
+// allow/deny decision.
 func withMeta(allowed bool) harnessOption {
 	return func(c *harnessConfig) {
 		c.meta = &recordingMetaAuthorizer{allowed: allowed}
@@ -100,6 +105,7 @@ func (h *testHarness) reportResource(t *testing.T, cmd resources.ReportResourceC
 
 // --- Test helpers ---
 
+// testAuthzContext returns a context carrying a test identity for authz checks.
 func testAuthzContext() context.Context {
 	claims := &authnapi.Claims{
 		SubjectId: authnapi.SubjectId("test-user"),
@@ -118,12 +124,14 @@ type recordingMetaAuthorizer struct {
 	calls     int
 }
 
+// Check records the relation and returns the configured allow/deny decision.
 func (r *recordingMetaAuthorizer) Check(_ context.Context, _ metaauthorizer.MetaObject, relation metaauthorizer.Relation, _ authnapi.AuthzContext) (bool, error) {
 	r.calls++
 	r.relations = append(r.relations, relation)
 	return r.allowed, r.err
 }
 
+// createReporterResourceKey builds a ReporterResourceKey from test parameters.
 func createReporterResourceKey(t *testing.T, localResourceId, resourceType, reporterType, reporterInstance string) model.ReporterResourceKey {
 	t.Helper()
 	localId, err := model.NewLocalResourceId(localResourceId)
@@ -285,6 +293,8 @@ func reportCommand(t *testing.T, localResourceId string, reporterData, commonDat
 	return cmd
 }
 
+// reporterPreferences reads the current direct_service_preferences values
+// from the fake repository for merge assertions.
 func reporterPreferences(t *testing.T, h *testHarness, localResourceId string) []interface{} {
 	t.Helper()
 	key := createReporterResourceKey(t, localResourceId, "workspace", "features", "features-instance-1")
@@ -302,6 +312,7 @@ func reporterPreferences(t *testing.T, h *testHarness, localResourceId string) [
 
 // --- Tests ---
 
+// TestAddResourceRelationships_AutoCreatesResource validates the corresponding user-story scenario.
 func TestAddResourceRelationships_AutoCreatesResource(t *testing.T) {
 	h := newTestHarness(t, withMeta(true))
 
@@ -322,6 +333,7 @@ func TestAddResourceRelationships_AutoCreatesResource(t *testing.T) {
 	assert.Equal(t, []interface{}{"RHEL"}, reporterPreferences(t, h, "new-workspace"))
 }
 
+// TestAddResourceRelationships_MergesIntoExisting validates the corresponding user-story scenario.
 func TestAddResourceRelationships_MergesIntoExisting(t *testing.T) {
 	h := newTestHarness(t, withMeta(true))
 
@@ -347,6 +359,7 @@ func TestAddResourceRelationships_MergesIntoExisting(t *testing.T) {
 	assert.Equal(t, "ws-1", reps.CommonData()["workspace_id"])
 }
 
+// TestAddResourceRelationships_MergesMultipleValues validates the corresponding user-story scenario.
 func TestAddResourceRelationships_MergesMultipleValues(t *testing.T) {
 	h := newTestHarness(t, withMeta(true))
 
@@ -363,6 +376,7 @@ func TestAddResourceRelationships_MergesMultipleValues(t *testing.T) {
 	assert.ElementsMatch(t, []interface{}{"RHEL", "Insights", "Ansible"}, reporterPreferences(t, h, "root"))
 }
 
+// TestAddResourceRelationships_ExistingValueIsIdempotent validates the corresponding user-story scenario.
 func TestAddResourceRelationships_ExistingValueIsIdempotent(t *testing.T) {
 	h := newTestHarness(t, withMeta(true))
 
@@ -379,6 +393,7 @@ func TestAddResourceRelationships_ExistingValueIsIdempotent(t *testing.T) {
 	assert.ElementsMatch(t, []interface{}{"RHEL", "Insights"}, reporterPreferences(t, h, "root"))
 }
 
+// TestAddResourceRelationships_SingleValuedFieldSetWhenAbsent validates the corresponding user-story scenario.
 func TestAddResourceRelationships_SingleValuedFieldSetWhenAbsent(t *testing.T) {
 	h := newTestHarness(t, withMeta(true))
 
@@ -398,6 +413,7 @@ func TestAddResourceRelationships_SingleValuedFieldSetWhenAbsent(t *testing.T) {
 	assert.Equal(t, "acct-1", reps.ReporterData()["direct_billing_account"])
 }
 
+// TestAddResourceRelationships_SingleValuedFieldConflictRejected validates the corresponding user-story scenario.
 func TestAddResourceRelationships_SingleValuedFieldConflictRejected(t *testing.T) {
 	h := newTestHarness(t, withMeta(true))
 
@@ -420,6 +436,7 @@ func TestAddResourceRelationships_SingleValuedFieldConflictRejected(t *testing.T
 	assert.Equal(t, "acct-1", reps.ReporterData()["direct_billing_account"])
 }
 
+// TestAddResourceRelationships_CommonScopedMerge validates the corresponding user-story scenario.
 func TestAddResourceRelationships_CommonScopedMerge(t *testing.T) {
 	h := newTestHarness(t, withMeta(true))
 
@@ -442,6 +459,7 @@ func TestAddResourceRelationships_CommonScopedMerge(t *testing.T) {
 	assert.ElementsMatch(t, []interface{}{"RHEL"}, reporterPreferences(t, h, "root"))
 }
 
+// TestAddResourceRelationships_TombstonedResourceReturnsNotFound validates the corresponding user-story scenario.
 func TestAddResourceRelationships_TombstonedResourceReturnsNotFound(t *testing.T) {
 	h := newTestHarness(t, withMeta(true))
 
@@ -475,6 +493,7 @@ func TestAddResourceRelationships_TombstonedResourceReturnsNotFound(t *testing.T
 	assert.ErrorIs(t, err, model.ErrResourceNotFound)
 }
 
+// TestAddResourceRelationships_AutoCreateRejectedWhenRequiredFieldsMissing validates the corresponding user-story scenario.
 func TestAddResourceRelationships_AutoCreateRejectedWhenRequiredFieldsMissing(t *testing.T) {
 	h := newTestHarness(t, withMeta(true))
 
@@ -511,6 +530,7 @@ func TestAddResourceRelationships_AutoCreateRejectedWhenRequiredFieldsMissing(t 
 	assert.ErrorIs(t, err, gorm.ErrRecordNotFound)
 }
 
+// TestAddResourceRelationships_TransactionIdAlreadyProcessedSkipsWrite validates the corresponding user-story scenario.
 func TestAddResourceRelationships_TransactionIdAlreadyProcessedSkipsWrite(t *testing.T) {
 	h := newTestHarness(t, withMeta(true))
 
@@ -533,6 +553,7 @@ func TestAddResourceRelationships_TransactionIdAlreadyProcessedSkipsWrite(t *tes
 	assert.ElementsMatch(t, []interface{}{"RHEL"}, reporterPreferences(t, h, "root"))
 }
 
+// TestAddResourceRelationships_BothRepresentationsAbsentRejected validates the corresponding user-story scenario.
 func TestAddResourceRelationships_BothRepresentationsAbsentRejected(t *testing.T) {
 	h := newTestHarness(t, withMeta(true))
 
@@ -542,6 +563,7 @@ func TestAddResourceRelationships_BothRepresentationsAbsentRejected(t *testing.T
 	assert.Equal(t, codes.InvalidArgument, status.Code(err))
 }
 
+// TestAddResourceRelationships_MissingAuthzContext validates the corresponding user-story scenario.
 func TestAddResourceRelationships_MissingAuthzContext(t *testing.T) {
 	h := newTestHarness(t, withMeta(true))
 
@@ -554,6 +576,7 @@ func TestAddResourceRelationships_MissingAuthzContext(t *testing.T) {
 	assert.Equal(t, codes.Unauthenticated, status.Code(err))
 }
 
+// TestAddResourceRelationships_MetaAuthzDenied validates the corresponding user-story scenario.
 func TestAddResourceRelationships_MetaAuthzDenied(t *testing.T) {
 	h := newTestHarness(t, withMeta(false))
 
@@ -566,6 +589,7 @@ func TestAddResourceRelationships_MetaAuthzDenied(t *testing.T) {
 	assert.ErrorIs(t, err, metaauthorizer.ErrMetaAuthorizationDenied)
 }
 
+// TestAddResourceRelationships_UsesReportResourceRelation validates the corresponding user-story scenario.
 func TestAddResourceRelationships_UsesReportResourceRelation(t *testing.T) {
 	h := newTestHarness(t, withMeta(true))
 

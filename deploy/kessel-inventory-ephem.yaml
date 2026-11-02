@@ -220,6 +220,8 @@ objects:
                 value: "true"
               - name: INVENTORY_API_CONFIG
                 value: "/inventory/inventory-api-config.yaml"
+              - name: INVENTORY_API_CONSUMER_LOAD_REPORTER_REPRESENTATION
+                value: ${CONSUMER_LOAD_REPORTER_REPRESENTATION}
               - name: PGDATA
                 value: /temp/data
               - name: INVENTORY_API_AUTHZ_IMPL
@@ -360,6 +362,9 @@ objects:
                   configMap:
                     name: ${INVENTORY_API_CONFIG_NAME}
 parameters:
+  - description: Load reporter representations while processing consumer tuple events
+    name: CONSUMER_LOAD_REPORTER_REPRESENTATION
+    value: "false"
   - description: ClowdEnvironment name (ephemeral, stage, prod)
     name: ENV_NAME
     required: true

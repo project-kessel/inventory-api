@@ -95,7 +95,7 @@ When changing CLI flags, config keys, default values, authentication/authorizati
 - **Makefile targets** - The `inventory-up-*` and `kessel-up` targets in the Makefile pass config names, ports, and service lists to the startup scripts. If a new service or config variant is added, add or update the corresponding target.
 - **Documentation** (`docs/dev-guides/docker-compose-options.md`, `README.md`) - The docker-compose options guide documents all make targets, ports, and usage instructions. Keep it current when targets or behavior change.
 
-**Viper env var limitation**: The env key replacer in `cmd/root.go` only maps `.` to `_`, not `-` to `_`. Config keys containing hyphens (e.g., `consumer.bootstrap-servers`) cannot be overridden via `INVENTORY_API_*` environment variables. Only dot-separated keys work as env overrides.
+**Viper env var mapping**: The env key replacer in `cmd/root.go` maps both `.` and `-` to `_`, so `consumer.bootstrap-servers` resolves to `INVENTORY_API_CONSUMER_BOOTSTRAP_SERVERS`. New config keys must use kebab-case: `load-reporter-representation` and `load_reporter_representation` are distinct keys, and only the kebab-case spelling is mapped to the environment.
 
 ### Common Operations
 - **Adding new resource types**: Update protobuf definitions, regenerate code, add schema validation

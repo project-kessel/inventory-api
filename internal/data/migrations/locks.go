@@ -3,12 +3,15 @@ package migrations
 import (
 	"context"
 	"database/sql"
+	"math/rand/v2"
+	"time"
 
 	"gorm.io/gorm"
 )
 
 const (
-	MigrationAdvisoryLockKey int64 = 1234567890
+	MigrationAdvisoryLockKey           int64 = 1234567890
+	migrationAdvisoryLockRetryInterval       = 100 * time.Millisecond
 )
 
 // function variable to allow tests to stub advisory locking behavior without
@@ -30,8 +33,12 @@ func isPostgres(db *gorm.DB) bool {
 // protects the migration operations. Without this binding, GORM would use random pooled
 // connections that don't hold the lock, allowing concurrent execution.
 //
-// The lock uses pg_advisory_lock(MigrationAdvisoryLockKey). Advisory locks are
-// automatically released when the connection closes.
+// The lock uses pg_try_advisory_lock(MigrationAdvisoryLockKey) with retry and
+// jitter. A blocking pg_advisory_lock waiter can deadlock with CREATE INDEX
+// CONCURRENTLY because PostgreSQL may wait for the waiter's virtual transaction
+// while the waiter waits for the migration session's advisory lock. Polling
+// keeps competing migration sessions from remaining blocked in PostgreSQL.
+// Advisory locks are automatically released when the connection closes.
 //
 // This design allows migrations to use DDL that cannot run in transactions
 // (e.g., CREATE INDEX CONCURRENTLY) while still ensuring only one process runs
@@ -56,7 +63,7 @@ func WithAdvisoryLock(ctx context.Context, db *gorm.DB, fn func(*gorm.DB) error)
 		_ = conn.Close()
 	}()
 
-	if _, err := conn.ExecContext(ctx, "SELECT pg_advisory_lock($1)", MigrationAdvisoryLockKey); err != nil {
+	if err := acquireMigrationAdvisoryLock(ctx, conn); err != nil {
 		return err
 	}
 	defer func() {
@@ -74,6 +81,33 @@ func WithAdvisoryLock(ctx context.Context, db *gorm.DB, fn func(*gorm.DB) error)
 	connDB.Statement.ConnPool = &connWrapper{conn: conn}
 
 	return fn(connDB)
+}
+
+func acquireMigrationAdvisoryLock(ctx context.Context, conn *sql.Conn) error {
+	for {
+		var acquired bool
+		if err := conn.QueryRowContext(
+			ctx,
+			"SELECT pg_try_advisory_lock($1)",
+			MigrationAdvisoryLockKey,
+		).Scan(&acquired); err != nil {
+			return err
+		}
+		if acquired {
+			return nil
+		}
+
+		retryDelay := migrationAdvisoryLockRetryInterval + time.Duration(
+			rand.Int64N(int64(migrationAdvisoryLockRetryInterval)),
+		)
+		retryTimer := time.NewTimer(retryDelay)
+		select {
+		case <-ctx.Done():
+			retryTimer.Stop()
+			return ctx.Err()
+		case <-retryTimer.C:
+		}
+	}
 }
 
 // connWrapper wraps *sql.Conn to satisfy gorm.ConnPool interface,

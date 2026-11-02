@@ -15,6 +15,13 @@ namespace and `false` in the others. A disabled migration init container exits
 successfully without connecting to the database, allowing the application
 container to start without competing for the migration advisory lock.
 
+Within the migration-owning namespace, every rolling pod may start its migration
+init container. Competing migrators poll `pg_try_advisory_lock` with jitter so
+only one runs migrations while the others remain outside PostgreSQL lock waits.
+Do not replace this with blocking `pg_advisory_lock`: its waiter can deadlock
+with `CREATE INDEX CONCURRENTLY` while PostgreSQL waits for old virtual
+transactions.
+
 This parameter controls migration ownership but does not coordinate deployment
 ordering. Deploy the migration-owning namespace first and wait for its migration
 init container to complete before deploying namespaces where migrations are

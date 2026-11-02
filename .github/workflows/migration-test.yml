@@ -52,3 +52,8 @@ jobs:
           --storage.postgres.user=inventory \
           --storage.postgres.password=inventory_password \
           --storage.postgres.sslmode=disable
+
+    - name: Test Concurrent Migration Locking
+      env:
+        POSTGRES_MIGRATION_TEST_DSN: host=localhost port=5432 dbname=inventory user=inventory password=inventory_password sslmode=disable
+      run: go test ./internal/data/migrations -run TestWithAdvisoryLockDoesNotDeadlockConcurrentIndex -count=1 -v

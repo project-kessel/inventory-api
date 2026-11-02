@@ -130,3 +130,54 @@ func TestRepresentations_WorkspaceID_UsesStringField(t *testing.T) {
 	assert.Equal(t, "ws-1", rep.WorkspaceID())
 	assert.Equal(t, rep.StringField("workspace_id"), rep.WorkspaceID())
 }
+
+func TestNewRepresentations_Validation(t *testing.T) {
+	ver := model.NewVersion(1)
+
+	t.Run("accepts nil data with version (tombstone case)", func(t *testing.T) {
+		// Tombstones have nil/empty data but a version
+		rep, err := model.NewRepresentations(nil, nil, nil, &ver)
+		require.NoError(t, err)
+		require.NotNil(t, rep)
+		assert.Nil(t, rep.ReporterData())
+		assert.Equal(t, &ver, rep.ReporterVersion())
+	})
+
+	t.Run("accepts empty data with version (tombstone case)", func(t *testing.T) {
+		emptyData := model.Representation(map[string]interface{}{})
+		rep, err := model.NewRepresentations(nil, nil, emptyData, &ver)
+		require.NoError(t, err)
+		require.NotNil(t, rep)
+		assert.NotNil(t, rep.ReporterData())
+		assert.Equal(t, 0, len(rep.ReporterData()))
+		assert.Equal(t, &ver, rep.ReporterVersion())
+	})
+
+	t.Run("rejects both versions nil", func(t *testing.T) {
+		data := model.Representation(map[string]interface{}{"key": "value"})
+		rep, err := model.NewRepresentations(data, nil, nil, nil)
+		require.Error(t, err)
+		assert.Nil(t, rep)
+		assert.Contains(t, err.Error(), "at least one version must be present")
+	})
+
+	t.Run("rejects non-empty data without version", func(t *testing.T) {
+		data := model.Representation(map[string]interface{}{"key": "value"})
+		rep, err := model.NewRepresentations(data, nil, nil, nil)
+		require.Error(t, err)
+		assert.Nil(t, rep)
+	})
+
+	t.Run("accepts both common and reporter", func(t *testing.T) {
+		commonData := model.Representation(map[string]interface{}{"common": "data"})
+		reporterData := model.Representation(map[string]interface{}{"reporter": "data"})
+		commonVer := model.NewVersion(1)
+		reporterVer := model.NewVersion(2)
+
+		rep, err := model.NewRepresentations(commonData, &commonVer, reporterData, &reporterVer)
+		require.NoError(t, err)
+		require.NotNil(t, rep)
+		assert.True(t, rep.HasCommon())
+		assert.True(t, rep.HasReporter())
+	})
+}

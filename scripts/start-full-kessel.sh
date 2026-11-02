@@ -117,7 +117,7 @@ done
 echo "Extracted $(ls "${RBAC_DEFS_DIR}"/*.json 2>/dev/null | wc -l) RBAC role definition files"
 
 ${DOCKER} compose --env-file "${ENV_FILE}" \
-  --profile relations --profile consumer --profile rbac "$@" \
+  --profile consumer --profile rbac "$@" \
   -f "${COMPOSE_DIR}/docker-compose.yaml" \
   -f "${RBAC_OVERRIDE_PATH}" \
   up --pull "${COMPOSE_PULL_MODE:-always}" -d

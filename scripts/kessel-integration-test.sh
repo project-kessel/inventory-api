@@ -27,7 +27,8 @@ fail() {
 
 # Ports (match full-kessel docker-compose)
 INVENTORY_GRPC="localhost:9081"
-RELATIONS_GRPC="localhost:9000"
+SPICEDB_GRPC="localhost:50051"
+SPICEDB_TOKEN="${SPICEDB_GRPC_PRESHARED_KEY:-foobar}"
 RBAC_HTTP="localhost:9080"
 KAFKA_BOOTSTRAP="localhost:9092"
 KAFKA_CONNECT="localhost:8083"
@@ -38,7 +39,7 @@ X_RH_IDENTITY=$(echo -n "{\"identity\":{\"account_number\":\"12345\",\"org_id\":
 
 # Test host UUIDs — unique per run to avoid tombstone conflicts on re-run.
 # DeleteResource soft-deletes (tombstone=true), and re-reporting a tombstoned
-# resource is an update that doesn't re-create the Relations API tuple.
+# resource is an update that doesn't re-create the SpiceDB relationship.
 RUN_ID=$(uuidgen | tr '[:upper:]' '[:lower:]' | tr -d '-' | head -c 12)
 HOST_ID="e2e10000-0000-0000-0000-${RUN_ID}"
 INSIGHTS_ID="e2e20000-0000-0000-0000-${RUN_ID}"
@@ -49,7 +50,7 @@ SUB_MGR_ID="e2e30000-0000-0000-0000-${RUN_ID}"
 log_step "Step 0: Prerequisites Check"
 
 MISSING=""
-for cmd in kcat grpcurl jq curl; do
+for cmd in kcat grpcurl jq curl zed; do
   if ! command -v "$cmd" &>/dev/null; then
     MISSING="${MISSING} ${cmd}"
   fi
@@ -62,6 +63,7 @@ if [[ -n "$MISSING" ]]; then
   echo "    grpcurl: go install github.com/fullstorydev/grpcurl/cmd/grpcurl@latest"
   echo "    jq:      dnf install jq    /  brew install jq"
   echo "    curl:    dnf install curl  /  brew install curl"
+  echo "    zed:     go install github.com/authzed/zed/cmd/zed@latest"
   exit 1
 fi
 pass "All prerequisites installed"
@@ -102,9 +104,34 @@ wait_for_grpc_service() {
   return 1
 }
 
+wait_for_spicedb() {
+  local retries="${1:-30}" interval="${2:-5}"
+  for ((i=1; i<=retries; i++)); do
+    if zed schema read --endpoint "${SPICEDB_GRPC}" --token "${SPICEDB_TOKEN}" --insecure --skip-version-check &>/dev/null; then
+      pass "SpiceDB is ready"
+      return 0
+    fi
+    if [[ $i -eq 1 ]]; then
+      log_info "Waiting for SpiceDB..."
+    fi
+    sleep "$interval"
+  done
+  fail "SpiceDB did not become ready after $((retries * interval))s"
+  return 1
+}
+
+read_spicedb_relationships() {
+  zed relationship read "$@" \
+    --json \
+    --endpoint "${SPICEDB_GRPC}" \
+    --token "${SPICEDB_TOKEN}" \
+    --insecure \
+    --skip-version-check 2>&1
+}
+
 HEALTH_OK=true
 wait_for_grpc_service "Inventory API" "${INVENTORY_GRPC}" "kessel.inventory.v1.KesselInventoryHealthService/GetReadyz" || HEALTH_OK=false
-wait_for_grpc_service "Relations API" "${RELATIONS_GRPC}" "kessel.relations.v1.KesselRelationsHealthService/GetReadyz" || HEALTH_OK=false
+wait_for_spicedb || HEALTH_OK=false
 wait_for_http_service "RBAC"          "http://${RBAC_HTTP}/metrics" || HEALTH_OK=false
 wait_for_http_service "Kafka Connect" "http://${KAFKA_CONNECT}/connectors" || HEALTH_OK=false
 
@@ -149,19 +176,16 @@ else
   log_warn "Could not retrieve root workspace (non-fatal)"
 fi
 
-# ─── Step 3: Verify Workspace Hierarchy in Relations API ─────────────────────
+# ─── Step 3: Verify Workspace Hierarchy in SpiceDB ───────────────────────────
 
-log_step "Step 3: Verify Workspace Hierarchy in Relations API"
+log_step "Step 3: Verify Workspace Hierarchy in SpiceDB"
 
-log_info "Polling Relations API for workspace tuples (up to 60s)..."
+log_info "Polling SpiceDB for workspace relationships (up to 60s)..."
 
 WS_TUPLES_FOUND=false
 for ((i=1; i<=20; i++)); do
-  TUPLES_RESPONSE=$(grpcurl -plaintext -d '{"filter":{"resourceNamespace":"rbac","resourceType":"workspace"}}' \
-    "${RELATIONS_GRPC}" kessel.relations.v1beta1.KesselTupleService/ReadTuples 2>&1) || true
-
-  if [[ -n "${TUPLES_RESPONSE:-}" ]]; then
-    TUPLE_COUNT=$(echo "$TUPLES_RESPONSE" | jq -s '[.[] | select(.tuple)] | length')
+  if TUPLES_RESPONSE=$(read_spicedb_relationships rbac/workspace); then
+    TUPLE_COUNT=$(jq -s '[.[] | select(.relationship)] | length' <<< "$TUPLES_RESPONSE")
     if [[ "$TUPLE_COUNT" -gt 0 ]]; then
       WS_TUPLES_FOUND=true
       break
@@ -171,20 +195,28 @@ for ((i=1; i<=20; i++)); do
 done
 
 if [[ "$WS_TUPLES_FOUND" == "true" ]]; then
-  pass "Found ${TUPLE_COUNT} workspace tuples in Relations API"
+  pass "Found ${TUPLE_COUNT} workspace relationship(s) in SpiceDB"
 
-  # Verify the default workspace has a parent tuple (default → root)
+  # Verify the default workspace has a parent relationship (default → root)
   if [[ -n "$DEFAULT_WORKSPACE_ID" && -n "$ROOT_WORKSPACE_ID" ]]; then
-    DEFAULT_WS_TUPLE=$(echo "$TUPLES_RESPONSE" | jq -s --arg wsid "$DEFAULT_WORKSPACE_ID" --arg root "$ROOT_WORKSPACE_ID" \
-      '[.[] | select(.tuple.resource.id == $wsid and .tuple.subject.subject.id == $root)] | length')
-    if [[ "$DEFAULT_WS_TUPLE" -gt 0 ]]; then
+    DEFAULT_WS_RELATIONSHIP_COUNT=$(jq -s \
+      --arg workspace_id "$DEFAULT_WORKSPACE_ID" \
+      --arg root_workspace_id "$ROOT_WORKSPACE_ID" \
+      '[.[] | select(
+        .relationship.resource.objectType == "rbac/workspace" and
+        .relationship.resource.objectId == $workspace_id and
+        .relationship.relation == "t_parent" and
+        .relationship.subject.object.objectType == "rbac/workspace" and
+        .relationship.subject.object.objectId == $root_workspace_id
+      )] | length' <<< "$TUPLES_RESPONSE")
+    if [[ "$DEFAULT_WS_RELATIONSHIP_COUNT" -gt 0 ]]; then
       pass "Default workspace has parent relationship to root workspace"
     else
-      log_warn "Default workspace parent tuple not found (may take a moment to replicate)"
+      log_warn "Default workspace parent relationship not found (may take a moment to replicate)"
     fi
   fi
 else
-  fail "No workspace tuples found in Relations API after 60s"
+  fail "No workspace relationships found in SpiceDB after 60s"
   echo "  Check that RBAC CDC pipeline is running (rbac-kafka-consumer, kafka-connect connectors)"
 fi
 
@@ -251,45 +283,29 @@ else
   echo "  Last grpcurl output: ${REPORT_RESULT}"
 fi
 
-# ─── Step 6: Verify Resource-to-Workspace Tuple in Relations API ─────────────
+# ─── Step 6: Verify Resource-to-Workspace Relationship in SpiceDB ────────────
 
-log_step "Step 6: Verify Resource-to-Workspace Tuple in Relations API"
+log_step "Step 6: Verify Resource-to-Workspace Relationship in SpiceDB"
 
-log_info "Polling Relations API for host tuples (up to 60s)..."
+log_info "Polling SpiceDB for the host-to-workspace relationship (up to 60s)..."
 
 HOST_TUPLE_FOUND=false
 for ((i=1; i<=20; i++)); do
-  HOST_TUPLES_RESPONSE=$(grpcurl -plaintext -d '{"filter":{"resourceNamespace":"hbi","resourceType":"host"}}' \
-    "${RELATIONS_GRPC}" kessel.relations.v1beta1.KesselTupleService/ReadTuples 2>&1) || true
-
-  if [[ -n "${HOST_TUPLES_RESPONSE:-}" ]]; then
-    HOST_TUPLE_COUNT=$(echo "$HOST_TUPLES_RESPONSE" | jq -s '[.[] | select(.tuple)] | length')
-    if [[ "$HOST_TUPLE_COUNT" -gt 0 ]]; then
-      HOST_TUPLE_FOUND=true
-      break
-    fi
+  if HOST_TUPLES_RESPONSE=$(read_spicedb_relationships "hbi/host:${HOST_ID}" t_workspace "rbac/workspace:${DEFAULT_WORKSPACE_ID}") &&
+    HOST_RELATIONSHIP_COUNT=$(jq -s '[.[] | select(.relationship)] | length' <<< "$HOST_TUPLES_RESPONSE") &&
+    [[ "$HOST_RELATIONSHIP_COUNT" -gt 0 ]]; then
+    HOST_TUPLE_FOUND=true
+    break
   fi
   sleep 3
 done
 
 if [[ "$HOST_TUPLE_FOUND" == "true" ]]; then
-  pass "Found ${HOST_TUPLE_COUNT} host tuple(s) in Relations API"
-
-  # Verify the tuple links our host to the correct workspace
-  MATCHING_TUPLE=$(echo "$HOST_TUPLES_RESPONSE" | jq -s --arg wsid "$DEFAULT_WORKSPACE_ID" \
-    '[.[] | select(.tuple.subject.subject.id == $wsid)] | length')
-
-  if [[ "$MATCHING_TUPLE" -gt 0 ]]; then
-    pass "Host resource is linked to workspace ${DEFAULT_WORKSPACE_ID}"
-  else
-    fail "Host tuple exists but not linked to expected workspace"
-    echo "  Expected workspace: ${DEFAULT_WORKSPACE_ID}"
-    echo "  Tuples: $(echo "$HOST_TUPLES_RESPONSE" | jq -s -c '.[] | select(.tuple) | {resource: .tuple.resource.id, relation: .tuple.relation, subject: .tuple.subject.subject.id}')"
-  fi
+  pass "Host resource is linked to workspace ${DEFAULT_WORKSPACE_ID} in SpiceDB"
 else
-  fail "No host tuples found in Relations API after 60s"
-  echo "  The resource may have been stored without creating authorization tuples."
-  echo "  Check that authz.impl=kessel in the inventory-api config."
+  fail "Host-to-workspace relationship not found in SpiceDB after 60s"
+  echo "  The resource may have been stored without creating an authorization relationship."
+  echo "  Check that authz.impl=spicedb in the inventory-api config."
 fi
 
 # ─── Step 7: RBAC Access Check ──────────────────────────────────────────────
@@ -364,25 +380,18 @@ log_info "Waiting for tuple cleanup (up to 30s)..."
 TUPLE_CLEANED=false
 for ((i=1; i<=10; i++)); do
   sleep 3
-  HOST_TUPLES_AFTER=$(grpcurl -plaintext -d '{"filter":{"resourceNamespace":"hbi","resourceType":"host"}}' \
-    "${RELATIONS_GRPC}" kessel.relations.v1beta1.KesselTupleService/ReadTuples 2>&1) || true
-
-  REMAINING=0
-  if [[ -n "${HOST_TUPLES_AFTER:-}" ]]; then
-    REMAINING=$(echo "$HOST_TUPLES_AFTER" | jq -s --arg wsid "$DEFAULT_WORKSPACE_ID" \
-      '[.[] | select(.tuple.subject.subject.id == $wsid)] | length')
-  fi
-
-  if [[ "$REMAINING" -eq 0 ]]; then
+  if HOST_TUPLES_AFTER=$(read_spicedb_relationships "hbi/host:${HOST_ID}" t_workspace "rbac/workspace:${DEFAULT_WORKSPACE_ID}") &&
+    REMAINING=$(jq -s '[.[] | select(.relationship)] | length' <<< "$HOST_TUPLES_AFTER") &&
+    [[ "$REMAINING" -eq 0 ]]; then
     TUPLE_CLEANED=true
     break
   fi
 done
 
 if [[ "$TUPLE_CLEANED" == "true" ]]; then
-  pass "Host-to-workspace tuple removed from Relations API after deletion"
+  pass "Host-to-workspace relationship removed from SpiceDB after deletion"
 else
-  fail "Host-to-workspace tuple still present after deletion (count: ${REMAINING})"
+  fail "Host-to-workspace relationship still present in SpiceDB after deletion"
 fi
 
 # ─── Step 9: Summary ─────────────────────────────────────────────────────────

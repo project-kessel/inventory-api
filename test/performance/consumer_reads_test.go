@@ -38,7 +38,8 @@ func runConsumerReads(t *testing.T, ctx context.Context, seedDB *gorm.DB, dsn st
 	}
 	if err := seedDB.WithContext(ctx).Exec(`
 		INSERT INTO reporter_representations (reporter_resource_id,version,generation,data,common_version,transaction_id,tombstone,created_at)
-		SELECT id,v.version,1,jsonb_build_object('payload','revived','sequence',v.version),?,
+		SELECT id,v.version,1,
+			CASE WHEN v.version=2 THEN NULL ELSE jsonb_build_object('payload','revived','sequence',v.version) END,?,
 			'consumer-revival-'||v.version,v.version=2,now()
 		FROM reporter_resources CROSS JOIN (VALUES (0),(1),(2)) v(version)
 		WHERE local_resource_id='perf-history-0'`, s.History-1).Error; err != nil {
@@ -203,8 +204,16 @@ func runConsumerReads(t *testing.T, ctx context.Context, seedDB *gorm.DB, dsn st
 			if testCase.previous {
 				result = previous
 			}
-			if current == nil || !current.HasReporter() || result == nil || !result.HasReporter() || result.ReporterVersion().Uint() != testCase.want {
+			if current == nil || !current.HasReporter() || result == nil || result.ReporterVersion() == nil || result.ReporterVersion().Uint() != testCase.want {
 				return fmt.Errorf("%s returned incorrect reporter version", testCase.name)
+			}
+			// The revival's previous row is the old generation's tombstone: the version
+			// must be reported, but no data. The delete row is live data and must carry it.
+			if testCase.previous && result.HasReporter() {
+				return fmt.Errorf("%s returned live data for a tombstone", testCase.name)
+			}
+			if !testCase.previous && !result.HasReporter() {
+				return fmt.Errorf("%s returned a tombstone instead of live data", testCase.name)
 			}
 			return nil
 		}

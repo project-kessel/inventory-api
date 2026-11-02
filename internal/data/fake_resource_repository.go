@@ -325,13 +325,10 @@ func (m *inMemoryRepresentationFetcher) fetchReporter(version uint, generation u
 	// Find reporter representation at exact version and generation
 	if generations, ok := m.reporterReps[version]; ok {
 		if entry, ok := generations[generation]; ok {
+			// A row with empty data is a tombstone: the row exists, so the version is
+			// returned alongside the nil data. This matches the SQL repository, which
+			// distinguishes "no row" from "row with empty data" via RowsAffected.
 			data := bizmodel.Representation(cloneJsonObject(entry.data))
-			// Empty data means "not found" (e.g., tombstone with nil data)
-			// Return (nil, nil, nil) - aligned with real repository behavior after Task 2 fix.
-			// This behavior is enforced by TestFetchRepresentations_MissingRowReturnsNil.
-			if len(data) == 0 {
-				return nil, nil, nil
-			}
 			v := bizmodel.NewVersion(entry.version)
 			return data, &v, nil
 		}

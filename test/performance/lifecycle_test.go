@@ -399,7 +399,7 @@ func resetAndSeed(ctx context.Context, db *gorm.DB, s settings, scenario string,
 			if e := db.WithContext(ctx).Exec(`INSERT INTO reporter_resources (id,local_resource_id,reporter_type,resource_type,reporter_instance_id,resource_id,api_href,representation_version,generation,tombstone,created_at,updated_at) VALUES (?,?,'hbi','host','perf',?,'/perf/history',?,0,true,now(),now())`, reporterID, id, resourceID, count).Error; e != nil {
 				return e
 			}
-			if e := db.WithContext(ctx).Exec(`INSERT INTO reporter_representations (reporter_resource_id,version,generation,data,common_version,transaction_id,tombstone,created_at) SELECT ?,n,0,jsonb_build_object('payload',?::text,'sequence',n),1,?||n,(n=?),now() FROM generate_series(1,?) n`, reporterID, payload, "history-reporter-"+id+"-", count, count).Error; e != nil {
+			if e := db.WithContext(ctx).Exec(`INSERT INTO reporter_representations (reporter_resource_id,version,generation,data,common_version,transaction_id,tombstone,created_at) SELECT ?,n,0,CASE WHEN n=? THEN NULL ELSE jsonb_build_object('payload',?::text,'sequence',n) END,1,?||n,(n=?),now() FROM generate_series(1,?) n`, reporterID, count, payload, "history-reporter-"+id+"-", count, count).Error; e != nil {
 				return e
 			}
 		}

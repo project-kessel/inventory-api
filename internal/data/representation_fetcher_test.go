@@ -57,3 +57,25 @@ func TestFetchCurrentAndPreviousRepresentations_AcceptsReporterCoordinates(t *te
 
 	require.NoError(t, err)
 }
+
+// TestInMemoryFetcher_FetchReporterReturnsVersionForTombstone pins the fake to the
+// SQL repository's contract: a row that exists with empty data is a tombstone, so
+// its version is returned alongside nil data. Only a missing row returns nil, nil.
+func TestInMemoryFetcher_FetchReporterReturnsVersionForTombstone(t *testing.T) {
+	fetcher := &inMemoryRepresentationFetcher{
+		reporterReps: map[uint]map[uint]*storedReporterRepresentation{
+			3: {0: {version: 3, generation: 0, tombstone: true}},
+		},
+	}
+
+	data, version, err := fetcher.fetchReporter(3, 0)
+	require.NoError(t, err)
+	require.Nil(t, data)
+	require.NotNil(t, version)
+	require.Equal(t, uint(3), version.Uint())
+
+	data, version, err = fetcher.fetchReporter(4, 0)
+	require.NoError(t, err)
+	require.Nil(t, data)
+	require.Nil(t, version)
+}

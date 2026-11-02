@@ -1007,7 +1007,7 @@ func TestInventoryConsumer_VersionCombinations(t *testing.T) {
 				require.NoError(t, repo.Save(db, *testData.Resource, model.OperationTypeCreated, testData.InitialTransactionId))
 				return testData.Key
 			},
-			message:     `{"schema":{"type":"string"},"payload":{"reporter_resource_key":{"local_resource_id":"reporter-version-create","resource_type":"integration","reporter":{"reporter_type":"notifications","reporter_instance_id":"notif-instance-1"}},"reporter_representation_version":0}}`,
+			message:     `{"schema":{"type":"string"},"payload":{"reporter_resource_key":{"local_resource_id":"reporter-version-create","resource_type":"integration","reporter":{"reporter_type":"notifications","reporter_instance_id":"notif-instance-1"}},"reporter_representation_version":0,"reporter_generation":0}}`,
 			operation:   string(model.OperationTypeCreated),
 			expectError: false,
 			expectToken: false, // Create with same workspace in both reps = no tuple changes
@@ -1033,7 +1033,7 @@ func TestInventoryConsumer_VersionCombinations(t *testing.T) {
 				require.NoError(t, repo.Save(db, *found, model.OperationTypeUpdated, model.TransactionId("tx-update")))
 				return testData.Key
 			},
-			message:     `{"schema":{"type":"string"},"payload":{"reporter_resource_key":{"local_resource_id":"reporter-version-update","resource_type":"integration","reporter":{"reporter_type":"notifications","reporter_instance_id":"notif-instance-1"}},"reporter_representation_version":1}}`,
+			message:     `{"schema":{"type":"string"},"payload":{"reporter_resource_key":{"local_resource_id":"reporter-version-update","resource_type":"integration","reporter":{"reporter_type":"notifications","reporter_instance_id":"notif-instance-1"}},"reporter_representation_version":1,"reporter_generation":0}}`,
 			operation:   string(model.OperationTypeUpdated),
 			expectError: false,
 			expectToken: false, // No tuples change when only reporter changes and workspace doesn't change
@@ -1072,7 +1072,7 @@ func TestInventoryConsumer_VersionCombinations(t *testing.T) {
 				require.NoError(t, repo.Save(db, *testData.Resource, model.OperationTypeCreated, testData.InitialTransactionId))
 				return testData.Key
 			},
-			message:     `{"schema":{"type":"string"},"payload":{"reporter_resource_key":{"local_resource_id":"both-versions-create","resource_type":"integration","reporter":{"reporter_type":"notifications","reporter_instance_id":"notif-instance-1"}},"common_version":0,"reporter_representation_version":0}}`,
+			message:     `{"schema":{"type":"string"},"payload":{"reporter_resource_key":{"local_resource_id":"both-versions-create","resource_type":"integration","reporter":{"reporter_type":"notifications","reporter_instance_id":"notif-instance-1"}},"common_version":0,"reporter_representation_version":0,"reporter_generation":0}}`,
 			operation:   string(model.OperationTypeCreated),
 			expectError: false,
 			expectToken: true,
@@ -1098,7 +1098,7 @@ func TestInventoryConsumer_VersionCombinations(t *testing.T) {
 				require.NoError(t, repo.Save(db, *found, model.OperationTypeUpdated, model.TransactionId("tx-both-update")))
 				return testData.Key
 			},
-			message:     `{"schema":{"type":"string"},"payload":{"reporter_resource_key":{"local_resource_id":"both-versions-update","resource_type":"integration","reporter":{"reporter_type":"notifications","reporter_instance_id":"notif-instance-1"}},"common_version":1,"reporter_representation_version":1}}`,
+			message:     `{"schema":{"type":"string"},"payload":{"reporter_resource_key":{"local_resource_id":"both-versions-update","resource_type":"integration","reporter":{"reporter_type":"notifications","reporter_instance_id":"notif-instance-1"}},"common_version":1,"reporter_representation_version":1,"reporter_generation":0}}`,
 			operation:   string(model.OperationTypeUpdated),
 			expectError: false,
 			expectToken: true,
@@ -1112,7 +1112,7 @@ func TestInventoryConsumer_VersionCombinations(t *testing.T) {
 				require.NoError(t, repo.Save(db, *testData.Resource, model.OperationTypeCreated, testData.InitialTransactionId))
 				return testData.Key
 			},
-			message:     `{"schema":{"type":"string"},"payload":{"reporter_resource_key":{"local_resource_id":"reporter-version-delete","resource_type":"integration","reporter":{"reporter_type":"notifications","reporter_instance_id":"notif-instance-1"}},"reporter_representation_version":1}}`,
+			message:     `{"schema":{"type":"string"},"payload":{"reporter_resource_key":{"local_resource_id":"reporter-version-delete","resource_type":"integration","reporter":{"reporter_type":"notifications","reporter_instance_id":"notif-instance-1"}},"reporter_representation_version":1,"reporter_generation":0}}`,
 			operation:   string(model.OperationTypeDeleted),
 			expectError: false,
 			expectToken: false,
@@ -1126,7 +1126,7 @@ func TestInventoryConsumer_VersionCombinations(t *testing.T) {
 				require.NoError(t, repo.Save(db, *testData.Resource, model.OperationTypeCreated, testData.InitialTransactionId))
 				return testData.Key
 			},
-			message:     `{"schema":{"type":"string"},"payload":{"reporter_resource_key":{"local_resource_id":"both-versions-delete","resource_type":"integration","reporter":{"reporter_type":"notifications","reporter_instance_id":"notif-instance-1"}},"common_version":0,"reporter_representation_version":1}}`,
+			message:     `{"schema":{"type":"string"},"payload":{"reporter_resource_key":{"local_resource_id":"both-versions-delete","resource_type":"integration","reporter":{"reporter_type":"notifications","reporter_instance_id":"notif-instance-1"}},"common_version":0,"reporter_representation_version":1,"reporter_generation":0}}`,
 			operation:   string(model.OperationTypeDeleted),
 			expectError: false,
 			expectToken: false,

@@ -126,6 +126,6 @@ if [[ -n "${INVENTORY_API_COMPOSE_OVERRIDE}" ]]; then
 fi
 
 ${DOCKER} compose --env-file "${ENV_FILE}" \
-  --profile relations --profile consumer --profile rbac "$@" \
+  --profile consumer --profile rbac "$@" \
   "${COMPOSE_FILES[@]}" \
   up --pull "${COMPOSE_PULL_MODE:-always}" -d

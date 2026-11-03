@@ -48,7 +48,6 @@ objects:
                 - --batch-delay=${BATCH_DELAY}
                 - --transaction-limit=${TRANSACTION_LIMIT}
                 - --execute=${EXECUTE}
-                - --consumer-boundary-verified=${CONSUMER_BOUNDARY_VERIFIED}
               env:
                 - name: ACG_CONFIG
                   value: /cdapp/cdappconfig.json
@@ -96,11 +95,8 @@ parameters:
   - description: Days since a tombstoned reporter was last updated; must be positive
     name: TOMBSTONE_DAYS
     value: "30"
-  - description: Enable deletion only after the runbook's operational preconditions are verified; false is a read-only preview
+  - description: Commit deletions; false runs a read-only preview
     name: EXECUTE
-    value: "false"
-  - description: Acknowledge publication, successful consumption and restart-safe offsets through the runbook boundary; does not verify them
-    name: CONSUMER_BOUNDARY_VERIFIED
     value: "false"
   - description: Maximum deleted rows across histories, reporter parents and roots per transaction (5-65534)
     name: ROWS_PER_TRANSACTION

@@ -24,18 +24,15 @@ const maxRowsPerTransaction = 65535 - 1
 // NewCommand creates an online, preview-by-default tombstone cleanup command.
 func NewCommand(storageOptions *storage.Options, loggerOptions common.LoggerOptions) *cobra.Command {
 	options := options{tombstoneDays: 30, rowsPerTransaction: 1000, batchDelay: 500 * time.Millisecond}
-	var execute, boundaryVerified bool
+	var execute bool
 	command := &cobra.Command{
 		Use:   "tombstoned-resources-cleanup-job",
 		Short: "Preview or remove expired tombstoned reporters and newly orphaned data",
-		Long:  "Remove reporters tombstoned before a fixed age cutoff, then their newly orphaned common history and roots. Writes may continue. Execution requires manual verification of publication, successful consumption and restart-safe offsets through a pre-cleanup boundary; the acknowledgment does not verify it.",
+		Long:  "Remove reporters tombstoned before a fixed age cutoff, then their newly orphaned common history and roots. Reads and writes may continue. Defaults to a read-only preview; --execute commits deletions.",
 		Args:  cobra.NoArgs,
 		RunE: func(command *cobra.Command, _ []string) error {
 			if err := validateInvocation(options); err != nil {
 				return err
-			}
-			if execute && !boundaryVerified {
-				return fmt.Errorf("--execute requires --consumer-boundary-verified; verify publication, successful consumption and restart-safe offsets first")
 			}
 			ctx, stop := tombstoneCleanupSignalContext(command.Context())
 			defer stop()
@@ -45,7 +42,6 @@ func NewCommand(storageOptions *storage.Options, loggerOptions common.LoggerOpti
 	f := command.Flags()
 	f.IntVar(&options.tombstoneDays, "tombstone-days", 30, "Days since the tombstoned reporter was last updated; positive")
 	f.BoolVar(&execute, "execute", false, "Commit deletions; default is read-only preview")
-	f.BoolVar(&boundaryVerified, "consumer-boundary-verified", false, "Acknowledge the runbook's manual pipeline boundary verification; does not establish it")
 	f.IntVar(&options.rowsPerTransaction, "rows-per-transaction", 1000, "Maximum deleted rows across histories, reporter parents and roots per transaction; minimum 5")
 	f.DurationVar(&options.batchDelay, "batch-delay", 500*time.Millisecond, "Interruptible delay between committed batches")
 	f.IntVar(&options.transactionLimit, "transaction-limit", 0, "Maximum committed transactions for this run; 0 processes the entire worklist")

@@ -53,12 +53,11 @@ func TestCommandDefaultsAndValidation(t *testing.T) {
 	}
 }
 
-// TestExecutionRequiresConsumerBoundaryAcknowledgment prevents accidentally
-// pruning data that an unverified replication backlog may still need.
-func TestExecutionRequiresConsumerBoundaryAcknowledgment(t *testing.T) {
+// TestExecuteReachesStorageValidation verifies execution needs only the execute flag.
+func TestExecuteReachesStorageValidation(t *testing.T) {
 	command := NewCommand(storage.NewOptions(), common.LoggerOptions{})
 	command.SetArgs([]string{"--execute"})
-	require.ErrorContains(t, command.Execute(), "--execute requires --consumer-boundary-verified")
+	require.ErrorContains(t, command.Execute(), "tombstone cleanup requires PostgreSQL storage options")
 }
 
 // TestValidationAllowsTechnicalBoundaries keeps defaults and unlimited execution

@@ -16,40 +16,27 @@ entry is skipped, even if it becomes tombstoned again. A report after a complete
 purge creates fresh Inventory state; historical transaction IDs and generations
 are not retained. SQL deletion does not emit a replacement tuple event.
 
-## Online execution prerequisites
+## Online execution
 
-API writes, KIC, Debezium and the internal consumer remain enabled. An old
-tombstone is not by itself proof that its delete event was processed: the internal
-consumer still joins through the reporter parent to read common history.
+API writes, KIC, Debezium and the internal consumer remain enabled. Execution
+requires only `--execute`; the job does not establish or verify a consumer
+checkpoint. It relies on the configured tombstone age for eligibility.
 
-Before each execution:
+Age alone does not prove replication has completed. The consumer still reads
+reporter parents and common history when processing events. Purging history
+needed by an unprocessed or replayed event can prevent authorization cleanup.
+Healthy consumer lag or an idle pod does not establish that this cannot happen.
+
+Before execution:
 
 1. Verify the target cluster/namespace, deployed image, database backup/recovery
    access, metrics and alerts. Run one cleanup invocation at a time. Confirm TEMP
    and DML privileges and available PostgreSQL temporary storage. Worklists live
    in PostgreSQL, not the Job's memory or /tmp.
-2. Record a UTC time and source WAL boundary while the pipeline is healthy. Verify
-   the connector checkpoint has published all transactions through that boundary.
-   Then capture the resulting exclusive Kafka end position for every tuple-topic
-   partition. Verify the actual connector, slot, subscriptions and consumer group
-   in the target environment. Do not assume stage names apply in production.
-3. Verify successful internal-consumer processing through those positions, without
-   skipped/failed replication. Verify committed restart positions also pass the
-   last boundary event in each partition. The current consumer commits raw event
-   offsets: processing the final event is not necessarily a restart-safe commit.
-   With a quiet partition, wait for subsequent normal traffic and its committed
-   progress; do not reset offsets to manufacture evidence. If publication,
-   processing or restart safety cannot be established, do not execute.
-4. Ensure the cleanup cutoff predates the captured boundary. Do not backdate or
-   import reporter state during cleanup. Do not rewind consumer offsets, reset
-   connector checkpoints or replay old events into purged history. Stop the job
-   if the pipeline loses the verified boundary or starts replaying older data.
-5. Run preview and then a capped execution before increasing the amount of work.
+2. Run preview and then a capped execution before increasing the amount of work.
    Monitor consumer errors/lag, authorization outcomes, database CPU, I/O, storage,
-   lock waits and batch timings. An idle pod or low lag alone is not drain proof.
+   lock waits and batch timings.
 
-`--consumer-boundary-verified` is an operator acknowledgment, not an automatic
-pipeline check. It does not require pausing writes or disabling the consumer.
 The policy comes from the [cleanup experiment](https://docs.google.com/document/d/18xugoI-Tv_YEsegl0QufNQyRw7xrChZbVW0-gqK0rEY/edit?tab=t.pwyzu9l7nrdf)
 and the [30-day proposal](https://redhat-internal.slack.com/archives/C059NUD49PD/p1790942240731049).
 
@@ -66,7 +53,7 @@ estimates while writes continue.
 inventory-api run-job tombstoned-resources-cleanup-job --tombstone-days=30
 inventory-api run-job tombstoned-resources-cleanup-job --tombstone-days=30 --transaction-limit=1
 inventory-api run-job tombstoned-resources-cleanup-job --tombstone-days=30 \
-  --execute --consumer-boundary-verified --rows-per-transaction=1000 --transaction-limit=1
+  --execute --rows-per-transaction=1000 --transaction-limit=1
 ```
 
 For capped execution, the temporary worklist stores at most
@@ -120,8 +107,8 @@ worklist entry is finalized or skipped. Temporary worklist changes do not consum
 the deletion budget. Row limits do not bound duration, bytes or WAL volume.
 
 SIGINT/SIGTERM cancels SQL or pacing; previously committed batches remain deleted.
-A failed batch rolls back. Rerun after verifying the boundary again; a fresh
-worklist selects remaining eligible parents. Temporary tables are dropped even
+A failed batch rolls back. Rerun with a fresh
+worklist to select remaining eligible parents. Temporary tables are dropped even
 on failure/cancellation. Never interpret a failed or cancelled Job as a completed
 cleanup; inspect committed counts and run a new preview.
 
@@ -134,11 +121,11 @@ oc process -f deploy/kessel-inventory-tombstone-cleanup-job.yaml \
 ```
 
 Use a new Job name for every run or changed configuration. For execution add
-`-p EXECUTE=true -p CONSUMER_BOUNDARY_VERIFIED=true -p TRANSACTION_LIMIT=1` initially.
+`-p EXECUTE=true -p TRANSACTION_LIMIT=1` initially.
 The template reuses Inventory's configuration Secrets and service account, with
 no mounted API token. Use the same template via app-interface when approved for
 stage/prod; pin the template ref and image to the reviewed build.
 
 After execution, verify active/recent tombstone samples, shared roots, expected
 per-table deletions, current authorization and continued report/delete processing.
-Run another preview and retain logs, boundary evidence and batch timings.
+Run another preview and retain logs and batch timings.

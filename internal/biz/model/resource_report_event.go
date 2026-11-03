@@ -95,6 +95,15 @@ func (re ResourceReportEvent) CurrentReporterRepresentationVersion() *Version {
 	return &re.reporterRepresentation.version
 }
 
+// CurrentReporterGeneration returns the generation from the ReporterRepresentation
+func (re ResourceReportEvent) CurrentReporterGeneration() *Generation {
+	if re.reporterRepresentation == nil {
+		return nil
+	}
+	gen := re.reporterRepresentation.Generation()
+	return &gen
+}
+
 func (re ResourceReportEvent) Id() ResourceId {
 	return re.id
 }

@@ -16,6 +16,12 @@ type CommonRepresentation struct {
 	transactionId TransactionId
 }
 
+// NewCommonRepresentation builds a common representation. The common data may
+// be empty: a reporter is allowed to send a report that carries only reporter
+// data (for example the Features workspace reporter, whose resource shape is
+// defined entirely by its reporter schema). This is a widening of accepted
+// input only -- representations that were accepted before are still accepted
+// and produce the same output.
 func NewCommonRepresentation(
 	resourceId ResourceId,
 	data Representation,
@@ -34,13 +40,6 @@ func NewCommonRepresentation(
 
 	if strings.TrimSpace(string(reporterInstanceId)) == "" {
 		return CommonRepresentation{}, fmt.Errorf("%w: ReporterInstanceId", ErrEmpty)
-	}
-	if len(data) == 0 {
-		return CommonRepresentation{}, fmt.Errorf("%w: CommonRepresentation data", ErrInvalidData)
-	}
-
-	if data.Data() == nil {
-		return CommonRepresentation{}, fmt.Errorf("CommonRepresentation requires non-empty data")
 	}
 
 	reporter := NewReporterId(reporterType, reporterInstanceId)

@@ -18,7 +18,7 @@ import (
 	"gorm.io/gorm"
 )
 
-// The eligibility and parent-delete statements also bind the cutoff timestamp.
+// Retain the existing upper bound on candidate fetches per transaction.
 const maxBatchSize = 65535 - 1
 
 // NewCommand creates an online, preview-by-default tombstone cleanup command.
@@ -46,9 +46,9 @@ func NewCommand(storageOptions *storage.Options, loggerOptions common.LoggerOpti
 	f.IntVar(&options.tombstoneDays, "tombstone-days", 30, "Days since the tombstoned reporter was last updated; positive")
 	f.BoolVar(&execute, "execute", false, "Commit deletions; default is read-only preview")
 	f.BoolVar(&boundaryVerified, "consumer-boundary-verified", false, "Acknowledge the runbook's manual pipeline boundary verification; does not establish it")
-	f.IntVar(&options.batchSize, "batch-size", 1000, "Maximum reporter parents per transaction; cascading history is additional")
+	f.IntVar(&options.batchSize, "batch-size", 1000, "Maximum deleted rows across histories, reporter parents and roots per transaction; minimum 5")
 	f.DurationVar(&options.batchDelay, "batch-delay", 500*time.Millisecond, "Interruptible delay between committed batches")
-	f.IntVar(&options.maxBatches, "max-batches", 0, "Maximum committed batches; 0 processes the entire worklist")
+	f.IntVar(&options.maxBatches, "max-batches", 0, "Maximum committed transactions for this run; 0 processes the entire worklist")
 	return command
 }
 
@@ -60,11 +60,11 @@ func validateInvocation(options options) error {
 	if options.tombstoneDays <= 0 || int64(options.tombstoneDays) > maxDays {
 		return fmt.Errorf("tombstone-days must be between 1 and %d so the cutoff does not predate year 1", maxDays)
 	}
-	if options.batchSize <= 0 || options.batchSize > maxBatchSize {
-		return fmt.Errorf("batch-size must be between 1 and %d (PostgreSQL bind parameter limit)", maxBatchSize)
+	if options.batchSize < 5 || options.batchSize > maxBatchSize {
+		return fmt.Errorf("batch-size must be between 5 and %d", maxBatchSize)
 	}
 	if options.maxBatches < 0 || options.batchDelay < 0 {
-		return fmt.Errorf("maximum batches and batch delay must not be negative")
+		return fmt.Errorf("transaction limit and batch delay must not be negative")
 	}
 	if options.maxBatches > 0 && int64(options.maxBatches) > math.MaxInt64/int64(options.batchSize) {
 		return fmt.Errorf("batch-size multiplied by max-batches would overflow the row limit")

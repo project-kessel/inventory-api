@@ -30,8 +30,9 @@ func TestCommandDefaultsAndValidation(t *testing.T) {
 		{[]string{"--tombstone-days=-1"}, "tombstone-days"},
 		{[]string{"--tombstone-days=0"}, "tombstone-days"},
 		{[]string{"--batch-size=0"}, "batch-size"},
+		{[]string{"--batch-size=4"}, "batch-size"},
 		{[]string{"--batch-delay=-1s"}, "batch delay"},
-		{[]string{"--max-batches=-1"}, "maximum batches"},
+		{[]string{"--max-batches=-1"}, "transaction limit"},
 		{[]string{"--tombstone-days=" + strconv.Itoa(int(^uint(0)>>1))}, "tombstone-days"},
 		{[]string{"--batch-size=65535"}, "batch-size"},
 	}
@@ -40,7 +41,7 @@ func TestCommandDefaultsAndValidation(t *testing.T) {
 			args    []string
 			message string
 		}{
-			[]string{"--batch-size=2", "--max-batches=" + strconv.Itoa(int(^uint(0)>>1))}, "overflow",
+			[]string{"--batch-size=5", "--max-batches=" + strconv.Itoa(int(^uint(0)>>1))}, "overflow",
 		})
 	}
 	for _, test := range cases {
@@ -66,7 +67,7 @@ func TestValidationAllowsTechnicalBoundaries(t *testing.T) {
 	for _, test := range []options{
 		{tombstoneDays: 7, batchSize: 1000},
 		{tombstoneDays: 30, batchSize: 65534},
-		{tombstoneDays: 30, batchSize: 1, maxBatches: int(^uint(0) >> 1)},
+		{tombstoneDays: 30, batchSize: 5, maxBatches: int(^uint(0)>>1) / 5},
 	} {
 		require.NoError(t, validateInvocation(test))
 	}

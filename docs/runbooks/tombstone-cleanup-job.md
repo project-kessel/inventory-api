@@ -1,10 +1,12 @@
 # Tombstone and orphan cleanup
 
 This one-time PostgreSQL job removes reporter parents that are still tombstoned
-and were last updated more than 30 days ago (configurable). It removes all their
-reporter history by the existing FK cascade. It removes common history and the
-resource root only for resource IDs touched by actual reporter deletions and
-only when no reporter parent remains, including recent tombstones. Unrelated
+and were last updated more than 30 days ago (configurable). It explicitly removes
+their reporter history in bounded chunks before deleting the parent; the existing
+FK cascade has no remaining history to delete. For the last reporter on a root,
+it also drains common history before atomically removing the parent and root.
+Any surviving reporter, including a recent tombstone, preserves the root and
+its remaining common history. Unrelated
 pre-existing orphans are out of scope. All reporters and resource types are included.
 There is no keep-two or seven-day representation policy in this job.
 
@@ -55,9 +57,10 @@ and the [30-day proposal](https://redhat-internal.slack.com/archives/C059NUD49PD
 
 Preview is the default and runs a read-only transaction. It counts parents,
 reporter history, affected resource IDs, removable common history and roots.
-For a capped invocation, the main impact counts describe the oldest candidate
-prefix; total eligibility is reported separately. These are snapshot estimates,
-not promises about a later execution while writes continue.
+Preview reports full eligible impact and, for capped runs, a separate maximum
+row budget (`batch-size * max-batches`). It does not predict per-table capped
+impact because a run may stop midway through a parent. Counts are snapshot
+estimates while writes continue.
 
 ```sh
 inventory-api run-job tombstoned-resources-cleanup-job --tombstone-days=30
@@ -65,6 +68,13 @@ inventory-api run-job tombstoned-resources-cleanup-job --tombstone-days=30 --max
 inventory-api run-job tombstoned-resources-cleanup-job --tombstone-days=30 \
   --execute --consumer-boundary-verified --batch-size=1000 --max-batches=1
 ```
+
+For capped execution, the temporary worklist stores at most
+`batch-size * max-batches` oldest parents. Execution does not count all eligible
+parents; preview still reports full eligibility and impact totals. Changed entries
+are skipped without refilling the bounded worklist. A cap bounds stored parent
+rows, not selection scan/sort cost. The same product bounds committed production
+row deletions across all four tables. Worklist housekeeping is excluded.
 
 Logs include `max_batches` and `worklist_limit` (zero means unlimited). A batch-start
 event precedes each logical batch, including its serialization retries. Final
@@ -79,25 +89,35 @@ PostgreSQL statement timeouts, including inherited database/role settings. The
 supplied OpenShift Job template sets no `activeDeadlineSeconds` on the Job or Pod.
 The initial database ping has a 30-second connection-check timeout; subsequent SQL
 uses the original invocation context. Delete batches retain a 5-second lock
-timeout. Batch size cannot exceed 65,534 parents because each statement reserves
-one PostgreSQL bind parameter for the cutoff. Capped-preview arithmetic must fit
+timeout. Rows per transaction must be between 5 and 65,534 deleted rows. The minimum reserves room
+for atomic removal of the final reporter snapshot, up to two common snapshots,
+the parent and the root. The maximum retains the existing upper bound on candidate fetch size. Capped-preview arithmetic must fit
 a signed 64-bit row count; retention must produce a cutoff no earlier than year 1.
 
 Parents are processed oldest updated_at first, with parent ID as the deterministic
 tie-breaker. Worklist selection reads reporter parents only; it does not count or
 rank their history. History sizes do not affect processing order.
 
-Batch size counts **reporter parents**: their complete histories and newly orphaned
-common history can greatly exceed that count. Measure deep-history batches before
-scaling up. Deletion does not itself reclaim disk; vacuum/repack is separate work.
+Rows per transaction counts **deleted rows across all four production tables**, default
+1,000. Multiple shallow parents can share a transaction; a deep parent spans
+transactions. Rows are selected in chunks using existing primary keys. Deletion
+does not itself reclaim disk; vacuum/repack is separate work.
 
 Each batch is one serializable transaction with existing serialization retries.
-Changes to reporter identity, update timestamp, generation or representation
-version cause the candidate to be skipped. Reporter cascade, common/root cleanup
-and worklist draining commit together. Logs report committed counts only, selected
-and skipped parents, unique affected resources, durations and remaining work.
-Completion means this invocation's worklist was exhausted, not that concurrent
-traffic cannot produce more eligible rows later.
+Changes to reporter identity, timestamp, generation or representation version
+cause that candidate to be skipped. Its current reporter snapshot remains until
+finalization. For the last reporter, common history is drained while preserving
+both the latest common version and the root's referenced version, if different.
+These final snapshots, parent and root are removed atomically within the budget.
+Shared roots retain their common history and root.
+
+An unfinished parent stays in the worklist and database as a restart anchor.
+A capped run can succeed with `complete=false`; rerun to continue its remaining
+history. Already committed history deletions are not restored if the candidate
+subsequently changes. Logs count only committed deletions, include `rows_deleted`
+and `row_limit` (zero means unlimited), and count selected parents only when their
+worklist entry is finalized or skipped. Temporary worklist changes do not consume
+the deletion budget. Row limits do not bound duration, bytes or WAL volume.
 
 SIGINT/SIGTERM cancels SQL or pacing; previously committed batches remain deleted.
 A failed batch rolls back. Rerun after verifying the boundary again; a fresh

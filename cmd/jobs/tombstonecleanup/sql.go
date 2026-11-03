@@ -36,98 +36,157 @@ const impactAllSQL = `WITH eligible AS (SELECT id,resource_id,updated_at,generat
  (SELECT COUNT(*) FROM common_representations h JOIN removable USING(resource_id)) AS common_history,
  (SELECT COUNT(*) FROM resource r JOIN removable ON removable.resource_id=r.id) AS roots`
 
-const impactLimitedSQL = `WITH eligible AS (SELECT id,resource_id,updated_at,generation,representation_version
- FROM reporter_resources WHERE tombstone IS TRUE AND updated_at < ?), selected AS (
- SELECT * FROM eligible ORDER BY updated_at ASC, id ASC LIMIT ?
- ), removable AS (
- SELECT DISTINCT selected.resource_id FROM selected WHERE NOT EXISTS (
- SELECT 1 FROM reporter_resources remaining WHERE remaining.resource_id=selected.resource_id
- AND NOT EXISTS (SELECT 1 FROM selected WHERE selected.id=remaining.id)))
- SELECT (SELECT COUNT(*) FROM eligible) AS candidates,
- (SELECT COUNT(*) FROM selected) AS reporter_resources,
- (SELECT COUNT(DISTINCT resource_id) FROM selected) AS affected,
- (SELECT COUNT(*) FROM reporter_representations h JOIN selected ON selected.id=h.reporter_resource_id) AS reporter_history,
- (SELECT COUNT(*) FROM common_representations h JOIN removable USING(resource_id)) AS common_history,
- (SELECT COUNT(*) FROM resource r JOIN removable ON removable.resource_id=r.id) AS roots`
-
-// impact counts reporter cascades and only roots whose every reporter is selected.
-// The prefix limit bounds parents, not the number of cascading history rows.
-func impact(tx *gorm.DB, cutoff time.Time, limit int64) (r result, err error) {
+// impact reports full eligible impact; capped executions report a separate row ceiling.
+func impact(tx *gorm.DB, cutoff time.Time) (r result, err error) {
 	var counts struct{ Candidates, ReporterResources, Affected, ReporterHistory, CommonHistory, Roots int64 }
-	query := impactAllSQL
-	arguments := []any{cutoff}
-	if limit > 0 {
-		query = impactLimitedSQL
-		arguments = append(arguments, limit)
-	}
-	err = tx.Raw(query, arguments...).Scan(&counts).Error
-	r.candidates = counts.Candidates
-	r.reporterResources = counts.ReporterResources
-	r.affected = counts.Affected
-	r.reporterHistory = counts.ReporterHistory
-	r.commonHistory = counts.CommonHistory
-	r.roots = counts.Roots
+	err = tx.Raw(impactAllSQL, cutoff).Scan(&counts).Error
+	r.candidates, r.reporterResources, r.affected = counts.Candidates, counts.ReporterResources, counts.Affected
+	r.reporterHistory, r.commonHistory, r.roots = counts.ReporterHistory, counts.CommonHistory, counts.Roots
 	return
 }
 
-// deleteBatch rechecks frozen identities before deletion. Separate statements
-// ensure orphan checks see the reporter deletions within this transaction.
+// deletedRows excludes temporary worklist housekeeping.
+func (r result) deletedRows() int64 {
+	return r.reporterResources + r.reporterHistory + r.commonHistory + r.roots
+}
+
+// deleteBatch drains histories explicitly, retaining the parent as a restart anchor.
+// Only finalized or skipped parents leave the worklist; partial history is progress.
 func deleteBatch(tx *gorm.DB, batchSize int, cutoff time.Time) (r result, err error) {
 	var batch []candidate
 	if err = tx.Raw(selectBatchSQL, batchSize).Scan(&batch).Error; err != nil {
 		return
 	}
-	r.selected = int64(len(batch))
-	if len(batch) == 0 {
-		return
-	}
-	ids := make([]uuid.UUID, 0, len(batch))
 	for _, c := range batch {
-		ids = append(ids, c.ID)
+		budget := int64(batchSize) - r.deletedRows()
+		if budget == 0 {
+			break
+		}
+		ids := []uuid.UUID{c.ID}
+		var eligible []candidate
+		if err = tx.Raw(recheckCandidatesSQL, ids, cutoff).Scan(&eligible).Error; err != nil {
+			return
+		}
+		if len(eligible) == 0 {
+			if err = tx.Exec(drainCandidatesSQL, ids).Error; err != nil {
+				return
+			}
+			r.selected++
+			r.skipped++
+			continue
+		}
+		before := r.deletedRows()
+		finalized := false
+		reporter := tx.Exec(deleteReporterChunkSQL, c.ID, c.Generation, c.RepresentationVersion, budget)
+		if err = reporter.Error; err != nil {
+			return
+		}
+		r.reporterHistory += reporter.RowsAffected
+		budget = int64(batchSize) - r.deletedRows()
+		var shared bool
+		if err = tx.Raw(hasOtherReporterSQL, c.ResourceID, c.ID).Scan(&shared).Error; err != nil {
+			return
+		}
+		if budget > 0 && !shared {
+			common := tx.Exec(deleteCommonChunkSQL, c.ResourceID, c.ResourceID, c.ResourceID, budget)
+			if err = common.Error; err != nil {
+				return
+			}
+			r.commonHistory += common.RowsAffected
+		}
+		// Remaining histories are protected snapshots, unless a chunk used the budget.
+		budget = int64(batchSize) - r.deletedRows()
+		if budget > 0 {
+			var tail struct{ Reporter, Common, Roots int64 }
+			if err = tx.Raw(finalizationSizeSQL, c.ID, c.ResourceID, c.ResourceID).Scan(&tail).Error; err != nil {
+				return
+			}
+			needed := tail.Reporter + 1
+			if !shared {
+				needed += tail.Common + tail.Roots
+			}
+			if needed <= budget {
+				history := tx.Exec(deleteFinalReporterSQL, c.ID, tail.Reporter)
+				if err = history.Error; err != nil {
+					return
+				}
+				r.reporterHistory += history.RowsAffected
+				if !shared {
+					common := tx.Exec(deleteFinalCommonSQL, c.ResourceID, tail.Common)
+					if err = common.Error; err != nil {
+						return
+					}
+					r.commonHistory += common.RowsAffected
+				}
+				parent := tx.Exec(deleteParentsSQL, ids, cutoff)
+				if err = parent.Error; err != nil {
+					return
+				}
+				if parent.RowsAffected != 1 {
+					return r, fmt.Errorf("parent changed or reporter history remains")
+				}
+				r.reporterResources++
+				if !shared {
+					root := tx.Exec(deleteRootsSQL, []uuid.UUID{c.ResourceID})
+					if err = root.Error; err != nil {
+						return
+					}
+					r.roots += root.RowsAffected
+				}
+				if err = tx.Exec(drainCandidatesSQL, ids).Error; err != nil {
+					return
+				}
+				r.selected++
+				finalized = true
+			}
+		}
+		if r.deletedRows() > int64(batchSize) {
+			return r, fmt.Errorf("deleted row budget exceeded")
+		}
+		if r.deletedRows() > before {
+			// A finalized parent has already left the worklist, so record its root directly.
+			affected := tx.Exec(recordAffectedRootSQL, c.ResourceID)
+			if err = affected.Error; err != nil {
+				return
+			}
+			r.affected += affected.RowsAffected
+		}
+		// Finish this oldest parent before advancing to younger candidates.
+		if !finalized {
+			break
+		}
 	}
-	var eligible []candidate
-	err = tx.Raw(recheckCandidatesSQL, ids, cutoff).Scan(&eligible).Error
-	if err != nil {
-		return
-	}
-	if len(eligible) > 0 {
-		eligibleIDs := make([]uuid.UUID, 0, len(eligible))
-		rootIDs := make([]uuid.UUID, 0, len(eligible))
-		for _, c := range eligible {
-			eligibleIDs = append(eligibleIDs, c.ID)
-			rootIDs = append(rootIDs, c.ResourceID)
-		}
-		if err = tx.Raw(countReporterHistorySQL, eligibleIDs).Scan(&r.reporterHistory).Error; err != nil {
-			return
-		}
-		deleted := tx.Exec(deleteParentsSQL, eligibleIDs, cutoff)
-		if err = deleted.Error; err != nil {
-			return
-		}
-		r.reporterResources = deleted.RowsAffected
-		if r.reporterResources != int64(len(eligible)) {
-			return r, fmt.Errorf("eligible reporters changed within transaction")
-		}
-		affected := tx.Exec(recordAffectedSQL, eligibleIDs)
-		if err = affected.Error; err != nil {
-			return
-		}
-		r.affected = affected.RowsAffected
-		common := tx.Exec(deleteCommonHistorySQL, rootIDs)
-		if err = common.Error; err != nil {
-			return
-		}
-		r.commonHistory = common.RowsAffected
-		roots := tx.Exec(deleteRootsSQL, rootIDs)
-		if err = roots.Error; err != nil {
-			return
-		}
-		r.roots = roots.RowsAffected
-	}
-	r.skipped = r.selected - r.reporterResources
-	err = tx.Exec(drainCandidatesSQL, ids).Error
 	return
 }
+
+const deleteReporterChunkSQL = `WITH chunk AS MATERIALIZED (
+ SELECT reporter_resource_id,version,generation FROM reporter_representations
+ WHERE reporter_resource_id=? AND NOT (generation=? AND version=?)
+ ORDER BY version,generation LIMIT ?)
+ DELETE FROM reporter_representations h USING chunk c WHERE h.reporter_resource_id=c.reporter_resource_id AND h.version=c.version AND h.generation=c.generation`
+
+const hasOtherReporterSQL = `SELECT EXISTS(SELECT 1 FROM reporter_resources WHERE resource_id=? AND id<>?)`
+
+// Keep both the API's pointer and MAX(version), which is used for version allocation.
+const deleteCommonChunkSQL = `WITH chunk AS MATERIALIZED (
+ SELECT resource_id,version FROM common_representations WHERE resource_id=?
+ AND version IS DISTINCT FROM (SELECT common_version FROM resource WHERE id=?)
+ AND version<>(SELECT MAX(version) FROM common_representations WHERE resource_id=?)
+ ORDER BY version LIMIT ?)
+ DELETE FROM common_representations h USING chunk c WHERE h.resource_id=c.resource_id AND h.version=c.version`
+
+// LIMIT keeps this check bounded even when the next chunk has much more history.
+const finalizationSizeSQL = `SELECT
+ (SELECT COUNT(*) FROM (SELECT 1 FROM reporter_representations WHERE reporter_resource_id=? LIMIT 6) h) AS reporter,
+ (SELECT COUNT(*) FROM (SELECT 1 FROM common_representations WHERE resource_id=? LIMIT 6) h) AS common,
+ (SELECT COUNT(*) FROM resource WHERE id=?) AS roots`
+const deleteFinalReporterSQL = `WITH chunk AS MATERIALIZED (
+ SELECT reporter_resource_id,version,generation FROM reporter_representations WHERE reporter_resource_id=? LIMIT ?)
+ DELETE FROM reporter_representations h USING chunk c WHERE h.reporter_resource_id=c.reporter_resource_id AND h.version=c.version AND h.generation=c.generation`
+const deleteFinalCommonSQL = `WITH chunk AS MATERIALIZED (
+ SELECT resource_id,version FROM common_representations WHERE resource_id=? LIMIT ?)
+ DELETE FROM common_representations h USING chunk c WHERE h.resource_id=c.resource_id AND h.version=c.version`
+const recordAffectedRootSQL = `INSERT INTO pg_temp.tombstone_cleanup_affected VALUES (?) ON CONFLICT DO NOTHING`
 
 const readOnlySQL = "SET TRANSACTION READ ONLY"
 
@@ -152,24 +211,14 @@ const recheckCandidatesSQL = `SELECT parent.id,parent.resource_id FROM reporter_
  AND parent.resource_id=planned.resource_id AND parent.updated_at=planned.updated_at
  AND parent.generation=planned.generation AND parent.representation_version=planned.representation_version`
 
-const countReporterHistorySQL = "SELECT COUNT(*) FROM reporter_representations WHERE reporter_resource_id IN ?"
-
 const deleteParentsSQL = `DELETE FROM reporter_resources parent USING pg_temp.tombstone_cleanup_candidates planned
    WHERE parent.id=planned.id AND parent.id IN ? AND parent.tombstone IS TRUE AND parent.updated_at < ?
    AND parent.resource_id=planned.resource_id AND parent.updated_at=planned.updated_at
-   AND parent.generation=planned.generation AND parent.representation_version=planned.representation_version`
-
-const recordAffectedSQL = "INSERT INTO pg_temp.tombstone_cleanup_affected SELECT DISTINCT resource_id FROM pg_temp.tombstone_cleanup_candidates WHERE id IN ? ON CONFLICT DO NOTHING"
-
-const deleteCommonHistorySQL = `DELETE FROM common_representations h WHERE h.resource_id IN ?
-   AND NOT EXISTS (SELECT 1 FROM reporter_resources parent WHERE parent.resource_id=h.resource_id)`
+   AND parent.generation=planned.generation AND parent.representation_version=planned.representation_version
+   AND NOT EXISTS (SELECT 1 FROM reporter_representations h WHERE h.reporter_resource_id=parent.id)`
 
 const deleteRootsSQL = `DELETE FROM resource r WHERE r.id IN ? AND NOT EXISTS
-   (SELECT 1 FROM reporter_resources parent WHERE parent.resource_id=r.id)`
+   (SELECT 1 FROM reporter_resources parent WHERE parent.resource_id=r.id)
+ AND NOT EXISTS (SELECT 1 FROM common_representations h WHERE h.resource_id=r.id)`
 
 const drainCandidatesSQL = "DELETE FROM pg_temp.tombstone_cleanup_candidates WHERE id IN ?"
-
-// deletedRows excludes temporary worklist housekeeping.
-func (r result) deletedRows() int64 {
-	return r.reporterResources + r.reporterHistory + r.commonHistory + r.roots
-}

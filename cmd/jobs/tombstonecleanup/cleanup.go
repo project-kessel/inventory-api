@@ -17,8 +17,8 @@ import (
 
 type options struct {
 	tombstoneDays, batchSize, maxBatches int
-	batchDelay                           time.Duration
-	cutoff                               time.Time
+	batchDelay                                          time.Duration
+	cutoff                                              time.Time
 }
 type batchCounts struct {
 	reporterHistory, commonHistory, parents, roots int64
@@ -56,18 +56,11 @@ func cleanup(ctx context.Context, db *gorm.DB, o options, execute bool, onSelect
 				if err := tx.Exec(disableStatementTimeoutSQL).Error; err != nil {
 					return err
 				}
-				limit := o.worklistLimit()
-				total, err := impact(tx, r.cutoff, 0)
+				counts, err := impact(tx, r.cutoff)
 				if err != nil {
 					return err
 				}
-				counts := total
-				if limit > 0 {
-					counts, err = impact(tx, r.cutoff, limit)
-					if err != nil {
-						return err
-					}
-				}
+				total := counts
 				counts.cutoff = r.cutoff
 				counts.totalReporterHistory = total.reporterHistory
 				counts.totalCommonHistory = total.commonHistory
@@ -99,7 +92,13 @@ func cleanup(ctx context.Context, db *gorm.DB, o options, execute bool, onSelect
 			if err := tx.Exec(createAffectedSQL).Error; err != nil {
 				return err
 			}
-			inserted := tx.Exec(insertCandidatesSQL, r.cutoff)
+			query := insertCandidatesSQL
+			arguments := []any{r.cutoff}
+			if limit := o.worklistLimit(); limit > 0 {
+				query = insertLimitedCandidatesSQL
+				arguments = append(arguments, limit)
+			}
+			inserted := tx.Exec(query, arguments...)
 			r.candidates = inserted.RowsAffected
 			return inserted.Error
 		})
@@ -140,7 +139,7 @@ func cleanup(ctx context.Context, db *gorm.DB, o options, execute bool, onSelect
 			if err != nil {
 				return fmt.Errorf("delete batch: %w", err)
 			}
-			if batch.selected == 0 {
+			if batch.selected == 0 && batch.deletedRows() == 0 {
 				return fmt.Errorf("worklist unexpectedly empty")
 			}
 			r.lastBatch = batchCounts{batch.reporterHistory, batch.commonHistory, batch.reporterResources, batch.roots}

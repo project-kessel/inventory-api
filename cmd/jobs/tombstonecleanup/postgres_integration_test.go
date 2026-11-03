@@ -17,13 +17,143 @@ import (
 	"gorm.io/gorm"
 )
 
-// TestTombstoneCleanupPostgres exercises eligibility, cascades and restart behavior
-// using the real schema and actual PostgreSQL transactions.
+// TestTombstoneCleanupPostgres checks the row budget against independent table counts.
 func TestTombstoneCleanupPostgres(t *testing.T) {
+	db := setupTombstoneCleanupPostgres(t)
+	cutoff := time.Date(2026, 10, 1, 0, 0, 0, 0, time.UTC)
+	seed := func(reporterRows, commonRows int, active bool) (uuid.UUID, uuid.UUID) {
+		root, id := uuid.New(), uuid.New()
+		require.NoError(t, db.Exec("INSERT INTO resource(id,type,common_version) VALUES (?,'host',0)", root).Error)
+		require.NoError(t, db.Exec(`INSERT INTO reporter_resources(id,resource_id,local_resource_id,reporter_type,resource_type,reporter_instance_id,api_href,generation,representation_version,tombstone,updated_at)
+   VALUES (?,?,?,'hbi','host','row-budget','https://example.test',0,0,?,?)`, id, root, id.String(), !active, cutoff.Add(-time.Hour)).Error)
+		require.NoError(t, db.Exec(`INSERT INTO reporter_representations(reporter_resource_id,version,generation,data,tombstone) SELECT ?,n,0,'{}',FALSE FROM generate_series(0,?-1)n`, id, reporterRows).Error)
+		require.NoError(t, db.Exec(`INSERT INTO common_representations(resource_id,version,data) SELECT ?,n,'{}' FROM generate_series(0,?-1)n`, root, commonRows).Error)
+		return root, id
+	}
+	count := func(query string, args ...any) int64 {
+		var n int64
+		require.NoError(t, db.Raw(query, args...).Scan(&n).Error)
+		return n
+	}
+	total := func() int64 {
+		return count(`SELECT (SELECT COUNT(*) FROM reporter_resources)+(SELECT COUNT(*) FROM reporter_representations)+(SELECT COUNT(*) FROM common_representations)+(SELECT COUNT(*) FROM resource)`)
+	}
+	reset := func() {
+		require.NoError(t, db.Exec("TRUNCATE reporter_representations,reporter_resources,common_representations,resource CASCADE").Error)
+	}
+	for _, size := range []int{5, 11, 1000} {
+		t.Run(fmt.Sprint("budget-", size), func(t *testing.T) {
+			reset()
+			root, id := seed(37, 39, false)
+			active, _ := seed(3, 4, true)
+			o := options{tombstoneDays: 30, cutoff: cutoff, batchSize: size, maxBatches: 1}
+			before := total()
+			preview, err := cleanup(context.Background(), db, o, false, nil, nil, nil)
+			require.NoError(t, err)
+			require.EqualValues(t, 37, preview.reporterHistory)
+			require.Equal(t, before, total())
+			previous := total()
+			var priorDeleted int64
+			verify := func(r result) {
+				now := total()
+				require.LessOrEqual(t, previous-now, int64(size))
+				require.Equal(t, previous-now, r.deletedRows()-priorDeleted)
+				previous = now
+				priorDeleted = r.deletedRows()
+			}
+			first, err := cleanup(context.Background(), db, o, true, nil, verify, nil)
+			require.NoError(t, err)
+			if size < 78 {
+				require.False(t, first.complete)
+				require.EqualValues(t, 1, count("SELECT COUNT(*) FROM reporter_resources WHERE id=?", id))
+				require.EqualValues(t, 1, count("SELECT COUNT(*) FROM reporter_representations WHERE reporter_resource_id=? AND version=0", id))
+			}
+			o.maxBatches = 0
+			priorDeleted = 0
+			previous = total()
+			run, err := cleanup(context.Background(), db, o, true, nil, verify, nil)
+			require.NoError(t, err)
+			require.True(t, run.complete)
+			require.Zero(t, count("SELECT COUNT(*) FROM resource WHERE id=?", root))
+			require.EqualValues(t, 4, count("SELECT COUNT(*) FROM common_representations WHERE resource_id=?", active))
+			again, err := cleanup(context.Background(), db, o, true, nil, nil, nil)
+			require.NoError(t, err)
+			require.Zero(t, again.candidates)
+		})
+	}
+	t.Run("shared roots changed candidates and cancellation", func(t *testing.T) {
+		reset()
+		root, id := seed(19, 23, false)
+		require.NoError(t, db.Exec(`INSERT INTO reporter_resources(id,resource_id,local_resource_id,reporter_type,resource_type,reporter_instance_id,api_href,console_href,generation,representation_version,tombstone,created_at,updated_at) SELECT gen_random_uuid(),resource_id,local_resource_id||'-active',reporter_type,resource_type,reporter_instance_id,api_href,console_href,generation,representation_version,FALSE,created_at,updated_at FROM reporter_resources WHERE id=?`, id).Error)
+		o := options{tombstoneDays: 30, cutoff: cutoff, batchSize: 5}
+		ctx, cancel := context.WithCancel(context.Background())
+		partial, err := cleanup(ctx, db, o, true, nil, func(result) { cancel() }, nil)
+		require.ErrorIs(t, err, context.Canceled)
+		require.EqualValues(t, 5, partial.reporterHistory)
+		run, err := cleanup(context.Background(), db, o, true, nil, nil, nil)
+		require.NoError(t, err)
+		require.True(t, run.complete)
+		require.EqualValues(t, 23, count("SELECT COUNT(*) FROM common_representations WHERE resource_id=?", root))
+		_, changed := seed(3, 4, false)
+		run, err = cleanup(context.Background(), db, o, true, func(result) {
+			require.NoError(t, db.Exec("UPDATE reporter_resources SET updated_at=? WHERE id=?", cutoff, changed).Error)
+		}, nil, nil)
+		require.NoError(t, err)
+		require.EqualValues(t, 1, run.skipped)
+	})
+	t.Run("later failure rolls back finalization but retains earlier chunks", func(t *testing.T) {
+		reset()
+		root, id := seed(13, 17, false)
+		require.NoError(t, db.Exec(`CREATE FUNCTION fail_root() RETURNS trigger AS $$ BEGIN RAISE EXCEPTION 'injected root failure'; END; $$ LANGUAGE plpgsql`).Error)
+		require.NoError(t, db.Exec(`CREATE TRIGGER fail_root BEFORE DELETE ON resource FOR EACH ROW EXECUTE FUNCTION fail_root()`).Error)
+		run, err := cleanup(context.Background(), db, options{tombstoneDays: 30, cutoff: cutoff, batchSize: 5}, true, nil, nil, nil)
+		require.ErrorContains(t, err, "injected root failure")
+		require.Greater(t, run.batches, 0)
+		require.EqualValues(t, 1, count("SELECT COUNT(*) FROM reporter_resources WHERE id=?", id))
+		require.EqualValues(t, 1, count("SELECT COUNT(*) FROM resource WHERE id=?", root))
+		require.EqualValues(t, 1, count("SELECT COUNT(*) FROM reporter_representations WHERE reporter_resource_id=?", id))
+		require.EqualValues(t, 2, count("SELECT COUNT(*) FROM common_representations WHERE resource_id=?", root))
+		require.NoError(t, db.Exec("DROP TRIGGER fail_root ON resource").Error)
+		require.NoError(t, db.Exec("DROP FUNCTION fail_root()").Error)
+	})
+	t.Run("new reporter between common chunks preserves the surviving root", func(t *testing.T) {
+		reset()
+		root, id := seed(1, 39, false)
+		added := false
+		run, err := cleanup(context.Background(), db, options{tombstoneDays: 30, cutoff: cutoff, batchSize: 5}, true, nil, func(progress result) {
+			if !added && progress.commonHistory > 0 {
+				added = true
+				require.NoError(t, db.Exec(`INSERT INTO reporter_resources(id,resource_id,local_resource_id,reporter_type,resource_type,reporter_instance_id,api_href,generation,representation_version,tombstone,updated_at)
+      VALUES (?,?,?,'hbi','host','new-reporter','https://example.test',0,0,FALSE,?)`, uuid.New(), root, uuid.NewString(), cutoff).Error)
+				require.NoError(t, db.Exec("INSERT INTO common_representations(resource_id,version,data) VALUES (?,999,'{}')", root).Error)
+			}
+		}, nil)
+		require.NoError(t, err)
+		require.True(t, added)
+		require.True(t, run.complete)
+		require.EqualValues(t, 5, run.commonHistory)
+		require.EqualValues(t, 35, count("SELECT COUNT(*) FROM common_representations WHERE resource_id=?", root))
+		require.EqualValues(t, 3, count("SELECT COUNT(*) FROM common_representations WHERE resource_id=? AND version IN (0,38,999)", root))
+		require.Zero(t, count("SELECT COUNT(*) FROM reporter_resources WHERE id=?", id))
+		require.EqualValues(t, 1, count("SELECT COUNT(*) FROM resource WHERE id=?", root))
+	})
+	t.Run("shallow parents share a transaction", func(t *testing.T) {
+		reset()
+		for i := 0; i < 4; i++ {
+			seed(1, 1, false)
+		}
+		run, err := cleanup(context.Background(), db, options{tombstoneDays: 30, cutoff: cutoff, batchSize: 16}, true, nil, nil, nil)
+		require.NoError(t, err)
+		require.Equal(t, 1, run.batches)
+		require.EqualValues(t, 16, run.deletedRows())
+	})
+}
+
+func TestTombstoneCleanupGuards(t *testing.T) {
 	db := setupTombstoneCleanupPostgres(t)
 	cutoff := time.Date(2026, 10, 1, 12, 0, 0, 0, time.UTC)
 	old := cutoff.Add(-time.Hour)
-	options := options{tombstoneDays: 30, batchSize: 3, cutoff: cutoff}
+	options := options{tombstoneDays: 30, batchSize: 1000, cutoff: cutoff}
 	seed := func(resourceID uuid.UUID, tombstone bool, updatedAt time.Time, reporterRows, commonRows int) uuid.UUID {
 		t.Helper()
 		require.NoError(t, db.Exec("INSERT INTO resource(id,type) VALUES (?, 'host') ON CONFLICT DO NOTHING", resourceID).Error)
@@ -97,112 +227,6 @@ func TestTombstoneCleanupPostgres(t *testing.T) {
 			require.Equal(t, int64(1), count("SELECT COUNT(*) FROM common_representations WHERE resource_id=?", root))
 		}
 	})
-	t.Run("oldest first regardless of history size with deterministic ID ties", func(t *testing.T) {
-		reset(t)
-		smallRoot, largeRoot := uuid.New(), uuid.New()
-		small := seed(smallRoot, true, old.Add(-time.Hour), 1, 2)
-		large := seed(largeRoot, true, old.Add(time.Minute), 5, 3)
-		tieOlder := seed(uuid.New(), true, old.Add(-time.Minute), 3, 1)
-		tieA := seed(uuid.New(), true, old, 3, 1)
-		tieB := seed(uuid.New(), true, old, 3, 1)
-		if tieA.String() > tieB.String() {
-			tieA, tieB = tieB, tieA
-		}
-		empty := seed(uuid.New(), true, old.Add(-2*time.Hour), 0, 0)
-		capped := options
-		capped.batchSize, capped.maxBatches = 1, 1
-		preview, err := cleanup(context.Background(), db, capped, false, nil, nil, nil)
-		require.NoError(t, err)
-		require.Zero(t, preview.reporterHistory)
-		require.Zero(t, preview.commonHistory)
-		require.Equal(t, int64(15), preview.totalReporterHistory)
-		require.Equal(t, int64(1), count("SELECT COUNT(*) FROM reporter_resources WHERE id=?", large))
-		all := capped
-		all.maxBatches = 0
-		expected := []uuid.UUID{empty, small, tieOlder, tieA, tieB, large}
-		run, err := cleanup(context.Background(), db, all, true, nil, func(progress result) {
-			for index, id := range expected {
-				remaining := int64(1)
-				if index < progress.batches {
-					remaining = 0
-				}
-				require.Equal(t, remaining, count("SELECT COUNT(*) FROM reporter_resources WHERE id=?", id))
-			}
-		}, nil)
-		require.NoError(t, err)
-		require.True(t, run.complete)
-		require.Equal(t, len(expected), run.batches)
-	})
-	t.Run("revived worklist entries are skipped and drained", func(t *testing.T) {
-		reset(t)
-		root := uuid.New()
-		id := seed(root, true, old, 3, 2)
-		run, err := cleanup(context.Background(), db, options, true, func(_ result) {
-			require.NoError(t, db.Exec("UPDATE reporter_resources SET tombstone=FALSE,generation=1,representation_version=0,updated_at=? WHERE id=?", cutoff.Add(time.Hour), id).Error)
-		}, nil, nil)
-		require.NoError(t, err)
-		require.True(t, run.complete)
-		require.Equal(t, int64(1), run.skipped)
-		require.Zero(t, run.reporterResources)
-		require.Equal(t, int64(3), count("SELECT COUNT(*) FROM reporter_representations WHERE reporter_resource_id=?", id))
-		require.Equal(t, int64(2), count("SELECT COUNT(*) FROM common_representations WHERE resource_id=?", root))
-	})
-	t.Run("batch cap cancellation and rerun count only committed work", func(t *testing.T) {
-		reset(t)
-		for index := 0; index < 5; index++ {
-			seed(uuid.New(), true, old, 2, 2)
-		}
-		capped := options
-		capped.batchSize, capped.maxBatches = 2, 1
-		preview, err := cleanup(context.Background(), db, capped, false, nil, nil, nil)
-		require.NoError(t, err)
-		require.Equal(t, int64(5), preview.candidates)
-		require.Equal(t, int64(2), preview.reporterResources)
-		require.Equal(t, int64(4), preview.reporterHistory)
-		require.Equal(t, int64(10), preview.totalReporterHistory)
-		require.Equal(t, int64(2), preview.roots)
-		require.Equal(t, int64(5), preview.totalRoots)
-		first, err := cleanup(context.Background(), db, capped, true, nil, nil, nil)
-		require.NoError(t, err)
-		require.Equal(t, int64(2), first.reporterResources)
-		require.Equal(t, int64(3), first.remaining)
-		require.False(t, first.complete)
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-		uncapped := capped
-		uncapped.maxBatches = 0
-		second, err := cleanup(ctx, db, uncapped, true, nil, func(_ result) { cancel() }, nil)
-		require.ErrorIs(t, err, context.Canceled)
-		require.Equal(t, 1, second.batches)
-		require.Equal(t, int64(2), second.reporterResources)
-		require.Equal(t, int64(1), count("SELECT COUNT(*) FROM reporter_resources WHERE TRUE"))
-		third, err := cleanup(context.Background(), db, uncapped, true, nil, nil, nil)
-		require.NoError(t, err)
-		require.True(t, third.complete)
-		require.Equal(t, int64(1), third.reporterResources)
-		final, err := cleanup(context.Background(), db, uncapped, true, nil, nil, nil)
-		require.NoError(t, err)
-		require.Zero(t, final.candidates)
-		require.True(t, final.complete)
-	})
-	t.Run("root failure rolls back parent cascade and common deletion", func(t *testing.T) {
-		reset(t)
-		root := uuid.New()
-		id := seed(root, true, old, 3, 2)
-		require.NoError(t, db.Exec(`CREATE FUNCTION tombstone_cleanup_fail() RETURNS trigger AS $$ BEGIN RAISE EXCEPTION 'injected root failure'; END; $$ LANGUAGE plpgsql`).Error)
-		require.NoError(t, db.Exec(`CREATE TRIGGER tombstone_cleanup_fail BEFORE DELETE ON resource FOR EACH ROW EXECUTE FUNCTION tombstone_cleanup_fail()`).Error)
-		t.Cleanup(func() {
-			_ = db.Exec("DROP TRIGGER IF EXISTS tombstone_cleanup_fail ON resource").Error
-			_ = db.Exec("DROP FUNCTION IF EXISTS tombstone_cleanup_fail()").Error
-		})
-		run, err := cleanup(context.Background(), db, options, true, nil, nil, nil)
-		require.ErrorContains(t, err, "injected root failure")
-		require.Zero(t, run.batches)
-		require.Zero(t, run.reporterResources)
-		require.Equal(t, int64(1), count("SELECT COUNT(*) FROM reporter_resources WHERE id=?", id))
-		require.Equal(t, int64(3), count("SELECT COUNT(*) FROM reporter_representations WHERE reporter_resource_id=?", id))
-		require.Equal(t, int64(2), count("SELECT COUNT(*) FROM common_representations WHERE resource_id=?", root))
-	})
 	t.Run("revival committed during a batch is preserved after serialization retry", func(t *testing.T) {
 		reset(t)
 		root := uuid.New()
@@ -254,38 +278,57 @@ func TestTombstoneCleanupPostgres(t *testing.T) {
 		require.Equal(t, int64(3), count("SELECT COUNT(*) FROM reporter_representations WHERE reporter_resource_id=?", id))
 		require.Equal(t, int64(2), count("SELECT COUNT(*) FROM common_representations WHERE resource_id=?", root))
 	})
-	t.Run("affected roots are unique across batches", func(t *testing.T) {
+	t.Run("concurrent child insertion cannot hide deletions in the FK cascade", func(t *testing.T) {
 		reset(t)
 		root := uuid.New()
-		seed(root, true, old, 2, 3)
-		seed(root, true, old, 2, 0)
-		single := options
-		single.batchSize = 1
-		run, err := cleanup(context.Background(), db, single, true, nil, nil, nil)
+		id := seed(root, true, old, 3, 2)
+		sqlDB, err := db.DB()
 		require.NoError(t, err)
-		require.Equal(t, 2, run.batches)
-		require.Equal(t, int64(2), run.reporterResources)
-		require.Equal(t, int64(1), run.affected)
-		require.Equal(t, int64(1), run.roots)
-		require.Equal(t, int64(3), run.commonHistory)
-	})
-	t.Run("deep history is a parent batch rather than a history row limit", func(t *testing.T) {
-		reset(t)
-		root := uuid.New()
-		id := seed(root, true, old, 0, 0)
-		require.NoError(t, db.Exec(`INSERT INTO reporter_representations(reporter_resource_id,generation,version,data,tombstone)
-		 SELECT ?,0,n,'{}',FALSE FROM generate_series(0,9999)n`, id).Error)
-		require.NoError(t, db.Exec(`INSERT INTO common_representations(resource_id,version,data)
-		 SELECT ?,n,'{}' FROM generate_series(0,9999)n`, root).Error)
-		deep := options
-		deep.batchSize = 1
-		run, err := cleanup(context.Background(), db, deep, true, nil, nil, nil)
+		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+		defer cancel()
+		guard, err := sqlDB.Conn(ctx)
 		require.NoError(t, err)
-		require.Equal(t, 1, run.batches)
-		require.Equal(t, int64(1), run.reporterResources)
-		require.Equal(t, int64(10000), run.reporterHistory)
-		require.Equal(t, int64(10000), run.commonHistory)
-		require.True(t, run.complete)
+		defer guard.Close() //nolint:errcheck
+		_, err = guard.ExecContext(ctx, "SELECT pg_advisory_lock(5217601)")
+		require.NoError(t, err)
+		defer guard.ExecContext(context.Background(), "SELECT pg_advisory_unlock(5217601)") //nolint:errcheck
+		// Statement-level blocking lets the writer commit after eligibility was
+		// read, but before DELETE takes any reporter row locks.
+		require.NoError(t, db.Exec(`CREATE FUNCTION tombstone_cleanup_pause() RETURNS trigger AS $$ BEGIN PERFORM pg_advisory_xact_lock(5217601); RETURN NULL; END; $$ LANGUAGE plpgsql`).Error)
+		require.NoError(t, db.Exec(`CREATE TRIGGER tombstone_cleanup_pause BEFORE DELETE ON reporter_resources FOR EACH STATEMENT EXECUTE FUNCTION tombstone_cleanup_pause()`).Error)
+		t.Cleanup(func() {
+			_ = db.Exec("DROP TRIGGER IF EXISTS tombstone_cleanup_pause ON reporter_resources").Error
+			_ = db.Exec("DROP FUNCTION IF EXISTS tombstone_cleanup_pause()").Error
+		})
+		type outcome struct {
+			result result
+			err    error
+		}
+		done := make(chan outcome, 1)
+		go func() {
+			run, err := cleanup(ctx, db, options, true, nil, nil, nil)
+			done <- outcome{run, err}
+		}()
+		require.Eventually(t, func() bool {
+			var waiting int64
+			return db.Raw("SELECT COUNT(*) FROM pg_locks WHERE locktype='advisory' AND NOT granted").Scan(&waiting).Error == nil && waiting > 0
+		}, 3*time.Second, 10*time.Millisecond)
+		require.NoError(t, db.Exec("INSERT INTO reporter_representations(reporter_resource_id,version,generation,data,tombstone) VALUES (?,999,0,'{}',FALSE)", id).Error)
+		_, err = guard.ExecContext(ctx, "SELECT pg_advisory_unlock(5217601)")
+		require.NoError(t, err)
+		select {
+		case finished := <-done:
+			require.NoError(t, finished.err)
+			require.Zero(t, finished.result.skipped)
+			require.EqualValues(t, 4, finished.result.reporterHistory)
+			require.EqualValues(t, 1, finished.result.reporterResources)
+			require.True(t, finished.result.complete)
+		case <-ctx.Done():
+			t.Fatal(ctx.Err())
+		}
+		require.Zero(t, count("SELECT COUNT(*) FROM reporter_resources WHERE id=?", id))
+		require.Zero(t, count("SELECT COUNT(*) FROM reporter_representations WHERE reporter_resource_id=?", id))
+		require.Zero(t, count("SELECT COUNT(*) FROM common_representations WHERE resource_id=?", root))
 	})
 }
 

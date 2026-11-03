@@ -143,7 +143,10 @@ func WithAdvisoryLock(ctx context.Context, db *gorm.DB, fn func(*gorm.DB) error)
 ```
 
 **Critical Design:**
-- Dedicated connection holds advisory lock (`pg_advisory_lock`)
+- Dedicated connection holds the advisory lock
+- Acquire with a retrying, jittered `pg_try_advisory_lock` loop; do not block
+  inside PostgreSQL because an advisory-lock waiter can deadlock with
+  `CREATE INDEX CONCURRENTLY`
 - GORM operations bound to locked connection via `connWrapper`
 - Prevents concurrent migrations across multiple instances
 - Enables non-transactional DDL like `CREATE INDEX CONCURRENTLY`

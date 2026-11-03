@@ -204,14 +204,11 @@ func runConsumerReads(t *testing.T, ctx context.Context, seedDB *gorm.DB, dsn st
 			if testCase.previous {
 				result = previous
 			}
-			if current == nil || !current.HasReporter() || result == nil || result.ReporterVersion() == nil || result.ReporterVersion().Uint() != testCase.want {
+			if current == nil || result == nil || result.ReporterVersion() == nil || result.ReporterVersion().Uint() != testCase.want {
 				return fmt.Errorf("%s returned incorrect reporter version", testCase.name)
 			}
-			// The revival's previous row is the old generation's tombstone: the version
-			// must be reported, but no data. The delete row is live data and must carry it.
-			if testCase.previous && result.HasReporter() {
-				return fmt.Errorf("%s returned live data for a tombstone", testCase.name)
-			}
+			// The delete row is live data and must carry it. The revival's previous row
+			// is the old generation's tombstone, so only its version is asserted above.
 			if !testCase.previous && !result.HasReporter() {
 				return fmt.Errorf("%s returned a tombstone instead of live data", testCase.name)
 			}

@@ -162,10 +162,25 @@ func TestNewRepresentations_Validation(t *testing.T) {
 	})
 
 	t.Run("rejects non-empty data without version", func(t *testing.T) {
-		data := model.Representation(map[string]interface{}{"key": "value"})
-		rep, err := model.NewRepresentations(data, nil, nil, nil)
-		require.Error(t, err)
-		assert.Nil(t, rep)
+		t.Run("common data without common version", func(t *testing.T) {
+			data := model.Representation(map[string]interface{}{"key": "value"})
+			reporterVer := model.NewVersion(1)
+
+			rep, err := model.NewRepresentations(data, nil, nil, &reporterVer)
+			require.Error(t, err)
+			assert.Nil(t, rep)
+			assert.Contains(t, err.Error(), "common data requires common version")
+		})
+
+		t.Run("reporter data without reporter version", func(t *testing.T) {
+			data := model.Representation(map[string]interface{}{"key": "value"})
+			commonVer := model.NewVersion(1)
+
+			rep, err := model.NewRepresentations(nil, &commonVer, data, nil)
+			require.Error(t, err)
+			assert.Nil(t, rep)
+			assert.Contains(t, err.Error(), "reporter data requires reporter version")
+		})
 	})
 
 	t.Run("accepts both common and reporter", func(t *testing.T) {

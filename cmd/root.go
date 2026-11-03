@@ -148,7 +148,9 @@ func initConfig() {
 	}
 
 	viper.SetEnvPrefix(strings.ReplaceAll(Name, "-", "_"))
-	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
+	// Map both separators so kebab-case config keys (e.g. consumer.bootstrap-servers)
+	// resolve to their uppercase underscore environment variables.
+	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_", "-", "_"))
 	viper.AutomaticEnv()
 
 	if err := viper.ReadInConfig(); err != nil {

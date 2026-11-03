@@ -20,7 +20,11 @@ type options struct {
 	batchDelay                           time.Duration
 	cutoff                               time.Time
 }
+type batchCounts struct {
+	reporterHistory, commonHistory, parents, roots int64
+}
 type result struct {
+	lastBatch                                                                                                    batchCounts
 	candidates, remaining, selected, skipped, reporterResources, reporterHistory, commonHistory, roots, affected int64
 	batches                                                                                                      int
 	selectionDuration                                                                                            time.Duration
@@ -32,7 +36,7 @@ type result struct {
 
 // cleanup freezes a parent worklist, tolerating online changes by skipping them.
 // Atomic serializable batches preserve roots that acquire a surviving reporter.
-func cleanup(ctx context.Context, db *gorm.DB, o options, execute bool, onSelection func(result), onBatch func(result)) (r result, err error) {
+func cleanup(ctx context.Context, db *gorm.DB, o options, execute bool, onSelection func(result), onBatch func(result), onBatchStart func(result)) (r result, err error) {
 	r.cutoff = o.cutoff
 	if r.cutoff.IsZero() {
 		r.cutoff = time.Now().UTC().AddDate(0, 0, -o.tombstoneDays)
@@ -52,10 +56,7 @@ func cleanup(ctx context.Context, db *gorm.DB, o options, execute bool, onSelect
 				if err := tx.Exec(disableStatementTimeoutSQL).Error; err != nil {
 					return err
 				}
-				var limit int64
-				if o.maxBatches > 0 {
-					limit = int64(o.batchSize) * int64(o.maxBatches)
-				}
+				limit := o.worklistLimit()
 				total, err := impact(tx, r.cutoff, 0)
 				if err != nil {
 					return err
@@ -114,6 +115,9 @@ func cleanup(ctx context.Context, db *gorm.DB, o options, execute bool, onSelect
 			if err := ctx.Err(); err != nil {
 				return err
 			}
+			if onBatchStart != nil {
+				onBatchStart(r)
+			}
 			var batch result
 			started := time.Now()
 			err := manager.HandleSerializableTransaction("tombstone_cleanup", connection.WithContext(ctx), func(tx *gorm.DB) error {
@@ -139,6 +143,7 @@ func cleanup(ctx context.Context, db *gorm.DB, o options, execute bool, onSelect
 			if batch.selected == 0 {
 				return fmt.Errorf("worklist unexpectedly empty")
 			}
+			r.lastBatch = batchCounts{batch.reporterHistory, batch.commonHistory, batch.reporterResources, batch.roots}
 			r.batches++
 			r.selected += batch.selected
 			r.skipped += batch.skipped
@@ -166,4 +171,12 @@ func cleanup(ctx context.Context, db *gorm.DB, o options, execute bool, onSelect
 		return nil
 	})
 	return
+}
+
+// worklistLimit returns the validated parent cap; zero selects all eligible parents.
+func (o options) worklistLimit() int64 {
+	if o.maxBatches == 0 {
+		return 0
+	}
+	return int64(o.batchSize) * int64(o.maxBatches)
 }

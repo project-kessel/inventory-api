@@ -168,3 +168,8 @@ const deleteRootsSQL = `DELETE FROM resource r WHERE r.id IN ? AND NOT EXISTS
    (SELECT 1 FROM reporter_resources parent WHERE parent.resource_id=r.id)`
 
 const drainCandidatesSQL = "DELETE FROM pg_temp.tombstone_cleanup_candidates WHERE id IN ?"
+
+// deletedRows excludes temporary worklist housekeeping.
+func (r result) deletedRows() int64 {
+	return r.reporterResources + r.reporterHistory + r.commonHistory + r.roots
+}

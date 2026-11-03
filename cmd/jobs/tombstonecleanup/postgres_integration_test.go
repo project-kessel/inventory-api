@@ -67,7 +67,7 @@ func TestTombstoneCleanupPostgres(t *testing.T) {
 		for _, root := range []uuid.UUID{orphanRoot, missingRoot} {
 			require.NoError(t, db.Exec("INSERT INTO common_representations(resource_id,version,data) VALUES (?,0,'{}')", root).Error)
 		}
-		preview, err := cleanup(context.Background(), db, options, false, nil, nil)
+		preview, err := cleanup(context.Background(), db, options, false, nil, nil, nil)
 		require.NoError(t, err)
 		require.Equal(t, int64(3), preview.candidates)
 		require.Equal(t, int64(8), preview.reporterHistory)
@@ -75,7 +75,7 @@ func TestTombstoneCleanupPostgres(t *testing.T) {
 		require.Equal(t, int64(1), preview.roots)
 		require.Zero(t, preview.batches)
 		require.Equal(t, int64(1), count("SELECT COUNT(*) FROM reporter_resources WHERE id=?", deleted))
-		run, err := cleanup(context.Background(), db, options, true, nil, nil)
+		run, err := cleanup(context.Background(), db, options, true, nil, nil, nil)
 		require.NoError(t, err)
 		require.True(t, run.complete)
 		require.Equal(t, int64(3), run.reporterResources)
@@ -111,7 +111,7 @@ func TestTombstoneCleanupPostgres(t *testing.T) {
 		empty := seed(uuid.New(), true, old.Add(-2*time.Hour), 0, 0)
 		capped := options
 		capped.batchSize, capped.maxBatches = 1, 1
-		preview, err := cleanup(context.Background(), db, capped, false, nil, nil)
+		preview, err := cleanup(context.Background(), db, capped, false, nil, nil, nil)
 		require.NoError(t, err)
 		require.Zero(t, preview.reporterHistory)
 		require.Zero(t, preview.commonHistory)
@@ -128,7 +128,7 @@ func TestTombstoneCleanupPostgres(t *testing.T) {
 				}
 				require.Equal(t, remaining, count("SELECT COUNT(*) FROM reporter_resources WHERE id=?", id))
 			}
-		})
+		}, nil)
 		require.NoError(t, err)
 		require.True(t, run.complete)
 		require.Equal(t, len(expected), run.batches)
@@ -139,7 +139,7 @@ func TestTombstoneCleanupPostgres(t *testing.T) {
 		id := seed(root, true, old, 3, 2)
 		run, err := cleanup(context.Background(), db, options, true, func(_ result) {
 			require.NoError(t, db.Exec("UPDATE reporter_resources SET tombstone=FALSE,generation=1,representation_version=0,updated_at=? WHERE id=?", cutoff.Add(time.Hour), id).Error)
-		}, nil)
+		}, nil, nil)
 		require.NoError(t, err)
 		require.True(t, run.complete)
 		require.Equal(t, int64(1), run.skipped)
@@ -154,7 +154,7 @@ func TestTombstoneCleanupPostgres(t *testing.T) {
 		}
 		capped := options
 		capped.batchSize, capped.maxBatches = 2, 1
-		preview, err := cleanup(context.Background(), db, capped, false, nil, nil)
+		preview, err := cleanup(context.Background(), db, capped, false, nil, nil, nil)
 		require.NoError(t, err)
 		require.Equal(t, int64(5), preview.candidates)
 		require.Equal(t, int64(2), preview.reporterResources)
@@ -162,7 +162,7 @@ func TestTombstoneCleanupPostgres(t *testing.T) {
 		require.Equal(t, int64(10), preview.totalReporterHistory)
 		require.Equal(t, int64(2), preview.roots)
 		require.Equal(t, int64(5), preview.totalRoots)
-		first, err := cleanup(context.Background(), db, capped, true, nil, nil)
+		first, err := cleanup(context.Background(), db, capped, true, nil, nil, nil)
 		require.NoError(t, err)
 		require.Equal(t, int64(2), first.reporterResources)
 		require.Equal(t, int64(3), first.remaining)
@@ -171,16 +171,16 @@ func TestTombstoneCleanupPostgres(t *testing.T) {
 		defer cancel()
 		uncapped := capped
 		uncapped.maxBatches = 0
-		second, err := cleanup(ctx, db, uncapped, true, nil, func(_ result) { cancel() })
+		second, err := cleanup(ctx, db, uncapped, true, nil, func(_ result) { cancel() }, nil)
 		require.ErrorIs(t, err, context.Canceled)
 		require.Equal(t, 1, second.batches)
 		require.Equal(t, int64(2), second.reporterResources)
 		require.Equal(t, int64(1), count("SELECT COUNT(*) FROM reporter_resources WHERE TRUE"))
-		third, err := cleanup(context.Background(), db, uncapped, true, nil, nil)
+		third, err := cleanup(context.Background(), db, uncapped, true, nil, nil, nil)
 		require.NoError(t, err)
 		require.True(t, third.complete)
 		require.Equal(t, int64(1), third.reporterResources)
-		final, err := cleanup(context.Background(), db, uncapped, true, nil, nil)
+		final, err := cleanup(context.Background(), db, uncapped, true, nil, nil, nil)
 		require.NoError(t, err)
 		require.Zero(t, final.candidates)
 		require.True(t, final.complete)
@@ -195,7 +195,7 @@ func TestTombstoneCleanupPostgres(t *testing.T) {
 			_ = db.Exec("DROP TRIGGER IF EXISTS tombstone_cleanup_fail ON resource").Error
 			_ = db.Exec("DROP FUNCTION IF EXISTS tombstone_cleanup_fail()").Error
 		})
-		run, err := cleanup(context.Background(), db, options, true, nil, nil)
+		run, err := cleanup(context.Background(), db, options, true, nil, nil, nil)
 		require.ErrorContains(t, err, "injected root failure")
 		require.Zero(t, run.batches)
 		require.Zero(t, run.reporterResources)
@@ -231,7 +231,7 @@ func TestTombstoneCleanupPostgres(t *testing.T) {
 		}
 		done := make(chan outcome, 1)
 		go func() {
-			run, err := cleanup(ctx, db, options, true, nil, nil)
+			run, err := cleanup(ctx, db, options, true, nil, nil, nil)
 			done <- outcome{run, err}
 		}()
 		require.Eventually(t, func() bool {
@@ -261,7 +261,7 @@ func TestTombstoneCleanupPostgres(t *testing.T) {
 		seed(root, true, old, 2, 0)
 		single := options
 		single.batchSize = 1
-		run, err := cleanup(context.Background(), db, single, true, nil, nil)
+		run, err := cleanup(context.Background(), db, single, true, nil, nil, nil)
 		require.NoError(t, err)
 		require.Equal(t, 2, run.batches)
 		require.Equal(t, int64(2), run.reporterResources)
@@ -279,7 +279,7 @@ func TestTombstoneCleanupPostgres(t *testing.T) {
 		 SELECT ?,n,'{}' FROM generate_series(0,9999)n`, root).Error)
 		deep := options
 		deep.batchSize = 1
-		run, err := cleanup(context.Background(), db, deep, true, nil, nil)
+		run, err := cleanup(context.Background(), db, deep, true, nil, nil, nil)
 		require.NoError(t, err)
 		require.Equal(t, 1, run.batches)
 		require.Equal(t, int64(1), run.reporterResources)

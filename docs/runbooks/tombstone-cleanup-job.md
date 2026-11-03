@@ -66,6 +66,13 @@ inventory-api run-job tombstoned-resources-cleanup-job --tombstone-days=30 \
   --execute --consumer-boundary-verified --batch-size=1000 --max-batches=1
 ```
 
+Logs include `max_batches` and `worklist_limit` (zero means unlimited). A batch-start
+event precedes each logical batch, including its serialization retries. Final
+`status=succeeded` means the invocation succeeded; `complete=true` means its selected
+worklist was exhausted. A successful capped run can leave additional eligible
+parents in the database. Failures use ERROR severity and retain committed counts,
+including when database cleanup/close fails after deletion has finished.
+
 Omit `--max-batches` or set it to 0 to process the whole frozen worklist. Default
 batch delay is 500ms. Cleanup transactions set `statement_timeout=0`, disabling
 PostgreSQL statement timeouts, including inherited database/role settings. The

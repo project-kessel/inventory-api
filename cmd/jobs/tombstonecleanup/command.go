@@ -67,7 +67,7 @@ func validateInvocation(options options) error {
 		return fmt.Errorf("maximum batches and batch delay must not be negative")
 	}
 	if options.maxBatches > 0 && int64(options.maxBatches) > math.MaxInt64/int64(options.batchSize) {
-		return fmt.Errorf("batch-size multiplied by max-batches would overflow the preview row limit")
+		return fmt.Errorf("batch-size multiplied by max-batches would overflow the row limit")
 	}
 	return nil
 }
@@ -116,6 +116,8 @@ func runTombstoneCleanupJob(ctx context.Context, storageOptions *storage.Options
 	}
 	_, logger := common.InitLogger(common.GetLogLevel(), loggerOptions)
 	helper := log.NewHelper(log.With(logger, "job", "tombstoned_resources_cleanup", "dry_run", !execute))
+	var r result
+	defer func() { logResult(helper, options, execute, "tombstone cleanup result", r, jobErr) }()
 	db, err := openTombstoneCleanupDatabase(ctx, storage.NewConfig(storageOptions).Complete())
 	if err != nil {
 		return err
@@ -130,24 +132,51 @@ func runTombstoneCleanupJob(ctx context.Context, storageOptions *storage.Options
 		}
 	}()
 	helper.Infow("msg", "tombstone cleanup configuration", "tombstone_days", options.tombstoneDays, "batch_size", options.batchSize, "batch_delay", options.batchDelay.String(), "max_batches", options.maxBatches)
-	report := func(message string, r result) {
-		fields := []any{
-			"msg", message, "cutoff", r.cutoff.Format(time.RFC3339Nano),
-			"candidates", r.candidates, "selection_duration", r.selectionDuration.String(),
-			"batch_duration", r.batchDuration.String(), "committed_batches", r.batches,
-			"selected", r.selected, "skipped", r.skipped,
-			"reporter_resources", r.reporterResources, "reporter_representations", r.reporterHistory,
-			"common_representations", r.commonHistory, "resource_roots", r.roots,
-			"affected_resources", r.affected, "remaining_worklist_rows", r.remaining, "complete", r.complete,
+
+	r, err = cleanup(ctx, db, options, execute, func(r result) { logResult(helper, options, execute, "tombstone cleanup selection complete", r, nil) }, func(r result) { logResult(helper, options, execute, "tombstone cleanup batch committed", r, nil) }, func(r result) {
+		helper.Infow("msg", "tombstone cleanup batch started", "batch", r.batches+1, "batch_size", options.batchSize, "remaining_worklist_rows", r.remaining, "committed_batches", r.batches)
+	})
+	return err
+}
+
+// logResult reports scoped progress and the final invocation outcome.
+func logResult(helper *log.Helper, options options, execute bool, message string, r result, jobErr error) {
+	deletedRows := int64(0)
+	if execute {
+		deletedRows = r.deletedRows()
+	}
+	fields := []any{
+		"msg", message, "max_batches", options.maxBatches, "worklist_limit", options.worklistLimit(),
+		"candidates", r.candidates, "selection_duration", r.selectionDuration.String(),
+		"row_limit", options.worklistLimit(), "rows_deleted", deletedRows,
+		"batch_reporter_representations", r.lastBatch.reporterHistory,
+		"batch_common_representations", r.lastBatch.commonHistory,
+		"batch_reporter_resources", r.lastBatch.parents, "batch_resource_roots", r.lastBatch.roots,
+		"batch_duration", r.batchDuration.String(), "committed_batches", r.batches,
+		"selected", r.selected, "skipped", r.skipped,
+		"reporter_resources", r.reporterResources, "reporter_representations", r.reporterHistory,
+		"common_representations", r.commonHistory, "resource_roots", r.roots,
+		"affected_resources", r.affected, "remaining_worklist_rows", r.remaining, "complete", r.complete,
+	}
+	if !execute {
+		fields = append(fields, "total_eligible_reporter_history", r.totalReporterHistory,
+			"total_eligible_common_history", r.totalCommonHistory,
+			"total_removable_roots", r.totalRoots, "total_affected_resources", r.totalAffected)
+	}
+	if !r.cutoff.IsZero() {
+		fields = append(fields, "cutoff", r.cutoff.Format(time.RFC3339Nano))
+	}
+	if message == "tombstone cleanup result" {
+		status := "succeeded"
+		if jobErr != nil {
+			status = "failed"
 		}
-		if !execute {
-			fields = append(fields, "total_eligible_reporter_history", r.totalReporterHistory,
-				"total_eligible_common_history", r.totalCommonHistory,
-				"total_removable_roots", r.totalRoots, "total_affected_resources", r.totalAffected)
-		}
+		fields = append(fields, "status", status)
+	}
+	if jobErr != nil {
+		fields = append(fields, "error", jobErr.Error())
+		helper.Errorw(fields...)
+	} else {
 		helper.Infow(fields...)
 	}
-	r, err := cleanup(ctx, db, options, execute, func(r result) { report("tombstone cleanup selection complete", r) }, func(r result) { report("tombstone cleanup batch committed", r) })
-	report("tombstone cleanup result", r)
-	return err
 }

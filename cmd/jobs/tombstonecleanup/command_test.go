@@ -1,9 +1,12 @@
 package tombstonecleanup
 
 import (
+	"bytes"
+	"context"
 	"strconv"
 	"testing"
 
+	"github.com/go-kratos/kratos/v2/log"
 	"github.com/project-kessel/inventory-api/cmd/common"
 	"github.com/project-kessel/inventory-api/internal/storage"
 	"github.com/stretchr/testify/require"
@@ -66,5 +69,23 @@ func TestValidationAllowsTechnicalBoundaries(t *testing.T) {
 		{tombstoneDays: 30, batchSize: 1, maxBatches: int(^uint(0) >> 1)},
 	} {
 		require.NoError(t, validateInvocation(test))
+	}
+}
+
+// TestFinalLogging distinguishes process outcome from scoped worklist completion.
+func TestFinalLogging(t *testing.T) {
+	for _, failure := range []error{nil, context.Canceled} {
+		var output bytes.Buffer
+		logResult(log.NewHelper(log.NewStdLogger(&output)), options{batchSize: 2, maxBatches: 1}, true, "tombstone cleanup result", result{batches: 1, reporterResources: 2, complete: true}, failure)
+		require.Contains(t, output.String(), "worklist_limit=2")
+		require.Contains(t, output.String(), "reporter_resources=2")
+		if failure == nil {
+			require.Contains(t, output.String(), "INFO")
+			require.Contains(t, output.String(), "status=succeeded")
+		} else {
+			require.Contains(t, output.String(), "ERROR")
+			require.Contains(t, output.String(), "status=failed")
+		}
+		require.NotContains(t, output.String(), "cutoff=")
 	}
 }

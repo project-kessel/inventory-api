@@ -17,8 +17,8 @@ import (
 func TestCommandDefaultsAndValidation(t *testing.T) {
 	command := NewCommand(storage.NewOptions(), common.LoggerOptions{})
 	for flag, expected := range map[string]string{
-		"execute": "false", "tombstone-days": "30", "batch-size": "1000",
-		"batch-delay": "500ms", "max-batches": "0",
+		"execute": "false", "tombstone-days": "30", "rows-per-transaction": "1000",
+		"batch-delay": "500ms", "transaction-limit": "0",
 	} {
 		require.NotNil(t, command.Flags().Lookup(flag), flag)
 		require.Equal(t, expected, command.Flags().Lookup(flag).DefValue, flag)
@@ -29,19 +29,19 @@ func TestCommandDefaultsAndValidation(t *testing.T) {
 	}{
 		{[]string{"--tombstone-days=-1"}, "tombstone-days"},
 		{[]string{"--tombstone-days=0"}, "tombstone-days"},
-		{[]string{"--batch-size=0"}, "batch-size"},
-		{[]string{"--batch-size=4"}, "batch-size"},
+		{[]string{"--rows-per-transaction=0"}, "rows-per-transaction"},
+		{[]string{"--rows-per-transaction=4"}, "rows-per-transaction"},
 		{[]string{"--batch-delay=-1s"}, "batch delay"},
-		{[]string{"--max-batches=-1"}, "transaction limit"},
+		{[]string{"--transaction-limit=-1"}, "transaction limit"},
 		{[]string{"--tombstone-days=" + strconv.Itoa(int(^uint(0)>>1))}, "tombstone-days"},
-		{[]string{"--batch-size=65535"}, "batch-size"},
+		{[]string{"--rows-per-transaction=65535"}, "rows-per-transaction"},
 	}
 	if strconv.IntSize == 64 {
 		cases = append(cases, struct {
 			args    []string
 			message string
 		}{
-			[]string{"--batch-size=5", "--max-batches=" + strconv.Itoa(int(^uint(0)>>1))}, "overflow",
+			[]string{"--rows-per-transaction=5", "--transaction-limit=" + strconv.Itoa(int(^uint(0)>>1))}, "overflow",
 		})
 	}
 	for _, test := range cases {
@@ -65,9 +65,9 @@ func TestExecutionRequiresConsumerBoundaryAcknowledgment(t *testing.T) {
 // available without introducing arbitrary limits on the amount of cleanup work.
 func TestValidationAllowsTechnicalBoundaries(t *testing.T) {
 	for _, test := range []options{
-		{tombstoneDays: 7, batchSize: 1000},
-		{tombstoneDays: 30, batchSize: 65534},
-		{tombstoneDays: 30, batchSize: 5, maxBatches: int(^uint(0)>>1) / 5},
+		{tombstoneDays: 7, rowsPerTransaction: 1000},
+		{tombstoneDays: 30, rowsPerTransaction: 65534},
+		{tombstoneDays: 30, rowsPerTransaction: 5, transactionLimit: int(^uint(0)>>1) / 5},
 	} {
 		require.NoError(t, validateInvocation(test))
 	}
@@ -77,7 +77,7 @@ func TestValidationAllowsTechnicalBoundaries(t *testing.T) {
 func TestFinalLogging(t *testing.T) {
 	for _, failure := range []error{nil, context.Canceled} {
 		var output bytes.Buffer
-		logResult(log.NewHelper(log.NewStdLogger(&output)), options{batchSize: 2, maxBatches: 1}, true, "tombstone cleanup result", result{batches: 1, reporterResources: 2, complete: true}, failure)
+		logResult(log.NewHelper(log.NewStdLogger(&output)), options{rowsPerTransaction: 2, transactionLimit: 1}, true, "tombstone cleanup result", result{batches: 1, reporterResources: 2, complete: true}, failure)
 		require.Contains(t, output.String(), "worklist_limit=2")
 		require.Contains(t, output.String(), "reporter_resources=2")
 		if failure == nil {

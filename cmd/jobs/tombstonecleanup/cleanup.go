@@ -16,7 +16,7 @@ import (
 )
 
 type options struct {
-	tombstoneDays, batchSize, maxBatches int
+	tombstoneDays, rowsPerTransaction, transactionLimit int
 	batchDelay                                          time.Duration
 	cutoff                                              time.Time
 }
@@ -110,7 +110,7 @@ func cleanup(ctx context.Context, db *gorm.DB, o options, execute bool, onSelect
 		if onSelection != nil {
 			onSelection(r)
 		}
-		for r.remaining > 0 && (o.maxBatches == 0 || r.batches < o.maxBatches) {
+		for r.remaining > 0 && (o.transactionLimit == 0 || r.batches < o.transactionLimit) {
 			if err := ctx.Err(); err != nil {
 				return err
 			}
@@ -133,7 +133,7 @@ func cleanup(ctx context.Context, db *gorm.DB, o options, execute bool, onSelect
 					return err
 				}
 				var err error
-				batch, err = deleteBatch(tx, o.batchSize, r.cutoff)
+				batch, err = deleteBatch(tx, o.rowsPerTransaction, r.cutoff)
 				return err
 			})
 			if err != nil {
@@ -156,7 +156,7 @@ func cleanup(ctx context.Context, db *gorm.DB, o options, execute bool, onSelect
 			if onBatch != nil {
 				onBatch(r)
 			}
-			if r.remaining > 0 && (o.maxBatches == 0 || r.batches < o.maxBatches) {
+			if r.remaining > 0 && (o.transactionLimit == 0 || r.batches < o.transactionLimit) {
 				timer := time.NewTimer(o.batchDelay)
 				select {
 				case <-ctx.Done():
@@ -174,8 +174,8 @@ func cleanup(ctx context.Context, db *gorm.DB, o options, execute bool, onSelect
 
 // worklistLimit returns the validated parent cap; zero selects all eligible parents.
 func (o options) worklistLimit() int64 {
-	if o.maxBatches == 0 {
+	if o.transactionLimit == 0 {
 		return 0
 	}
-	return int64(o.batchSize) * int64(o.maxBatches)
+	return int64(o.rowsPerTransaction) * int64(o.transactionLimit)
 }

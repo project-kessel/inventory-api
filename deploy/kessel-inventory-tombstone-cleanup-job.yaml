@@ -44,9 +44,9 @@ objects:
                 - run-job
                 - tombstoned-resources-cleanup-job
                 - --tombstone-days=${TOMBSTONE_DAYS}
-                - --batch-size=${BATCH_SIZE}
+                - --rows-per-transaction=${ROWS_PER_TRANSACTION}
                 - --batch-delay=${BATCH_DELAY}
-                - --max-batches=${MAX_BATCHES}
+                - --transaction-limit=${TRANSACTION_LIMIT}
                 - --execute=${EXECUTE}
                 - --consumer-boundary-verified=${CONSUMER_BOUNDARY_VERIFIED}
               env:
@@ -103,13 +103,13 @@ parameters:
     name: CONSUMER_BOUNDARY_VERIFIED
     value: "false"
   - description: Maximum deleted rows across histories, reporter parents and roots per transaction (5-65534)
-    name: BATCH_SIZE
+    name: ROWS_PER_TRANSACTION
     value: "1000"
   - description: Interruptible delay between committed batches (Go duration)
     name: BATCH_DELAY
     value: "500ms"
   - description: Maximum committed transactions for this run; 0 processes the entire worklist
-    name: MAX_BATCHES
+    name: TRANSACTION_LIMIT
     value: "0"
   - description: Clowder application configuration Secret containing cdappconfig.json
     name: CLOWDER_CONFIG_SECRET_NAME

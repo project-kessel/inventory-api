@@ -52,13 +52,13 @@ func (r result) deletedRows() int64 {
 
 // deleteBatch drains histories explicitly, retaining the parent as a restart anchor.
 // Only finalized or skipped parents leave the worklist; partial history is progress.
-func deleteBatch(tx *gorm.DB, batchSize int, cutoff time.Time) (r result, err error) {
+func deleteBatch(tx *gorm.DB, rowsPerTransaction int, cutoff time.Time) (r result, err error) {
 	var batch []candidate
-	if err = tx.Raw(selectBatchSQL, batchSize).Scan(&batch).Error; err != nil {
+	if err = tx.Raw(selectBatchSQL, rowsPerTransaction).Scan(&batch).Error; err != nil {
 		return
 	}
 	for _, c := range batch {
-		budget := int64(batchSize) - r.deletedRows()
+		budget := int64(rowsPerTransaction) - r.deletedRows()
 		if budget == 0 {
 			break
 		}
@@ -82,7 +82,7 @@ func deleteBatch(tx *gorm.DB, batchSize int, cutoff time.Time) (r result, err er
 			return
 		}
 		r.reporterHistory += reporter.RowsAffected
-		budget = int64(batchSize) - r.deletedRows()
+		budget = int64(rowsPerTransaction) - r.deletedRows()
 		var shared bool
 		if err = tx.Raw(hasOtherReporterSQL, c.ResourceID, c.ID).Scan(&shared).Error; err != nil {
 			return
@@ -95,7 +95,7 @@ func deleteBatch(tx *gorm.DB, batchSize int, cutoff time.Time) (r result, err er
 			r.commonHistory += common.RowsAffected
 		}
 		// Remaining histories are protected snapshots, unless a chunk used the budget.
-		budget = int64(batchSize) - r.deletedRows()
+		budget = int64(rowsPerTransaction) - r.deletedRows()
 		if budget > 0 {
 			var tail struct{ Reporter, Common, Roots int64 }
 			if err = tx.Raw(finalizationSizeSQL, c.ID, c.ResourceID, c.ResourceID).Scan(&tail).Error; err != nil {
@@ -140,7 +140,7 @@ func deleteBatch(tx *gorm.DB, batchSize int, cutoff time.Time) (r result, err er
 				finalized = true
 			}
 		}
-		if r.deletedRows() > int64(batchSize) {
+		if r.deletedRows() > int64(rowsPerTransaction) {
 			return r, fmt.Errorf("deleted row budget exceeded")
 		}
 		if r.deletedRows() > before {

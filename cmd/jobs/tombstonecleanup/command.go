@@ -19,11 +19,11 @@ import (
 )
 
 // Retain the existing upper bound on candidate fetches per transaction.
-const maxBatchSize = 65535 - 1
+const maxRowsPerTransaction = 65535 - 1
 
 // NewCommand creates an online, preview-by-default tombstone cleanup command.
 func NewCommand(storageOptions *storage.Options, loggerOptions common.LoggerOptions) *cobra.Command {
-	options := options{tombstoneDays: 30, batchSize: 1000, batchDelay: 500 * time.Millisecond}
+	options := options{tombstoneDays: 30, rowsPerTransaction: 1000, batchDelay: 500 * time.Millisecond}
 	var execute, boundaryVerified bool
 	command := &cobra.Command{
 		Use:   "tombstoned-resources-cleanup-job",
@@ -46,9 +46,9 @@ func NewCommand(storageOptions *storage.Options, loggerOptions common.LoggerOpti
 	f.IntVar(&options.tombstoneDays, "tombstone-days", 30, "Days since the tombstoned reporter was last updated; positive")
 	f.BoolVar(&execute, "execute", false, "Commit deletions; default is read-only preview")
 	f.BoolVar(&boundaryVerified, "consumer-boundary-verified", false, "Acknowledge the runbook's manual pipeline boundary verification; does not establish it")
-	f.IntVar(&options.batchSize, "batch-size", 1000, "Maximum deleted rows across histories, reporter parents and roots per transaction; minimum 5")
+	f.IntVar(&options.rowsPerTransaction, "rows-per-transaction", 1000, "Maximum deleted rows across histories, reporter parents and roots per transaction; minimum 5")
 	f.DurationVar(&options.batchDelay, "batch-delay", 500*time.Millisecond, "Interruptible delay between committed batches")
-	f.IntVar(&options.maxBatches, "max-batches", 0, "Maximum committed transactions for this run; 0 processes the entire worklist")
+	f.IntVar(&options.transactionLimit, "transaction-limit", 0, "Maximum committed transactions for this run; 0 processes the entire worklist")
 	return command
 }
 
@@ -60,14 +60,14 @@ func validateInvocation(options options) error {
 	if options.tombstoneDays <= 0 || int64(options.tombstoneDays) > maxDays {
 		return fmt.Errorf("tombstone-days must be between 1 and %d so the cutoff does not predate year 1", maxDays)
 	}
-	if options.batchSize < 5 || options.batchSize > maxBatchSize {
-		return fmt.Errorf("batch-size must be between 5 and %d", maxBatchSize)
+	if options.rowsPerTransaction < 5 || options.rowsPerTransaction > maxRowsPerTransaction {
+		return fmt.Errorf("rows-per-transaction must be between 5 and %d", maxRowsPerTransaction)
 	}
-	if options.maxBatches < 0 || options.batchDelay < 0 {
+	if options.transactionLimit < 0 || options.batchDelay < 0 {
 		return fmt.Errorf("transaction limit and batch delay must not be negative")
 	}
-	if options.maxBatches > 0 && int64(options.maxBatches) > math.MaxInt64/int64(options.batchSize) {
-		return fmt.Errorf("batch-size multiplied by max-batches would overflow the row limit")
+	if options.transactionLimit > 0 && int64(options.transactionLimit) > math.MaxInt64/int64(options.rowsPerTransaction) {
+		return fmt.Errorf("rows-per-transaction multiplied by transaction-limit would overflow the row limit")
 	}
 	return nil
 }
@@ -131,10 +131,10 @@ func runTombstoneCleanupJob(ctx context.Context, storageOptions *storage.Options
 			jobErr = errors.Join(jobErr, fmt.Errorf("error closing database: %w", closeErr))
 		}
 	}()
-	helper.Infow("msg", "tombstone cleanup configuration", "tombstone_days", options.tombstoneDays, "batch_size", options.batchSize, "batch_delay", options.batchDelay.String(), "max_batches", options.maxBatches)
+	helper.Infow("msg", "tombstone cleanup configuration", "tombstone_days", options.tombstoneDays, "rows_per_transaction", options.rowsPerTransaction, "batch_delay", options.batchDelay.String(), "transaction_limit", options.transactionLimit)
 
 	r, err = cleanup(ctx, db, options, execute, func(r result) { logResult(helper, options, execute, "tombstone cleanup selection complete", r, nil) }, func(r result) { logResult(helper, options, execute, "tombstone cleanup batch committed", r, nil) }, func(r result) {
-		helper.Infow("msg", "tombstone cleanup batch started", "batch", r.batches+1, "batch_size", options.batchSize, "remaining_worklist_rows", r.remaining, "committed_batches", r.batches)
+		helper.Infow("msg", "tombstone cleanup batch started", "batch", r.batches+1, "rows_per_transaction", options.rowsPerTransaction, "remaining_worklist_rows", r.remaining, "committed_batches", r.batches)
 	})
 	return err
 }
@@ -146,7 +146,7 @@ func logResult(helper *log.Helper, options options, execute bool, message string
 		deletedRows = r.deletedRows()
 	}
 	fields := []any{
-		"msg", message, "max_batches", options.maxBatches, "worklist_limit", options.worklistLimit(),
+		"msg", message, "transaction_limit", options.transactionLimit, "worklist_limit", options.worklistLimit(),
 		"candidates", r.candidates, "selection_duration", r.selectionDuration.String(),
 		"row_limit", options.worklistLimit(), "rows_deleted", deletedRows,
 		"batch_reporter_representations", r.lastBatch.reporterHistory,

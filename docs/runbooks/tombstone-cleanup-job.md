@@ -58,32 +58,32 @@ and the [30-day proposal](https://redhat-internal.slack.com/archives/C059NUD49PD
 Preview is the default and runs a read-only transaction. It counts parents,
 reporter history, affected resource IDs, removable common history and roots.
 Preview reports full eligible impact and, for capped runs, a separate maximum
-row budget (`batch-size * max-batches`). It does not predict per-table capped
+row budget (`rows-per-transaction * transaction-limit`). It does not predict per-table capped
 impact because a run may stop midway through a parent. Counts are snapshot
 estimates while writes continue.
 
 ```sh
 inventory-api run-job tombstoned-resources-cleanup-job --tombstone-days=30
-inventory-api run-job tombstoned-resources-cleanup-job --tombstone-days=30 --max-batches=1
+inventory-api run-job tombstoned-resources-cleanup-job --tombstone-days=30 --transaction-limit=1
 inventory-api run-job tombstoned-resources-cleanup-job --tombstone-days=30 \
-  --execute --consumer-boundary-verified --batch-size=1000 --max-batches=1
+  --execute --consumer-boundary-verified --rows-per-transaction=1000 --transaction-limit=1
 ```
 
 For capped execution, the temporary worklist stores at most
-`batch-size * max-batches` oldest parents. Execution does not count all eligible
+`rows-per-transaction * transaction-limit` oldest parents. Execution does not count all eligible
 parents; preview still reports full eligibility and impact totals. Changed entries
 are skipped without refilling the bounded worklist. A cap bounds stored parent
 rows, not selection scan/sort cost. The same product bounds committed production
 row deletions across all four tables. Worklist housekeeping is excluded.
 
-Logs include `max_batches` and `worklist_limit` (zero means unlimited). A batch-start
+Logs include `transaction_limit` and `worklist_limit` (zero means unlimited). A batch-start
 event precedes each logical batch, including its serialization retries. Final
 `status=succeeded` means the invocation succeeded; `complete=true` means its selected
 worklist was exhausted. A successful capped run can leave additional eligible
 parents in the database. Failures use ERROR severity and retain committed counts,
 including when database cleanup/close fails after deletion has finished.
 
-Omit `--max-batches` or set it to 0 to process the whole frozen worklist. Default
+Omit `--transaction-limit` or set it to 0 to process the whole frozen worklist. Default
 batch delay is 500ms. Cleanup transactions set `statement_timeout=0`, disabling
 PostgreSQL statement timeouts, including inherited database/role settings. The
 supplied OpenShift Job template sets no `activeDeadlineSeconds` on the Job or Pod.
@@ -134,7 +134,7 @@ oc process -f deploy/kessel-inventory-tombstone-cleanup-job.yaml \
 ```
 
 Use a new Job name for every run or changed configuration. For execution add
-`-p EXECUTE=true -p CONSUMER_BOUNDARY_VERIFIED=true -p MAX_BATCHES=1` initially.
+`-p EXECUTE=true -p CONSUMER_BOUNDARY_VERIFIED=true -p TRANSACTION_LIMIT=1` initially.
 The template reuses Inventory's configuration Secrets and service account, with
 no mounted API token. Use the same template via app-interface when approved for
 stage/prod; pin the template ref and image to the reviewed build.

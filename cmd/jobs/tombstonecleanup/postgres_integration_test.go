@@ -46,7 +46,7 @@ func TestTombstoneCleanupPostgres(t *testing.T) {
 			reset()
 			root, id := seed(37, 39, false)
 			active, _ := seed(3, 4, true)
-			o := options{tombstoneDays: 30, cutoff: cutoff, batchSize: size, maxBatches: 1}
+			o := options{tombstoneDays: 30, cutoff: cutoff, rowsPerTransaction: size, transactionLimit: 1}
 			before := total()
 			preview, err := cleanup(context.Background(), db, o, false, nil, nil, nil)
 			require.NoError(t, err)
@@ -68,7 +68,7 @@ func TestTombstoneCleanupPostgres(t *testing.T) {
 				require.EqualValues(t, 1, count("SELECT COUNT(*) FROM reporter_resources WHERE id=?", id))
 				require.EqualValues(t, 1, count("SELECT COUNT(*) FROM reporter_representations WHERE reporter_resource_id=? AND version=0", id))
 			}
-			o.maxBatches = 0
+			o.transactionLimit = 0
 			priorDeleted = 0
 			previous = total()
 			run, err := cleanup(context.Background(), db, o, true, nil, verify, nil)
@@ -85,7 +85,7 @@ func TestTombstoneCleanupPostgres(t *testing.T) {
 		reset()
 		root, id := seed(19, 23, false)
 		require.NoError(t, db.Exec(`INSERT INTO reporter_resources(id,resource_id,local_resource_id,reporter_type,resource_type,reporter_instance_id,api_href,console_href,generation,representation_version,tombstone,created_at,updated_at) SELECT gen_random_uuid(),resource_id,local_resource_id||'-active',reporter_type,resource_type,reporter_instance_id,api_href,console_href,generation,representation_version,FALSE,created_at,updated_at FROM reporter_resources WHERE id=?`, id).Error)
-		o := options{tombstoneDays: 30, cutoff: cutoff, batchSize: 5}
+		o := options{tombstoneDays: 30, cutoff: cutoff, rowsPerTransaction: 5}
 		ctx, cancel := context.WithCancel(context.Background())
 		partial, err := cleanup(ctx, db, o, true, nil, func(result) { cancel() }, nil)
 		require.ErrorIs(t, err, context.Canceled)
@@ -106,7 +106,7 @@ func TestTombstoneCleanupPostgres(t *testing.T) {
 		root, id := seed(13, 17, false)
 		require.NoError(t, db.Exec(`CREATE FUNCTION fail_root() RETURNS trigger AS $$ BEGIN RAISE EXCEPTION 'injected root failure'; END; $$ LANGUAGE plpgsql`).Error)
 		require.NoError(t, db.Exec(`CREATE TRIGGER fail_root BEFORE DELETE ON resource FOR EACH ROW EXECUTE FUNCTION fail_root()`).Error)
-		run, err := cleanup(context.Background(), db, options{tombstoneDays: 30, cutoff: cutoff, batchSize: 5}, true, nil, nil, nil)
+		run, err := cleanup(context.Background(), db, options{tombstoneDays: 30, cutoff: cutoff, rowsPerTransaction: 5}, true, nil, nil, nil)
 		require.ErrorContains(t, err, "injected root failure")
 		require.Greater(t, run.batches, 0)
 		require.EqualValues(t, 1, count("SELECT COUNT(*) FROM reporter_resources WHERE id=?", id))
@@ -120,7 +120,7 @@ func TestTombstoneCleanupPostgres(t *testing.T) {
 		reset()
 		root, id := seed(1, 39, false)
 		added := false
-		run, err := cleanup(context.Background(), db, options{tombstoneDays: 30, cutoff: cutoff, batchSize: 5}, true, nil, func(progress result) {
+		run, err := cleanup(context.Background(), db, options{tombstoneDays: 30, cutoff: cutoff, rowsPerTransaction: 5}, true, nil, func(progress result) {
 			if !added && progress.commonHistory > 0 {
 				added = true
 				require.NoError(t, db.Exec(`INSERT INTO reporter_resources(id,resource_id,local_resource_id,reporter_type,resource_type,reporter_instance_id,api_href,generation,representation_version,tombstone,updated_at)
@@ -142,7 +142,7 @@ func TestTombstoneCleanupPostgres(t *testing.T) {
 		for i := 0; i < 4; i++ {
 			seed(1, 1, false)
 		}
-		run, err := cleanup(context.Background(), db, options{tombstoneDays: 30, cutoff: cutoff, batchSize: 16}, true, nil, nil, nil)
+		run, err := cleanup(context.Background(), db, options{tombstoneDays: 30, cutoff: cutoff, rowsPerTransaction: 16}, true, nil, nil, nil)
 		require.NoError(t, err)
 		require.Equal(t, 1, run.batches)
 		require.EqualValues(t, 16, run.deletedRows())
@@ -153,7 +153,7 @@ func TestTombstoneCleanupGuards(t *testing.T) {
 	db := setupTombstoneCleanupPostgres(t)
 	cutoff := time.Date(2026, 10, 1, 12, 0, 0, 0, time.UTC)
 	old := cutoff.Add(-time.Hour)
-	options := options{tombstoneDays: 30, batchSize: 1000, cutoff: cutoff}
+	options := options{tombstoneDays: 30, rowsPerTransaction: 1000, cutoff: cutoff}
 	seed := func(resourceID uuid.UUID, tombstone bool, updatedAt time.Time, reporterRows, commonRows int) uuid.UUID {
 		t.Helper()
 		require.NoError(t, db.Exec("INSERT INTO resource(id,type) VALUES (?, 'host') ON CONFLICT DO NOTHING", resourceID).Error)

@@ -7,7 +7,7 @@ import (
 	"io"
 	"os"
 	"strings"
-	"sync"
+	"sync/atomic"
 	"time"
 
 	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
@@ -37,8 +37,8 @@ type SpiceDBRelationsRepository struct {
 	client                   *authzed.Client
 	healthClient             grpc_health_v1.HealthClient
 	schemaFilePath           string
-	initOnce                 sync.Once
-	initErr                  error
+	initGate                 chan struct{}
+	initialized              atomic.Bool
 	fullyConsistentAsDefault bool
 	Logger                   *log.Helper
 	successCounter           metric.Int64Counter
@@ -125,6 +125,7 @@ func NewSpiceDBRelationsRepository(config *SpiceDBConfig, logger log.Logger) (*S
 		client:                   client,
 		healthClient:             healthClient,
 		schemaFilePath:           config.SchemaFile,
+		initGate:                 make(chan struct{}, 1),
 		fullyConsistentAsDefault: config.FullyConsistent,
 		Logger:                   logHelper,
 		successCounter:           successCounter,
@@ -145,22 +146,40 @@ func (s *SpiceDBRelationsRepository) incrSuccessCounter(method string) {
 	s.successCounter.Add(context.Background(), 1, metric.WithAttributes(attribute.String("method", method)))
 }
 
+// initialize applies the schema once after a successful write while keeping failed attempts retryable.
 func (s *SpiceDBRelationsRepository) initialize(ctx context.Context) error {
-	s.initOnce.Do(func() {
-		schema, err := readFile(s.schemaFilePath)
-		if err != nil {
-			s.initErr = fmt.Errorf("failed to load schema file: %w", err)
-			return
-		}
+	if s.initialized.Load() {
+		return nil
+	}
 
-		_, err = s.client.WriteSchema(ctx, &v1.WriteSchemaRequest{
-			Schema: schema,
-		})
-		if err != nil {
-			s.initErr = err
-		}
+	select {
+	case s.initGate <- struct{}{}:
+		defer func() { <-s.initGate }()
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+
+	if s.initialized.Load() {
+		return nil
+	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+
+	schema, err := readFile(s.schemaFilePath)
+	if err != nil {
+		return fmt.Errorf("failed to load schema file: %w", err)
+	}
+
+	_, err = s.client.WriteSchema(ctx, &v1.WriteSchemaRequest{
+		Schema: schema,
 	})
-	return s.initErr
+	if err != nil {
+		return err
+	}
+
+	s.initialized.Store(true)
+	return nil
 }
 
 // Close closes the SpiceDB client connections.

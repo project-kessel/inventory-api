@@ -46,10 +46,10 @@ func cleanup(ctx context.Context, db *gorm.DB, o options, execute bool, onSelect
 		started := time.Now()
 		if !execute {
 			connectionErr = connection.Transaction(func(tx *gorm.DB) error {
-				if err := tx.Exec("SET TRANSACTION READ ONLY").Error; err != nil {
+				if err := tx.Exec(readOnlySQL).Error; err != nil {
 					return err
 				}
-				if err := tx.Exec("SET LOCAL statement_timeout=0").Error; err != nil {
+				if err := tx.Exec(disableStatementTimeoutSQL).Error; err != nil {
 					return err
 				}
 				var limit int64
@@ -86,19 +86,16 @@ func cleanup(ctx context.Context, db *gorm.DB, o options, execute bool, onSelect
 		defer func() {
 			dropCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
-			connectionErr = errors.Join(connectionErr, connection.WithContext(dropCtx).Exec("DROP TABLE IF EXISTS pg_temp.tombstone_cleanup_candidates,pg_temp.tombstone_cleanup_affected").Error)
+			connectionErr = errors.Join(connectionErr, connection.WithContext(dropCtx).Exec(dropWorklistSQL).Error)
 		}()
 		connectionErr = connection.Transaction(func(tx *gorm.DB) error {
-			if err := tx.Exec("SET LOCAL statement_timeout=0").Error; err != nil {
+			if err := tx.Exec(disableStatementTimeoutSQL).Error; err != nil {
 				return err
 			}
-			if err := tx.Exec(`CREATE TEMP TABLE tombstone_cleanup_candidates (
-    id uuid NOT NULL,resource_id uuid NOT NULL,updated_at timestamptz NOT NULL,
-    generation bigint NOT NULL,representation_version bigint NOT NULL,
-    PRIMARY KEY(updated_at,id),UNIQUE(id)) ON COMMIT PRESERVE ROWS`).Error; err != nil {
+			if err := tx.Exec(createWorklistSQL).Error; err != nil {
 				return err
 			}
-			if err := tx.Exec("CREATE TEMP TABLE tombstone_cleanup_affected (resource_id uuid PRIMARY KEY) ON COMMIT PRESERVE ROWS").Error; err != nil {
+			if err := tx.Exec(createAffectedSQL).Error; err != nil {
 				return err
 			}
 			inserted := tx.Exec(insertCandidatesSQL, r.cutoff)
@@ -126,10 +123,10 @@ func cleanup(ctx context.Context, db *gorm.DB, o options, execute bool, onSelect
 				if tx.Error != nil {
 					return tx.Error
 				}
-				if err := tx.Exec("SET LOCAL statement_timeout=0").Error; err != nil {
+				if err := tx.Exec(disableStatementTimeoutSQL).Error; err != nil {
 					return err
 				}
-				if err := tx.Exec("SET LOCAL lock_timeout='5s'").Error; err != nil {
+				if err := tx.Exec(batchLockTimeoutSQL).Error; err != nil {
 					return err
 				}
 				var err error

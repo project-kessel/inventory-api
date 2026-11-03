@@ -86,11 +86,7 @@ func deleteBatch(tx *gorm.DB, batchSize int, cutoff time.Time) (r result, err er
 		ids = append(ids, c.ID)
 	}
 	var eligible []candidate
-	err = tx.Raw(`SELECT parent.id,parent.resource_id FROM reporter_resources parent
- JOIN pg_temp.tombstone_cleanup_candidates planned ON planned.id=parent.id
- WHERE parent.id IN ? AND parent.tombstone IS TRUE AND parent.updated_at < ?
- AND parent.resource_id=planned.resource_id AND parent.updated_at=planned.updated_at
- AND parent.generation=planned.generation AND parent.representation_version=planned.representation_version`, ids, cutoff).Scan(&eligible).Error
+	err = tx.Raw(recheckCandidatesSQL, ids, cutoff).Scan(&eligible).Error
 	if err != nil {
 		return
 	}
@@ -101,13 +97,10 @@ func deleteBatch(tx *gorm.DB, batchSize int, cutoff time.Time) (r result, err er
 			eligibleIDs = append(eligibleIDs, c.ID)
 			rootIDs = append(rootIDs, c.ResourceID)
 		}
-		if err = tx.Raw("SELECT COUNT(*) FROM reporter_representations WHERE reporter_resource_id IN ?", eligibleIDs).Scan(&r.reporterHistory).Error; err != nil {
+		if err = tx.Raw(countReporterHistorySQL, eligibleIDs).Scan(&r.reporterHistory).Error; err != nil {
 			return
 		}
-		deleted := tx.Exec(`DELETE FROM reporter_resources parent USING pg_temp.tombstone_cleanup_candidates planned
-   WHERE parent.id=planned.id AND parent.id IN ? AND parent.tombstone IS TRUE AND parent.updated_at < ?
-   AND parent.resource_id=planned.resource_id AND parent.updated_at=planned.updated_at
-   AND parent.generation=planned.generation AND parent.representation_version=planned.representation_version`, eligibleIDs, cutoff)
+		deleted := tx.Exec(deleteParentsSQL, eligibleIDs, cutoff)
 		if err = deleted.Error; err != nil {
 			return
 		}
@@ -115,25 +108,63 @@ func deleteBatch(tx *gorm.DB, batchSize int, cutoff time.Time) (r result, err er
 		if r.reporterResources != int64(len(eligible)) {
 			return r, fmt.Errorf("eligible reporters changed within transaction")
 		}
-		affected := tx.Exec("INSERT INTO pg_temp.tombstone_cleanup_affected SELECT DISTINCT resource_id FROM pg_temp.tombstone_cleanup_candidates WHERE id IN ? ON CONFLICT DO NOTHING", eligibleIDs)
+		affected := tx.Exec(recordAffectedSQL, eligibleIDs)
 		if err = affected.Error; err != nil {
 			return
 		}
 		r.affected = affected.RowsAffected
-		common := tx.Exec(`DELETE FROM common_representations h WHERE h.resource_id IN ?
-   AND NOT EXISTS (SELECT 1 FROM reporter_resources parent WHERE parent.resource_id=h.resource_id)`, rootIDs)
+		common := tx.Exec(deleteCommonHistorySQL, rootIDs)
 		if err = common.Error; err != nil {
 			return
 		}
 		r.commonHistory = common.RowsAffected
-		roots := tx.Exec(`DELETE FROM resource r WHERE r.id IN ? AND NOT EXISTS
-   (SELECT 1 FROM reporter_resources parent WHERE parent.resource_id=r.id)`, rootIDs)
+		roots := tx.Exec(deleteRootsSQL, rootIDs)
 		if err = roots.Error; err != nil {
 			return
 		}
 		r.roots = roots.RowsAffected
 	}
 	r.skipped = r.selected - r.reporterResources
-	err = tx.Exec("DELETE FROM pg_temp.tombstone_cleanup_candidates WHERE id IN ?", ids).Error
+	err = tx.Exec(drainCandidatesSQL, ids).Error
 	return
 }
+
+const readOnlySQL = "SET TRANSACTION READ ONLY"
+
+const disableStatementTimeoutSQL = "SET LOCAL statement_timeout=0"
+
+const dropWorklistSQL = "DROP TABLE IF EXISTS pg_temp.tombstone_cleanup_candidates,pg_temp.tombstone_cleanup_affected"
+
+const createWorklistSQL = `CREATE TEMP TABLE tombstone_cleanup_candidates (
+    id uuid NOT NULL,resource_id uuid NOT NULL,updated_at timestamptz NOT NULL,
+    generation bigint NOT NULL,representation_version bigint NOT NULL,
+    PRIMARY KEY(updated_at,id),UNIQUE(id)) ON COMMIT PRESERVE ROWS`
+
+const createAffectedSQL = "CREATE TEMP TABLE tombstone_cleanup_affected (resource_id uuid PRIMARY KEY) ON COMMIT PRESERVE ROWS"
+
+const batchLockTimeoutSQL = "SET LOCAL lock_timeout='5s'"
+
+const insertLimitedCandidatesSQL = `INSERT INTO pg_temp.tombstone_cleanup_candidates SELECT id,resource_id,updated_at,generation,representation_version FROM reporter_resources WHERE tombstone IS TRUE AND updated_at < ? ORDER BY updated_at ASC,id ASC LIMIT ?`
+
+const recheckCandidatesSQL = `SELECT parent.id,parent.resource_id FROM reporter_resources parent
+ JOIN pg_temp.tombstone_cleanup_candidates planned ON planned.id=parent.id
+ WHERE parent.id IN ? AND parent.tombstone IS TRUE AND parent.updated_at < ?
+ AND parent.resource_id=planned.resource_id AND parent.updated_at=planned.updated_at
+ AND parent.generation=planned.generation AND parent.representation_version=planned.representation_version`
+
+const countReporterHistorySQL = "SELECT COUNT(*) FROM reporter_representations WHERE reporter_resource_id IN ?"
+
+const deleteParentsSQL = `DELETE FROM reporter_resources parent USING pg_temp.tombstone_cleanup_candidates planned
+   WHERE parent.id=planned.id AND parent.id IN ? AND parent.tombstone IS TRUE AND parent.updated_at < ?
+   AND parent.resource_id=planned.resource_id AND parent.updated_at=planned.updated_at
+   AND parent.generation=planned.generation AND parent.representation_version=planned.representation_version`
+
+const recordAffectedSQL = "INSERT INTO pg_temp.tombstone_cleanup_affected SELECT DISTINCT resource_id FROM pg_temp.tombstone_cleanup_candidates WHERE id IN ? ON CONFLICT DO NOTHING"
+
+const deleteCommonHistorySQL = `DELETE FROM common_representations h WHERE h.resource_id IN ?
+   AND NOT EXISTS (SELECT 1 FROM reporter_resources parent WHERE parent.resource_id=h.resource_id)`
+
+const deleteRootsSQL = `DELETE FROM resource r WHERE r.id IN ? AND NOT EXISTS
+   (SELECT 1 FROM reporter_resources parent WHERE parent.resource_id=r.id)`
+
+const drainCandidatesSQL = "DELETE FROM pg_temp.tombstone_cleanup_candidates WHERE id IN ?"

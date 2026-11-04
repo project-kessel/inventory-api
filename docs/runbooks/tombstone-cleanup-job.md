@@ -59,7 +59,9 @@ Before execution:
    recovery access, metrics and alerts. Run one invocation at a time. Confirm TEMP
    and DML privileges and available PostgreSQL temporary storage; the worklist
    lives in PostgreSQL, not in the Job's memory.
-2. Run a preview, then a capped execution, before increasing the amount of work.
+2. Do not start while the consumer is failing, lagging, or replaying from
+   rewound offsets.
+3. Run a preview, then a capped execution, before increasing the amount of work.
    Monitor consumer errors and lag, authorization outcomes, database CPU, I/O,
    storage, lock waits and batch timings.
 

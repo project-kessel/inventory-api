@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"os"
 	"os/signal"
 	"syscall"
@@ -62,6 +63,10 @@ func validateInvocation(options options) error {
 	}
 	if options.maxBatches < 0 || options.batchDelay < 0 {
 		return fmt.Errorf("max-batches and batch-delay must not be negative")
+	}
+	// The worklist stores parents-per-batch × max-batches + 1 parents.
+	if int64(options.maxBatches) > (math.MaxInt64-1)/int64(options.parentsPerBatch()) {
+		return fmt.Errorf("max-batches is too large for rows-per-transaction")
 	}
 	return nil
 }

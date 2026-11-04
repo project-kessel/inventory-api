@@ -34,7 +34,9 @@ const insertWorklistSQL = `INSERT INTO pg_temp.tombstone_cleanup_worklist
  SELECT id, updated_at FROM reporter_resources WHERE tombstone AND updated_at < ?`
 
 // insertLimitedWorklistSQL keeps only the oldest parents a capped run can reach.
-const insertLimitedWorklistSQL = insertWorklistSQL + ` ORDER BY updated_at, id LIMIT ?`
+const insertLimitedWorklistSQL = `INSERT INTO pg_temp.tombstone_cleanup_worklist
+ SELECT id, updated_at FROM reporter_resources WHERE tombstone AND updated_at < ?
+ ORDER BY updated_at, id LIMIT ?`
 
 const selectBatchSQL = `SELECT id FROM pg_temp.tombstone_cleanup_worklist ORDER BY updated_at, id LIMIT ?`
 

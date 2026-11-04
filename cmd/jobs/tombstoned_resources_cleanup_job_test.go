@@ -21,7 +21,4 @@ func TestRunJobRegistersTombstonedResourcesCleanupAsPreviewByDefault(t *testing.
 	tombstoneDays, err := cleanupCommand.Flags().GetInt("tombstone-days")
 	require.NoError(t, err)
 	require.Equal(t, 30, tombstoneDays)
-	transactionLimit, err := cleanupCommand.Flags().GetInt("transaction-limit")
-	require.NoError(t, err)
-	require.Zero(t, transactionLimit)
 }

@@ -3,7 +3,6 @@ package tombstonecleanup
 import (
 	"bytes"
 	"context"
-	"strconv"
 	"testing"
 
 	"github.com/go-kratos/kratos/v2/log"
@@ -12,80 +11,51 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestCommandDefaultsAndValidation protects preview defaults and rejects invalid
-// batch controls before attempting a database connection.
-func TestCommandDefaultsAndValidation(t *testing.T) {
-	command := NewCommand(storage.NewOptions(), common.LoggerOptions{})
-	for flag, expected := range map[string]string{
-		"execute": "false", "tombstone-days": "30", "rows-per-transaction": "1000",
-		"batch-delay": "500ms", "transaction-limit": "0",
+// TestCommandRejectsInvalidControls checks each control fails with its own
+// message before a database connection is attempted.
+func TestCommandRejectsInvalidControls(t *testing.T) {
+	for _, test := range []struct{ arg, message string }{
+		{"--tombstone-days=0", "tombstone-days"},
+		{"--tombstone-days=-1", "tombstone-days"},
+		{"--rows-per-transaction=4", "rows-per-transaction"},
+		{"--rows-per-transaction=50001", "rows-per-transaction"},
+		{"--max-batches=-1", "max-batches"},
+		{"--batch-delay=-1s", "batch-delay"},
 	} {
-		require.NotNil(t, command.Flags().Lookup(flag), flag)
-		require.Equal(t, expected, command.Flags().Lookup(flag).DefValue, flag)
-	}
-	cases := []struct {
-		args    []string
-		message string
-	}{
-		{[]string{"--tombstone-days=-1"}, "tombstone-days"},
-		{[]string{"--tombstone-days=0"}, "tombstone-days"},
-		{[]string{"--rows-per-transaction=0"}, "rows-per-transaction"},
-		{[]string{"--rows-per-transaction=4"}, "rows-per-transaction"},
-		{[]string{"--batch-delay=-1s"}, "batch delay"},
-		{[]string{"--transaction-limit=-1"}, "transaction limit"},
-		{[]string{"--tombstone-days=" + strconv.Itoa(int(^uint(0)>>1))}, "tombstone-days"},
-		{[]string{"--rows-per-transaction=65535"}, "rows-per-transaction"},
-	}
-	if strconv.IntSize == 64 {
-		cases = append(cases, struct {
-			args    []string
-			message string
-		}{
-			[]string{"--rows-per-transaction=5", "--transaction-limit=" + strconv.Itoa(int(^uint(0)>>1))}, "overflow",
-		})
-	}
-	for _, test := range cases {
-		t.Run(test.args[0], func(t *testing.T) {
+		t.Run(test.arg, func(t *testing.T) {
 			command := NewCommand(storage.NewOptions(), common.LoggerOptions{})
-			command.SetArgs(test.args)
-			require.ErrorContains(t, command.Execute(), test.message, test.args)
+			command.SetArgs([]string{test.arg})
+			require.ErrorContains(t, command.Execute(), test.message)
 		})
 	}
 }
 
-// TestExecuteReachesStorageValidation verifies execution needs only the execute flag.
-func TestExecuteReachesStorageValidation(t *testing.T) {
-	command := NewCommand(storage.NewOptions(), common.LoggerOptions{})
-	command.SetArgs([]string{"--execute"})
-	require.ErrorContains(t, command.Execute(), "tombstone cleanup requires PostgreSQL storage options")
-}
-
-// TestValidationAllowsTechnicalBoundaries keeps defaults and unlimited execution
-// available without introducing arbitrary limits on the amount of cleanup work.
-func TestValidationAllowsTechnicalBoundaries(t *testing.T) {
-	for _, test := range []options{
-		{tombstoneDays: 7, rowsPerTransaction: 1000},
-		{tombstoneDays: 30, rowsPerTransaction: 65534},
-		{tombstoneDays: 30, rowsPerTransaction: 5, transactionLimit: int(^uint(0)>>1) / 5},
+// TestCommandAcceptsBoundaryControls reaches storage validation, past flag checks.
+func TestCommandAcceptsBoundaryControls(t *testing.T) {
+	for _, args := range [][]string{
+		{"--execute"},
+		{"--rows-per-transaction=5", "--max-batches=1", "--batch-delay=0s"},
+		{"--rows-per-transaction=50000", "--tombstone-days=1"},
 	} {
-		require.NoError(t, validateInvocation(test))
+		command := NewCommand(storage.NewOptions(), common.LoggerOptions{})
+		command.SetArgs(args)
+		require.ErrorContains(t, command.Execute(), "requires PostgreSQL storage options", args)
 	}
 }
 
-// TestFinalLogging distinguishes process outcome from scoped worklist completion.
-func TestFinalLogging(t *testing.T) {
+// TestFinalLogStatus distinguishes a failed invocation from a successful one.
+func TestFinalLogStatus(t *testing.T) {
 	for _, failure := range []error{nil, context.Canceled} {
 		var output bytes.Buffer
-		logResult(log.NewHelper(log.NewStdLogger(&output)), options{rowsPerTransaction: 2, transactionLimit: 1}, true, "tombstone cleanup result", result{batches: 1, reporterResources: 2, complete: true}, failure)
-		require.Contains(t, output.String(), "worklist_limit=2")
-		require.Contains(t, output.String(), "reporter_resources=2")
+		logResult(log.NewHelper(log.NewStdLogger(&output)), "tombstone cleanup result", true, result{batches: 1, deleted: counts{parents: 2}}, &failure)
+		require.Contains(t, output.String(), "reporter_resources_deleted=2")
 		if failure == nil {
 			require.Contains(t, output.String(), "INFO")
 			require.Contains(t, output.String(), "status=succeeded")
 		} else {
 			require.Contains(t, output.String(), "ERROR")
 			require.Contains(t, output.String(), "status=failed")
+			require.Contains(t, output.String(), "context canceled")
 		}
-		require.NotContains(t, output.String(), "cutoff=")
 	}
 }

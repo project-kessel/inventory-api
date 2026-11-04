@@ -46,7 +46,7 @@ objects:
                 - --tombstone-days=${TOMBSTONE_DAYS}
                 - --rows-per-transaction=${ROWS_PER_TRANSACTION}
                 - --batch-delay=${BATCH_DELAY}
-                - --transaction-limit=${TRANSACTION_LIMIT}
+                - --max-batches=${MAX_BATCHES}
                 - --execute=${EXECUTE}
               env:
                 - name: ACG_CONFIG
@@ -98,14 +98,14 @@ parameters:
   - description: Commit deletions; false runs a read-only preview
     name: EXECUTE
     value: "false"
-  - description: Maximum deleted rows across histories, reporter parents and roots per transaction (5-65534)
+  - description: Maximum rows deleted per transaction across all tables (5-50000); a batch holds this divided by 5 parents
     name: ROWS_PER_TRANSACTION
     value: "1000"
-  - description: Interruptible delay between committed batches (Go duration)
+  - description: Interruptible delay between batches and between full history chunks (Go duration)
     name: BATCH_DELAY
     value: "500ms"
-  - description: Maximum committed transactions for this run; 0 processes the entire worklist
-    name: TRANSACTION_LIMIT
+  - description: Maximum parent batches for this run; 0 processes every eligible parent
+    name: MAX_BATCHES
     value: "0"
   - description: Clowder application configuration Secret containing cdappconfig.json
     name: CLOWDER_CONFIG_SECRET_NAME

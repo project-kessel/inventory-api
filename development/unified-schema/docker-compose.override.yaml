@@ -1,0 +1,10 @@
+services:
+  invmigrate:
+    volumes:
+      - ../unified-schema/configs/inventory-api.yaml:/inventory-api-compose.yaml:ro,z
+      - ../unified-schema/resources:/data/schema/resources:ro,z
+
+  inventory-api:
+    volumes:
+      - ../unified-schema/configs/inventory-api.yaml:/inventory-api-compose.yaml:ro,z
+      - ../unified-schema/resources:/data/schema/resources:ro,z

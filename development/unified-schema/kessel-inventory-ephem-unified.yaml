@@ -1,0 +1,354 @@
+apiVersion: template.openshift.io/v1
+kind: Template
+metadata:
+  name: inventory
+objects:
+  - apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: inventory-api-config
+    data:
+      inventory-api-config.yaml: |
+        storage:
+          max-serialization-retries: 10
+          outbox-mode: wal
+        authn:
+          authenticator:
+            type: first_match
+            chain:
+              - type: oidc
+                enable: true
+                transport:
+                  http: false
+                  grpc: true
+                config:
+                  authn-server-url: >-
+                    ${SSO_SERVER_URL}/auth/realms/redhat-external
+                  # Ephemeral callers use dynamically-created SSO clients.
+                  skip-client-id-check: true
+                  principal-user-domain: redhat.com
+                  grpc-endpoints:
+                    - "/kessel.inventory.v1beta2.KesselTupleService/CreateTuples"
+                    - "/kessel.inventory.v1beta2.KesselTupleService/DeleteTuples"
+                    - "/kessel.inventory.v1beta2.KesselTupleService/ReadTuples"
+                    - "/kessel.inventory.v1beta2.KesselTupleService/AcquireLock"
+              - type: x-rh-identity
+                transport:
+                  http: true
+                  grpc: false
+              - type: allow-unauthenticated
+        metaauthorizer:
+          tuple-crud-allowlist:
+            - "${TUPLE_CRUD_CLIENT_ID}"
+        authz:
+          kessel:
+            insecure-client: true
+            enable-oidc-auth: false
+          spicedb:
+            schema-file: "/etc/spicedb-schema/schema.zed"
+            use-tls: false
+            fully-consistent: true
+        selfsubjectstrategy:
+          redhatRbacSelfSubjectStrategy:
+            enabled: true
+            issuerDomain: redhat
+            # Retained for validation; tuple CRUD authn is endpoint-scoped.
+            oidcIssuerDomains:
+              - iss: https://not-used.example.com
+                domain: redhat
+        consumer:
+          enabled: true
+          topic: outbox.event.kessel.tuples
+          retry-options:
+            consumer-max-retries: -1
+            operation-max-retries: -1
+            backoff-factor: 5
+            max-backoff-seconds: 30
+          auth:
+            enabled: false
+        consistency:
+          read-after-write-enabled: true # false == off for all service providers
+          read-after-write-allowlist: ["*"] # specify ["*"] to allow any request to optionally r-a-w
+        schema:
+          repository: in-memory
+          in-memory:
+            type: unified
+            path: /data/schema/resources
+        log:
+          level: "info"
+  - apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: resources-tarball
+    binaryData:
+       resources.tar.gz: ${UNIFIED_RESOURCES_TARBALL}
+  - apiVersion: cloud.redhat.com/v1alpha1
+    kind: ClowdApp
+    metadata:
+      name: kessel-inventory
+    spec:
+      envName: ${ENV_NAME}
+      database:
+        name: kessel-inventory
+        version: 16
+      kafkaTopics:
+        - topicName: outbox.event.kessel.tuples
+          partitions: 1
+          replicas: 3
+        - topicName: outbox.event.kessel.resources
+          partitions: 1
+          replicas: 3
+      dependencies:
+        - kessel-relations
+        - kessel-kafkaconnect
+      deployments:
+        - name: api
+          replicas: ${{REPLICAS}}
+          podSpec:
+            initContainers:
+              - name: fetch-spicedb-schema
+                image: ${SCHEMA_INIT_IMAGE}
+                command:
+                  - sh
+                  - -c
+                  - |
+                    curl -sSfL -o /etc/spicedb-schema/schema.zed \
+                      "https://raw.githubusercontent.com/${SPICEDB_SCHEMA_REPO}/${SPICEDB_SCHEMA_REF}/${SPICEDB_SCHEMA_PATH}"
+                inheritEnv: false
+                volumeMounts:
+                  - name: spicedb-schema
+                    mountPath: /etc/spicedb-schema
+              - name: copy-resources
+                image: registry.access.redhat.com/ubi9
+                imagePullPolicy: Always
+                command:
+                  - /bin/sh
+                  - "-c"
+                  - |
+                    echo "Extracting resources from tarball..."
+                    tar -xzf /mnt/resources/resources.tar.gz -C /data/schema/resources
+                    echo "Extraction complete!"
+                volumeMounts:
+                  - name: resources-tarball
+                    mountPath: "/mnt/resources"
+                  - name: resource-volume
+                    mountPath: "/data/schema/resources"
+              - name: migration
+                image: ${INVENTORY_IMAGE}:${IMAGE_TAG}
+                imagePullPolicy: Always
+                command: ["inventory-api"]
+                args: ["migrate"]
+                inheritEnv: true
+            image: ${INVENTORY_IMAGE}:${IMAGE_TAG}
+            imagePullPolicy: Always
+            command: ["inventory-api"]
+            args: ["serve"]
+            livenessProbe:
+              httpGet:
+                path: /api/kessel/v1/livez
+                port: 8000
+            readinessProbe:
+              httpGet:
+                path: /api/kessel/v1/readyz
+                port: 8000
+            env:
+              - name: CLOWDER_ENABLED
+                value: "true"
+              - name: INVENTORY_API_CONFIG
+                value: "/inventory/inventory-api-config.yaml"
+              - name: PGDATA
+                value: /temp/data
+              - name: INVENTORY_API_AUTHZ_IMPL
+                value: ${AUTHZ_IMPL}
+              - name: INVENTORY_API_AUTHZ_SPICEDB_ENDPOINT
+                value: "relations-spicedb:50051"
+              - name: INVENTORY_API_AUTHZ_SPICEDB_TOKEN
+                valueFrom:
+                  secretKeyRef:
+                    name: dev-spicedb-config
+                    key: preshared_key
+            volumeMounts:
+              - name: config-volume
+                mountPath: "/inventory"
+              - name: resource-volume
+                mountPath: "/data/schema/resources"
+              - name: resources-tarball
+                mountPath: "/mnt/resources"
+              - name: spicedb-schema
+                mountPath: /etc/spicedb-schema
+            volumes:
+              - name: config-volume
+                configMap:
+                  name: inventory-api-config
+              - name: resource-volume
+                emptyDir: {}
+              - name: resources-tarball
+                configMap:
+                  name: resources-tarball
+              - name: spicedb-schema
+                emptyDir: {}
+          webServices:
+            public:
+              enabled: true
+              h2cEnabled: true
+              h2cTargetPort: 9000
+              apiPath: kessel
+      testing:
+        iqePlugin: kessel-inventory
+  - apiVersion: batch/v1
+    kind: CronJob
+    metadata:
+      name: business-metrics-collect
+      labels:
+        app: kessel-inventory-jobs
+        job-type: metrics-collect
+    spec:
+      suspend: ${{METRICS_CRONJOB_SUSPEND}}
+      schedule: "@hourly"
+      concurrencyPolicy: Forbid
+      successfulJobsHistoryLimit: 3
+      failedJobsHistoryLimit: 3
+      jobTemplate:
+        metadata:
+          labels:
+            app: kessel-inventory-jobs
+            job-type: metrics-collect
+        spec:
+          backoffLimit: 3
+          template:
+            metadata:
+              labels:
+                app: kessel-inventory-jobs
+                job-type: metrics-collect
+            spec:
+              restartPolicy: OnFailure
+              containers:
+                - name: metrics-collect
+                  image: ${INVENTORY_IMAGE}:${IMAGE_TAG}
+                  imagePullPolicy: Always
+                  command:
+                    - inventory-api
+                    - run-job
+                    - metrics-collect-job
+                    - --retention-days=30
+                  env:
+                    - name: CLOWDER_ENABLED
+                      value: "true"
+                    - name: INVENTORY_API_CONFIG
+                      value: "/inventory/inventory-api-config.yaml"
+                    - name: PGDATA
+                      value: /temp/data
+                    - name: INVENTORY_API_STORAGE_POSTGRES_HOST
+                      valueFrom:
+                        secretKeyRef:
+                          name: kessel-inventory-db
+                          key: db.host
+                          optional: true
+                    - name: INVENTORY_API_STORAGE_POSTGRES_PORT
+                      valueFrom:
+                        secretKeyRef:
+                          name: kessel-inventory-db
+                          key: db.port
+                          optional: true
+                    - name: INVENTORY_API_STORAGE_POSTGRES_DBNAME
+                      valueFrom:
+                        secretKeyRef:
+                          name: kessel-inventory-db
+                          key: db.name
+                          optional: true
+                    - name: INVENTORY_API_STORAGE_POSTGRES_USER
+                      valueFrom:
+                        secretKeyRef:
+                          name: kessel-inventory-db
+                          key: db.user
+                          optional: true
+                    - name: INVENTORY_API_STORAGE_POSTGRES_PASSWORD
+                      valueFrom:
+                        secretKeyRef:
+                          name: kessel-inventory-db
+                          key: db.password
+                          optional: true
+                    - name: INVENTORY_API_STORAGE_DATABASE
+                      value: postgres
+                  volumeMounts:
+                    - name: config-volume
+                      mountPath: "/inventory"
+                  resources:
+                    requests:
+                      memory: ${JOB_REQUESTS_MEMORY}
+                      cpu: ${JOB_REQUESTS_CPU}
+                    limits:
+                      memory: ${JOB_LIMITS_MEMORY}
+                      cpu: ${JOB_LIMITS_CPU}
+              volumes:
+                - name: config-volume
+                  configMap:
+                    name: ${INVENTORY_API_CONFIG_NAME}
+parameters:
+  - description: ClowdEnvironment name (ephemeral, stage, prod)
+    name: ENV_NAME
+    required: true
+  - description: App Image
+    name: INVENTORY_IMAGE
+    value: quay.io/redhat-services-prod/project-kessel-tenant/kessel-inventory/inventory-api
+  - description: Image Tag
+    name: IMAGE_TAG
+    required: true
+    value: latest
+  - description: Number of replicas
+    name: REPLICAS
+    value: "1"
+  - name: TOPIC_HEARTBEAT_PREFIX
+    value: debezium-heartbeat
+    description: Prefix for the connector heartbeat topic
+  - name: DEBEZIUM_ACTION_QUERY
+    value: "SELECT pg_logical_emit_message(false, 'heartbeat', now()::varchar);"
+    description: Query action that runs for each heartbeat event
+  - name: DEBEZIUM_HEARTBEAT_INTERVAL_MS
+    value: "300000"
+    description: The interval for the Debezium heartbeat in ms
+  - name: DEBEZIUM_POLL_INTERVAL_MS
+    value: "250"
+    description: The interval for the Debezium batch processing
+  - description: Name of the Inventory API Config K8s ConfigMap
+    name: INVENTORY_API_CONFIG_NAME
+    value: inventory-api-config
+  - description: Memory request for job
+    name: JOB_REQUESTS_MEMORY
+    value: '256Mi'
+  - description: CPU request for job
+    name: JOB_REQUESTS_CPU
+    value: '100m'
+  - description: Memory limit for job
+    name: JOB_LIMITS_MEMORY
+    value: '384Mi'
+  - description: CPU limit for job
+    name: JOB_LIMITS_CPU
+    value: '200m'
+  - description: Suspend the metrics collection CronJob (set to true to disable)
+    name: METRICS_CRONJOB_SUSPEND
+    value: "true"
+  - name: AUTHZ_IMPL
+    description: Authz implementation (allow-all, kessel, spicedb)
+    value: "spicedb"
+  - name: SSO_SERVER_URL
+    description: Base URL for the ephemeral Keycloak endpoint
+    value: http://keycloak:8080
+  - name: TUPLE_CRUD_CLIENT_ID
+    description: OIDC client ID or '*' for tuple CRUD endpoints
+    value: "*"
+  - name: SCHEMA_INIT_IMAGE
+    description: Image for the schema init container
+    value: registry.access.redhat.com/ubi9/ubi-minimal:latest
+  - name: SPICEDB_SCHEMA_REPO
+    description: GitHub org/repo for SpiceDB schema
+    value: project-kessel/rbac-config
+  - name: SPICEDB_SCHEMA_REF
+    description: Git ref for SpiceDB schema
+    value: master
+  - name: SPICEDB_SCHEMA_PATH
+    description: Path to schema.zed within the repo
+    value: configs/stage/schemas/schema.zed
+  - name: UNIFIED_RESOURCES_TARBALL
+    description: Base64-encoded resources.tar.gz containing unified YAML schema artifacts
+    required: true

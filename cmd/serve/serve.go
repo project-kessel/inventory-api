@@ -496,6 +496,12 @@ func newSchemaRepository(ctx context.Context, c schema.CompletedConfig, reporter
 		case inmemoryConfig.DirRepository:
 			logger.Infof("Using dir in-memory schema repository from path %q", c.InMemory.Path)
 			return data.NewInMemorySchemaRepositoryFromDir(ctx, c.InMemory.Path, schemaFactory)
+		case inmemoryConfig.UnifiedYAMLRepository:
+			// The unified YAML repository builds its own schema adapters from
+			// the resource definitions, so the factory-based dispatch does not
+			// apply here.
+			logger.Infof("Using unified YAML in-memory schema repository from path %q", c.InMemory.Path)
+			return data.NewInMemorySchemaRepositoryFromUnifiedYAMLDir(ctx, c.InMemory.Path)
 		default:
 			return nil, fmt.Errorf("invalid repository type: %s/%s", c.Repository, c.InMemory.Type)
 		}

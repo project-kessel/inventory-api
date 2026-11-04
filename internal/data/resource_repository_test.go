@@ -4070,6 +4070,56 @@ func TestEmptyAndNilRepresentationPersistence(t *testing.T) {
 		require.NoError(t, err, "Empty common representation should be accepted by the domain model")
 		require.NotNil(t, resource)
 	})
+
+	t.Run("empty common save then non-empty common update succeeds", func(t *testing.T) {
+		// Regression: an empty common representation is persisted as a versioned
+		// row; a later update of the same resource with non-empty common data must
+		// be assigned the next version instead of colliding with that row.
+		p := newResourceParams(t, "empty-common-then-update")
+		found, db := saveAndFind(t, p, validReporter(t), emptyRep(), "empty-then-update")
+
+		key, err := bizmodel.NewReporterResourceKey(p.localResourceId, p.resourceType, p.reporterType, p.reporterInstanceId)
+		require.NoError(t, err)
+
+		err = found.Update(key, p.apiHref, nil, nil, validReporter(t), validCommon(t, "ws-after-empty"), newUniqueTxID("empty-then-update-upd"))
+		require.NoError(t, err)
+
+		mc := metricscollector.NewFakeMetricsCollector()
+		tm := NewGormTransactionManager(mc, 3)
+		repo := NewResourceRepository(db, tm, noopOutboxPublisher())
+		err = repo.Save(db, *found, bizmodel.OperationTypeUpdated, emptyTxId)
+		require.NoError(t, err, "second save after an empty common save must succeed")
+
+		var commonCount int64
+		result := db.Table("common_representations").Count(&commonCount)
+		require.NoError(t, result.Error)
+		assert.Equal(t, int64(2), commonCount, "expected the empty common row and the updated common row")
+	})
+
+	t.Run("non-empty common save then empty common update succeeds", func(t *testing.T) {
+		// Regression: an update carrying an empty (but non-nil) common
+		// representation must be assigned a new version instead of reusing the
+		// initial version, which would collide with the persisted row.
+		p := newResourceParams(t, "nonempty-then-empty-common")
+		found, db := saveAndFind(t, p, validReporter(t), validCommon(t, "ws-initial"), "nonempty-then-empty")
+
+		key, err := bizmodel.NewReporterResourceKey(p.localResourceId, p.resourceType, p.reporterType, p.reporterInstanceId)
+		require.NoError(t, err)
+
+		err = found.Update(key, p.apiHref, nil, nil, validReporter(t), emptyRep(), newUniqueTxID("nonempty-then-empty-upd"))
+		require.NoError(t, err)
+
+		mc := metricscollector.NewFakeMetricsCollector()
+		tm := NewGormTransactionManager(mc, 3)
+		repo := NewResourceRepository(db, tm, noopOutboxPublisher())
+		err = repo.Save(db, *found, bizmodel.OperationTypeUpdated, emptyTxId)
+		require.NoError(t, err, "update carrying an empty common representation must not collide with the initial version row")
+
+		var commonCount int64
+		result := db.Table("common_representations").Count(&commonCount)
+		require.NoError(t, result.Error)
+		assert.Equal(t, int64(2), commonCount, "expected the initial common row and the empty updated common row")
+	})
 }
 
 // Test 1.1: Delete after common-only update - verifies gap-tolerant delete fetching

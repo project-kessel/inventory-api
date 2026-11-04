@@ -35,6 +35,8 @@ definition rbac/widget {
 	relation t_workspace: rbac/workspace
 }
 
+definition features/service {}
+
 definition rbac/workspace {
 	permission parent = t_parent
 	relation t_parent: rbac/workspace
@@ -42,4 +44,7 @@ definition rbac/workspace {
 	permission user_grant = t_user_grant
 	relation t_user_grant: rbac/role_binding
 	permission view_widget = t_user_grant->view_widget + t_parent->view_widget
+	relation t_features_workspace_desire_all_services: features/service:*
+	relation t_features_workspace_ignore_inherited_desired_services: features/service:*
+	relation t_features_workspace_ignore_inherited_paid_services: features/service:*
 }

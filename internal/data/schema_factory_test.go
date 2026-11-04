@@ -34,10 +34,10 @@ func TestSchemaFactorySelection(t *testing.T) {
 		_, isWorkspaces = FeaturesAwareSchemaFactory(billingAccountType, false, jsonSchema).(JsonSchemaWithWorkspaces)
 		assert.True(t, isWorkspaces, "common billing account uses the default workspace schema")
 
-		_, isRelations := FeaturesAwareSchemaFactory(workspaceType, true, jsonSchema).(JsonSchemaWithRelations)
-		assert.True(t, isRelations, "reporter workspace carries the Features relations")
+		_, isWorkspace := FeaturesAwareSchemaFactory(workspaceType, true, jsonSchema).(featuresWorkspaceSchema)
+		assert.True(t, isWorkspace, "reporter workspace carries the Features relations and wildcard tuple logic")
 
-		_, isRelations = FeaturesAwareSchemaFactory(billingAccountType, true, jsonSchema).(JsonSchemaWithRelations)
+		_, isRelations := FeaturesAwareSchemaFactory(billingAccountType, true, jsonSchema).(JsonSchemaWithRelations)
 		assert.True(t, isRelations, "reporter billing account carries the Features relations")
 	})
 }

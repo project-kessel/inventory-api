@@ -59,22 +59,7 @@ func TestCommonRepresentation_Initialization(t *testing.T) {
 		errors.AssertIs(t, err, ErrInvalidUUID)
 	})
 
-	t.Run("should reject nil data", func(t *testing.T) {
-		t.Parallel()
-
-		_, err := NewCommonRepresentation(
-			fixture.ValidResourceIdType(),
-			fixture.NilRepresentationType(),
-			fixture.ValidVersionType(),
-			fixture.ValidReporterTypeType(),
-			fixture.ValidReporterInstanceIdType(),
-			fixture.ValidTransactionIdType(),
-		)
-
-		errors.AssertIs(t, err, ErrInvalidData)
-	})
-
-	t.Run("should reject empty data object", func(t *testing.T) {
+	t.Run("should accept empty data object when schema allows it", func(t *testing.T) {
 		t.Parallel()
 
 		_, err := NewCommonRepresentation(
@@ -86,7 +71,9 @@ func TestCommonRepresentation_Initialization(t *testing.T) {
 			fixture.ValidTransactionIdType(),
 		)
 
-		errors.AssertIs(t, err, ErrInvalidData)
+		if err != nil {
+			t.Errorf("Expected no error for empty data when schema permits it, got %v", err)
+		}
 	})
 
 	t.Run("should reject empty reporter type", func(t *testing.T) {

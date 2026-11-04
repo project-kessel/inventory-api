@@ -224,6 +224,8 @@ Deploys Inventory API with its own SpiceDB instance (and backing Postgres), Kafk
 
 The consumer defaults to `consumer.load-reporter-representation: false`. In this mode, creates and updates replicate common representation tuples, and deletes use the latest stored common representation, including for queued legacy events without a common version. To opt into reporter representation processing, set this key to `true` in the mounted YAML configuration (or pass `--consumer.load-reporter-representation=true` when running the binary). You can also enable it with `INVENTORY_API_CONSUMER_LOAD_REPORTER_REPRESENTATION=true`.
 
+The same key also gates reporter-derived tuple calculation. While it is `false`, the schema factory keeps the pre-reporter-tuples Features relations, so common-representation tuple output is unchanged. Setting it to `true` switches the Features workspace and billing account reporter schemas to their reporter-derived relations, which requires a SpiceDB schema that defines them (see the `features` definitions in the rbac-config schema) before you enable it in a deployed environment.
+
 ```shell
 make inventory-up-spicedb
 ```

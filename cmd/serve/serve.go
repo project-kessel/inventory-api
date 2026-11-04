@@ -234,7 +234,7 @@ func NewCommand(
 			}
 
 			// constructs schema repository
-			schemaRepository, err := newSchemaRepository(ctx, schemaConfig, log.NewHelper(log.With(logger, "subsystem", "schemaRepository")))
+			schemaRepository, err := newSchemaRepository(ctx, schemaConfig, consumerOptions.LoadReporterRepresentation, log.NewHelper(log.With(logger, "subsystem", "schemaRepository")))
 			if err != nil {
 				return err
 			}
@@ -471,7 +471,19 @@ func shutdown(db *gorm.DB, srv *server.Server, pprofSrv *pprof.Server, cm *consu
 	}
 }
 
-func newSchemaRepository(ctx context.Context, c schema.CompletedConfig, logger *log.Helper) (bizmodel.SchemaRepository, error) {
+// newSchemaRepository builds the configured schema repository. reporterTuples
+// selects the schema dispatch: when false, the pre-reporter-tuples Features
+// schemas are used and tuple calculation is unchanged; when true, Features
+// reporter schemas produce reporter-derived tuples. The flag is owned by
+// consumer.load-reporter-representation, since reporter tuples are only
+// calculable when the consumer loads reporter representations.
+func newSchemaRepository(ctx context.Context, c schema.CompletedConfig, reporterTuples bool, logger *log.Helper) (bizmodel.SchemaRepository, error) {
+	schemaFactory := data.LegacyFeaturesAwareSchemaFactory
+	if reporterTuples {
+		schemaFactory = data.FeaturesAwareSchemaFactory
+	}
+	logger.Infof("Reporter-derived tuple calculation enabled: %t", reporterTuples)
+
 	switch c.Repository {
 	case schema.InMemoryRepository:
 		switch c.InMemory.Type {
@@ -480,10 +492,10 @@ func newSchemaRepository(ctx context.Context, c schema.CompletedConfig, logger *
 			return data.NewInMemorySchemaRepository(), nil
 		case inmemoryConfig.JSONRepository:
 			logger.Infof("Using json in-memory schema repository from path %q", c.InMemory.Path)
-			return data.NewInMemorySchemaRepositoryFromJsonFile(ctx, c.InMemory.Path, data.FeaturesAwareSchemaFactory)
+			return data.NewInMemorySchemaRepositoryFromJsonFile(ctx, c.InMemory.Path, schemaFactory)
 		case inmemoryConfig.DirRepository:
 			logger.Infof("Using dir in-memory schema repository from path %q", c.InMemory.Path)
-			return data.NewInMemorySchemaRepositoryFromDir(ctx, c.InMemory.Path, data.FeaturesAwareSchemaFactory)
+			return data.NewInMemorySchemaRepositoryFromDir(ctx, c.InMemory.Path, schemaFactory)
 		default:
 			return nil, fmt.Errorf("invalid repository type: %s/%s", c.Repository, c.InMemory.Type)
 		}

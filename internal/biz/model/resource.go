@@ -32,10 +32,10 @@ func NewResource(id ResourceId, localResourceId LocalResourceId, resourceType Re
 		reporterRepresentationData = &emptyRep
 	}
 
-	// If common representation data is provided, initialize commonVersion to 0
-	// Otherwise, leave it as nil
+	// If common representation data is provided (even when empty), initialize
+	// commonVersion so the write is tracked; otherwise, leave it as nil
 	var commonVersion *Version
-	if commonRepresentationData != nil && len(*commonRepresentationData) > 0 {
+	if commonRepresentationData != nil {
 		cv := NewVersion(initialCommonVersion)
 		commonVersion = &cv
 	}
@@ -101,9 +101,11 @@ func (r *Resource) Update(
 	commonRepresentationData *Representation,
 	transactionId TransactionId,
 ) error {
-	// Only increment commonVersion if common representation data is provided
+	// Any non-nil common representation (including an empty one) is a write to
+	// the common stream and must be assigned the next version; only a nil
+	// common representation leaves the stream untouched.
 	var commonVersion *Version
-	if commonRepresentationData != nil && len(*commonRepresentationData) > 0 {
+	if commonRepresentationData != nil {
 		if r.commonVersion != nil {
 			cv := r.commonVersion.Increment()
 			commonVersion = &cv

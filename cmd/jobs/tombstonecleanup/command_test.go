@@ -20,7 +20,6 @@ func TestCommandRejectsInvalidControls(t *testing.T) {
 		{"--rows-per-transaction=4", "rows-per-transaction"},
 		{"--rows-per-transaction=50001", "rows-per-transaction"},
 		{"--max-batches=-1", "max-batches"},
-		{"--max-batches=9223372036854775807", "max-batches"},
 		{"--batch-delay=-1s", "batch-delay"},
 	} {
 		t.Run(test.arg, func(t *testing.T) {

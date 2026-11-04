@@ -131,6 +131,28 @@ func TestRepresentations_WorkspaceID_UsesStringField(t *testing.T) {
 	assert.Equal(t, rep.StringField("workspace_id"), rep.WorkspaceID())
 }
 
+func TestRepresentations_ReporterBoolField(t *testing.T) {
+	reporter := func(data map[string]interface{}) *model.Representations {
+		ver := model.NewVersion(0)
+		rep, err := model.NewRepresentations(nil, nil, model.Representation(data), &ver)
+		require.NoError(t, err)
+		return rep
+	}
+
+	assert.True(t, reporter(map[string]interface{}{"f": true}).ReporterBoolField("f"))
+	assert.False(t, reporter(map[string]interface{}{"f": false}).ReporterBoolField("f"))
+	assert.False(t, reporter(map[string]interface{}{}).ReporterBoolField("f"), "missing")
+	assert.False(t, reporter(map[string]interface{}{"f": "features/service:*"}).ReporterBoolField("f"), "non-boolean")
+
+	ver := model.NewVersion(0)
+	commonOnly, err := model.NewRepresentations(model.Representation(map[string]interface{}{"f": true}), &ver, nil, nil)
+	require.NoError(t, err)
+	assert.False(t, commonOnly.ReporterBoolField("f"), "common representation is not read")
+
+	var nilRep *model.Representations
+	assert.False(t, nilRep.ReporterBoolField("f"))
+}
+
 func TestNewRepresentations_Validation(t *testing.T) {
 	ver := model.NewVersion(1)
 

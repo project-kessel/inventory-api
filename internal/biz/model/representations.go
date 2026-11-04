@@ -163,3 +163,15 @@ func (r *Representations) ReporterStringSliceField(fieldName string) []string {
 	}
 	return result
 }
+
+// ReporterBoolField returns a boolean value from the reporter representation.
+// Returns false if the field is missing, not a boolean, or there is no
+// reporter representation.
+func (r *Representations) ReporterBoolField(fieldName string) bool {
+	if r != nil && r.HasReporter() {
+		if value, ok := r.reporterData[fieldName].(bool); ok {
+			return value
+		}
+	}
+	return false
+}

@@ -34,10 +34,62 @@ var workspaceRelations = []model.RelationDef{
 	mustRelationDef("direct_service_preferences", "direct_service_preferences", featureNamespace, "service", true),
 }
 
+// workspaceWildcardRelations are boolean reporter fields backed by a typed
+// wildcard tuple (features/service:*). true writes the tuple; false and
+// omission both mean the tuple is absent.
+var workspaceWildcardRelations = []string{
+	"desire_all_services",
+	"ignore_inherited_desired_services",
+	"ignore_inherited_paid_services",
+}
+
+// featuresWorkspaceSchema adds the boolean wildcard relations to the
+// table-driven workspace relations.
+type featuresWorkspaceSchema struct {
+	JsonSchemaWithRelations
+}
+
 // NewFeaturesWorkspaceSchemaFromString creates the reporter-aware Features
 // workspace schema.
 func NewFeaturesWorkspaceSchemaFromString(jsonSchema string) model.Schema {
-	return NewJsonSchemaWithRelations(jsonSchema, workspaceRelations)
+	return featuresWorkspaceSchema{JsonSchemaWithRelations{jsonSchema: jsonSchema, relations: workspaceRelations}}
+}
+
+// CalculateTuples diffs the wildcard relations the same way as the other
+// relations: a tuple is created when a field becomes true and deleted when it
+// stops being true.
+func (s featuresWorkspaceSchema) CalculateTuples(
+	current, previous *model.Representations,
+	key model.ReporterResourceKey,
+) (model.TuplesToReplicate, error) {
+	result, err := s.JsonSchemaWithRelations.CalculateTuples(current, previous, key)
+	if err != nil {
+		return model.TuplesToReplicate{}, err
+	}
+
+	var creates, deletes []model.RelationsTuple
+	if result.HasTuplesToCreate() {
+		creates = *result.TuplesToCreate()
+	}
+	if result.HasTuplesToDelete() {
+		deletes = *result.TuplesToDelete()
+	}
+
+	for _, relation := range workspaceWildcardRelations {
+		c, d := model.DiffRelationValues(key, relation, featureNamespace, "service",
+			wildcardValues(current, relation), wildcardValues(previous, relation))
+		creates = append(creates, c...)
+		deletes = append(deletes, d...)
+	}
+
+	return model.NewTuplesToReplicate(creates, deletes)
+}
+
+func wildcardValues(r *model.Representations, field string) []string {
+	if r.ReporterBoolField(field) {
+		return []string{"*"}
+	}
+	return nil
 }
 
 // The legacy definitions below reproduce the tuple model that shipped before

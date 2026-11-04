@@ -240,6 +240,70 @@ func TestSecondCreateRelationshipSucceedsWithUpsertTrue(t *testing.T) {
 	assert.True(t, exists)
 }
 
+// TestFeaturesWorkspaceWildcardSpiceDB writes the translated wildcard tuples
+// to a real SpiceDB and checks that a relation-scoped delete with the
+// features/service:* subject removes only that tuple.
+func TestFeaturesWorkspaceWildcardSpiceDB(t *testing.T) {
+	requireSpiceDBIntegration(t)
+
+	t.Parallel()
+
+	ctx := context.Background()
+	spiceDbRepo, err := container.CreateSpiceDbRepository()
+	if !assert.NoError(t, err) {
+		return
+	}
+	defer spiceDbRepo.Close()
+
+	workspaceID := uniqueID(t, "ws")
+	relations := []string{
+		"features_workspace_desire_all_services",
+		"features_workspace_ignore_inherited_desired_services",
+		"features_workspace_ignore_inherited_paid_services",
+	}
+
+	tuples := make([]model.RelationsTuple, 0, len(relations))
+	for _, relation := range relations {
+		tuples = append(tuples, createRelationship("rbac", "workspace", workspaceID, relation, "features", "service", "*", ""))
+	}
+
+	exists := func(relation string) bool {
+		return CheckForRelationship(spiceDbRepo, "*", "features", "service", "", relation, "rbac", "workspace", workspaceID, model.NewConsistencyUnspecified())
+	}
+
+	_, err = spiceDbRepo.CreateTuples(ctx, tuples, true, nil)
+	if !assert.NoError(t, err) {
+		return
+	}
+
+	container.WaitForQuantizationInterval()
+
+	for _, relation := range relations {
+		assert.True(t, exists(relation), "wildcard tuple for %s must exist", relation)
+	}
+
+	deleteFilter := model.NewTupleFilter().
+		WithReporterType(model.DeserializeReporterType("rbac")).
+		WithObjectType(model.DeserializeResourceType("workspace")).
+		WithObjectId(model.DeserializeLocalResourceId(workspaceID)).
+		WithRelation(model.DeserializeRelation("features_workspace_desire_all_services")).
+		WithSubject(model.NewTupleSubjectFilter().
+			WithReporterType(model.DeserializeReporterType("features")).
+			WithSubjectType(model.DeserializeResourceType("service")).
+			WithSubjectId(model.DeserializeLocalResourceId("*")))
+
+	_, err = spiceDbRepo.DeleteTuples(ctx, deleteFilter, nil)
+	if !assert.NoError(t, err) {
+		return
+	}
+
+	container.WaitForQuantizationInterval()
+
+	assert.False(t, exists("features_workspace_desire_all_services"), "deleted wildcard tuple must be gone")
+	assert.True(t, exists("features_workspace_ignore_inherited_desired_services"), "sibling wildcard tuple must survive")
+	assert.True(t, exists("features_workspace_ignore_inherited_paid_services"), "sibling wildcard tuple must survive")
+}
+
 func TestIsBackendAvailable(t *testing.T) {
 	requireSpiceDBIntegration(t)
 

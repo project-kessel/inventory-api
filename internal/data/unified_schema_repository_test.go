@@ -59,13 +59,28 @@ func TestNewInMemorySchemaRepositoryFromUnifiedYAMLDir_CalculatesCommonAndReport
 	)
 	require.NoError(t, err)
 
-	tuples, err := resourceSchema.Schema().CalculateTuples(current, nil, key)
+	// Reporter relations live on the reporter adapter and common relations on
+	// the common adapter: each adapter only produces tuples for the relations
+	// it holds, and SchemaService.CalculateTuplesForResource merges the two.
+	commonTuples, err := resourceSchema.Schema().CalculateTuples(current, nil, key)
 	require.NoError(t, err)
-	require.Len(t, *tuples.TuplesToCreate(), 2)
-	assert.ElementsMatch(t, []model.RelationsTuple{
+	require.Len(t, *commonTuples.TuplesToCreate(), 1)
+	assert.Equal(t,
 		model.NewRelationTupleForSubject(key, "workspace", "rbac", "workspace", "workspace-1"),
+		(*commonTuples.TuplesToCreate())[0],
+	)
+
+	reporterType, err := model.NewReporterType("hbi")
+	require.NoError(t, err)
+	reporterSchema, err := repository.GetReporterSchema(context.Background(), resourceType, reporterType)
+	require.NoError(t, err)
+	reporterTuples, err := reporterSchema.Schema().CalculateTuples(current, nil, key)
+	require.NoError(t, err)
+	require.Len(t, *reporterTuples.TuplesToCreate(), 1)
+	assert.Equal(t,
 		model.NewRelationTupleForSubject(key, "host", "hbi", "host", "host-1"),
-	}, *tuples.TuplesToCreate())
+		(*reporterTuples.TuplesToCreate())[0],
+	)
 }
 
 func TestNewInMemorySchemaRepositoryFromUnifiedYAMLDir_AllowsReporterWithoutSchema(t *testing.T) {

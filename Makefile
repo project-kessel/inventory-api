@@ -250,6 +250,10 @@ get-token:
 kessel-up:
 	./scripts/start-full-kessel.sh
 
+.PHONY: kessel-up-unified
+kessel-up-unified:
+	INVENTORY_API_COMPOSE_OVERRIDE=development/unified-schema/docker-compose.override.yaml ./scripts/start-full-kessel.sh
+
 .PHONY: kessel-up-monitoring
 kessel-up-monitoring:
 	./scripts/start-full-kessel.sh --profile monitoring

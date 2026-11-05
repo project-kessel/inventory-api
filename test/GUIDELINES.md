@@ -20,6 +20,37 @@ When external dependencies are needed, leverage testcontainers to download and r
 
 For further reading on the principles behind this approach, see: [The secret world of testing without mocking](https://www.alechenninger.com/2020/11/the-secret-world-of-testing-without.html) by Alec Henninger.
 
+### Database Backend Selection
+
+Tests that verify database behavior (repositories, migrations, constraints, transaction handling) run against **PostgreSQL by default**, because that is what production runs and SQLite cannot reproduce PostgreSQL-specific behavior such as JSONB constraints, advisory locks, and transaction conflicts (RHCLOUD-51816). Tests of business logic keep using the in-memory fakes; SQLite remains available as an explicit fallback for environments without a container runtime.
+
+Select the backend with `TEST_DB`:
+
+```bash
+# PostgreSQL via Testcontainers (default; needs Docker or Podman)
+make test                                   # full suite, database tests on PostgreSQL
+TEST_DB=postgres ./scripts/testcontainers-run.sh go test ./internal/data/ -count=1 -race -short
+
+# In-memory SQLite (no container runtime needed) — the explicit fallback
+make test-sqlite                            # full suite, database tests on SQLite
+TEST_DB=sqlite go test ./internal/data/ -count=1 -race -short
+```
+
+`scripts/testcontainers-run.sh` detects Docker contexts and rootless Podman sockets and sets `DOCKER_HOST` accordingly; it disables Ryuk for Podman, so test binaries must stop their shared containers from `TestMain` via `testutil.TerminateSharedPostgres()`. `TEST_POSTGRES_IMAGE` (default `postgres:17.8`) overrides the container image. The container runs `wal_level=logical`, matching production's Debezium outbox pipeline, so tests exercise the real WAL outbox publisher (`pg_logical_emit_message`) — `outboxeventsrepository_test.go` verifies its output through a logical replication slot. Test helpers wire the WAL publisher on PostgreSQL and the no-op publisher on SQLite.
+
+The PostgreSQL backend (in `internal/testutil`, see `postgres_testdb.go`) starts **one container per test binary**, migrates a **template database once per distinct migrate function**, and copies that template into a **private database per test** — isolation without per-test migration cost. Databases are dropped with `WITH (FORCE)` on test cleanup.
+
+When adding database-backed tests:
+
+- Get a migrated database through `testutil.NewTestDB(t, cfg, migrate)`, passing a **package-level** migrate function so its template is reused. Packages without schema needs (e.g. transaction-manager behavior tests) pass `nil`.
+- Stop the shared container from `TestMain` after `m.Run()` via `testutil.TerminateSharedPostgres()`. Check and report its returned error, and exit nonzero on cleanup failure even if the tests passed (see `internal/data/health/main_test.go`). Preserve a failing test exit status. This is normal-exit cleanup, not signal handling.
+- Call repository methods with the returned handle as before; tests do not need to know which backend is active.
+- Branch on `testutil.UsingPostgres()` only for behavior that cannot be expressed on both backends, and document why in a comment. Examples: capping lock waits with `SET LOCAL lock_timeout` where SQLite would fail fast instead of blocking (`resource_repository_test.go`), asserting the real isolation level (`transaction_manager_test.go`), or asserting PostgreSQL-specific query results that SQLite cannot run (`cmd/jobs/metrics_collect_job_test.go`).
+
+Tests that deliberately remain on SQLite verify SQLite-specific fallback behavior itself: `migrations/locks_test.go`'s `TestWithAdvisoryLock_Sqlite*` (no locking outside PostgreSQL). Portable database tests run on both backends, with PostgreSQL the default. PostgreSQL-specific tests (advisory locks, real serialization conflicts, WAL decoding, and container cleanup) explicitly skip the SQLite fallback.
+
+CI runs `make test` on every pull request (see `build-test.yml`).
+
 ## Test Organization & File Structure
 
 ### Test File Naming

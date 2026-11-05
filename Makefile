@@ -149,12 +149,26 @@ clean:
 
 
 .PHONY: test
-# run all tests
+# run all tests; database-backed tests default to PostgreSQL through
+# Testcontainers (RHCLOUD-51816), so Docker or Podman must be running.
+# scripts/testcontainers-run.sh detects the runtime automatically.
 test:
 	@echo ""
-	@echo "Running tests."
+	@echo "Running tests (database tests on PostgreSQL via Testcontainers)."
 	# TODO: e2e tests are taking too long to be enabled by default. They need to be sped up.
-	@$(GO) test ./... -count=1 -race -short -covermode=atomic -coverprofile=coverage.txt -skip 'TestInventoryAPIGRPC_*|TestInventoryAPIHTTP_*|Test_ACMKafkaConsumer'
+	@./scripts/testcontainers-run.sh $(GO) test ./... -count=1 -race -short -covermode=atomic -coverprofile=coverage.txt -skip 'TestInventoryAPIGRPC_*|TestInventoryAPIHTTP_*|Test_ACMKafkaConsumer'
+	@echo "Overall test coverage:"
+	@$(GO) tool cover -func=coverage.txt | grep total: | awk '{print $$3}'
+
+.PHONY: test-sqlite
+# run all tests with database-backed tests on in-memory SQLite; needs no
+# container runtime but does not reproduce PostgreSQL behavior (JSONB
+# constraints, advisory locks, transaction conflicts)
+test-sqlite:
+	@echo ""
+	@echo "Running tests (database tests on in-memory SQLite)."
+	# TODO: e2e tests are taking too long to be enabled by default. They need to be sped up.
+	@TEST_DB=sqlite $(GO) test ./... -count=1 -race -short -covermode=atomic -coverprofile=coverage.txt -skip 'TestInventoryAPIGRPC_*|TestInventoryAPIHTTP_*|Test_ACMKafkaConsumer'
 	@echo "Overall test coverage:"
 	@$(GO) tool cover -func=coverage.txt | grep total: | awk '{print $$3}'
 

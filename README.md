@@ -317,11 +317,18 @@ authz:
 Tests can be run using:
 
 ```shell
+# Full suite; database-backed tests run on PostgreSQL via Testcontainers,
+# so Docker or Podman must be running (detected automatically)
 make test
+
+# Same suite with database-backed tests on in-memory SQLite (no container
+# runtime needed, but does not reproduce PostgreSQL behavior)
+make test-sqlite
 
 # Run resource lifecycle performance tests and print a summary (ensure Docker or Podman is running)
 make test-performance
 ```
+
 
 For end-to-test info see [here](./test/README.md).
 

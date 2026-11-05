@@ -8,8 +8,8 @@ import (
 )
 
 func TestLastLiveReporterBeforeBoundaries(t *testing.T) {
-	db := setupInMemoryDB(t)
-	repo := NewResourceRepository(db, NewFakeTransactionManager(3), noopOutboxPublisher())
+	db := setupRepositoryDB(t)
+	repo := NewResourceRepository(db, NewFakeTransactionManager(3), testOutboxPublisher())
 	resource := createTestResourceWithLocalId(t, "history-boundaries")
 	require.NoError(t, repo.Save(db, resource, bizmodel.OperationTypeCreated, bizmodel.NewTransactionId("history-seed")))
 	key := createContractReporterResourceKey(t, "history-boundaries", "k8s_cluster", "ocm", "ocm-instance-1")

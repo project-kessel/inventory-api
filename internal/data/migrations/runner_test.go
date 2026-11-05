@@ -5,19 +5,22 @@ import (
 	"testing"
 
 	"github.com/go-kratos/kratos/v2/log"
-	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
+
+	"github.com/project-kessel/inventory-api/internal/testutil"
 )
 
 const initialMigrationID = "20251120120000"
 
-func openSQLite(t *testing.T) *gorm.DB {
+// openTestDB returns an empty test database on the backend selected through
+// TEST_DB: PostgreSQL via Testcontainers (the default, matching
+// production) or in-memory SQLite (the dependency-free fallback, selected
+// explicitly with TEST_DB=sqlite). No
+// schema is applied — these tests run the migrations themselves, which is
+// the behavior under test.
+func openTestDB(t *testing.T) *gorm.DB {
 	t.Helper()
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
-	if err != nil {
-		t.Fatalf("open sqlite: %v", err)
-	}
-	return db
+	return testutil.NewTestDB(t, &gorm.Config{}, nil)
 }
 
 func tableExists(t *testing.T, db *gorm.DB, table string) bool {
@@ -26,7 +29,7 @@ func tableExists(t *testing.T, db *gorm.DB, table string) bool {
 }
 
 func TestRunCreatesTables(t *testing.T) {
-	db := openSQLite(t)
+	db := openTestDB(t)
 	ctx := context.Background()
 
 	if err := Run(ctx, db, log.NewHelper(log.DefaultLogger)); err != nil {
@@ -43,7 +46,7 @@ func TestRunCreatesTables(t *testing.T) {
 }
 
 func TestRunIdempotent(t *testing.T) {
-	db := openSQLite(t)
+	db := openTestDB(t)
 	ctx := context.Background()
 
 	if err := Run(ctx, db, log.NewHelper(log.DefaultLogger)); err != nil {

@@ -174,8 +174,8 @@ func TestResourceLifecyclePerformance(t *testing.T) {
 	if err := data.Migrate(db, nil); err != nil {
 		t.Fatal(err)
 	}
-	// Migrations bind a GORM session to a dedicated advisory-lock connection.
-	// Use a fresh handle for requests after that connection has been released.
+	// Use a fresh handle for requests so the request pool is independent of
+	// the connections used while applying migrations.
 	db, err = gorm.Open(postgres.Open(dsn), &gorm.Config{TranslateError: true})
 	if err != nil {
 		t.Fatal(err)

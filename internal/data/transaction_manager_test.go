@@ -3,32 +3,47 @@ package data
 //TODO
 
 import (
-	"database/sql"
+	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 
 	bizmodel "github.com/project-kessel/inventory-api/internal/biz/model"
 	"github.com/project-kessel/inventory-api/internal/metricscollector"
+	"github.com/project-kessel/inventory-api/internal/testutil"
 )
 
+// setupTestDB returns a schema-less test database on the backend selected
+// through TEST_DB: PostgreSQL via Testcontainers (the default, matching
+// production) or in-memory SQLite (the dependency-free fallback, selected
+// explicitly with TEST_DB=sqlite). The
+// transaction manager tests exercise begin/commit/retry behavior and need no
+// schema.
 func setupTestDB(t *testing.T) *gorm.DB {
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{
-		Logger: logger.Default.LogMode(logger.Silent),
-	})
-	assert.NoError(t, err)
+	t.Helper()
 
-	// Enable foreign keys for SQLite
-	db.Exec("PRAGMA foreign_keys = ON")
+	if !testutil.UsingPostgres() {
+		db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{
+			Logger: logger.Default.LogMode(logger.Silent),
+		})
+		assert.NoError(t, err)
 
-	return db
+		// Enable foreign keys for SQLite (PostgreSQL enforces them by default)
+		db.Exec("PRAGMA foreign_keys = ON")
+
+		return db
+	}
+
+	return testutil.NewTestDB(t, &gorm.Config{Logger: logger.Default.LogMode(logger.Silent)}, nil)
 }
 
 // =============================================================================
@@ -127,19 +142,21 @@ func TestGormTransactionManager_TransactionIsolation(t *testing.T) {
 	// Create a simple table for testing
 	db.Exec("CREATE TABLE test_table (id INTEGER PRIMARY KEY, value TEXT)")
 
-	var txLevel sql.IsolationLevel
 	err := tm.HandleSerializableTransaction("test_operation", db, func(tx *gorm.DB) error {
-		// Check the isolation level by attempting to read it
-		// This is a basic test - in a real scenario, we'd test actual isolation behavior
-		row := tx.Raw("PRAGMA read_uncommitted").Row()
-		var result interface{}
-		_ = row.Scan(&result)
-		txLevel = sql.LevelSerializable // We know this is what we set
+		// Verify the transaction actually runs at serializable isolation. On
+		// PostgreSQL this reads the session's isolation level directly; SQLite
+		// has no such statement and serializable behavior is implicit.
+		if testutil.UsingPostgres() {
+			var level string
+			if err := tx.Raw("SHOW TRANSACTION ISOLATION LEVEL").Scan(&level).Error; err != nil {
+				return err
+			}
+			assert.Equal(t, "serializable", strings.ToLower(strings.TrimSpace(level)))
+		}
 		return nil
 	})
 
 	assert.NoError(t, err)
-	assert.Equal(t, sql.LevelSerializable, txLevel)
 }
 
 func TestGormTransactionManager_MaxRetries(t *testing.T) {
@@ -226,6 +243,86 @@ func TestGormTransactionManager_SerializationFailureRecovery(t *testing.T) {
 	// Check that serialization failures were recorded but not exhaustion
 	assert.Equal(t, 2, metricscollector.GetSerializationFailureCount())
 	assert.Equal(t, 0, metricscollector.GetSerializationExhaustionCount())
+}
+
+func TestGormTransactionManager_PostgresSerializationConflictRecovery(t *testing.T) {
+	if !testutil.UsingPostgres() {
+		t.Skip("real serialization conflicts require PostgreSQL; SQLite retry coverage remains above")
+	}
+	db := setupTestDB(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	db = db.WithContext(ctx)
+	require.NoError(t, db.Exec("CREATE TABLE serialization_counter (id INTEGER PRIMARY KEY, value INTEGER NOT NULL)").Error)
+	require.NoError(t, db.Exec("INSERT INTO serialization_counter VALUES (1, 0)").Error)
+	require.NoError(t, db.Exec("CREATE TABLE serialization_attempts (attempt INTEGER PRIMARY KEY)").Error)
+
+	snapshotTaken := make(chan struct{})
+	writerResult := make(chan error, 1)
+	writerDone := make(chan struct{})
+	go func() {
+		defer close(writerDone)
+		select {
+		case <-snapshotTaken:
+			// Autocommit completes before the stale snapshot is allowed to write.
+			writerResult <- db.Exec("UPDATE serialization_counter SET value = value + 1 WHERE id = 1").Error
+		case <-ctx.Done():
+			writerResult <- ctx.Err()
+		}
+	}()
+	defer func() {
+		cancel()
+		select {
+		case <-writerDone:
+		case <-time.After(10 * time.Second):
+			t.Error("timed out waiting for serialization-conflict writer cleanup")
+		}
+	}()
+
+	tm := NewGormTransactionManager(metricscollector.NewFakeMetricsCollector(), 3)
+	attempts := 0
+	var observedValues []int
+	var conflictError error
+	err := tm.HandleSerializableTransaction("real_serialization_recovery", db, func(tx *gorm.DB) error {
+		attempts++
+		var value int
+		if err := tx.Raw("SELECT value FROM serialization_counter WHERE id = 1").Scan(&value).Error; err != nil {
+			return err
+		}
+		observedValues = append(observedValues, value)
+		if err := tx.Exec("INSERT INTO serialization_attempts VALUES (?)", attempts).Error; err != nil {
+			return err
+		}
+		if attempts == 1 {
+			close(snapshotTaken)
+			select {
+			case err := <-writerResult:
+				if err != nil {
+					return fmt.Errorf("conflicting writer: %w", err)
+				}
+			case <-ctx.Done():
+				return ctx.Err()
+			}
+		}
+		err := tx.Exec("UPDATE serialization_counter SET value = ? WHERE id = 1", value+1).Error
+		if attempts == 1 {
+			conflictError = err
+		}
+		return err
+	})
+	require.NoError(t, err)
+	var pgError *pgconn.PgError
+	require.ErrorAs(t, conflictError, &pgError)
+	assert.Equal(t, "40001", pgError.SQLState())
+	assert.Equal(t, 2, attempts)
+	assert.Equal(t, []int{0, 1}, observedValues, "retry must use a fresh snapshot")
+
+	var persistedValue int
+	require.NoError(t, db.Raw("SELECT value FROM serialization_counter WHERE id = 1").Scan(&persistedValue).Error)
+	assert.Equal(t, 2, persistedValue, "both committed increments must survive")
+	var persistedAttempts []int
+	require.NoError(t, db.Raw("SELECT attempt FROM serialization_attempts ORDER BY attempt").Scan(&persistedAttempts).Error)
+	assert.Equal(t, []int{2}, persistedAttempts, "writes from the failed attempt must be rolled back")
 }
 
 func TestGormTransactionManager_DeeplyWrappedSerializationError(t *testing.T) {

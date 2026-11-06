@@ -27,3 +27,25 @@ type AddResourceRelationshipsCommand struct {
 	// Write behavior
 	WriteVisibility resources.WriteVisibility
 }
+
+// RemoveResourceRelationshipsCommand contains the data needed to remove one or
+// more relationships from a resource. This is the domain command used by the
+// usecase layer, decoupled from protobuf types.
+type RemoveResourceRelationshipsCommand struct {
+	// Resource identification
+	LocalResourceId    model.LocalResourceId
+	ResourceType       model.ResourceType
+	ReporterType       model.ReporterType
+	ReporterInstanceId model.ReporterInstanceId
+
+	// Idempotency key. When nil (or empty) a new transaction ID is generated.
+	TransactionId *model.TransactionId
+
+	// Partial representations naming the relationship values to remove.
+	// At least one must be provided.
+	ReporterRepresentation *model.Representation
+	CommonRepresentation   *model.Representation
+
+	// Write behavior
+	WriteVisibility resources.WriteVisibility
+}

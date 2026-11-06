@@ -9,7 +9,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
 	"time"
 
 	kratosErrors "github.com/go-kratos/kratos/v2/errors"
@@ -36,29 +35,6 @@ const listenTimeout = 10 * time.Second
 
 // Domain errors re-exported from the model package.
 var ErrResourceNotFound = model.ErrResourceNotFound
-
-// AddResourceRelationshipsCommand contains the data needed to add one or more
-// relationships to a resource. This is the domain command used by the usecase
-// layer, decoupled from protobuf types.
-type AddResourceRelationshipsCommand struct {
-	// Resource identification
-	LocalResourceId    model.LocalResourceId
-	ResourceType       model.ResourceType
-	ReporterType       model.ReporterType
-	ReporterInstanceId model.ReporterInstanceId
-
-	// Idempotency key. When nil (or empty) a new transaction ID is generated.
-	TransactionId *model.TransactionId
-
-	// Partial representations containing only relationship-typed fields.
-	// The values are merged additively into the stored representations.
-	// At least one must be provided.
-	ReporterRepresentation *model.Representation
-	CommonRepresentation   *model.Representation
-
-	// Write behavior
-	WriteVisibility resources.WriteVisibility
-}
 
 // AddResourceRelationshipsUseCase adds relationship-typed fields to a
 // resource's representations without asserting the complete representation
@@ -338,7 +314,7 @@ func (uc *AddResourceRelationshipsUseCase) createResourceWithRelationships(ctx c
 func (uc *AddResourceRelationshipsUseCase) addRelationshipsToExistingResource(ctx context.Context, tx *gorm.DB, cmd AddResourceRelationshipsCommand, res *model.Resource, key model.ReporterResourceKey, txid model.TransactionId) error {
 	// Tombstoned representations cannot be re-activated through the delta
 	// endpoints; a new ReportResource call is required.
-	reporterResource, err := findReporterResource(res.ReporterResources(), key)
+	reporterResource, err := res.ReporterResourceByKey(key)
 	if err != nil {
 		return err
 	}
@@ -383,6 +359,14 @@ func (uc *AddResourceRelationshipsUseCase) addRelationshipsToExistingResource(ct
 		return status.Errorf(codes.InvalidArgument, "failed validation for add resource relationships: %v", err)
 	}
 
+	// Only write to the common stream when the request actually names common
+	// fields; a reporter-only add must not produce a new common representation
+	// version for unchanged data.
+	var updateCommonPtr *model.Representation
+	if cmd.CommonRepresentation != nil && len(mergedCommon) > 0 {
+		updateCommonPtr = &mergedCommon
+	}
+
 	// The AddResourceRelationships contract carries no metadata, so the
 	// stored hrefs are preserved on update. The stored reporter version is
 	// not carried over: it is per-report metadata and, like ReportResource,
@@ -393,7 +377,7 @@ func (uc *AddResourceRelationshipsUseCase) addRelationshipsToExistingResource(ct
 		reporterResource.ConsoleHref(),
 		nil,
 		mergedReporterPtr,
-		mergedCommonPtr,
+		updateCommonPtr,
 		*cmd.TransactionId,
 	); err != nil {
 		return fmt.Errorf("failed to update resource: %w", err)
@@ -491,28 +475,6 @@ func valuesEqual(a, b interface{}) bool {
 // carries no fields.
 func representationIsEmpty(rep *model.Representation) bool {
 	return rep == nil || len(*rep) == 0
-}
-
-// findReporterResource locates the reporter resource matching the key, using
-// the same case-insensitive matching semantics as the model's update path.
-func findReporterResource(reporterResources []model.ReporterResource, key model.ReporterResourceKey) (model.ReporterResource, error) {
-	for _, reporterResource := range reporterResources {
-		storedKey := reporterResource.Key()
-
-		if strings.EqualFold(storedKey.LocalResourceId().Serialize(), key.LocalResourceId().Serialize()) &&
-			strings.EqualFold(storedKey.ResourceType().Serialize(), key.ResourceType().Serialize()) &&
-			strings.EqualFold(storedKey.ReporterType().Serialize(), key.ReporterType().Serialize()) {
-
-			searchReporterInstanceId := key.ReporterInstanceId().Serialize()
-			storedReporterInstanceId := storedKey.ReporterInstanceId().Serialize()
-
-			if searchReporterInstanceId == "" || strings.EqualFold(storedReporterInstanceId, searchReporterInstanceId) {
-				return reporterResource, nil
-			}
-		}
-	}
-
-	return model.ReporterResource{}, fmt.Errorf("reporter resource matching the requested key was not found in resource")
 }
 
 // enforceMetaAuthzObject calls the MetaAuthorizer to validate access using a MetaObject.

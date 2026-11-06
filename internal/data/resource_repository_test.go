@@ -481,7 +481,7 @@ func TestFindResourceByKeys(t *testing.T) {
 	for _, impl := range implementations {
 		t.Run(impl.name, func(t *testing.T) {
 			// Helper function to get fresh instances for each test
-			getFreshInstances := func() (bizmodel.ResourceRepository, *gorm.DB) {
+			getFreshInstances := func(t *testing.T) (bizmodel.ResourceRepository, *gorm.DB) {
 				if impl.name == "Fake Repository" {
 					return impl.repo(t), impl.db(t)
 				}
@@ -493,7 +493,7 @@ func TestFindResourceByKeys(t *testing.T) {
 			}
 
 			t.Run("Save and FindResourceByKeys workflow", func(t *testing.T) {
-				repo, db := getFreshInstances()
+				repo, db := getFreshInstances(t)
 
 				resource := createTestResource(t)
 				err := repo.Save(db, resource, bizmodel.OperationTypeCreated, bizmodel.NewTransactionId("test-tx-123"))
@@ -514,7 +514,7 @@ func TestFindResourceByKeys(t *testing.T) {
 			})
 
 			t.Run("FindResourceByKeys returns ErrRecordNotFound for non-existent resource", func(t *testing.T) {
-				repo, db := getFreshInstances()
+				repo, db := getFreshInstances(t)
 
 				key, err := bizmodel.NewReporterResourceKey(
 					"non-existent",
@@ -533,7 +533,7 @@ func TestFindResourceByKeys(t *testing.T) {
 				resource1 := createTestResourceWithLocalId(t, "resource-1")
 				resource2 := createTestResourceWithLocalId(t, "resource-2")
 
-				repo, db := getFreshInstances()
+				repo, db := getFreshInstances(t)
 
 				err := repo.Save(db, resource1, bizmodel.OperationTypeCreated, bizmodel.NewTransactionId("test-tx-1"))
 				require.NoError(t, err)
@@ -562,7 +562,7 @@ func TestFindResourceByKeys(t *testing.T) {
 			})
 
 			t.Run("FindResourceByKeys works with nil transaction", func(t *testing.T) {
-				repo, db := getFreshInstances()
+				repo, db := getFreshInstances(t)
 
 				resource := createTestResource(t)
 				err := repo.Save(db, resource, bizmodel.OperationTypeCreated, bizmodel.NewTransactionId("test-tx-1"))
@@ -583,7 +583,7 @@ func TestFindResourceByKeys(t *testing.T) {
 			})
 
 			t.Run("FindResourceByKeys with nil transaction returns ErrRecordNotFound for non-existent resource", func(t *testing.T) {
-				repo, _ := getFreshInstances()
+				repo, _ := getFreshInstances(t)
 
 				key, err := bizmodel.NewReporterResourceKey(
 					"non-existent-nil-tx",
@@ -599,7 +599,7 @@ func TestFindResourceByKeys(t *testing.T) {
 			})
 
 			t.Run("FindResourceByKeys works when reporterInstanceId is not provided in search key", func(t *testing.T) {
-				repo, db := getFreshInstances()
+				repo, db := getFreshInstances(t)
 
 				resource := createTestResourceWithLocalId(t, "test-resource-no-instance-lookup")
 				err := repo.Save(db, resource, bizmodel.OperationTypeCreated, bizmodel.NewTransactionId("test-tx-no-instance"))
@@ -621,7 +621,7 @@ func TestFindResourceByKeys(t *testing.T) {
 
 			// Case-insensitive tests
 			t.Run("Case-insensitive matching", func(t *testing.T) {
-				repo, db := getFreshInstances()
+				repo, db := getFreshInstances(t)
 
 				// Create a resource with mixed case values
 				resource := createTestResourceWithMixedCase(t)
@@ -742,7 +742,7 @@ func TestFindResourceByKeys_TombstoneFilter(t *testing.T) {
 
 	for _, impl := range implementations {
 		t.Run(impl.name, func(t *testing.T) {
-			getFreshInstances := func() (bizmodel.ResourceRepository, *gorm.DB) {
+			getFreshInstances := func(t *testing.T) (bizmodel.ResourceRepository, *gorm.DB) {
 				if impl.name == "Fake Repository" {
 					return impl.repo(t), impl.db(t)
 				}
@@ -753,7 +753,7 @@ func TestFindResourceByKeys_TombstoneFilter(t *testing.T) {
 				return repo, db
 			}
 
-			repo, db := getFreshInstances()
+			repo, db := getFreshInstances(t)
 
 			resource := createTestResourceWithLocalId(t, "tombstoned-resource")
 			err := repo.Save(db, resource, bizmodel.OperationTypeCreated, bizmodel.NewTransactionId("test-tx-tombstone"))
@@ -823,7 +823,7 @@ func TestUniqueConstraint_ReporterResourceCompositeKey(t *testing.T) {
 
 	for _, impl := range implementations {
 		t.Run(impl.name, func(t *testing.T) {
-			getFreshInstances := func() (bizmodel.ResourceRepository, *gorm.DB) {
+			getFreshInstances := func(t *testing.T) (bizmodel.ResourceRepository, *gorm.DB) {
 				if impl.name == "Fake Repository" {
 					return impl.repo(t), impl.db(t)
 				}
@@ -835,7 +835,7 @@ func TestUniqueConstraint_ReporterResourceCompositeKey(t *testing.T) {
 			}
 
 			t.Run("should reject duplicate composite key", func(t *testing.T) {
-				repo, db := getFreshInstances()
+				repo, db := getFreshInstances(t)
 
 				// Create first resource
 				resource1 := createTestResourceWithLocalId(t, "duplicate-key-test")
@@ -858,7 +858,7 @@ func TestUniqueConstraint_ReporterResourceCompositeKey(t *testing.T) {
 			})
 
 			t.Run("should allow same key with different versions", func(t *testing.T) {
-				repo, db := getFreshInstances()
+				repo, db := getFreshInstances(t)
 
 				// Create and save initial resource
 				resource := createTestResourceWithLocalId(t, "version-test-resource")
@@ -889,7 +889,7 @@ func TestUniqueConstraint_ReporterResourceCompositeKey(t *testing.T) {
 			})
 
 			t.Run("should allow same key components with different resource types", func(t *testing.T) {
-				repo, db := getFreshInstances()
+				repo, db := getFreshInstances(t)
 
 				// Create first resource with k8s_cluster type
 				resource1 := createTestResourceWithLocalIdAndType(t, "multi-type-test", "k8s_cluster")
@@ -903,7 +903,7 @@ func TestUniqueConstraint_ReporterResourceCompositeKey(t *testing.T) {
 			})
 
 			t.Run("should allow same key components with different reporter types", func(t *testing.T) {
-				repo, db := getFreshInstances()
+				repo, db := getFreshInstances(t)
 
 				// Create resource with OCM reporter
 				resource1 := createTestResourceWithReporter(t, "reporter-test", "ocm", "ocm-instance-1")
@@ -917,7 +917,7 @@ func TestUniqueConstraint_ReporterResourceCompositeKey(t *testing.T) {
 			})
 
 			t.Run("should allow same key components with different reporter instances", func(t *testing.T) {
-				repo, db := getFreshInstances()
+				repo, db := getFreshInstances(t)
 
 				// Create resource with instance-1
 				resource1 := createTestResourceWithReporter(t, "instance-test", "ocm", "ocm-instance-1")
@@ -964,7 +964,7 @@ func TestResourceRepository_IdempotentOperations(t *testing.T) {
 
 	for _, impl := range implementations {
 		t.Run(impl.name, func(t *testing.T) {
-			getFreshInstances := func() (bizmodel.ResourceRepository, *gorm.DB) {
+			getFreshInstances := func(t *testing.T) (bizmodel.ResourceRepository, *gorm.DB) {
 				if impl.name == "Fake Repository" {
 					return impl.repo(t), impl.db(t)
 				}
@@ -976,7 +976,7 @@ func TestResourceRepository_IdempotentOperations(t *testing.T) {
 			}
 
 			t.Run("report -> delete -> resubmit same delete", func(t *testing.T) {
-				repo, db := getFreshInstances()
+				repo, db := getFreshInstances(t)
 
 				localResourceId := "repo-idempotent-delete-test"
 
@@ -1051,7 +1051,7 @@ func TestResourceRepository_IdempotentOperations(t *testing.T) {
 			})
 
 			t.Run("report -> resubmit same report -> delete -> resubmit same delete", func(t *testing.T) {
-				repo, db := getFreshInstances()
+				repo, db := getFreshInstances(t)
 
 				localResourceId := "repo-idempotent-full-test"
 
@@ -1108,7 +1108,7 @@ func TestResourceRepository_IdempotentOperations(t *testing.T) {
 			})
 
 			t.Run("complex idempotency: multiple report and delete cycles", func(t *testing.T) {
-				repo, db := getFreshInstances()
+				repo, db := getFreshInstances(t)
 
 				localResourceId := "repo-complex-idempotent-test"
 				key := createContractReporterResourceKey(t, localResourceId, "k8s_cluster", "ocm", "ocm-instance-1")
@@ -1210,7 +1210,7 @@ func TestSave(t *testing.T) {
 	for _, impl := range implementations {
 		t.Run(impl.name, func(t *testing.T) {
 			// Helper function to get fresh instances for each test
-			getFreshInstances := func() (bizmodel.ResourceRepository, *gorm.DB) {
+			getFreshInstances := func(t *testing.T) (bizmodel.ResourceRepository, *gorm.DB) {
 				if impl.name == "Fake Repository" {
 					return impl.repo(t), impl.db(t)
 				}
@@ -1222,7 +1222,7 @@ func TestSave(t *testing.T) {
 			}
 
 			t.Run("Save handles duplicate calls gracefully", func(t *testing.T) {
-				repo, db := getFreshInstances()
+				repo, db := getFreshInstances(t)
 
 				resource := createTestResourceWithLocalId(t, "update-test")
 				err := repo.Save(db, resource, bizmodel.OperationTypeCreated, bizmodel.NewTransactionId("test-tx-1"))
@@ -1264,7 +1264,7 @@ func TestSave(t *testing.T) {
 			})
 
 			t.Run("Save creates new resource successfully", func(t *testing.T) {
-				repo, db := getFreshInstances()
+				repo, db := getFreshInstances(t)
 
 				resource := createTestResourceWithLocalId(t, "save-new-test")
 
@@ -1285,7 +1285,7 @@ func TestSave(t *testing.T) {
 					t.Skip("This test is specific to real repository database operations")
 				}
 
-				repo, db := getFreshInstances()
+				repo, db := getFreshInstances(t)
 
 				resource := createTestResourceWithLocalId(t, "zero-pk-test")
 				err := repo.Save(db, resource, bizmodel.OperationTypeCreated, bizmodel.NewTransactionId("test-tx-zero-pk"))
@@ -1333,7 +1333,7 @@ func TestResourceRepository_MultipleHostsLifecycle(t *testing.T) {
 
 	for _, impl := range implementations {
 		t.Run(impl.name, func(t *testing.T) {
-			getFreshInstances := func() (bizmodel.ResourceRepository, *gorm.DB) {
+			getFreshInstances := func(t *testing.T) (bizmodel.ResourceRepository, *gorm.DB) {
 				if impl.name == "Fake Repository" {
 					return impl.repo(t), impl.db(t)
 				}
@@ -1344,7 +1344,7 @@ func TestResourceRepository_MultipleHostsLifecycle(t *testing.T) {
 				return repo, db
 			}
 
-			repo, db := getFreshInstances()
+			repo, db := getFreshInstances(t)
 
 			// Create 2 hosts
 			host1 := createTestResourceWithLocalIdAndType(t, "host-1", "host")
@@ -1468,7 +1468,7 @@ func TestResourceRepository_PartialDataScenarios(t *testing.T) {
 
 	for _, impl := range implementations {
 		t.Run(impl.name, func(t *testing.T) {
-			getFreshInstances := func() (bizmodel.ResourceRepository, *gorm.DB) {
+			getFreshInstances := func(t *testing.T) (bizmodel.ResourceRepository, *gorm.DB) {
 				if impl.name == "Fake Repository" {
 					return impl.repo(t), impl.db(t)
 				}
@@ -1480,7 +1480,7 @@ func TestResourceRepository_PartialDataScenarios(t *testing.T) {
 			}
 
 			t.Run("Report resource with just reporter data and no common data", func(t *testing.T) {
-				repo, db := getFreshInstances()
+				repo, db := getFreshInstances(t)
 
 				resource := createTestResourceWithReporterDataOnly(t, "reporter-only-resource")
 				err := repo.Save(db, resource, bizmodel.OperationTypeCreated, bizmodel.NewTransactionId("tx-reporter-only"))
@@ -1495,7 +1495,7 @@ func TestResourceRepository_PartialDataScenarios(t *testing.T) {
 			})
 
 			t.Run("Report resource with no reporter data but has common data", func(t *testing.T) {
-				repo, db := getFreshInstances()
+				repo, db := getFreshInstances(t)
 
 				resource := createTestResourceWithCommonDataOnly(t, "common-only-resource")
 				err := repo.Save(db, resource, bizmodel.OperationTypeCreated, bizmodel.NewTransactionId("tx-common-only"))
@@ -1510,7 +1510,7 @@ func TestResourceRepository_PartialDataScenarios(t *testing.T) {
 			})
 
 			t.Run("Report resource with both data, then just reporter data, then just common data", func(t *testing.T) {
-				repo, db := getFreshInstances()
+				repo, db := getFreshInstances(t)
 
 				// 1. Report with both reporter and common data
 				resourceBoth := createTestResourceWithLocalId(t, "progressive-resource")
@@ -2159,7 +2159,7 @@ func TestFindLatestRepresentations(t *testing.T) {
 	for _, impl := range implementations {
 		t.Run(impl.name, func(t *testing.T) {
 			// Helper to get fresh instances
-			getFresh := func() (bizmodel.ResourceRepository, *gorm.DB) {
+			getFresh := func(t *testing.T) (bizmodel.ResourceRepository, *gorm.DB) {
 				if impl.name == "Fake Repository" {
 					return impl.repo(t), impl.db(t)
 				}
@@ -2169,7 +2169,7 @@ func TestFindLatestRepresentations(t *testing.T) {
 				return NewResourceRepository(db, tm, testOutboxPublisher()), db
 			}
 
-			repo, db := getFresh()
+			repo, db := getFresh(t)
 
 			key, err := bizmodel.NewReporterResourceKey("localResourceId-latest", "host", "hbi", "hbi-instance-1")
 			require.NoError(t, err)
@@ -2260,7 +2260,7 @@ func TestFindCurrentAndPreviousVersionedRepresentations(t *testing.T) {
 
 	for _, impl := range implementations {
 		t.Run(impl.name, func(t *testing.T) {
-			getFreshInstances := func() (bizmodel.ResourceRepository, *gorm.DB) {
+			getFreshInstances := func(t *testing.T) (bizmodel.ResourceRepository, *gorm.DB) {
 				if impl.name == "Fake Repository" {
 					return impl.repo(t), impl.db(t)
 				}
@@ -2272,7 +2272,7 @@ func TestFindCurrentAndPreviousVersionedRepresentations(t *testing.T) {
 			}
 
 			t.Run("GetCurrentAndPreviousWorkspaceID extracts workspace IDs correctly", func(t *testing.T) {
-				repo, db := getFreshInstances()
+				repo, db := getFreshInstances(t)
 
 				// Create and update a resource to have versioned representations (same for both implementations)
 				resource := createTestResourceWithLocalIdAndType(t, "workspace-test-resource", "host")
@@ -2306,7 +2306,7 @@ func TestFindCurrentAndPreviousVersionedRepresentations(t *testing.T) {
 			})
 
 			t.Run("GetCurrentAndPreviousWorkspaceID handles version 0", func(t *testing.T) {
-				repo, db := getFreshInstances()
+				repo, db := getFreshInstances(t)
 
 				key, err := bizmodel.NewReporterResourceKey("test-resource-v0", "host", "hbi", "hbi-instance-1")
 				require.NoError(t, err)

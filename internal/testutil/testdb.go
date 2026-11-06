@@ -30,7 +30,8 @@ const (
 )
 
 // TestDBBackend returns the database backend selected through
-// TestDBBackendEnvVar, defaulting to BackendPostgres.
+// TestDBBackendEnvVar, defaulting to BackendPostgres. It panics on unsupported
+// values so backend-specific branches cannot silently treat typos as SQLite.
 //
 // PostgreSQL is the default because it is what production runs and SQLite
 // cannot reproduce PostgreSQL-specific behavior (JSONB constraints, advisory
@@ -38,15 +39,21 @@ const (
 // TEST_DB=sqlite when no container runtime is available.
 func TestDBBackend() string {
 	backend := strings.ToLower(strings.TrimSpace(os.Getenv(TestDBBackendEnvVar)))
-	if backend == "" {
+	switch backend {
+	case "":
 		return BackendPostgres
+	case BackendPostgres, BackendSQLite:
+		return backend
+	default:
+		panic(fmt.Sprintf("unknown %s value %q: expected %q or %q",
+			TestDBBackendEnvVar, backend, BackendPostgres, BackendSQLite))
 	}
-	return backend
 }
 
 // UsingPostgres reports whether tests are running against the PostgreSQL
 // backend. Use this to branch over backend-specific behavior that cannot be
-// expressed generically (for example, setting a lock timeout).
+// expressed generically (for example, setting a lock timeout). Like TestDBBackend,
+// it panics if TestDBBackendEnvVar contains an unsupported value.
 func UsingPostgres() bool {
 	return TestDBBackend() == BackendPostgres
 }

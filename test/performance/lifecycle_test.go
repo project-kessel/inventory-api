@@ -137,6 +137,10 @@ func config(t *testing.T) settings {
 	return s
 }
 
+// TestResourceLifecyclePerformance measures gRPC resource lifecycles against a
+// dedicated PostgreSQL instance with fresh and history-heavy data at two worker
+// counts, checking final state and configured performance baselines. It also runs
+// consumer-read measurements; the lifecycle path uses a no-op outbox publisher.
 func TestResourceLifecyclePerformance(t *testing.T) {
 	s := config(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)

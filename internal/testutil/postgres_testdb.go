@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
+
 	_ "github.com/jackc/pgx/v5/stdlib" // Register the pgx driver for database/sql maintenance connections
 	"github.com/moby/moby/api/types/container"
 	inventoryerrors "github.com/project-kessel/inventory-api/internal/errors"
@@ -21,6 +21,7 @@ import (
 	"github.com/testcontainers/testcontainers-go/wait"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 const (
@@ -50,9 +51,10 @@ const (
 // test binary, together with the maintenance connection used to create and
 // drop databases.
 type postgresServer struct {
-	container testcontainers.Container
-	admin     *sql.DB
-	dsnArgs   string // host/port/credentials; dbname is appended per database
+	container   testcontainers.Container
+	admin       *sql.DB
+	maintenance *gorm.DB // identifier-aware statements over the same admin pool
+	dsnArgs     string   // host/port/credentials; dbname is appended per database
 }
 
 var (
@@ -249,8 +251,8 @@ func startPostgresServer() (server *postgresServer, err error) {
 			host, port.Port(), postgresTestUser, password),
 	}
 
-	// database/sql, not GORM: the maintenance connection only issues
-	// CREATE/DROP DATABASE, which cannot run inside transactions.
+	// The maintenance pool runs CREATE/DROP DATABASE outside transactions.
+	// GORM wraps this same pool below solely for identifier-aware statements.
 	admin, err := sql.Open("pgx", srv.dsn(postgresMaintenanceDB))
 	if err != nil {
 		return nil, fmt.Errorf("open maintenance connection: %w", err)
@@ -261,7 +263,16 @@ func startPostgresServer() (server *postgresServer, err error) {
 		_ = admin.Close()
 		return nil, fmt.Errorf("ping postgres container: %w", err)
 	}
+	maintenance, err := gorm.Open(postgres.New(postgres.Config{Conn: admin}), &gorm.Config{
+		SkipDefaultTransaction: true,
+		DisableAutomaticPing:   true, // the pool was checked above with a bounded context
+	})
+	if err != nil {
+		_ = admin.Close()
+		return nil, fmt.Errorf("initialize postgres maintenance statements: %w", err)
+	}
 	srv.admin = admin
+	srv.maintenance = maintenance
 
 	fmt.Printf("testutil: started PostgreSQL %s in %s (host=%s port=%s)\n",
 		image, time.Since(started).Round(time.Millisecond), host, port.Port())
@@ -382,18 +393,22 @@ func postgresTestDBName(t *testing.T) string {
 	return fmt.Sprintf("%s_%s_%s", postgresTestNamePrefix, safe, uuid.NewString()[:8])
 }
 
-// createDatabase creates a database, optionally copying a template. Database
-// names are identifiers, so SQL value placeholders cannot be used for them.
+// createDatabase creates a database, optionally copying a template. GORM's
+// clause.Table arguments quote names as PostgreSQL identifiers, not SQL values.
 func createDatabase(srv *postgresServer, name, templateName string) error {
-	statement := "CREATE DATABASE " + pgx.Identifier{name}.Sanitize()
-	if templateName != "" {
-		statement += " TEMPLATE " + pgx.Identifier{templateName}.Sanitize()
-	}
-
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	if _, err := srv.admin.ExecContext(ctx, statement); err != nil {
-		return fmt.Errorf("%s: %w", statement, err)
+
+	maintenance := srv.maintenance.WithContext(ctx)
+	var err error
+	if templateName == "" {
+		err = maintenance.Exec("CREATE DATABASE ?", clause.Table{Name: name}).Error
+	} else {
+		err = maintenance.Exec("CREATE DATABASE ? TEMPLATE ?",
+			clause.Table{Name: name}, clause.Table{Name: templateName}).Error
+	}
+	if err != nil {
+		return fmt.Errorf("create database %s: %w", name, err)
 	}
 	return nil
 }
@@ -406,10 +421,9 @@ func createDatabase(srv *postgresServer, name, templateName string) error {
 func dropDatabase(t *testing.T, srv *postgresServer, name string) {
 	t.Helper()
 
-	statement := "DROP DATABASE " + pgx.Identifier{name}.Sanitize() + " WITH (FORCE)"
 	for attempt := 1; attempt <= 3; attempt++ {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		_, err := srv.admin.ExecContext(ctx, statement)
+		err := srv.maintenance.WithContext(ctx).Exec("DROP DATABASE ? WITH (FORCE)", clause.Table{Name: name}).Error
 		cancel()
 		if err == nil {
 			return

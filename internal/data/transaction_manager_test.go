@@ -134,6 +134,9 @@ func TestGormTransactionManager_MultipleRetries(t *testing.T) {
 	assert.Equal(t, 1, callCount)
 }
 
+// TestGormTransactionManager_TransactionIsolation checks PostgreSQL's reported
+// isolation level inside a managed transaction; SQLite exercises successful
+// transaction execution without a session-level isolation query.
 func TestGormTransactionManager_TransactionIsolation(t *testing.T) {
 	db := setupTestDB(t)
 	mc := metricscollector.NewFakeMetricsCollector()
@@ -245,6 +248,10 @@ func TestGormTransactionManager_SerializationFailureRecovery(t *testing.T) {
 	assert.Equal(t, 0, metricscollector.GetSerializationExhaustionCount())
 }
 
+// TestGormTransactionManager_PostgresSerializationConflictRecovery forces a real
+// PostgreSQL 40001 conflict and verifies retry with a fresh snapshot: both
+// committed increments survive, but writes from the failed attempt are rolled back.
+// SQLite is skipped because it cannot reproduce this PostgreSQL snapshot conflict.
 func TestGormTransactionManager_PostgresSerializationConflictRecovery(t *testing.T) {
 	if !testutil.UsingPostgres() {
 		t.Skip("real serialization conflicts require PostgreSQL; SQLite retry coverage remains above")

@@ -7,6 +7,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// TestLastLiveReporterBeforeBoundaries verifies strict generation/version ordering
+// across history gaps: live lookups skip tombstones, while previous-representation
+// lookups retain them, and neither includes the boundary itself.
 func TestLastLiveReporterBeforeBoundaries(t *testing.T) {
 	db := setupRepositoryDB(t)
 	repo := NewResourceRepository(db, NewFakeTransactionManager(3), testOutboxPublisher())

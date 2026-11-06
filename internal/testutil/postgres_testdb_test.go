@@ -10,6 +10,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// TestTerminateSharedPostgres_Unused verifies that repeated cleanup without
+// database setup succeeds without starting a container.
 func TestTerminateSharedPostgres_Unused(t *testing.T) {
 	if os.Getenv("TEST_POSTGRES_LIFECYCLE_CHILD") == t.Name() {
 		require.NoError(t, TerminateSharedPostgres())
@@ -21,6 +23,8 @@ func TestTerminateSharedPostgres_Unused(t *testing.T) {
 	require.NoError(t, err, "%s", output)
 }
 
+// TestSharedPostgresServer_AfterTermination verifies that setup after shutdown
+// fails with a useful message instead of returning a nil server.
 func TestSharedPostgresServer_AfterTermination(t *testing.T) {
 	if os.Getenv("TEST_POSTGRES_LIFECYCLE_CHILD") == t.Name() {
 		require.NoError(t, TerminateSharedPostgres())
@@ -50,6 +54,8 @@ func runPostgresLifecycleTest(t *testing.T) ([]byte, error) {
 	return command.CombinedOutput()
 }
 
+// TestPostgresDatabaseIdentifiers verifies that creation, template cloning, and
+// deletion preserve quoted identifiers without executing SQL-looking name text.
 func TestPostgresDatabaseIdentifiers(t *testing.T) {
 	if !UsingPostgres() {
 		t.Skip("database identifier quoting requires the PostgreSQL backend")
@@ -85,6 +91,8 @@ func TestPostgresDatabaseIdentifiers(t *testing.T) {
 	}
 }
 
+// TestPostgresServerTerminate_ReportsFailureAndAllowsRetry verifies that failed
+// cleanup identifies the container and retains enough state to retry removal.
 func TestPostgresServerTerminate_ReportsFailureAndAllowsRetry(t *testing.T) {
 	if !UsingPostgres() {
 		t.Skip("container cleanup requires the PostgreSQL backend")

@@ -28,6 +28,8 @@ func tableExists(t *testing.T, db *gorm.DB, table string) bool {
 	return db.Migrator().HasTable(table)
 }
 
+// TestRunCreatesTables checks that migrations create the core resource and
+// reporter-resource tables on the selected database backend.
 func TestRunCreatesTables(t *testing.T) {
 	db := openTestDB(t)
 	ctx := context.Background()
@@ -45,6 +47,8 @@ func TestRunCreatesTables(t *testing.T) {
 	}
 }
 
+// TestRunIdempotent verifies that rerunning migrations on an already migrated
+// database succeeds without attempting incompatible schema changes.
 func TestRunIdempotent(t *testing.T) {
 	db := openTestDB(t)
 	ctx := context.Background()

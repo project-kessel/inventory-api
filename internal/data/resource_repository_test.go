@@ -34,6 +34,9 @@ func ptrGeneration(g uint) *bizmodel.Generation {
 
 var emptyTxId = bizmodel.NewTransactionId("")
 
+// TestResourceRepositoryContract applies the same resource persistence contract
+// to the database-backed repository and the in-memory fake to keep their
+// externally observable behavior aligned.
 func TestResourceRepositoryContract(t *testing.T) {
 	implementations := []struct {
 		name string
@@ -449,6 +452,9 @@ func testRepositoryContract(t *testing.T, repo bizmodel.ResourceRepository, db *
 
 }
 
+// TestFindResourceByKeys checks real and fake lookup semantics for saved and
+// missing resources, nil transaction handles, omitted reporter instances, and
+// case normalization of reporter resource keys.
 func TestFindResourceByKeys(t *testing.T) {
 	implementations := []struct {
 		name string
@@ -711,6 +717,8 @@ func TestFindResourceByKeys(t *testing.T) {
 	}
 }
 
+// TestFindResourceByKeys_TombstoneFilter verifies that deleting a resource does
+// not hide its reporter identity from key-based lookups in either repository.
 func TestFindResourceByKeys_TombstoneFilter(t *testing.T) {
 	implementations := []struct {
 		name string
@@ -792,6 +800,9 @@ func TestFindResourceByKeys_TombstoneFilter(t *testing.T) {
 	}
 }
 
+// TestUniqueConstraint_ReporterResourceCompositeKey checks that both repositories
+// reject duplicate reporter identities while allowing versioned updates and keys
+// distinguished by resource type, reporter type, or reporter instance.
 func TestUniqueConstraint_ReporterResourceCompositeKey(t *testing.T) {
 	implementations := []struct {
 		name string
@@ -933,6 +944,9 @@ func TestUniqueConstraint_ReporterResourceCompositeKey(t *testing.T) {
 	}
 }
 
+// TestResourceRepository_IdempotentOperations exercises repeated report/delete
+// cycles in both repositories, including the invariant that deleting an already
+// tombstoned reporter does not advance its representation version.
 func TestResourceRepository_IdempotentOperations(t *testing.T) {
 	implementations := []struct {
 		name string
@@ -1178,6 +1192,9 @@ func TestResourceRepository_IdempotentOperations(t *testing.T) {
 	}
 }
 
+// TestSave checks that creation and subsequent updates remain retrievable in
+// both repositories, with a database-only case for safely skipping
+// representations whose primary keys are zero-valued.
 func TestSave(t *testing.T) {
 	implementations := []struct {
 		name string
@@ -1302,6 +1319,9 @@ func TestSave(t *testing.T) {
 	}
 }
 
+// TestResourceRepository_MultipleHostsLifecycle verifies that two distinct hosts
+// survive creation and updates independently and remain retrievable as tombstones
+// after deletion in both repository implementations.
 func TestResourceRepository_MultipleHostsLifecycle(t *testing.T) {
 	implementations := []struct {
 		name string
@@ -1437,6 +1457,9 @@ func TestResourceRepository_MultipleHostsLifecycle(t *testing.T) {
 	}
 }
 
+// TestResourceRepository_PartialDataScenarios checks that reporter-only and
+// common-only resources remain retrievable in both repositories, as does a
+// resource updated with progressively reduced representation payloads.
 func TestResourceRepository_PartialDataScenarios(t *testing.T) {
 	implementations := []struct {
 		name string
@@ -1578,6 +1601,9 @@ func TestResourceRepository_PartialDataScenarios(t *testing.T) {
 	}
 }
 
+// TestSerializableCreateFails verifies that an uncommitted conflicting insert
+// causes a managed create to fail. PostgreSQL uses a bounded lock timeout
+// (55P03), whereas SQLite fails promptly; this is not a retry-exhaustion test.
 func TestSerializableCreateFails(t *testing.T) {
 	implementations := []struct {
 		name string
@@ -1659,6 +1685,9 @@ func TestSerializableCreateFails(t *testing.T) {
 	}
 }
 
+// TestSerializableUpdateFails verifies that an uncommitted conflicting update
+// causes a managed update to fail. PostgreSQL uses a bounded lock timeout
+// (55P03), whereas SQLite fails promptly; this is not a retry-exhaustion test.
 func TestSerializableUpdateFails(t *testing.T) {
 	implementations := []struct {
 		name string
@@ -2133,6 +2162,8 @@ func createContractReporterResourceKey(t *testing.T, localResourceId, resourceTy
 	return key
 }
 
+// TestFindLatestRepresentations verifies that both repositories return the newest
+// common representation's version and payload rather than earlier saved history.
 func TestFindLatestRepresentations(t *testing.T) {
 	implementations := []struct {
 		name string
@@ -2233,6 +2264,9 @@ func TestFindLatestRepresentations(t *testing.T) {
 	}
 }
 
+// TestFindCurrentAndPreviousVersionedRepresentations checks workspace transitions
+// in both repositories, including the absence of a predecessor for version zero
+// and empty workspace IDs for missing or incorrectly typed representation data.
 func TestFindCurrentAndPreviousVersionedRepresentations(t *testing.T) {
 	implementations := []struct {
 		name string
@@ -3127,6 +3161,9 @@ func TestFindCurrentAndPreviousVersionedRepresentations_UpdateAfterCommonOnlyUpd
 	}
 }
 
+// TestHasTransactionIdBeenProcessed checks that empty and unknown IDs are not
+// treated as processed by either repository, with fake-specific cases for
+// independent ID tracking and concurrent reads before and after marking an ID.
 func TestHasTransactionIdBeenProcessed(t *testing.T) {
 	implementations := []struct {
 		name string
@@ -3301,6 +3338,8 @@ func testHasTransactionIdBeenProcessed(t *testing.T, repo bizmodel.ResourceRepos
 	})
 }
 
+// TestTransactionIDUniqueConstraint exercises database uniqueness enforcement
+// for transaction IDs through repository saves and direct representation inserts.
 func TestTransactionIDUniqueConstraint(t *testing.T) {
 	implementations := []struct {
 		name string

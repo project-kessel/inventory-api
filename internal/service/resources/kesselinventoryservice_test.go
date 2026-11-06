@@ -3588,6 +3588,9 @@ func TestInventoryService_ReportResource_ErrorFormats(t *testing.T) {
 	}
 }
 
+// TestInventoryService_ReportResource_ValidationErrorFormats checks that an
+// unknown reporter is rejected as InvalidArgument with report-validation context
+// through both the gRPC and HTTP transports.
 func TestInventoryService_ReportResource_ValidationErrorFormats(t *testing.T) {
 	claims := &authnapi.Claims{
 		SubjectId: authnapi.SubjectId("reporter-service"),
@@ -3657,6 +3660,9 @@ func TestInventoryService_ReportResource_ValidationErrorFormats(t *testing.T) {
 
 // --- ReportResource: WriteVisibility Variations ---
 
+// TestInventoryService_ReportResource_WriteVisibility verifies through both
+// transports that every supported write-visibility mode accepts the report and
+// persists the resource, without asserting authorization propagation timing.
 func TestInventoryService_ReportResource_WriteVisibility(t *testing.T) {
 	claims := &authnapi.Claims{
 		SubjectId: authnapi.SubjectId("reporter-service"),

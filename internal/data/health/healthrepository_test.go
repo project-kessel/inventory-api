@@ -54,6 +54,9 @@ func TestHealthInit(t *testing.T) {
 	assert.Equal(t, "RELATIONS-API UNHEALTHY", resp.Status())
 }
 
+// TestHealthRepo_IsBackendAvailable_AllCases verifies that storage and relations
+// failures are combined in the health response rather than returned as errors,
+// and that storage status identifies the selected database backend.
 func TestHealthRepo_IsBackendAvailable_AllCases(t *testing.T) {
 	ctx := context.TODO()
 	relationsConfig, _ := relations.NewConfig(relations.NewOptions()).Complete(ctx)

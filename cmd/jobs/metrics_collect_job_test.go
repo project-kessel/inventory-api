@@ -263,6 +263,8 @@ func TestCollectResourcesPerWorkspaceJob_EmptyResult(t *testing.T) {
 	require.NoError(t, mock.ExpectationsWereMet())
 }
 
+// TestCollectMetricsWithDB verifies that PostgreSQL metrics collection persists a
+// summary, while SQLite reports the unsupported workspace-query syntax as an error.
 func TestCollectMetricsWithDB(t *testing.T) {
 	db := setupTestDB(t)
 	logger := testLogger()

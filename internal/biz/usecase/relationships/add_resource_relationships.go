@@ -1,9 +1,9 @@
-// Package usecase implements the relationship delta use cases. These use
+// Package relationships implements the relationship delta use cases. These use
 // cases provide targeted add/remove mutations of relationship-typed
 // representation fields, complementing — not replacing — the full-snapshot
 // semantics of the resources use cases (ReportResource / DeleteResource),
 // which remain unchanged.
-package usecase
+package relationships
 
 import (
 	"context"

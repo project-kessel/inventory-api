@@ -330,8 +330,14 @@ func (r *Resource) findReporterResourceToUpdateByKey(key ReporterResourceKey) (*
 		}
 	}
 
-	return nil, fmt.Errorf("reporter resource with key (localResourceId=%s, resourceType=%s, reporterType=%s, reporterInstanceId=%s) not found in resource",
-		key.LocalResourceId(), key.ResourceType(), key.ReporterType(), key.ReporterInstanceId())
+	return nil, fmt.Errorf("reporter resource matching the requested key was not found in resource")
+}
+
+// ReporterResourceByKey locates the reporter resource within this resource that
+// matches the given key, using case-insensitive matching semantics. Returns an
+// error if no matching reporter resource exists.
+func (r *Resource) ReporterResourceByKey(key ReporterResourceKey) (*ReporterResource, error) {
+	return r.findReporterResourceToUpdateByKey(key)
 }
 
 // Add getters only where needed

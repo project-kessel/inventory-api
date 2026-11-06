@@ -171,7 +171,7 @@ func (uc *AddResourceRelationshipsUseCase) AddResourceRelationships(ctx context.
 			return fmt.Errorf("failed to check transaction ID: %w", err)
 		}
 		if alreadyProcessed {
-			uc.Log.Infof("Transaction already processed, skipping update: transaction_id=%s", cmd.TransactionId.String())
+			uc.Log.Info("Transaction already processed, skipping update")
 			return nil
 		}
 	}
@@ -200,7 +200,7 @@ func (uc *AddResourceRelationshipsUseCase) AddResourceRelationships(ctx context.
 
 	err = addRelationships()
 	if err != nil && !uc.Config.IdempotencyCheckEnabled && isDuplicateTransactionError(err) {
-		uc.Log.Debugf("Idempotency check disabled and duplicate transaction ID detected, retrying with new transaction ID: %s", cmd.TransactionId.String())
+		uc.Log.Debug("Idempotency check disabled and duplicate transaction ID detected, retrying with new transaction ID")
 		retryTxid, retryErr := getNextTransactionID()
 		if retryErr != nil {
 			return retryErr

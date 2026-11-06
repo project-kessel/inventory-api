@@ -28,13 +28,15 @@ Select the backend with `TEST_DB`:
 
 ```bash
 # PostgreSQL via Testcontainers (default; needs Docker or Podman)
-make test                                   # full suite, database tests on PostgreSQL
+make test                                   # short-mode suite, database tests on PostgreSQL
 TEST_DB=postgres ./scripts/testcontainers-run.sh go test ./internal/data/ -count=1 -race -short
 
 # In-memory SQLite (no container runtime needed) — the explicit fallback
-make test-sqlite                            # full suite, database tests on SQLite
+make test-sqlite                            # short-mode suite, database tests on SQLite
 TEST_DB=sqlite go test ./internal/data/ -count=1 -race -short
 ```
+
+Both Make targets run with `-short` and explicitly skip the E2E/Kafka test patterns `TestInventoryAPIGRPC_*`, `TestInventoryAPIHTTP_*`, and `Test_ACMKafkaConsumer`; neither runs the full test suite. The SQLite fallback also skips PostgreSQL-specific tests.
 
 `scripts/testcontainers-run.sh` detects Docker contexts and rootless Podman sockets and sets `DOCKER_HOST` accordingly; it disables Ryuk for Podman, so test binaries must stop their shared containers from `TestMain` via `testutil.TerminateSharedPostgres()`. `TEST_POSTGRES_IMAGE` (default `postgres:17.8`) overrides the container image. The container runs `wal_level=logical`, matching production's Debezium outbox pipeline, so tests exercise the real WAL outbox publisher (`pg_logical_emit_message`) — `outboxeventsrepository_test.go` verifies its output through a logical replication slot. Test helpers wire the WAL publisher on PostgreSQL and the no-op publisher on SQLite.
 
@@ -61,7 +63,7 @@ CI runs `make test` on every pull request (see `build-test.yml`).
 
 ### Test Execution Patterns
 ```bash
-# Full test suite (excludes slow e2e by default)  
+# Short-mode suite (excludes E2E and Kafka test patterns)
 make test
 
 # E2E tests in Kind cluster

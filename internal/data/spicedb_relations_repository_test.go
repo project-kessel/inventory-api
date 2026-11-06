@@ -28,6 +28,8 @@ func TestMain(m *testing.M) {
 	os.Exit(run(m))
 }
 
+// run manages test dependencies and returns the test status after PostgreSQL
+// cleanup, allowing deferred SpiceDB cleanup to finish before TestMain exits.
 func run(m *testing.M) int {
 	flag.Parse()
 

@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	_ "github.com/jackc/pgx/v5/stdlib" // Register the pgx driver for database/sql maintenance connections
 	"github.com/moby/moby/api/types/container"
 	inventoryerrors "github.com/project-kessel/inventory-api/internal/errors"
@@ -118,7 +119,7 @@ func PostgresTestDSN(t *testing.T, migrate func(*gorm.DB) error) string {
 	tpl.ensure(t, srv, migrate)
 
 	name := postgresTestDBName(t)
-	if err := createDatabase(srv, fmt.Sprintf("CREATE DATABASE %q TEMPLATE %q", name, tpl.name)); err != nil {
+	if err := createDatabase(srv, name, tpl.name); err != nil {
 		t.Fatalf("create postgres test database: %v", err)
 	}
 
@@ -175,9 +176,15 @@ func sharedPostgresServer(t *testing.T) *postgresServer {
 	if postgresErr != nil {
 		t.Fatal(formatPostgresHint(postgresErr))
 	}
+	if postgresShared == nil {
+		t.Fatal("shared PostgreSQL test server is unavailable: TerminateSharedPostgres was called before this test")
+	}
 	return postgresShared
 }
 
+// startPostgresServer starts a logical-WAL-enabled test container and opens its
+// maintenance pool. Failed setup cleans up the container; on success, the caller
+// owns termination.
 func startPostgresServer() (server *postgresServer, err error) {
 	image := strings.TrimSpace(os.Getenv(PostgresImageEnvVar))
 	if image == "" {
@@ -300,10 +307,10 @@ func pristineTemplate() *postgresTemplate {
 	return pristineTemplateVal
 }
 
-// ensure migrates the template database on first use. Failures are recorded
-// on the template instead of failing the test immediately: t.Fatalf inside
-// sync.Once.Do would runtime.Goexit before the once is marked done, causing
-// every subsequent caller to retry the failed setup.
+// ensure initializes the migrated template once and reports any cached setup
+// error to every caller. Calling t.Fatalf inside sync.Once.Do would end only the
+// initializing test while leaving the once completed, hiding the failure from
+// subsequent callers.
 func (tpl *postgresTemplate) ensure(t *testing.T, srv *postgresServer, migrate func(*gorm.DB) error) {
 	t.Helper()
 
@@ -319,9 +326,11 @@ func (tpl *postgresTemplate) ensure(t *testing.T, srv *postgresServer, migrate f
 	}
 }
 
+// buildTemplate creates and migrates a reusable template database, closing its
+// connection pool before returning so PostgreSQL can clone it for each test.
 func buildTemplate(tpl *postgresTemplate, srv *postgresServer, migrate func(*gorm.DB) error) error {
 	started := time.Now()
-	if err := createDatabase(srv, fmt.Sprintf("CREATE DATABASE %q", tpl.name)); err != nil {
+	if err := createDatabase(srv, tpl.name, ""); err != nil {
 		return fmt.Errorf("create template database: %w", err)
 	}
 
@@ -373,7 +382,14 @@ func postgresTestDBName(t *testing.T) string {
 	return fmt.Sprintf("%s_%s_%s", postgresTestNamePrefix, safe, uuid.NewString()[:8])
 }
 
-func createDatabase(srv *postgresServer, statement string) error {
+// createDatabase creates a database, optionally copying a template. Database
+// names are identifiers, so SQL value placeholders cannot be used for them.
+func createDatabase(srv *postgresServer, name, templateName string) error {
+	statement := "CREATE DATABASE " + pgx.Identifier{name}.Sanitize()
+	if templateName != "" {
+		statement += " TEMPLATE " + pgx.Identifier{templateName}.Sanitize()
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	if _, err := srv.admin.ExecContext(ctx, statement); err != nil {
@@ -390,7 +406,7 @@ func createDatabase(srv *postgresServer, statement string) error {
 func dropDatabase(t *testing.T, srv *postgresServer, name string) {
 	t.Helper()
 
-	statement := fmt.Sprintf("DROP DATABASE %q WITH (FORCE)", name)
+	statement := "DROP DATABASE " + pgx.Identifier{name}.Sanitize() + " WITH (FORCE)"
 	for attempt := 1; attempt <= 3; attempt++ {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		_, err := srv.admin.ExecContext(ctx, statement)
@@ -406,6 +422,8 @@ func dropDatabase(t *testing.T, srv *postgresServer, name string) {
 	}
 }
 
+// closePostgresTestDB closes the test handle's pool before the database-drop
+// cleanup runs. Close failures are logged without failing the test.
 func closePostgresTestDB(t *testing.T, db *gorm.DB) {
 	t.Helper()
 

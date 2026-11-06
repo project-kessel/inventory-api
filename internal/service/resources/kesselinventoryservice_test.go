@@ -12,11 +12,11 @@ import (
 	krlog "github.com/go-kratos/kratos/v2/log"
 	kratosTransport "github.com/go-kratos/kratos/v2/transport"
 	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2"
-	"github.com/project-kessel/inventory-api/internal/biz/model_legacy"
 	"google.golang.org/protobuf/types/known/structpb"
 
 	"github.com/project-kessel/inventory-api/internal/data"
 	"github.com/project-kessel/inventory-api/internal/metricscollector"
+	"github.com/project-kessel/inventory-api/internal/storage"
 	"github.com/project-kessel/inventory-api/internal/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -1401,7 +1401,7 @@ func TestInventoryService_ReportResource_Update_FieldsEffective(t *testing.T) {
 	}
 
 	runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
-		repo, db := newSQLiteTestRepo(t)
+		repo, db := newTestRepo(t)
 		uc := newTestUsecase(t, testUsecaseConfig{Repo: repo})
 		key := buildReporterResourceKey(t, "update-effective-host", "host", "hbi", "instance-001")
 		return TestServerConfig{
@@ -3200,18 +3200,32 @@ func TestInventoryService_StreamedListObjects_NilRequest(t *testing.T) {
 	assert.Contains(t, err.Error(), "request is nil")
 }
 
-// newSQLiteTestRepo creates a real GORM repository backed by an in-memory SQLite
-// database with all migrations applied. Returns the repository and the underlying
+// migrateServiceDB brings a fresh test database up to the current schema.
+// It is a named function so the PostgreSQL test backend can key its template
+// database on a stable value and run the migrations only once per test
+// binary; see testutil.PostgresTestDSN.
+func migrateServiceDB(db *gorm.DB) error {
+	return data.Migrate(db, nil)
+}
+
+// newTestRepo creates a real GORM repository backed by a fully migrated test
+// database on the backend selected through TEST_DB: PostgreSQL via
+// Testcontainers (the default, matching production) or in-memory SQLite (the
+// dependency-free fallback, selected explicitly with TEST_DB=sqlite).
+// Returns the repository and the underlying
 // *gorm.DB for use in assertions.
-func newSQLiteTestRepo(t *testing.T) (model.ResourceRepository, *gorm.DB) {
+func newTestRepo(t *testing.T) (model.ResourceRepository, *gorm.DB) {
 	t.Helper()
-	db := testutil.NewSQLiteTestDB(t, &gorm.Config{TranslateError: true})
-	err := data.Migrate(db, nil)
-	require.NoError(t, err)
+	db := testutil.NewTestDB(t, &gorm.Config{TranslateError: true}, migrateServiceDB)
 	mc := metricscollector.NewFakeMetricsCollector()
 	tm := data.NewGormTransactionManager(mc, 3)
-	noopPublisher := func(_ *gorm.DB, _ *model_legacy.OutboxEvent) error { return nil }
-	repo := data.NewResourceRepository(db, tm, noopPublisher)
+	// Match production outbox wiring: WAL publisher on PostgreSQL (the test
+	// container runs wal_level=logical), no-op on SQLite.
+	publisher := data.SetOutboxPublisher(storage.OutboxModeNone)
+	if testutil.UsingPostgres() {
+		publisher = data.SetOutboxPublisher(storage.OutboxModeWAL)
+	}
+	repo := data.NewResourceRepository(db, tm, publisher)
 	return repo, db
 }
 
@@ -3272,7 +3286,7 @@ func TestInventoryService_ReportResource_AllOptionalMetadataFields(t *testing.T)
 	}
 
 	runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
-		repo, db := newSQLiteTestRepo(t)
+		repo, db := newTestRepo(t)
 		uc := newTestUsecase(t, testUsecaseConfig{Repo: repo})
 		return TestServerConfig{
 			Usecase:       uc,
@@ -3359,7 +3373,7 @@ func TestInventoryService_ReportResource_NilOrEmptyRepresentationStructs(t *test
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
-				repo, _ := newSQLiteTestRepo(t)
+				repo, _ := newTestRepo(t)
 				uc := newTestUsecase(t, testUsecaseConfig{Repo: repo})
 				req := &pb.ReportResourceRequest{
 					Type:               "host",
@@ -3439,7 +3453,7 @@ func TestInventoryService_ReportResource_NilOrEmptyRepresentationStructs(t *test
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
-				repo, _ := newSQLiteTestRepo(t)
+				repo, _ := newTestRepo(t)
 				uc := newTestUsecase(t, testUsecaseConfig{Repo: repo})
 				req := &pb.ReportResourceRequest{
 					Type:               "host",
@@ -3574,6 +3588,9 @@ func TestInventoryService_ReportResource_ErrorFormats(t *testing.T) {
 	}
 }
 
+// TestInventoryService_ReportResource_ValidationErrorFormats checks that an
+// unknown reporter is rejected as InvalidArgument with report-validation context
+// through both the gRPC and HTTP transports.
 func TestInventoryService_ReportResource_ValidationErrorFormats(t *testing.T) {
 	claims := &authnapi.Claims{
 		SubjectId: authnapi.SubjectId("reporter-service"),
@@ -3612,7 +3629,7 @@ func TestInventoryService_ReportResource_ValidationErrorFormats(t *testing.T) {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
-				repo, _ := newSQLiteTestRepo(t)
+				repo, _ := newTestRepo(t)
 				uc := newTestUsecase(t, testUsecaseConfig{Repo: repo})
 				req := &pb.ReportResourceRequest{
 					Type:               tc.resourceType,
@@ -3643,6 +3660,9 @@ func TestInventoryService_ReportResource_ValidationErrorFormats(t *testing.T) {
 
 // --- ReportResource: WriteVisibility Variations ---
 
+// TestInventoryService_ReportResource_WriteVisibility verifies through both
+// transports that every supported write-visibility mode accepts the report and
+// persists the resource, without asserting authorization propagation timing.
 func TestInventoryService_ReportResource_WriteVisibility(t *testing.T) {
 	claims := &authnapi.Claims{
 		SubjectId: authnapi.SubjectId("reporter-service"),
@@ -3675,7 +3695,7 @@ func TestInventoryService_ReportResource_WriteVisibility(t *testing.T) {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
-				repo, db := newSQLiteTestRepo(t)
+				repo, db := newTestRepo(t)
 				uc := newTestUsecase(t, testUsecaseConfig{Repo: repo})
 				req := &pb.ReportResourceRequest{
 					Type:               "host",
@@ -3750,7 +3770,7 @@ func TestInventoryService_ReportResource_InventoryIdSet(t *testing.T) {
 	}
 
 	runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
-		repo, db := newSQLiteTestRepo(t)
+		repo, db := newTestRepo(t)
 		uc := newTestUsecase(t, testUsecaseConfig{Repo: repo})
 		return TestServerConfig{
 			Usecase:       uc,
@@ -3898,7 +3918,7 @@ func TestInventoryService_ReportResource_TransactionIdIdempotency(t *testing.T) 
 	}
 
 	runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
-		repo, db := newSQLiteTestRepo(t)
+		repo, db := newTestRepo(t)
 		uc := newTestUsecase(t, testUsecaseConfig{Repo: repo})
 		return TestServerConfig{
 			Usecase:       uc,
@@ -3970,7 +3990,7 @@ func TestInventoryService_ReportResource_IdempotencyDisabled(t *testing.T) {
 	}
 
 	runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
-		repo, _ := newSQLiteTestRepo(t)
+		repo, _ := newTestRepo(t)
 		idempotencyOff := usecase.NewUsecaseConfig()
 		idempotencyOff.IdempotencyCheckEnabled = false
 		uc := newTestUsecase(t, testUsecaseConfig{

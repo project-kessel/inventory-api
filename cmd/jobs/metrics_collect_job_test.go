@@ -9,6 +9,7 @@ import (
 	"github.com/project-kessel/inventory-api/cmd/common"
 	"github.com/project-kessel/inventory-api/internal"
 	"github.com/project-kessel/inventory-api/internal/data/model"
+	"github.com/project-kessel/inventory-api/internal/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gorm.io/driver/postgres"
@@ -262,6 +263,8 @@ func TestCollectResourcesPerWorkspaceJob_EmptyResult(t *testing.T) {
 	require.NoError(t, mock.ExpectationsWereMet())
 }
 
+// TestCollectMetricsWithDB verifies that PostgreSQL metrics collection persists a
+// summary, while SQLite reports the unsupported workspace-query syntax as an error.
 func TestCollectMetricsWithDB(t *testing.T) {
 	db := setupTestDB(t)
 	logger := testLogger()
@@ -272,14 +275,22 @@ func TestCollectMetricsWithDB(t *testing.T) {
 	createTestReporterResource(t, db, "host", "hbi")
 
 	// Seed common_representations for collectResourcesPerWorkspaceJob
-	// Note: SQLite doesn't support LATERAL joins, so this will fail on that query.
-	// We test the full flow by verifying collectMetricsWithDB handles errors gracefully.
 	err := collectMetricsWithDB(db, logger, DefaultRetentionDays)
 
-	// SQLite doesn't support PostgreSQL-specific syntax (LATERAL, ::float),
-	// so the resources_per_workspace query will fail. This validates error handling.
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "resources_per_workspace query failed")
+	if testutil.UsingPostgres() {
+		// The resources_per_workspace query uses PostgreSQL-specific syntax
+		// (LATERAL joins, ::float casts), so on the production backend the full
+		// flow succeeds and records a metrics summary.
+		require.NoError(t, err)
+		var summaries int64
+		require.NoError(t, db.Model(&model.MetricsSummary{}).Count(&summaries).Error)
+		assert.Equal(t, int64(1), summaries, "collectMetricsWithDB should write one metrics summary")
+	} else {
+		// SQLite doesn't support PostgreSQL-specific syntax (LATERAL, ::float),
+		// so the resources_per_workspace query fails. This validates error handling.
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "resources_per_workspace query failed")
+	}
 }
 
 func TestCollectMetricsWithDB_WritesAndCleansUp(t *testing.T) {

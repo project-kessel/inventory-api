@@ -43,7 +43,7 @@ jobs:
 
           echo "COVERPKG: $COVERPKG"
 
-          GOTOOLCHAIN=go1.25.7+auto go test -short -covermode=atomic \
+          ./scripts/testcontainers-run.sh env GOTOOLCHAIN=go1.26.10+auto go test -short -covermode=atomic \
             -coverpkg=$COVERPKG \
             -coverprofile=v1beta2-coverage.out \
             ./api/kessel/inventory/v1beta2/... ./internal/...

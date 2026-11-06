@@ -1,12 +1,15 @@
 package data
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gorm.io/gorm"
@@ -31,30 +34,33 @@ func ptrGeneration(g uint) *bizmodel.Generation {
 
 var emptyTxId = bizmodel.NewTransactionId("")
 
+// TestResourceRepositoryContract applies the same resource persistence contract
+// to the database-backed repository and the in-memory fake to keep their
+// externally observable behavior aligned.
 func TestResourceRepositoryContract(t *testing.T) {
 	implementations := []struct {
 		name string
-		repo func() bizmodel.ResourceRepository
-		db   func() *gorm.DB
+		repo func(t *testing.T) bizmodel.ResourceRepository
+		db   func(t *testing.T) *gorm.DB
 	}{
 		{
 			name: "Real Repository with GormTransactionManager",
-			repo: func() bizmodel.ResourceRepository {
-				db := setupInMemoryDB(t)
+			repo: func(t *testing.T) bizmodel.ResourceRepository {
+				db := setupRepositoryDB(t)
 				mc := metricscollector.NewFakeMetricsCollector()
 				tm := NewGormTransactionManager(mc, 3)
-				return NewResourceRepository(db, tm, noopOutboxPublisher())
+				return NewResourceRepository(db, tm, testOutboxPublisher())
 			},
-			db: func() *gorm.DB {
-				return setupInMemoryDB(t)
+			db: func(t *testing.T) *gorm.DB {
+				return setupRepositoryDB(t)
 			},
 		},
 		{
 			name: "Fake Repository",
-			repo: func() bizmodel.ResourceRepository {
+			repo: func(t *testing.T) bizmodel.ResourceRepository {
 				return NewFakeResourceRepository()
 			},
-			db: func() *gorm.DB {
+			db: func(t *testing.T) *gorm.DB {
 				return nil // Fake doesn't need real DB
 			},
 		},
@@ -62,7 +68,7 @@ func TestResourceRepositoryContract(t *testing.T) {
 
 	for _, impl := range implementations {
 		t.Run(impl.name, func(t *testing.T) {
-			testRepositoryContract(t, impl.repo(), impl.db())
+			testRepositoryContract(t, impl.repo(t), impl.db(t))
 		})
 	}
 }
@@ -446,30 +452,33 @@ func testRepositoryContract(t *testing.T, repo bizmodel.ResourceRepository, db *
 
 }
 
+// TestFindResourceByKeys checks real and fake lookup semantics for saved and
+// missing resources, nil transaction handles, omitted reporter instances, and
+// case normalization of reporter resource keys.
 func TestFindResourceByKeys(t *testing.T) {
 	implementations := []struct {
 		name string
-		repo func() bizmodel.ResourceRepository
-		db   func() *gorm.DB
+		repo func(t *testing.T) bizmodel.ResourceRepository
+		db   func(t *testing.T) *gorm.DB
 	}{
 		{
 			name: "Real Repository with GormTransactionManager",
-			repo: func() bizmodel.ResourceRepository {
-				db := setupInMemoryDB(t)
+			repo: func(t *testing.T) bizmodel.ResourceRepository {
+				db := setupRepositoryDB(t)
 				mc := metricscollector.NewFakeMetricsCollector()
 				tm := NewGormTransactionManager(mc, 3)
-				return NewResourceRepository(db, tm, noopOutboxPublisher())
+				return NewResourceRepository(db, tm, testOutboxPublisher())
 			},
-			db: func() *gorm.DB {
-				return setupInMemoryDB(t)
+			db: func(t *testing.T) *gorm.DB {
+				return setupRepositoryDB(t)
 			},
 		},
 		{
 			name: "Fake Repository",
-			repo: func() bizmodel.ResourceRepository {
+			repo: func(t *testing.T) bizmodel.ResourceRepository {
 				return NewFakeResourceRepository()
 			},
-			db: func() *gorm.DB {
+			db: func(t *testing.T) *gorm.DB {
 				return nil // Fake doesn't need real DB
 			},
 		},
@@ -478,19 +487,19 @@ func TestFindResourceByKeys(t *testing.T) {
 	for _, impl := range implementations {
 		t.Run(impl.name, func(t *testing.T) {
 			// Helper function to get fresh instances for each test
-			getFreshInstances := func() (bizmodel.ResourceRepository, *gorm.DB) {
+			getFreshInstances := func(t *testing.T) (bizmodel.ResourceRepository, *gorm.DB) {
 				if impl.name == "Fake Repository" {
-					return impl.repo(), impl.db()
+					return impl.repo(t), impl.db(t)
 				}
-				db := setupInMemoryDB(t)
+				db := setupRepositoryDB(t)
 				mc := metricscollector.NewFakeMetricsCollector()
 				tm := NewGormTransactionManager(mc, 3)
-				repo := NewResourceRepository(db, tm, noopOutboxPublisher())
+				repo := NewResourceRepository(db, tm, testOutboxPublisher())
 				return repo, db
 			}
 
 			t.Run("Save and FindResourceByKeys workflow", func(t *testing.T) {
-				repo, db := getFreshInstances()
+				repo, db := getFreshInstances(t)
 
 				resource := createTestResource(t)
 				err := repo.Save(db, resource, bizmodel.OperationTypeCreated, bizmodel.NewTransactionId("test-tx-123"))
@@ -511,7 +520,7 @@ func TestFindResourceByKeys(t *testing.T) {
 			})
 
 			t.Run("FindResourceByKeys returns ErrRecordNotFound for non-existent resource", func(t *testing.T) {
-				repo, db := getFreshInstances()
+				repo, db := getFreshInstances(t)
 
 				key, err := bizmodel.NewReporterResourceKey(
 					"non-existent",
@@ -530,7 +539,7 @@ func TestFindResourceByKeys(t *testing.T) {
 				resource1 := createTestResourceWithLocalId(t, "resource-1")
 				resource2 := createTestResourceWithLocalId(t, "resource-2")
 
-				repo, db := getFreshInstances()
+				repo, db := getFreshInstances(t)
 
 				err := repo.Save(db, resource1, bizmodel.OperationTypeCreated, bizmodel.NewTransactionId("test-tx-1"))
 				require.NoError(t, err)
@@ -559,7 +568,7 @@ func TestFindResourceByKeys(t *testing.T) {
 			})
 
 			t.Run("FindResourceByKeys works with nil transaction", func(t *testing.T) {
-				repo, db := getFreshInstances()
+				repo, db := getFreshInstances(t)
 
 				resource := createTestResource(t)
 				err := repo.Save(db, resource, bizmodel.OperationTypeCreated, bizmodel.NewTransactionId("test-tx-1"))
@@ -580,7 +589,7 @@ func TestFindResourceByKeys(t *testing.T) {
 			})
 
 			t.Run("FindResourceByKeys with nil transaction returns ErrRecordNotFound for non-existent resource", func(t *testing.T) {
-				repo, _ := getFreshInstances()
+				repo, _ := getFreshInstances(t)
 
 				key, err := bizmodel.NewReporterResourceKey(
 					"non-existent-nil-tx",
@@ -596,7 +605,7 @@ func TestFindResourceByKeys(t *testing.T) {
 			})
 
 			t.Run("FindResourceByKeys works when reporterInstanceId is not provided in search key", func(t *testing.T) {
-				repo, db := getFreshInstances()
+				repo, db := getFreshInstances(t)
 
 				resource := createTestResourceWithLocalId(t, "test-resource-no-instance-lookup")
 				err := repo.Save(db, resource, bizmodel.OperationTypeCreated, bizmodel.NewTransactionId("test-tx-no-instance"))
@@ -618,7 +627,7 @@ func TestFindResourceByKeys(t *testing.T) {
 
 			// Case-insensitive tests
 			t.Run("Case-insensitive matching", func(t *testing.T) {
-				repo, db := getFreshInstances()
+				repo, db := getFreshInstances(t)
 
 				// Create a resource with mixed case values
 				resource := createTestResourceWithMixedCase(t)
@@ -708,30 +717,32 @@ func TestFindResourceByKeys(t *testing.T) {
 	}
 }
 
+// TestFindResourceByKeys_TombstoneFilter verifies that deleting a resource does
+// not hide its reporter identity from key-based lookups in either repository.
 func TestFindResourceByKeys_TombstoneFilter(t *testing.T) {
 	implementations := []struct {
 		name string
-		repo func() bizmodel.ResourceRepository
-		db   func() *gorm.DB
+		repo func(t *testing.T) bizmodel.ResourceRepository
+		db   func(t *testing.T) *gorm.DB
 	}{
 		{
 			name: "Real Repository with GormTransactionManager",
-			repo: func() bizmodel.ResourceRepository {
-				db := setupInMemoryDB(t)
+			repo: func(t *testing.T) bizmodel.ResourceRepository {
+				db := setupRepositoryDB(t)
 				mc := metricscollector.NewFakeMetricsCollector()
 				tm := NewGormTransactionManager(mc, 3)
-				return NewResourceRepository(db, tm, noopOutboxPublisher())
+				return NewResourceRepository(db, tm, testOutboxPublisher())
 			},
-			db: func() *gorm.DB {
-				return setupInMemoryDB(t)
+			db: func(t *testing.T) *gorm.DB {
+				return setupRepositoryDB(t)
 			},
 		},
 		{
 			name: "Fake Repository",
-			repo: func() bizmodel.ResourceRepository {
+			repo: func(t *testing.T) bizmodel.ResourceRepository {
 				return NewFakeResourceRepository()
 			},
-			db: func() *gorm.DB {
+			db: func(t *testing.T) *gorm.DB {
 				return nil
 			},
 		},
@@ -739,18 +750,18 @@ func TestFindResourceByKeys_TombstoneFilter(t *testing.T) {
 
 	for _, impl := range implementations {
 		t.Run(impl.name, func(t *testing.T) {
-			getFreshInstances := func() (bizmodel.ResourceRepository, *gorm.DB) {
+			getFreshInstances := func(t *testing.T) (bizmodel.ResourceRepository, *gorm.DB) {
 				if impl.name == "Fake Repository" {
-					return impl.repo(), impl.db()
+					return impl.repo(t), impl.db(t)
 				}
-				db := setupInMemoryDB(t)
+				db := setupRepositoryDB(t)
 				mc := metricscollector.NewFakeMetricsCollector()
 				tm := NewGormTransactionManager(mc, 3)
-				repo := NewResourceRepository(db, tm, noopOutboxPublisher())
+				repo := NewResourceRepository(db, tm, testOutboxPublisher())
 				return repo, db
 			}
 
-			repo, db := getFreshInstances()
+			repo, db := getFreshInstances(t)
 
 			resource := createTestResourceWithLocalId(t, "tombstoned-resource")
 			err := repo.Save(db, resource, bizmodel.OperationTypeCreated, bizmodel.NewTransactionId("test-tx-tombstone"))
@@ -789,30 +800,33 @@ func TestFindResourceByKeys_TombstoneFilter(t *testing.T) {
 	}
 }
 
+// TestUniqueConstraint_ReporterResourceCompositeKey checks that both repositories
+// reject duplicate reporter identities while allowing versioned updates and keys
+// distinguished by resource type, reporter type, or reporter instance.
 func TestUniqueConstraint_ReporterResourceCompositeKey(t *testing.T) {
 	implementations := []struct {
 		name string
-		repo func() bizmodel.ResourceRepository
-		db   func() *gorm.DB
+		repo func(t *testing.T) bizmodel.ResourceRepository
+		db   func(t *testing.T) *gorm.DB
 	}{
 		{
 			name: "Real Repository with GormTransactionManager",
-			repo: func() bizmodel.ResourceRepository {
-				db := setupInMemoryDB(t)
+			repo: func(t *testing.T) bizmodel.ResourceRepository {
+				db := setupRepositoryDB(t)
 				mc := metricscollector.NewFakeMetricsCollector()
 				tm := NewGormTransactionManager(mc, 3)
-				return NewResourceRepository(db, tm, noopOutboxPublisher())
+				return NewResourceRepository(db, tm, testOutboxPublisher())
 			},
-			db: func() *gorm.DB {
-				return setupInMemoryDB(t)
+			db: func(t *testing.T) *gorm.DB {
+				return setupRepositoryDB(t)
 			},
 		},
 		{
 			name: "Fake Repository",
-			repo: func() bizmodel.ResourceRepository {
+			repo: func(t *testing.T) bizmodel.ResourceRepository {
 				return NewFakeResourceRepository()
 			},
-			db: func() *gorm.DB {
+			db: func(t *testing.T) *gorm.DB {
 				return nil
 			},
 		},
@@ -820,19 +834,19 @@ func TestUniqueConstraint_ReporterResourceCompositeKey(t *testing.T) {
 
 	for _, impl := range implementations {
 		t.Run(impl.name, func(t *testing.T) {
-			getFreshInstances := func() (bizmodel.ResourceRepository, *gorm.DB) {
+			getFreshInstances := func(t *testing.T) (bizmodel.ResourceRepository, *gorm.DB) {
 				if impl.name == "Fake Repository" {
-					return impl.repo(), impl.db()
+					return impl.repo(t), impl.db(t)
 				}
-				db := setupInMemoryDB(t)
+				db := setupRepositoryDB(t)
 				mc := metricscollector.NewFakeMetricsCollector()
 				tm := NewGormTransactionManager(mc, 3)
-				repo := NewResourceRepository(db, tm, noopOutboxPublisher())
+				repo := NewResourceRepository(db, tm, testOutboxPublisher())
 				return repo, db
 			}
 
 			t.Run("should reject duplicate composite key", func(t *testing.T) {
-				repo, db := getFreshInstances()
+				repo, db := getFreshInstances(t)
 
 				// Create first resource
 				resource1 := createTestResourceWithLocalId(t, "duplicate-key-test")
@@ -855,7 +869,7 @@ func TestUniqueConstraint_ReporterResourceCompositeKey(t *testing.T) {
 			})
 
 			t.Run("should allow same key with different versions", func(t *testing.T) {
-				repo, db := getFreshInstances()
+				repo, db := getFreshInstances(t)
 
 				// Create and save initial resource
 				resource := createTestResourceWithLocalId(t, "version-test-resource")
@@ -886,7 +900,7 @@ func TestUniqueConstraint_ReporterResourceCompositeKey(t *testing.T) {
 			})
 
 			t.Run("should allow same key components with different resource types", func(t *testing.T) {
-				repo, db := getFreshInstances()
+				repo, db := getFreshInstances(t)
 
 				// Create first resource with k8s_cluster type
 				resource1 := createTestResourceWithLocalIdAndType(t, "multi-type-test", "k8s_cluster")
@@ -900,7 +914,7 @@ func TestUniqueConstraint_ReporterResourceCompositeKey(t *testing.T) {
 			})
 
 			t.Run("should allow same key components with different reporter types", func(t *testing.T) {
-				repo, db := getFreshInstances()
+				repo, db := getFreshInstances(t)
 
 				// Create resource with OCM reporter
 				resource1 := createTestResourceWithReporter(t, "reporter-test", "ocm", "ocm-instance-1")
@@ -914,7 +928,7 @@ func TestUniqueConstraint_ReporterResourceCompositeKey(t *testing.T) {
 			})
 
 			t.Run("should allow same key components with different reporter instances", func(t *testing.T) {
-				repo, db := getFreshInstances()
+				repo, db := getFreshInstances(t)
 
 				// Create resource with instance-1
 				resource1 := createTestResourceWithReporter(t, "instance-test", "ocm", "ocm-instance-1")
@@ -930,30 +944,33 @@ func TestUniqueConstraint_ReporterResourceCompositeKey(t *testing.T) {
 	}
 }
 
+// TestResourceRepository_IdempotentOperations exercises repeated report/delete
+// cycles in both repositories, including the invariant that deleting an already
+// tombstoned reporter does not advance its representation version.
 func TestResourceRepository_IdempotentOperations(t *testing.T) {
 	implementations := []struct {
 		name string
-		repo func() bizmodel.ResourceRepository
-		db   func() *gorm.DB
+		repo func(t *testing.T) bizmodel.ResourceRepository
+		db   func(t *testing.T) *gorm.DB
 	}{
 		{
 			name: "Real Repository with GormTransactionManager",
-			repo: func() bizmodel.ResourceRepository {
-				db := setupInMemoryDB(t)
+			repo: func(t *testing.T) bizmodel.ResourceRepository {
+				db := setupRepositoryDB(t)
 				mc := metricscollector.NewFakeMetricsCollector()
 				tm := NewGormTransactionManager(mc, 3)
-				return NewResourceRepository(db, tm, noopOutboxPublisher())
+				return NewResourceRepository(db, tm, testOutboxPublisher())
 			},
-			db: func() *gorm.DB {
-				return setupInMemoryDB(t)
+			db: func(t *testing.T) *gorm.DB {
+				return setupRepositoryDB(t)
 			},
 		},
 		{
 			name: "Fake Repository",
-			repo: func() bizmodel.ResourceRepository {
+			repo: func(t *testing.T) bizmodel.ResourceRepository {
 				return NewFakeResourceRepository()
 			},
-			db: func() *gorm.DB {
+			db: func(t *testing.T) *gorm.DB {
 				return nil
 			},
 		},
@@ -961,19 +978,19 @@ func TestResourceRepository_IdempotentOperations(t *testing.T) {
 
 	for _, impl := range implementations {
 		t.Run(impl.name, func(t *testing.T) {
-			getFreshInstances := func() (bizmodel.ResourceRepository, *gorm.DB) {
+			getFreshInstances := func(t *testing.T) (bizmodel.ResourceRepository, *gorm.DB) {
 				if impl.name == "Fake Repository" {
-					return impl.repo(), impl.db()
+					return impl.repo(t), impl.db(t)
 				}
-				db := setupInMemoryDB(t)
+				db := setupRepositoryDB(t)
 				mc := metricscollector.NewFakeMetricsCollector()
 				tm := NewGormTransactionManager(mc, 3)
-				repo := NewResourceRepository(db, tm, noopOutboxPublisher())
+				repo := NewResourceRepository(db, tm, testOutboxPublisher())
 				return repo, db
 			}
 
 			t.Run("report -> delete -> resubmit same delete", func(t *testing.T) {
-				repo, db := getFreshInstances()
+				repo, db := getFreshInstances(t)
 
 				localResourceId := "repo-idempotent-delete-test"
 
@@ -1048,7 +1065,7 @@ func TestResourceRepository_IdempotentOperations(t *testing.T) {
 			})
 
 			t.Run("report -> resubmit same report -> delete -> resubmit same delete", func(t *testing.T) {
-				repo, db := getFreshInstances()
+				repo, db := getFreshInstances(t)
 
 				localResourceId := "repo-idempotent-full-test"
 
@@ -1105,7 +1122,7 @@ func TestResourceRepository_IdempotentOperations(t *testing.T) {
 			})
 
 			t.Run("complex idempotency: multiple report and delete cycles", func(t *testing.T) {
-				repo, db := getFreshInstances()
+				repo, db := getFreshInstances(t)
 
 				localResourceId := "repo-complex-idempotent-test"
 				key := createContractReporterResourceKey(t, localResourceId, "k8s_cluster", "ocm", "ocm-instance-1")
@@ -1175,30 +1192,33 @@ func TestResourceRepository_IdempotentOperations(t *testing.T) {
 	}
 }
 
+// TestSave checks that creation and subsequent updates remain retrievable in
+// both repositories, with a database-only case for safely skipping
+// representations whose primary keys are zero-valued.
 func TestSave(t *testing.T) {
 	implementations := []struct {
 		name string
-		repo func() bizmodel.ResourceRepository
-		db   func() *gorm.DB
+		repo func(t *testing.T) bizmodel.ResourceRepository
+		db   func(t *testing.T) *gorm.DB
 	}{
 		{
 			name: "Real Repository with GormTransactionManager",
-			repo: func() bizmodel.ResourceRepository {
-				db := setupInMemoryDB(t)
+			repo: func(t *testing.T) bizmodel.ResourceRepository {
+				db := setupRepositoryDB(t)
 				mc := metricscollector.NewFakeMetricsCollector()
 				tm := NewGormTransactionManager(mc, 3)
-				return NewResourceRepository(db, tm, noopOutboxPublisher())
+				return NewResourceRepository(db, tm, testOutboxPublisher())
 			},
-			db: func() *gorm.DB {
-				return setupInMemoryDB(t)
+			db: func(t *testing.T) *gorm.DB {
+				return setupRepositoryDB(t)
 			},
 		},
 		{
 			name: "Fake Repository",
-			repo: func() bizmodel.ResourceRepository {
+			repo: func(t *testing.T) bizmodel.ResourceRepository {
 				return NewFakeResourceRepository()
 			},
-			db: func() *gorm.DB {
+			db: func(t *testing.T) *gorm.DB {
 				return nil // Fake doesn't need real DB
 			},
 		},
@@ -1207,19 +1227,19 @@ func TestSave(t *testing.T) {
 	for _, impl := range implementations {
 		t.Run(impl.name, func(t *testing.T) {
 			// Helper function to get fresh instances for each test
-			getFreshInstances := func() (bizmodel.ResourceRepository, *gorm.DB) {
+			getFreshInstances := func(t *testing.T) (bizmodel.ResourceRepository, *gorm.DB) {
 				if impl.name == "Fake Repository" {
-					return impl.repo(), impl.db()
+					return impl.repo(t), impl.db(t)
 				}
-				db := setupInMemoryDB(t)
+				db := setupRepositoryDB(t)
 				mc := metricscollector.NewFakeMetricsCollector()
 				tm := NewGormTransactionManager(mc, 3)
-				repo := NewResourceRepository(db, tm, noopOutboxPublisher())
+				repo := NewResourceRepository(db, tm, testOutboxPublisher())
 				return repo, db
 			}
 
 			t.Run("Save handles duplicate calls gracefully", func(t *testing.T) {
-				repo, db := getFreshInstances()
+				repo, db := getFreshInstances(t)
 
 				resource := createTestResourceWithLocalId(t, "update-test")
 				err := repo.Save(db, resource, bizmodel.OperationTypeCreated, bizmodel.NewTransactionId("test-tx-1"))
@@ -1261,7 +1281,7 @@ func TestSave(t *testing.T) {
 			})
 
 			t.Run("Save creates new resource successfully", func(t *testing.T) {
-				repo, db := getFreshInstances()
+				repo, db := getFreshInstances(t)
 
 				resource := createTestResourceWithLocalId(t, "save-new-test")
 
@@ -1282,7 +1302,7 @@ func TestSave(t *testing.T) {
 					t.Skip("This test is specific to real repository database operations")
 				}
 
-				repo, db := getFreshInstances()
+				repo, db := getFreshInstances(t)
 
 				resource := createTestResourceWithLocalId(t, "zero-pk-test")
 				err := repo.Save(db, resource, bizmodel.OperationTypeCreated, bizmodel.NewTransactionId("test-tx-zero-pk"))
@@ -1299,30 +1319,33 @@ func TestSave(t *testing.T) {
 	}
 }
 
+// TestResourceRepository_MultipleHostsLifecycle verifies that two distinct hosts
+// survive creation and updates independently and remain retrievable as tombstones
+// after deletion in both repository implementations.
 func TestResourceRepository_MultipleHostsLifecycle(t *testing.T) {
 	implementations := []struct {
 		name string
-		repo func() bizmodel.ResourceRepository
-		db   func() *gorm.DB
+		repo func(t *testing.T) bizmodel.ResourceRepository
+		db   func(t *testing.T) *gorm.DB
 	}{
 		{
 			name: "Real Repository with GormTransactionManager",
-			repo: func() bizmodel.ResourceRepository {
-				db := setupInMemoryDB(t)
+			repo: func(t *testing.T) bizmodel.ResourceRepository {
+				db := setupRepositoryDB(t)
 				mc := metricscollector.NewFakeMetricsCollector()
 				tm := NewGormTransactionManager(mc, 3)
-				return NewResourceRepository(db, tm, noopOutboxPublisher())
+				return NewResourceRepository(db, tm, testOutboxPublisher())
 			},
-			db: func() *gorm.DB {
-				return setupInMemoryDB(t)
+			db: func(t *testing.T) *gorm.DB {
+				return setupRepositoryDB(t)
 			},
 		},
 		{
 			name: "Fake Repository",
-			repo: func() bizmodel.ResourceRepository {
+			repo: func(t *testing.T) bizmodel.ResourceRepository {
 				return NewFakeResourceRepository()
 			},
-			db: func() *gorm.DB {
+			db: func(t *testing.T) *gorm.DB {
 				return nil
 			},
 		},
@@ -1330,18 +1353,18 @@ func TestResourceRepository_MultipleHostsLifecycle(t *testing.T) {
 
 	for _, impl := range implementations {
 		t.Run(impl.name, func(t *testing.T) {
-			getFreshInstances := func() (bizmodel.ResourceRepository, *gorm.DB) {
+			getFreshInstances := func(t *testing.T) (bizmodel.ResourceRepository, *gorm.DB) {
 				if impl.name == "Fake Repository" {
-					return impl.repo(), impl.db()
+					return impl.repo(t), impl.db(t)
 				}
-				db := setupInMemoryDB(t)
+				db := setupRepositoryDB(t)
 				mc := metricscollector.NewFakeMetricsCollector()
 				tm := NewGormTransactionManager(mc, 3)
-				repo := NewResourceRepository(db, tm, noopOutboxPublisher())
+				repo := NewResourceRepository(db, tm, testOutboxPublisher())
 				return repo, db
 			}
 
-			repo, db := getFreshInstances()
+			repo, db := getFreshInstances(t)
 
 			// Create 2 hosts
 			host1 := createTestResourceWithLocalIdAndType(t, "host-1", "host")
@@ -1434,30 +1457,33 @@ func TestResourceRepository_MultipleHostsLifecycle(t *testing.T) {
 	}
 }
 
+// TestResourceRepository_PartialDataScenarios checks that reporter-only and
+// common-only resources remain retrievable in both repositories, as does a
+// resource updated with progressively reduced representation payloads.
 func TestResourceRepository_PartialDataScenarios(t *testing.T) {
 	implementations := []struct {
 		name string
-		repo func() bizmodel.ResourceRepository
-		db   func() *gorm.DB
+		repo func(t *testing.T) bizmodel.ResourceRepository
+		db   func(t *testing.T) *gorm.DB
 	}{
 		{
 			name: "Real Repository with GormTransactionManager",
-			repo: func() bizmodel.ResourceRepository {
-				db := setupInMemoryDB(t)
+			repo: func(t *testing.T) bizmodel.ResourceRepository {
+				db := setupRepositoryDB(t)
 				mc := metricscollector.NewFakeMetricsCollector()
 				tm := NewGormTransactionManager(mc, 3)
-				return NewResourceRepository(db, tm, noopOutboxPublisher())
+				return NewResourceRepository(db, tm, testOutboxPublisher())
 			},
-			db: func() *gorm.DB {
-				return setupInMemoryDB(t)
+			db: func(t *testing.T) *gorm.DB {
+				return setupRepositoryDB(t)
 			},
 		},
 		{
 			name: "Fake Repository",
-			repo: func() bizmodel.ResourceRepository {
+			repo: func(t *testing.T) bizmodel.ResourceRepository {
 				return NewFakeResourceRepository()
 			},
-			db: func() *gorm.DB {
+			db: func(t *testing.T) *gorm.DB {
 				return nil
 			},
 		},
@@ -1465,19 +1491,19 @@ func TestResourceRepository_PartialDataScenarios(t *testing.T) {
 
 	for _, impl := range implementations {
 		t.Run(impl.name, func(t *testing.T) {
-			getFreshInstances := func() (bizmodel.ResourceRepository, *gorm.DB) {
+			getFreshInstances := func(t *testing.T) (bizmodel.ResourceRepository, *gorm.DB) {
 				if impl.name == "Fake Repository" {
-					return impl.repo(), impl.db()
+					return impl.repo(t), impl.db(t)
 				}
-				db := setupInMemoryDB(t)
+				db := setupRepositoryDB(t)
 				mc := metricscollector.NewFakeMetricsCollector()
 				tm := NewGormTransactionManager(mc, 3)
-				repo := NewResourceRepository(db, tm, noopOutboxPublisher())
+				repo := NewResourceRepository(db, tm, testOutboxPublisher())
 				return repo, db
 			}
 
 			t.Run("Report resource with just reporter data and no common data", func(t *testing.T) {
-				repo, db := getFreshInstances()
+				repo, db := getFreshInstances(t)
 
 				resource := createTestResourceWithReporterDataOnly(t, "reporter-only-resource")
 				err := repo.Save(db, resource, bizmodel.OperationTypeCreated, bizmodel.NewTransactionId("tx-reporter-only"))
@@ -1492,7 +1518,7 @@ func TestResourceRepository_PartialDataScenarios(t *testing.T) {
 			})
 
 			t.Run("Report resource with no reporter data but has common data", func(t *testing.T) {
-				repo, db := getFreshInstances()
+				repo, db := getFreshInstances(t)
 
 				resource := createTestResourceWithCommonDataOnly(t, "common-only-resource")
 				err := repo.Save(db, resource, bizmodel.OperationTypeCreated, bizmodel.NewTransactionId("tx-common-only"))
@@ -1507,7 +1533,7 @@ func TestResourceRepository_PartialDataScenarios(t *testing.T) {
 			})
 
 			t.Run("Report resource with both data, then just reporter data, then just common data", func(t *testing.T) {
-				repo, db := getFreshInstances()
+				repo, db := getFreshInstances(t)
 
 				// 1. Report with both reporter and common data
 				resourceBoth := createTestResourceWithLocalId(t, "progressive-resource")
@@ -1575,22 +1601,25 @@ func TestResourceRepository_PartialDataScenarios(t *testing.T) {
 	}
 }
 
+// TestSerializableCreateFails verifies that an uncommitted conflicting insert
+// causes a managed create to fail. PostgreSQL uses a bounded lock timeout
+// (55P03), whereas SQLite fails promptly; this is not a retry-exhaustion test.
 func TestSerializableCreateFails(t *testing.T) {
 	implementations := []struct {
 		name string
-		repo func() bizmodel.ResourceRepository
-		db   func() *gorm.DB
+		repo func(t *testing.T) bizmodel.ResourceRepository
+		db   func(t *testing.T) *gorm.DB
 	}{
 		{
 			name: "Real Repository with GormTransactionManager",
-			repo: func() bizmodel.ResourceRepository {
-				db := setupInMemoryDB(t)
+			repo: func(t *testing.T) bizmodel.ResourceRepository {
+				db := setupRepositoryDB(t)
 				mc := metricscollector.NewFakeMetricsCollector()
 				tm := NewGormTransactionManager(mc, 3)
-				return NewResourceRepository(db, tm, noopOutboxPublisher())
+				return NewResourceRepository(db, tm, testOutboxPublisher())
 			},
-			db: func() *gorm.DB {
-				return setupInMemoryDB(t)
+			db: func(t *testing.T) *gorm.DB {
+				return setupRepositoryDB(t)
 			},
 		},
 	}
@@ -1598,15 +1627,20 @@ func TestSerializableCreateFails(t *testing.T) {
 	for _, impl := range implementations {
 		t.Run(impl.name, func(t *testing.T) {
 			// Fresh instances
-			db := setupInMemoryDB(t)
+			db := setupRepositoryDB(t)
+			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+			db = db.WithContext(ctx)
 			mc := metricscollector.NewFakeMetricsCollector()
 			tm := NewGormTransactionManager(mc, 3)
-			repo := NewResourceRepository(db, tm, noopOutboxPublisher())
+			repo := NewResourceRepository(db, tm, testOutboxPublisher())
 
 			resource := createTestResourceWithLocalId(t, "serializable-create-conflict")
 
 			// Begin a conflicting serializable transaction and create the same resource
 			conflictTx := db.Begin(&sql.TxOptions{Isolation: sql.LevelSerializable})
+			require.NoError(t, conflictTx.Error)
+			defer conflictTx.Rollback()
 			// Do a read to simulate how a service would before creating
 			foundResource, err := repo.FindResourceByKeys(conflictTx, resource.ReporterResources()[0].ReporterResourceKey)
 			assert.NotNil(t, err)
@@ -1616,6 +1650,22 @@ func TestSerializableCreateFails(t *testing.T) {
 
 			// Attempt to create the same resource via a separate serializable transaction managed by TM
 			err = tm.HandleSerializableTransaction("test_create_resource", db, func(tx *gorm.DB) error {
+				if testutil.UsingPostgres() {
+					// The conflict transaction above holds an uncommitted insert for the
+					// same key. On PostgreSQL the save below would block on that
+					// unique-index entry instead of failing promptly as it does on
+					// SQLite, so cap the wait: the lock timeout turns the indefinite
+					// block into a deterministic failure that still exercises the
+					// transaction manager's error path.
+					//
+					// Retry exhaustion from repeated serialization failures is covered
+					// synthetically (and deterministically) with pgconn.PgError 40001
+					// in transaction_manager_test.go; orchestrating repeated genuine
+					// 40001s here would depend on subtle snapshot timing.
+					if err := tx.Exec("SET LOCAL lock_timeout = '250ms'").Error; err != nil {
+						return err
+					}
+				}
 				foundResource, err := repo.FindResourceByKeys(tx, resource.ReporterResources()[0].ReporterResourceKey)
 				assert.NotNil(t, err)
 				assert.Nil(t, foundResource)
@@ -1623,6 +1673,11 @@ func TestSerializableCreateFails(t *testing.T) {
 			})
 			assert.Error(t, err)
 			assert.ErrorContains(t, err, "transaction failed")
+			if testutil.UsingPostgres() {
+				var pgError *pgconn.PgError
+				require.ErrorAs(t, err, &pgError)
+				assert.Equal(t, "55P03", pgError.SQLState(), "the uncommitted insert must cause a lock timeout")
+			}
 
 			// Cleanup
 			assert.NoError(t, conflictTx.Commit().Error)
@@ -1630,22 +1685,25 @@ func TestSerializableCreateFails(t *testing.T) {
 	}
 }
 
+// TestSerializableUpdateFails verifies that an uncommitted conflicting update
+// causes a managed update to fail. PostgreSQL uses a bounded lock timeout
+// (55P03), whereas SQLite fails promptly; this is not a retry-exhaustion test.
 func TestSerializableUpdateFails(t *testing.T) {
 	implementations := []struct {
 		name string
-		repo func() bizmodel.ResourceRepository
-		db   func() *gorm.DB
+		repo func(t *testing.T) bizmodel.ResourceRepository
+		db   func(t *testing.T) *gorm.DB
 	}{
 		{
 			name: "Real Repository with GormTransactionManager",
-			repo: func() bizmodel.ResourceRepository {
-				db := setupInMemoryDB(t)
+			repo: func(t *testing.T) bizmodel.ResourceRepository {
+				db := setupRepositoryDB(t)
 				mc := metricscollector.NewFakeMetricsCollector()
 				tm := NewGormTransactionManager(mc, 3)
-				return NewResourceRepository(db, tm, noopOutboxPublisher())
+				return NewResourceRepository(db, tm, testOutboxPublisher())
 			},
-			db: func() *gorm.DB {
-				return setupInMemoryDB(t)
+			db: func(t *testing.T) *gorm.DB {
+				return setupRepositoryDB(t)
 			},
 		},
 	}
@@ -1653,10 +1711,13 @@ func TestSerializableUpdateFails(t *testing.T) {
 	for _, impl := range implementations {
 		t.Run(impl.name, func(t *testing.T) {
 			// Fresh instances
-			db := setupInMemoryDB(t)
+			db := setupRepositoryDB(t)
+			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+			db = db.WithContext(ctx)
 			mc := metricscollector.NewFakeMetricsCollector()
 			tm := NewGormTransactionManager(mc, 3)
-			repo := NewResourceRepository(db, tm, noopOutboxPublisher())
+			repo := NewResourceRepository(db, tm, testOutboxPublisher())
 
 			// Create initial resource (committed)
 			resource := createTestResourceWithLocalId(t, "serializable-update-conflict")
@@ -1674,6 +1735,8 @@ func TestSerializableUpdateFails(t *testing.T) {
 
 			// Begin a conflicting serializable transaction and update the same resource
 			conflictTx := db.Begin(&sql.TxOptions{Isolation: sql.LevelSerializable})
+			require.NoError(t, conflictTx.Error)
+			defer conflictTx.Rollback()
 			// Do a read to simulate how a service would before saving
 			foundResource, err := repo.FindResourceByKeys(conflictTx, resource.ReporterResources()[0].ReporterResourceKey)
 			assert.Nil(t, err)
@@ -1683,10 +1746,31 @@ func TestSerializableUpdateFails(t *testing.T) {
 
 			// Attempt to update the same resource via TM-managed serializable transaction
 			err = tm.HandleSerializableTransaction("test_update_resource", db, func(tx *gorm.DB) error {
+				if testutil.UsingPostgres() {
+					// The conflict transaction above holds the row lock for this
+					// resource. On PostgreSQL the save below would block on that lock
+					// instead of failing promptly as it does on SQLite, so cap the
+					// wait: the lock timeout turns the indefinite block into a
+					// deterministic failure that still exercises the transaction
+					// manager's error path.
+					//
+					// Retry exhaustion from repeated serialization failures is covered
+					// synthetically (and deterministically) with pgconn.PgError 40001
+					// in transaction_manager_test.go; orchestrating repeated genuine
+					// 40001s here would depend on subtle snapshot timing.
+					if err := tx.Exec("SET LOCAL lock_timeout = '250ms'").Error; err != nil {
+						return err
+					}
+				}
 				return repo.Save(tx, resource, bizmodel.OperationTypeUpdated, bizmodel.NewTransactionId("tx-update"))
 			})
 			assert.Error(t, err)
 			assert.ErrorContains(t, err, "transaction failed")
+			if testutil.UsingPostgres() {
+				var pgError *pgconn.PgError
+				require.ErrorAs(t, err, &pgError)
+				assert.Equal(t, "55P03", pgError.SQLState(), "the uncommitted update must cause a lock timeout")
+			}
 
 			// Cleanup
 			assert.NoError(t, conflictTx.Commit().Error)
@@ -1694,17 +1778,32 @@ func TestSerializableUpdateFails(t *testing.T) {
 	}
 }
 
-func setupInMemoryDB(t *testing.T) *gorm.DB {
-	db := testutil.NewSQLiteTestDB(t, &gorm.Config{TranslateError: true})
-
-	err := Migrate(db, nil)
-	require.NoError(t, err)
-
-	return db
+// migrateRepositoryDB brings a fresh test database up to the current schema.
+// It is a named function so the PostgreSQL test backend can key its template
+// database on a stable value and run the migrations only once per test
+// binary; see testutil.PostgresTestDSN.
+func migrateRepositoryDB(db *gorm.DB) error {
+	return Migrate(db, nil)
 }
 
-// noopOutboxPublisher sets the no-op publisher for use with SQLite in tests
-func noopOutboxPublisher() OutboxPublisher {
+// setupRepositoryDB returns a fully migrated test database on the backend
+// selected through TEST_DB: PostgreSQL via Testcontainers (the default,
+// matching production) or in-memory SQLite (the dependency-free fallback,
+// selected explicitly with TEST_DB=sqlite).
+func setupRepositoryDB(t *testing.T) *gorm.DB {
+	t.Helper()
+	return testutil.NewTestDB(t, &gorm.Config{TranslateError: true}, migrateRepositoryDB)
+}
+
+// testOutboxPublisher returns the outbox publisher matching production wiring
+// for the active backend: the WAL publisher on PostgreSQL (the test container
+// runs wal_level=logical, so pg_logical_emit_message works and its output is
+// consumable through logical replication slots), and the no-op publisher on
+// SQLite, which has no logical decoding support.
+func testOutboxPublisher() OutboxPublisher {
+	if testutil.UsingPostgres() {
+		return SetOutboxPublisher(storage.OutboxModeWAL)
+	}
 	return SetOutboxPublisher(storage.OutboxModeNone)
 }
 
@@ -2063,43 +2162,45 @@ func createContractReporterResourceKey(t *testing.T, localResourceId, resourceTy
 	return key
 }
 
+// TestFindLatestRepresentations verifies that both repositories return the newest
+// common representation's version and payload rather than earlier saved history.
 func TestFindLatestRepresentations(t *testing.T) {
 	implementations := []struct {
 		name string
-		repo func() bizmodel.ResourceRepository
-		db   func() *gorm.DB
+		repo func(t *testing.T) bizmodel.ResourceRepository
+		db   func(t *testing.T) *gorm.DB
 	}{
 		{
 			name: "Real Repository with GormTransactionManager",
-			repo: func() bizmodel.ResourceRepository {
-				db := setupInMemoryDB(t)
+			repo: func(t *testing.T) bizmodel.ResourceRepository {
+				db := setupRepositoryDB(t)
 				mc := metricscollector.NewFakeMetricsCollector()
 				tm := NewGormTransactionManager(mc, 3)
-				return NewResourceRepository(db, tm, noopOutboxPublisher())
+				return NewResourceRepository(db, tm, testOutboxPublisher())
 			},
-			db: func() *gorm.DB { return setupInMemoryDB(t) },
+			db: func(t *testing.T) *gorm.DB { return setupRepositoryDB(t) },
 		},
 		{
 			name: "Fake Repository",
-			repo: func() bizmodel.ResourceRepository { return NewFakeResourceRepository() },
-			db:   func() *gorm.DB { return nil },
+			repo: func(t *testing.T) bizmodel.ResourceRepository { return NewFakeResourceRepository() },
+			db:   func(t *testing.T) *gorm.DB { return nil },
 		},
 	}
 
 	for _, impl := range implementations {
 		t.Run(impl.name, func(t *testing.T) {
 			// Helper to get fresh instances
-			getFresh := func() (bizmodel.ResourceRepository, *gorm.DB) {
+			getFresh := func(t *testing.T) (bizmodel.ResourceRepository, *gorm.DB) {
 				if impl.name == "Fake Repository" {
-					return impl.repo(), impl.db()
+					return impl.repo(t), impl.db(t)
 				}
-				db := setupInMemoryDB(t)
+				db := setupRepositoryDB(t)
 				mc := metricscollector.NewFakeMetricsCollector()
 				tm := NewGormTransactionManager(mc, 3)
-				return NewResourceRepository(db, tm, noopOutboxPublisher()), db
+				return NewResourceRepository(db, tm, testOutboxPublisher()), db
 			}
 
-			repo, db := getFresh()
+			repo, db := getFresh(t)
 
 			key, err := bizmodel.NewReporterResourceKey("localResourceId-latest", "host", "hbi", "hbi-instance-1")
 			require.NoError(t, err)
@@ -2163,46 +2264,49 @@ func TestFindLatestRepresentations(t *testing.T) {
 	}
 }
 
+// TestFindCurrentAndPreviousVersionedRepresentations checks workspace transitions
+// in both repositories, including the absence of a predecessor for version zero
+// and empty workspace IDs for missing or incorrectly typed representation data.
 func TestFindCurrentAndPreviousVersionedRepresentations(t *testing.T) {
 	implementations := []struct {
 		name string
-		repo func() bizmodel.ResourceRepository
-		db   func() *gorm.DB
+		repo func(t *testing.T) bizmodel.ResourceRepository
+		db   func(t *testing.T) *gorm.DB
 	}{
 		{
 			name: "Real Repository with GormTransactionManager",
-			repo: func() bizmodel.ResourceRepository {
-				db := setupInMemoryDB(t)
+			repo: func(t *testing.T) bizmodel.ResourceRepository {
+				db := setupRepositoryDB(t)
 				mc := metricscollector.NewFakeMetricsCollector()
 				tm := NewGormTransactionManager(mc, 3)
-				return NewResourceRepository(db, tm, noopOutboxPublisher())
+				return NewResourceRepository(db, tm, testOutboxPublisher())
 			},
-			db: func() *gorm.DB { return setupInMemoryDB(t) },
+			db: func(t *testing.T) *gorm.DB { return setupRepositoryDB(t) },
 		},
 		{
 			name: "Fake Repository",
-			repo: func() bizmodel.ResourceRepository {
+			repo: func(t *testing.T) bizmodel.ResourceRepository {
 				return NewFakeResourceRepository()
 			},
-			db: func() *gorm.DB { return nil },
+			db: func(t *testing.T) *gorm.DB { return nil },
 		},
 	}
 
 	for _, impl := range implementations {
 		t.Run(impl.name, func(t *testing.T) {
-			getFreshInstances := func() (bizmodel.ResourceRepository, *gorm.DB) {
+			getFreshInstances := func(t *testing.T) (bizmodel.ResourceRepository, *gorm.DB) {
 				if impl.name == "Fake Repository" {
-					return impl.repo(), impl.db()
+					return impl.repo(t), impl.db(t)
 				}
-				db := setupInMemoryDB(t)
+				db := setupRepositoryDB(t)
 				mc := metricscollector.NewFakeMetricsCollector()
 				tm := NewGormTransactionManager(mc, 3)
-				repo := NewResourceRepository(db, tm, noopOutboxPublisher())
+				repo := NewResourceRepository(db, tm, testOutboxPublisher())
 				return repo, db
 			}
 
 			t.Run("GetCurrentAndPreviousWorkspaceID extracts workspace IDs correctly", func(t *testing.T) {
-				repo, db := getFreshInstances()
+				repo, db := getFreshInstances(t)
 
 				// Create and update a resource to have versioned representations (same for both implementations)
 				resource := createTestResourceWithLocalIdAndType(t, "workspace-test-resource", "host")
@@ -2236,7 +2340,7 @@ func TestFindCurrentAndPreviousVersionedRepresentations(t *testing.T) {
 			})
 
 			t.Run("GetCurrentAndPreviousWorkspaceID handles version 0", func(t *testing.T) {
-				repo, db := getFreshInstances()
+				repo, db := getFreshInstances(t)
 
 				key, err := bizmodel.NewReporterResourceKey("test-resource-v0", "host", "hbi", "hbi-instance-1")
 				require.NoError(t, err)
@@ -2335,10 +2439,10 @@ func TestFindCurrentAndPreviousVersionedRepresentations_NoCommonInconsistency(t 
 	// is nil for such a resource, so the lookup returns nothing and no tuples are ever computed
 	// -- the resource is effectively invisible to authorization.
 	t.Run("case 1: resource reported without common data yields no current representation", func(t *testing.T) {
-		db := setupInMemoryDB(t)
+		db := setupRepositoryDB(t)
 		mc := metricscollector.NewFakeMetricsCollector()
 		tm := NewGormTransactionManager(mc, 3)
-		repo := NewResourceRepository(db, tm, noopOutboxPublisher())
+		repo := NewResourceRepository(db, tm, testOutboxPublisher())
 
 		resource, key := createResourceNoCommon(t, "case1-no-common")
 		require.NoError(t, repo.Save(db, resource, bizmodel.OperationTypeCreated, emptyTxId))
@@ -2367,10 +2471,10 @@ func TestFindCurrentAndPreviousVersionedRepresentations_NoCommonInconsistency(t 
 	// "updated-host". This documents the inconsistency: the versioned lookup surfaces a stale v0
 	// common representation, decoupled from the latest reporter state.
 	t.Run("case 2: dropping common data resolves stale common via last known version, decoupled from latest reporter", func(t *testing.T) {
-		db := setupInMemoryDB(t)
+		db := setupRepositoryDB(t)
 		mc := metricscollector.NewFakeMetricsCollector()
 		tm := NewGormTransactionManager(mc, 3)
-		repo := NewResourceRepository(db, tm, noopOutboxPublisher())
+		repo := NewResourceRepository(db, tm, testOutboxPublisher())
 
 		// Create WITH common data -> common version 0, workspace "test-workspace".
 		resource := createTestResourceWithLocalIdAndType(t, "case2-drop-common", "host")
@@ -2429,10 +2533,10 @@ func TestFindCurrentAndPreviousVersionedRepresentations_NoCommonInconsistency(t 
 func TestFindCurrentAndPreviousVersionedRepresentations_TwoStreamScenarios(t *testing.T) {
 
 	t.Run("reporter-only create", func(t *testing.T) {
-		db := setupInMemoryDB(t)
+		db := setupRepositoryDB(t)
 		mc := metricscollector.NewFakeMetricsCollector()
 		tm := NewGormTransactionManager(mc, 3)
-		repo := NewResourceRepository(db, tm, noopOutboxPublisher())
+		repo := NewResourceRepository(db, tm, testOutboxPublisher())
 
 		resource, key := createResourceNoCommon(t, "reporter-only-create")
 		require.NoError(t, repo.Save(db, resource, bizmodel.OperationTypeCreated, emptyTxId))
@@ -2454,10 +2558,10 @@ func TestFindCurrentAndPreviousVersionedRepresentations_TwoStreamScenarios(t *te
 	})
 
 	t.Run("reporter-only update", func(t *testing.T) {
-		db := setupInMemoryDB(t)
+		db := setupRepositoryDB(t)
 		mc := metricscollector.NewFakeMetricsCollector()
 		tm := NewGormTransactionManager(mc, 3)
-		repo := NewResourceRepository(db, tm, noopOutboxPublisher())
+		repo := NewResourceRepository(db, tm, testOutboxPublisher())
 
 		// Create reporter-only resource
 		resource, key := createResourceNoCommon(t, "reporter-only-update")
@@ -2493,10 +2597,10 @@ func TestFindCurrentAndPreviousVersionedRepresentations_TwoStreamScenarios(t *te
 	})
 
 	t.Run("common-only update while reporter unchanged", func(t *testing.T) {
-		db := setupInMemoryDB(t)
+		db := setupRepositoryDB(t)
 		mc := metricscollector.NewFakeMetricsCollector()
 		tm := NewGormTransactionManager(mc, 3)
-		repo := NewResourceRepository(db, tm, noopOutboxPublisher())
+		repo := NewResourceRepository(db, tm, testOutboxPublisher())
 
 		// Create resource with both common and reporter data
 		resource := createTestResourceWithLocalIdAndType(t, "common-update", "host")
@@ -2536,10 +2640,10 @@ func TestFindCurrentAndPreviousVersionedRepresentations_TwoStreamScenarios(t *te
 	})
 
 	t.Run("both streams advance", func(t *testing.T) {
-		db := setupInMemoryDB(t)
+		db := setupRepositoryDB(t)
 		mc := metricscollector.NewFakeMetricsCollector()
 		tm := NewGormTransactionManager(mc, 3)
-		repo := NewResourceRepository(db, tm, noopOutboxPublisher())
+		repo := NewResourceRepository(db, tm, testOutboxPublisher())
 
 		// Create with both streams
 		resource := createTestResourceWithLocalIdAndType(t, "both-streams", "host")
@@ -2580,10 +2684,10 @@ func TestFindCurrentAndPreviousVersionedRepresentations_TwoStreamScenarios(t *te
 	})
 
 	t.Run("cv == 0 underflow guard", func(t *testing.T) {
-		db := setupInMemoryDB(t)
+		db := setupRepositoryDB(t)
 		mc := metricscollector.NewFakeMetricsCollector()
 		tm := NewGormTransactionManager(mc, 3)
-		repo := NewResourceRepository(db, tm, noopOutboxPublisher())
+		repo := NewResourceRepository(db, tm, testOutboxPublisher())
 
 		// Create with common v0
 		resource := createTestResourceWithLocalIdAndType(t, "underflow-guard", "host")
@@ -2608,10 +2712,10 @@ func TestFindCurrentAndPreviousVersionedRepresentations_TwoStreamScenarios(t *te
 // fetching previous reporter representation works correctly when a resource is
 // deleted and then revived (tombstone → new generation with version reset to 0).
 func TestFindCurrentAndPreviousVersionedRepresentations_TombstoneRevival(t *testing.T) {
-	db := setupInMemoryDB(t)
+	db := setupRepositoryDB(t)
 	mc := metricscollector.NewFakeMetricsCollector()
 	tm := NewGormTransactionManager(mc, 3)
-	repo := NewResourceRepository(db, tm, noopOutboxPublisher())
+	repo := NewResourceRepository(db, tm, testOutboxPublisher())
 
 	// Create reporter-only resource (no common representation)
 	resource, key := createResourceNoCommon(t, "revival-test")
@@ -2692,10 +2796,10 @@ func TestFindCurrentAndPreviousVersionedRepresentations_TombstoneRevival(t *test
 //   - WITHOUT generation tracking: would incorrectly fetch gen=1, ver=0 (wrong!)
 //   - WITH generation tracking: correctly fetches gen=0, ver=0 (correct!)
 func TestFindCurrentAndPreviousVersionedRepresentations_EventReplayRaceCondition(t *testing.T) {
-	db := setupInMemoryDB(t)
+	db := setupRepositoryDB(t)
 	mc := metricscollector.NewFakeMetricsCollector()
 	tm := NewGormTransactionManager(mc, 3)
-	repo := NewResourceRepository(db, tm, noopOutboxPublisher())
+	repo := NewResourceRepository(db, tm, testOutboxPublisher())
 
 	// Step 1: Create resource at gen=0, ver=0
 	resource, key := createResourceNoCommon(t, "replay-race-test")
@@ -2769,10 +2873,10 @@ func TestFindLatestRepresentations_ReporterOnly(t *testing.T) {
 		t.Skip("skipping test requiring SpiceDB Docker container")
 	}
 
-	db := setupInMemoryDB(t)
+	db := setupRepositoryDB(t)
 	mc := metricscollector.NewFakeMetricsCollector()
 	tm := NewGormTransactionManager(mc, 3)
-	repo := NewResourceRepository(db, tm, noopOutboxPublisher())
+	repo := NewResourceRepository(db, tm, testOutboxPublisher())
 
 	resource, key := createResourceNoCommon(t, "latest-reporter-only")
 	require.NoError(t, repo.Save(db, resource, bizmodel.OperationTypeCreated, emptyTxId))
@@ -2787,10 +2891,10 @@ func TestFindLatestRepresentations_ReporterOnly(t *testing.T) {
 }
 
 func TestFindLatestRepresentations_ReporterOnlyAfterDelete(t *testing.T) {
-	db := setupInMemoryDB(t)
+	db := setupRepositoryDB(t)
 	mc := metricscollector.NewFakeMetricsCollector()
 	tm := NewGormTransactionManager(mc, 3)
-	repo := NewResourceRepository(db, tm, noopOutboxPublisher())
+	repo := NewResourceRepository(db, tm, testOutboxPublisher())
 
 	resource, key := createResourceNoCommon(t, "reporter-only-delete")
 	require.NoError(t, repo.Save(db, resource, bizmodel.OperationTypeCreated, emptyTxId))
@@ -2823,13 +2927,13 @@ func TestFindLatestRepresentations_GenerationOrdering(t *testing.T) {
 		{
 			name: "Real Repository",
 			repo: func() bizmodel.ResourceRepository {
-				db := setupInMemoryDB(t)
+				db := setupRepositoryDB(t)
 				mc := metricscollector.NewFakeMetricsCollector()
 				tm := NewGormTransactionManager(mc, 3)
-				return NewResourceRepository(db, tm, noopOutboxPublisher())
+				return NewResourceRepository(db, tm, testOutboxPublisher())
 			},
 			db: func() *gorm.DB {
-				return setupInMemoryDB(t)
+				return setupRepositoryDB(t)
 			},
 		},
 		{
@@ -2915,13 +3019,13 @@ func TestFindCurrentAndPreviousVersionedRepresentations_ReporterOnlyDelete(t *te
 		{
 			name: "Real Repository",
 			repo: func() bizmodel.ResourceRepository {
-				db := setupInMemoryDB(t)
+				db := setupRepositoryDB(t)
 				mc := metricscollector.NewFakeMetricsCollector()
 				tm := NewGormTransactionManager(mc, 3)
-				return NewResourceRepository(db, tm, noopOutboxPublisher())
+				return NewResourceRepository(db, tm, testOutboxPublisher())
 			},
 			db: func() *gorm.DB {
-				return setupInMemoryDB(t)
+				return setupRepositoryDB(t)
 			},
 		},
 		{
@@ -2983,12 +3087,12 @@ func TestFindCurrentAndPreviousVersionedRepresentations_UpdateAfterCommonOnlyUpd
 		{
 			name: "Real Repository with GormTransactionManager",
 			repo: func() bizmodel.ResourceRepository {
-				db := setupInMemoryDB(t)
+				db := setupRepositoryDB(t)
 				mc := metricscollector.NewFakeMetricsCollector()
 				tm := NewGormTransactionManager(mc, 3)
-				return NewResourceRepository(db, tm, noopOutboxPublisher())
+				return NewResourceRepository(db, tm, testOutboxPublisher())
 			},
-			db: func() *gorm.DB { return setupInMemoryDB(t) },
+			db: func() *gorm.DB { return setupRepositoryDB(t) },
 		},
 		{
 			name: "Fake Repository",
@@ -3057,30 +3161,33 @@ func TestFindCurrentAndPreviousVersionedRepresentations_UpdateAfterCommonOnlyUpd
 	}
 }
 
+// TestHasTransactionIdBeenProcessed checks that empty and unknown IDs are not
+// treated as processed by either repository, with fake-specific cases for
+// independent ID tracking and concurrent reads before and after marking an ID.
 func TestHasTransactionIdBeenProcessed(t *testing.T) {
 	implementations := []struct {
 		name string
-		repo func() bizmodel.ResourceRepository
-		db   func() *gorm.DB
+		repo func(t *testing.T) bizmodel.ResourceRepository
+		db   func(t *testing.T) *gorm.DB
 	}{
 		{
 			name: "Real Repository with GormTransactionManager",
-			repo: func() bizmodel.ResourceRepository {
-				db := setupInMemoryDB(t)
+			repo: func(t *testing.T) bizmodel.ResourceRepository {
+				db := setupRepositoryDB(t)
 				mc := metricscollector.NewFakeMetricsCollector()
 				tm := NewGormTransactionManager(mc, 3)
-				return NewResourceRepository(db, tm, noopOutboxPublisher())
+				return NewResourceRepository(db, tm, testOutboxPublisher())
 			},
-			db: func() *gorm.DB {
-				return setupInMemoryDB(t)
+			db: func(t *testing.T) *gorm.DB {
+				return setupRepositoryDB(t)
 			},
 		},
 		{
 			name: "Fake Repository",
-			repo: func() bizmodel.ResourceRepository {
+			repo: func(t *testing.T) bizmodel.ResourceRepository {
 				return NewFakeResourceRepository()
 			},
-			db: func() *gorm.DB {
+			db: func(t *testing.T) *gorm.DB {
 				return nil // Fake doesn't need real DB
 			},
 		},
@@ -3088,7 +3195,7 @@ func TestHasTransactionIdBeenProcessed(t *testing.T) {
 
 	for _, impl := range implementations {
 		t.Run(impl.name, func(t *testing.T) {
-			testHasTransactionIdBeenProcessed(t, impl.repo(), impl.db())
+			testHasTransactionIdBeenProcessed(t, impl.repo(t), impl.db(t))
 		})
 	}
 }
@@ -3231,29 +3338,31 @@ func testHasTransactionIdBeenProcessed(t *testing.T, repo bizmodel.ResourceRepos
 	})
 }
 
+// TestTransactionIDUniqueConstraint exercises database uniqueness enforcement
+// for transaction IDs through repository saves and direct representation inserts.
 func TestTransactionIDUniqueConstraint(t *testing.T) {
 	implementations := []struct {
 		name string
-		repo func() bizmodel.ResourceRepository
-		db   func() *gorm.DB
+		repo func(t *testing.T) bizmodel.ResourceRepository
+		db   func(t *testing.T) *gorm.DB
 	}{
 		{
 			name: "Real Repository with GormTransactionManager",
-			repo: func() bizmodel.ResourceRepository {
-				db := setupInMemoryDB(t)
+			repo: func(t *testing.T) bizmodel.ResourceRepository {
+				db := setupRepositoryDB(t)
 				mc := metricscollector.NewFakeMetricsCollector()
 				tm := NewGormTransactionManager(mc, 3)
-				return NewResourceRepository(db, tm, noopOutboxPublisher())
+				return NewResourceRepository(db, tm, testOutboxPublisher())
 			},
-			db: func() *gorm.DB {
-				return setupInMemoryDB(t)
+			db: func(t *testing.T) *gorm.DB {
+				return setupRepositoryDB(t)
 			},
 		},
 	}
 
 	for _, impl := range implementations {
 		t.Run(impl.name, func(t *testing.T) {
-			testTransactionIDUniqueConstraint(t, impl.repo(), impl.db())
+			testTransactionIDUniqueConstraint(t, impl.repo(t), impl.db(t))
 		})
 	}
 }
@@ -3435,10 +3544,10 @@ func testTransactionIDUniqueConstraint(t *testing.T, repo bizmodel.ResourceRepos
 }
 
 func TestCommonVersionIncrementAndResetCycle(t *testing.T) {
-	db := setupInMemoryDB(t)
+	db := setupRepositoryDB(t)
 	mc := metricscollector.NewFakeMetricsCollector()
 	tm := NewGormTransactionManager(mc, 3)
-	repo := NewResourceRepository(db, tm, noopOutboxPublisher())
+	repo := NewResourceRepository(db, tm, testOutboxPublisher())
 
 	localResourceID := "resource-common-version-cycle"
 	resourceId := uuid.New()
@@ -3538,10 +3647,10 @@ func TestCommonVersionIncrementAndResetCycle(t *testing.T) {
 }
 
 func TestCommonVersionAfterDeleteAndRecreate(t *testing.T) {
-	db := setupInMemoryDB(t)
+	db := setupRepositoryDB(t)
 	mc := metricscollector.NewFakeMetricsCollector()
 	tm := NewGormTransactionManager(mc, 3)
-	repo := NewResourceRepository(db, tm, noopOutboxPublisher())
+	repo := NewResourceRepository(db, tm, testOutboxPublisher())
 
 	localResourceID := "resource-delete-recreate"
 
@@ -3660,10 +3769,10 @@ func TestCommonVersionAfterDeleteAndRecreate(t *testing.T) {
 }
 
 func TestNullCommonVersionPersistence(t *testing.T) {
-	db := setupInMemoryDB(t)
+	db := setupRepositoryDB(t)
 	mc := metricscollector.NewFakeMetricsCollector()
 	tm := NewGormTransactionManager(mc, 3)
-	repo := NewResourceRepository(db, tm, noopOutboxPublisher())
+	repo := NewResourceRepository(db, tm, testOutboxPublisher())
 
 	localResourceID := "resource-without-common-rep"
 	resourceId := uuid.New()
@@ -3739,10 +3848,10 @@ func TestNullCommonVersionPersistence(t *testing.T) {
 }
 
 func TestCommonVersionDropThenReAdd(t *testing.T) {
-	db := setupInMemoryDB(t)
+	db := setupRepositoryDB(t)
 	mc := metricscollector.NewFakeMetricsCollector()
 	tm := NewGormTransactionManager(mc, 3)
-	repo := NewResourceRepository(db, tm, noopOutboxPublisher())
+	repo := NewResourceRepository(db, tm, testOutboxPublisher())
 
 	localResourceID := "resource-common-version-drop-readd"
 	resourceId := uuid.New()
@@ -3841,10 +3950,10 @@ func TestCommonVersionDropThenReAdd(t *testing.T) {
 }
 
 func TestCommonVersionFirstAddedOnUpdate(t *testing.T) {
-	db := setupInMemoryDB(t)
+	db := setupRepositoryDB(t)
 	mc := metricscollector.NewFakeMetricsCollector()
 	tm := NewGormTransactionManager(mc, 3)
-	repo := NewResourceRepository(db, tm, noopOutboxPublisher())
+	repo := NewResourceRepository(db, tm, testOutboxPublisher())
 
 	localResourceID := "resource-no-common-then-update"
 	resourceId := uuid.New()
@@ -3974,10 +4083,10 @@ func TestEmptyAndNilRepresentationPersistence(t *testing.T) {
 	// saveAndFind saves a resource and retrieves it by reporter key.
 	saveAndFind := func(t *testing.T, p resourceParams, reporter, common *bizmodel.Representation, txSuffix string) (*bizmodel.Resource, *gorm.DB) {
 		t.Helper()
-		db := setupInMemoryDB(t)
+		db := setupRepositoryDB(t)
 		mc := metricscollector.NewFakeMetricsCollector()
 		tm := NewGormTransactionManager(mc, 3)
-		repo := NewResourceRepository(db, tm, noopOutboxPublisher())
+		repo := NewResourceRepository(db, tm, testOutboxPublisher())
 
 		resource, err := bizmodel.NewResource(
 			p.resourceId, p.localResourceId, p.resourceType, p.reporterType,
@@ -4086,7 +4195,7 @@ func TestEmptyAndNilRepresentationPersistence(t *testing.T) {
 
 		mc := metricscollector.NewFakeMetricsCollector()
 		tm := NewGormTransactionManager(mc, 3)
-		repo := NewResourceRepository(db, tm, noopOutboxPublisher())
+		repo := NewResourceRepository(db, tm, testOutboxPublisher())
 		err = repo.Save(db, *found, bizmodel.OperationTypeUpdated, emptyTxId)
 		require.NoError(t, err, "second save after an empty common save must succeed")
 
@@ -4111,7 +4220,7 @@ func TestEmptyAndNilRepresentationPersistence(t *testing.T) {
 
 		mc := metricscollector.NewFakeMetricsCollector()
 		tm := NewGormTransactionManager(mc, 3)
-		repo := NewResourceRepository(db, tm, noopOutboxPublisher())
+		repo := NewResourceRepository(db, tm, testOutboxPublisher())
 		err = repo.Save(db, *found, bizmodel.OperationTypeUpdated, emptyTxId)
 		require.NoError(t, err, "update carrying an empty common representation must not collide with the initial version row")
 
@@ -4132,12 +4241,12 @@ func TestFindCurrentAndPreviousVersionedRepresentations_DeleteAfterCommonOnlyUpd
 		{
 			name: "Real Repository with GormTransactionManager",
 			repo: func() bizmodel.ResourceRepository {
-				db := setupInMemoryDB(t)
+				db := setupRepositoryDB(t)
 				mc := metricscollector.NewFakeMetricsCollector()
 				tm := NewGormTransactionManager(mc, 3)
-				return NewResourceRepository(db, tm, noopOutboxPublisher())
+				return NewResourceRepository(db, tm, testOutboxPublisher())
 			},
-			db: func() *gorm.DB { return setupInMemoryDB(t) },
+			db: func() *gorm.DB { return setupRepositoryDB(t) },
 		},
 		{
 			name: "Fake Repository",
@@ -4218,12 +4327,12 @@ func TestFetchRepresentations_MissingRowReturnsNil(t *testing.T) {
 		{
 			name: "Real Repository with GormTransactionManager",
 			repo: func() bizmodel.ResourceRepository {
-				db := setupInMemoryDB(t)
+				db := setupRepositoryDB(t)
 				mc := metricscollector.NewFakeMetricsCollector()
 				tm := NewGormTransactionManager(mc, 3)
-				return NewResourceRepository(db, tm, noopOutboxPublisher())
+				return NewResourceRepository(db, tm, testOutboxPublisher())
 			},
-			db: func() *gorm.DB { return setupInMemoryDB(t) },
+			db: func() *gorm.DB { return setupRepositoryDB(t) },
 		},
 		{
 			name: "Fake Repository",

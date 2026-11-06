@@ -8,9 +8,9 @@ import (
 	"github.com/google/uuid"
 	"github.com/project-kessel/inventory-api/internal/data"
 	"github.com/project-kessel/inventory-api/internal/data/model"
+	"github.com/project-kessel/inventory-api/internal/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
 
@@ -18,14 +18,21 @@ func testLogger() *log.Helper {
 	return log.NewHelper(log.NewStdLogger(io.Discard))
 }
 
+// migrateJobsDB brings a fresh test database up to the current schema. It is
+// a named function so the PostgreSQL test backend can key its template
+// database on a stable value and run the migrations only once per test
+// binary; see testutil.PostgresTestDSN.
+func migrateJobsDB(db *gorm.DB) error {
+	return data.Migrate(db, testLogger())
+}
+
+// setupTestDB returns a fully migrated test database on the backend selected
+// through TEST_DB: PostgreSQL via Testcontainers (the default, matching
+// production) or in-memory SQLite (the dependency-free fallback, selected
+// explicitly with TEST_DB=sqlite).
 func setupTestDB(t *testing.T) *gorm.DB {
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{TranslateError: true})
-	require.NoError(t, err)
-
-	err = data.Migrate(db, testLogger())
-	require.NoError(t, err)
-
-	return db
+	t.Helper()
+	return testutil.NewTestDB(t, &gorm.Config{TranslateError: true}, migrateJobsDB)
 }
 
 func createTestReporterResource(t *testing.T, db *gorm.DB, resourceType, reporterType string) uuid.UUID {

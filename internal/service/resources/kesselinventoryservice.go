@@ -16,12 +16,16 @@ import (
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
+// InventoryService implements the v1beta2 KesselInventoryService for gRPC and
+// HTTP, delegating to the resource and relationship usecases.
 type InventoryService struct {
 	pb.UnimplementedKesselInventoryServiceServer
 	Ctl                 *resources.Usecase
 	AddRelationshipsCtl *relationsusecase.AddResourceRelationshipsUseCase
 }
 
+// NewKesselInventoryServiceV1beta2 constructs the v1beta2 inventory service
+// from the resource usecase and the add-relationships usecase.
 func NewKesselInventoryServiceV1beta2(c *resources.Usecase, addRelationships *relationsusecase.AddResourceRelationshipsUseCase) *InventoryService {
 	return &InventoryService{
 		Ctl:                 c,

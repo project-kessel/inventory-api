@@ -97,6 +97,8 @@ func newAddRelationshipsTestServer(t *testing.T) (TestServerConfig, model.Resour
 	}, repo
 }
 
+// mustStruct converts the given map to a protobuf Struct, failing the test on
+// invalid input.
 func mustStruct(t *testing.T, m map[string]interface{}) *structpb.Struct {
 	t.Helper()
 	s, err := structpb.NewStruct(m)
@@ -125,6 +127,9 @@ func strPtr(s string) *string {
 	return &s
 }
 
+// TestInventoryService_AddResourceRelationships_MergesIntoExisting validates
+// that named relationship values are merged additively into an existing
+// resource over both gRPC and HTTP.
 func TestInventoryService_AddResourceRelationships_MergesIntoExisting(t *testing.T) {
 	cfg, repo := newAddRelationshipsTestServer(t)
 
@@ -180,6 +185,9 @@ func TestInventoryService_AddResourceRelationships_MergesIntoExisting(t *testing
 	})
 }
 
+// TestInventoryService_AddResourceRelationships_AutoCreatesResource validates
+// that a request naming a resource that does not yet exist creates it with the
+// provided relationship fields as its initial representation.
 func TestInventoryService_AddResourceRelationships_AutoCreatesResource(t *testing.T) {
 	cfg, repo := newAddRelationshipsTestServer(t)
 
@@ -217,6 +225,9 @@ func TestInventoryService_AddResourceRelationships_AutoCreatesResource(t *testin
 	})
 }
 
+// TestInventoryService_AddResourceRelationships_AutoCreateMissingRequiredCommon
+// validates that auto-creation is rejected with INVALID_ARGUMENT when the
+// schema requires common fields the request does not provide.
 func TestInventoryService_AddResourceRelationships_AutoCreateMissingRequiredCommon(t *testing.T) {
 	cfg, _ := newAddRelationshipsTestServer(t)
 
@@ -242,6 +253,9 @@ func TestInventoryService_AddResourceRelationships_AutoCreateMissingRequiredComm
 	})
 }
 
+// TestInventoryService_AddResourceRelationships_BothRepresentationsAbsent
+// validates that a request carrying neither a reporter nor a common
+// representation is rejected with INVALID_ARGUMENT.
 func TestInventoryService_AddResourceRelationships_BothRepresentationsAbsent(t *testing.T) {
 	cfg, _ := newAddRelationshipsTestServer(t)
 
@@ -263,6 +277,9 @@ func TestInventoryService_AddResourceRelationships_BothRepresentationsAbsent(t *
 	})
 }
 
+// TestInventoryService_AddResourceRelationships_TombstonedResource validates
+// that adding relationships to a tombstoned resource returns NOT_FOUND over
+// both transports.
 func TestInventoryService_AddResourceRelationships_TombstonedResource(t *testing.T) {
 	cfg, _ := newAddRelationshipsTestServer(t)
 
@@ -318,6 +335,8 @@ func TestInventoryService_AddResourceRelationships_TombstonedResource(t *testing
 	})
 }
 
+// TestInventoryService_AddResourceRelationships_MissingReporterType validates
+// that a request without a reporter type is rejected with INVALID_ARGUMENT.
 func TestInventoryService_AddResourceRelationships_MissingReporterType(t *testing.T) {
 	cfg, _ := newAddRelationshipsTestServer(t)
 

@@ -26,6 +26,20 @@ func (jschema JsonSchemaWithWorkspaces) Validate(data interface{}) (bool, error)
 	return validateJsonSchema(jschema.jsonSchema, data)
 }
 
+// CommonRelationFields returns an empty slice: JSON schemas carry no
+// relation metadata, so strict field enforcement cannot be applied on this
+// path (known limitation; full enforcement is unified schema only).
+func (jschema JsonSchemaWithWorkspaces) CommonRelationFields() []string {
+	return nil
+}
+
+// ReporterRelationFields returns an empty slice: JSON schemas carry no
+// relation metadata, so strict field enforcement cannot be applied on this
+// path (known limitation; full enforcement is unified schema only).
+func (jschema JsonSchemaWithWorkspaces) ReporterRelationFields(_ model.ReporterType) []string {
+	return nil
+}
+
 func validateJsonSchema(jsonSchema string, data interface{}) (bool, error) {
 	schemaLoader := gojsonschema.NewStringLoader(jsonSchema)
 	dataLoader := gojsonschema.NewGoLoader(data)

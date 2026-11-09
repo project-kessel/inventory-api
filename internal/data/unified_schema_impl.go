@@ -48,6 +48,27 @@ func (s *UnifiedSchemaImpl) Validate(data interface{}) (bool, error) {
 	return false, fmt.Errorf("validation failed: %s", joinValidationErrors(validationErrors))
 }
 
+// CommonRelationFields returns the names of relationship-typed fields that
+// belong to the common representation stream.
+func (s *UnifiedSchemaImpl) CommonRelationFields() []string {
+	fields := make([]string, 0, len(s.commonRelations))
+	for _, relation := range s.commonRelations {
+		fields = append(fields, relation.Field)
+	}
+	return fields
+}
+
+// ReporterRelationFields returns the names of relationship-typed fields that
+// belong to the reporter representation stream for the given reporter type.
+func (s *UnifiedSchemaImpl) ReporterRelationFields(reporterType model.ReporterType) []string {
+	reporterRelations := s.reporterRelations[reporterType.String()]
+	fields := make([]string, 0, len(reporterRelations))
+	for _, relation := range reporterRelations {
+		fields = append(fields, relation.Field)
+	}
+	return fields
+}
+
 // CalculateTuples calculates common and reporter-specific relation changes.
 func (s *UnifiedSchemaImpl) CalculateTuples(
 	currentRepresentation, previousRepresentation *model.Representations,

@@ -110,6 +110,13 @@ func (uc *RemoveResourceRelationshipsUseCase) RemoveResourceRelationships(ctx co
 		return status.Error(codes.InvalidArgument, "at least one of reporter or common relationship fields must be provided")
 	}
 
+	// Reject attribute (non-relationship) fields before any transaction work:
+	// the endpoint contract allows only relationship-typed fields. Schemas
+	// without relation metadata skip this check.
+	if err := uc.schemaService.ValidateRelationshipFields(ctx, cmd.ResourceType, cmd.ReporterType, cmd.CommonRepresentation, cmd.ReporterRepresentation); err != nil {
+		return status.Errorf(codes.InvalidArgument, "failed validation for remove resource relationships: %v", err)
+	}
+
 	var subscription pubsub.Subscription
 
 	txid, err := getNextTransactionID()

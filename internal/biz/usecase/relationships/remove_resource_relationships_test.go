@@ -29,6 +29,9 @@ func newRemoveTestHarness(t *testing.T, opts ...removeHarnessOption) *removeTest
 
 	resourceRepo := data.NewFakeResourceRepository()
 	schemaRepo := newFakeSchemaRepository(t)
+	if cfg.schemaRepo != nil {
+		schemaRepo = cfg.schemaRepo
+	}
 	mc := metricscollector.NewFakeMetricsCollector()
 	var metaAuth metaauthorizer.MetaAuthorizer
 	if cfg.meta != nil {
@@ -68,13 +71,23 @@ type removeTestHarness struct {
 type removeHarnessOption func(*removeHarnessConfig)
 
 type removeHarnessConfig struct {
-	meta *recordingMetaAuthorizer
+	meta       *recordingMetaAuthorizer
+	schemaRepo model.SchemaRepository
 }
 
 // withRemoveMeta returns a harness option that sets the meta-authorizer decision.
 func withRemoveMeta(allowed bool) removeHarnessOption {
 	return func(c *removeHarnessConfig) {
 		c.meta = &recordingMetaAuthorizer{allowed: allowed}
+	}
+}
+
+// withRemoveSchemaRepository returns a harness option that overrides the
+// default JSON-schema repository, e.g. to register a schema carrying
+// relation metadata for attribute-field rejection tests.
+func withRemoveSchemaRepository(repo model.SchemaRepository) removeHarnessOption {
+	return func(c *removeHarnessConfig) {
+		c.schemaRepo = repo
 	}
 }
 
@@ -448,4 +461,61 @@ func TestRemoveResourceRelationships_UsesReportResourceRelation(t *testing.T) {
 
 	assert.Equal(t, 1, h.meta.calls)
 	assert.Equal(t, []metaauthorizer.Relation{metaauthorizer.RelationReportResource}, h.meta.relations)
+}
+
+// TestRemoveResourceRelationships_RejectsAttributeFields validates that
+// non-relationship fields in the request are rejected with
+// INVALID_ARGUMENT when the schema carries relation metadata, before any
+// resource lookup occurs.
+func TestRemoveResourceRelationships_RejectsAttributeFields(t *testing.T) {
+	h := newRemoveTestHarness(t, withRemoveMeta(true), withRemoveSchemaRepository(newUnifiedSchemaRepository(t)))
+
+	cmd := removeCommand(t, "ws-attr-1",
+		map[string]interface{}{
+			"direct_service_preferences": []interface{}{"service-a"},
+			"display_name":               "not a relationship field",
+		}, nil)
+
+	err := h.usecase.RemoveResourceRelationships(h.ctx, cmd)
+
+	require.Error(t, err)
+	assert.Equal(t, codes.InvalidArgument, status.Code(err))
+	assert.Contains(t, err.Error(), `reporter field "display_name" is not a relationship field`)
+}
+
+// TestRemoveResourceRelationships_AcceptsRelationFieldsUnderUnifiedSchema
+// validates that removing relationship-typed fields from both representation
+// streams succeeds when the schemas carry relation metadata.
+func TestRemoveResourceRelationships_AcceptsRelationFieldsUnderUnifiedSchema(t *testing.T) {
+	h := newRemoveTestHarness(t, withRemoveMeta(true), withRemoveSchemaRepository(newUnifiedSchemaRepository(t)))
+
+	seed := reportCommand(t, "ws-attr-2", map[string]interface{}{
+		"direct_service_preferences": []interface{}{"RHEL", "Insights"},
+	}, map[string]interface{}{
+		"workspace_id": "ws-1",
+	})
+	require.NoError(t, h.reportResource(t, seed))
+
+	cmd := removeCommand(t, "ws-attr-2",
+		map[string]interface{}{"direct_service_preferences": []interface{}{"Insights"}},
+		map[string]interface{}{"workspace_id": "ws-1"})
+
+	err := h.usecase.RemoveResourceRelationships(h.ctx, cmd)
+
+	require.NoError(t, err)
+	assert.ElementsMatch(t, []interface{}{"RHEL"}, reporterPreferencesAt(t, h, "ws-attr-2"))
+}
+
+// TestRemoveResourceRelationships_RejectsWrongStreamFields validates that
+// relation fields supplied in the wrong representation stream are rejected
+// with INVALID_ARGUMENT before any resource lookup occurs.
+func TestRemoveResourceRelationships_RejectsWrongStreamFields(t *testing.T) {
+	h := newRemoveTestHarness(t, withRemoveMeta(true), withRemoveSchemaRepository(newUnifiedSchemaRepository(t)))
+
+	reporterStreamInCommon := removeCommand(t, "ws-stream-1", nil,
+		map[string]interface{}{"direct_service_preferences": []interface{}{"service-a"}})
+	err := h.usecase.RemoveResourceRelationships(h.ctx, reporterStreamInCommon)
+	require.Error(t, err)
+	assert.Equal(t, codes.InvalidArgument, status.Code(err))
+	assert.Contains(t, err.Error(), `common field "direct_service_preferences" is a reporter relationship field, not a common one`)
 }

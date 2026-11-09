@@ -33,7 +33,8 @@ type testHarness struct {
 type harnessOption func(*harnessConfig)
 
 type harnessConfig struct {
-	meta *recordingMetaAuthorizer
+	meta       *recordingMetaAuthorizer
+	schemaRepo model.SchemaRepository
 }
 
 // newTestHarness creates a test harness with a fake resource repository,
@@ -48,6 +49,9 @@ func newTestHarness(t *testing.T, opts ...harnessOption) *testHarness {
 
 	resourceRepo := data.NewFakeResourceRepository()
 	schemaRepo := newFakeSchemaRepository(t)
+	if cfg.schemaRepo != nil {
+		schemaRepo = cfg.schemaRepo
+	}
 	mc := metricscollector.NewFakeMetricsCollector()
 	var metaAuth metaauthorizer.MetaAuthorizer
 	if cfg.meta != nil {
@@ -81,6 +85,71 @@ func withMeta(allowed bool) harnessOption {
 	return func(c *harnessConfig) {
 		c.meta = &recordingMetaAuthorizer{allowed: allowed}
 	}
+}
+
+// withSchemaRepository returns a harness option that overrides the default
+// JSON-schema repository, e.g. to register a schema carrying relation
+// metadata for attribute-field rejection tests.
+func withSchemaRepository(repo model.SchemaRepository) harnessOption {
+	return func(c *harnessConfig) {
+		c.schemaRepo = repo
+	}
+}
+
+// newUnifiedSchemaRepository registers schemas for workspace/features whose
+// schemas carry relation metadata, enabling strict attribute-field
+// rejection: workspace_id is the common relation field (registered on the
+// resource schema, mirroring the unified schema repository's wiring), and
+// direct_service_preferences / direct_billing_account are the reporter
+// relation fields. The embedded JSON schemas are permissive so
+// representation validation does not constrain tests using this repository.
+func newUnifiedSchemaRepository(t *testing.T) model.SchemaRepository {
+	t.Helper()
+	schemaRepository := data.NewInMemorySchemaRepository()
+
+	commonSchema := data.NewUnifiedSchemaImpl(
+		map[string]interface{}{
+			"$schema": "http://json-schema.org/draft-07/schema#",
+			"type":    "object",
+			"properties": map[string]interface{}{
+				"workspace_id": map[string]interface{}{"type": "string"},
+			},
+			"required": []interface{}{},
+		},
+		[]data.UnifiedSchemaRelation{
+			{Name: "workspace", Target: "rbac/workspace", Field: "workspace_id", Cardinality: "one"},
+		},
+		nil)
+
+	unifiedSchema := data.NewUnifiedSchemaImpl(
+		map[string]interface{}{
+			"$schema": "http://json-schema.org/draft-07/schema#",
+			"type":    "object",
+		},
+		[]data.UnifiedSchemaRelation{
+			{Name: "workspace", Target: "rbac/workspace", Field: "workspace_id", Cardinality: "one"},
+		},
+		map[string][]data.UnifiedSchemaRelation{
+			"features": {
+				{Name: "service_preference", Target: "features/service", Field: "direct_service_preferences", Cardinality: "many"},
+				{Name: "billing_account", Target: "features/billing_account", Field: "direct_billing_account", Cardinality: "one"},
+			},
+		})
+
+	workspace, err := model.NewResourceType("workspace")
+	require.NoError(t, err)
+	features, err := model.NewReporterType("features")
+	require.NoError(t, err)
+
+	workspaceSchema, err := model.NewResourceSchemaRepresentation(workspace, commonSchema)
+	require.NoError(t, err)
+	require.NoError(t, schemaRepository.CreateResourceSchema(context.Background(), workspaceSchema))
+
+	featuresWorkspace, err := model.NewReporterSchemaRepresentation(workspace, features, unifiedSchema)
+	require.NoError(t, err)
+	require.NoError(t, schemaRepository.CreateReporterSchema(context.Background(), featuresWorkspace))
+
+	return schemaRepository
 }
 
 // reportResource seeds an existing resource through the ReportResource use
@@ -600,4 +669,61 @@ func TestAddResourceRelationships_UsesReportResourceRelation(t *testing.T) {
 
 	assert.Equal(t, 1, h.meta.calls)
 	assert.Equal(t, []metaauthorizer.Relation{metaauthorizer.RelationReportResource}, h.meta.relations)
+}
+
+// TestAddResourceRelationships_RejectsAttributeFields validates that
+// non-relationship fields in the request are rejected with
+// INVALID_ARGUMENT when the schema carries relation metadata.
+func TestAddResourceRelationships_RejectsAttributeFields(t *testing.T) {
+	h := newTestHarness(t, withSchemaRepository(newUnifiedSchemaRepository(t)))
+
+	cmd := addCommand(t, "ws-attr-1",
+		map[string]interface{}{
+			"direct_service_preferences": []interface{}{"service-a"},
+			"display_name":               "not a relationship field",
+		}, nil)
+
+	err := h.usecase.AddResourceRelationships(h.ctx, cmd)
+
+	require.Error(t, err)
+	assert.Equal(t, codes.InvalidArgument, status.Code(err))
+	assert.Contains(t, err.Error(), `reporter field "display_name" is not a relationship field`)
+}
+
+// TestAddResourceRelationships_AcceptsRelationFieldsUnderUnifiedSchema
+// validates that relationship-typed fields from both representation streams
+// are accepted when the schemas carry relation metadata, auto-creating the
+// resource as usual.
+func TestAddResourceRelationships_AcceptsRelationFieldsUnderUnifiedSchema(t *testing.T) {
+	h := newTestHarness(t, withSchemaRepository(newUnifiedSchemaRepository(t)))
+
+	cmd := addCommand(t, "ws-attr-2",
+		map[string]interface{}{"direct_service_preferences": []interface{}{"service-a"}},
+		map[string]interface{}{"workspace_id": "workspace-1"})
+
+	err := h.usecase.AddResourceRelationships(h.ctx, cmd)
+
+	require.NoError(t, err)
+}
+
+// TestAddResourceRelationships_RejectsWrongStreamFields validates that
+// relation fields supplied in the wrong representation stream are rejected:
+// a reporter relation field in the common struct and a common relation field
+// in the reporter struct both fail with INVALID_ARGUMENT.
+func TestAddResourceRelationships_RejectsWrongStreamFields(t *testing.T) {
+	h := newTestHarness(t, withSchemaRepository(newUnifiedSchemaRepository(t)))
+
+	reporterStreamInCommon := addCommand(t, "ws-stream-1", nil,
+		map[string]interface{}{"direct_service_preferences": []interface{}{"service-a"}})
+	err := h.usecase.AddResourceRelationships(h.ctx, reporterStreamInCommon)
+	require.Error(t, err)
+	assert.Equal(t, codes.InvalidArgument, status.Code(err))
+	assert.Contains(t, err.Error(), `common field "direct_service_preferences" is a reporter relationship field, not a common one`)
+
+	commonStreamInReporter := addCommand(t, "ws-stream-2",
+		map[string]interface{}{"workspace_id": "workspace-1"}, nil)
+	err = h.usecase.AddResourceRelationships(h.ctx, commonStreamInReporter)
+	require.Error(t, err)
+	assert.Equal(t, codes.InvalidArgument, status.Code(err))
+	assert.Contains(t, err.Error(), `reporter field "workspace_id" is a common relationship field, not a reporter one`)
 }

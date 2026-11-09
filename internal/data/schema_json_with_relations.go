@@ -23,6 +23,22 @@ func (s JsonSchemaWithRelations) Validate(data interface{}) (bool, error) {
 	return validateJsonSchema(s.jsonSchema, data)
 }
 
+// CommonRelationFields returns an empty slice: the relation definitions
+// this type carries are not reporter-scoped and are used only for tuple
+// calculation, so strict field enforcement is not applied on this path
+// (known limitation; full enforcement is unified schema only).
+func (s JsonSchemaWithRelations) CommonRelationFields() []string {
+	return nil
+}
+
+// ReporterRelationFields returns an empty slice: the relation definitions
+// this type carries are not reporter-scoped and are used only for tuple
+// calculation, so strict field enforcement is not applied on this path
+// (known limitation; full enforcement is unified schema only).
+func (s JsonSchemaWithRelations) ReporterRelationFields(_ model.ReporterType) []string {
+	return nil
+}
+
 func (s JsonSchemaWithRelations) CalculateTuples(
 	currentRepresentation, previousRepresentation *model.Representations,
 	key model.ReporterResourceKey,

@@ -316,7 +316,18 @@ func NewCommand(
 				logger,
 			)
 
-			inventory_service := resourcesvc.NewKesselInventoryServiceV1beta2(inventory_controller, add_relationships_controller)
+			remove_relationships_controller := relationsusecase.NewRemoveResourceRelationshipsUseCase(
+				resourceRepo,
+				schemaRepository,
+				listenManager,
+				waitForNotifCircuitBreaker,
+				usecaseConfig,
+				mc,
+				metaauthorizer.NewSimpleMetaAuthorizer(),
+				logger,
+			)
+
+			inventory_service := resourcesvc.NewKesselInventoryServiceV1beta2(inventory_controller, add_relationships_controller, remove_relationships_controller)
 			pbv1beta2.RegisterKesselInventoryServiceServer(server.GrpcServer, inventory_service)
 			pbv1beta2.RegisterKesselInventoryServiceHTTPServer(server.HttpServer, inventory_service)
 

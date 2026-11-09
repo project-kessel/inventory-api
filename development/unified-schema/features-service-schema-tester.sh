@@ -4,9 +4,13 @@
 # running inventory-api instance.
 #
 # Prerequisites:
-#   - Full Kessel stack running (via `make kessel-up`, `make kessel-up-unfied`, or ephemeral deployment)
+#   - Full Kessel stack running in unified schema mode (via
+#     `make kessel-up-unified` or an ephemeral deployment); the unified-schema
+#     config enables load-reporter-representation, which reporter-side
+#     relationship tuples require
 #   - `zed` on PATH and configured (`zed context set`) against the same
 #     SpiceDB instance inventory-api writes to
+#   - `grpcurl` on PATH for the API calls
 #
 # What this script does, in order:
 #   1. Seeds a workspace hierarchy directly into SpiceDB via zed
@@ -88,9 +92,15 @@ assert_tuple_exists() {
 #   matches SUBJECT_ID.
 #   PASS = the tuple is absent, as expected.
 #   FAIL = the tuple exists but should not; the offending tuples are printed.
+#   FAIL = the zed read itself failed — a failed read is never treated as
+#   proof of absence.
 assert_tuple_absent() {
   local actual
-  actual=$(zed relationship read "$1" "$2" 2>/dev/null)
+  if ! actual=$(zed relationship read "$1" "$2" 2>/dev/null); then
+    echo "FAIL: $4 — zed relationship read failed"
+    FAIL_COUNT=$((FAIL_COUNT + 1))
+    return
+  fi
   if echo "$actual" | grep -q "$3"; then
     echo "FAIL: $4 — tuple EXISTS but was not expected"
     echo "      unexpected: $1 $2 -> subject $3"
@@ -100,6 +110,32 @@ assert_tuple_absent() {
   else
     echo "PASS: $4 — no such tuple, as expected"
     PASS_COUNT=$((PASS_COUNT + 1))
+  fi
+}
+
+# assert_check EXPECTED_ALLOWED DESCRIPTION
+#   Reads a Check request (JSON) from stdin, invokes the Check endpoint, and
+#   asserts that the response's "allowed" value equals EXPECTED_ALLOWED
+#   ("true" or "false"). PASS/FAIL is recorded like the tuple assertions; a
+#   failed grpcurl call is recorded as a failure rather than a pass.
+assert_check() {
+  local expected="$1" description="$2"
+  local response
+  if ! response=$(grpcurl -plaintext -d @ localhost:${PORT_NUMBER} kessel.inventory.v1beta2.KesselInventoryService.Check 2>&1); then
+    echo "FAIL: $description — Check call failed"
+    echo "      error:"
+    echo "$response" | sed 's/^/        /'
+    FAIL_COUNT=$((FAIL_COUNT + 1))
+    return
+  fi
+  if echo "$response" | grep -Eq "\"allowed\": *${expected}"; then
+    echo "PASS: $description — allowed=${expected}, as expected"
+    PASS_COUNT=$((PASS_COUNT + 1))
+  else
+    echo "FAIL: $description — expected allowed=${expected}"
+    echo "      response:"
+    echo "$response" | sed 's/^/        /'
+    FAIL_COUNT=$((FAIL_COUNT + 1))
   fi
 }
 
@@ -316,13 +352,14 @@ echo "All resources reported...time for Checks"
 echo "Need to give things time to replicate...sleeping for 20 seconds"
 sleep 20
 
-# Each Check below evaluates the enabled_services PERMISSION
-# In the grpcurl output, look for "allowed": true or "allowed": false in each CheckResponse.
+# Each Check below evaluates the enabled_services PERMISSION and is asserted
+# by assert_check, which reads the request from the heredoc, invokes the
+# endpoint, and verifies the response's "allowed" value against the expected
+# outcome — recording PASS/FAIL like the tuple assertions.
 #
 # Allowed: root desires service a and root's main account pays for it; both
 # sides inherit down the tree to team 1.
-echo "Team 1 should have access to service A"
-grpcurl -plaintext -d @ localhost:${PORT_NUMBER} kessel.inventory.v1beta2.KesselInventoryService.Check <<EOF
+assert_check true "Team 1 should have access to service A" <<EOF
 {
   "object": {
     "resourceType": "workspace",
@@ -346,8 +383,7 @@ EOF
 
 # Allowed: dept a (team 1's ancestor) desires service b and the main account
 # pays for it.
-echo "Team 1 should also have access to service B"
-grpcurl -plaintext -d @ localhost:${PORT_NUMBER} kessel.inventory.v1beta2.KesselInventoryService.Check <<EOF
+assert_check true "Team 1 should also have access to service B" <<EOF
 {
   "object": {
     "resourceType": "workspace",
@@ -371,8 +407,7 @@ EOF
 
 # DENIED: team 1 desires service d directly, but no billing account pays for
 # service d. Desire without payment is not enough.
-echo "Team 1 should NOT have access to service D"
-grpcurl -plaintext -d @ localhost:${PORT_NUMBER} kessel.inventory.v1beta2.KesselInventoryService.Check <<EOF
+assert_check false "Team 1 should NOT have access to service D" <<EOF
 {
   "object": {
     "resourceType": "workspace",
@@ -396,8 +431,7 @@ EOF
 
 # DENIED: dept b's special account pays for service c, but team 2 does not
 # desire it (only team 3 does). Payment without desire is not enough.
-echo "Team 2 should NOT have access to service C"
-grpcurl -plaintext -d @ localhost:${PORT_NUMBER} kessel.inventory.v1beta2.KesselInventoryService.Check <<EOF
+assert_check false "Team 2 should NOT have access to service C" <<EOF
 {
   "object": {
     "resourceType": "workspace",
@@ -421,8 +455,7 @@ EOF
 
 # Allowed: team 3 desires service c directly AND dept b's special account
 # pays for it — both sides satisfied.
-echo "Team 3 SHOULD have access to service C"
-grpcurl -plaintext -d @ localhost:${PORT_NUMBER} kessel.inventory.v1beta2.KesselInventoryService.Check <<EOF
+assert_check true "Team 3 SHOULD have access to service C" <<EOF
 {
   "object": {
     "resourceType": "workspace",
@@ -542,8 +575,7 @@ sleep 20
 # Both previously-DENIED checks should now flip to allowed, because each Add
 # satisfied the missing half of the desire+payment equation.
 
-echo "Team 1 SHOULD NOW have access to service D (desired directly + now paid by main account)"
-grpcurl -plaintext -d @ localhost:${PORT_NUMBER} kessel.inventory.v1beta2.KesselInventoryService.Check <<EOF
+assert_check true "Team 1 SHOULD NOW have access to service D (desired directly + now paid by main account)" <<EOF
 {
   "object": {
     "resourceType": "workspace",
@@ -565,8 +597,7 @@ grpcurl -plaintext -d @ localhost:${PORT_NUMBER} kessel.inventory.v1beta2.Kessel
 }
 EOF
 
-echo "Team 2 SHOULD NOW have access to service C (now desired directly + paid by special account)"
-grpcurl -plaintext -d @ localhost:${PORT_NUMBER} kessel.inventory.v1beta2.KesselInventoryService.Check <<EOF
+assert_check true "Team 2 SHOULD NOW have access to service C (now desired directly + paid by special account)" <<EOF
 {
   "object": {
     "resourceType": "workspace",
@@ -593,8 +624,7 @@ EOF
 # desire (its own preference) + payment (inherited from dept b's special
 # account). If auto-create is broken, this check fails AND the tuple grep
 # below reports a missing preference.
-echo "Team 4 (auto-created) SHOULD have access to service C (own desire + dept b's account pays for it)"
-grpcurl -plaintext -d @ localhost:${PORT_NUMBER} kessel.inventory.v1beta2.KesselInventoryService.Check <<EOF
+assert_check true "Team 4 (auto-created) SHOULD have access to service C (own desire + dept b's account pays for it)" <<EOF
 {
   "object": {
     "resourceType": "workspace",
@@ -693,8 +723,7 @@ sleep 20
 # The three checks that flipped to allowed after the Adds should now flip
 # back to denied (team 4 included — the auto-created resource), and the
 # final check confirms an unrelated relationship was untouched.
-echo "Team 1 should NO LONGER have access to service D (no longer paid for by main account)"
-grpcurl -plaintext -d @ localhost:${PORT_NUMBER} kessel.inventory.v1beta2.KesselInventoryService.Check <<EOF
+assert_check false "Team 1 should NO LONGER have access to service D (no longer paid for by main account)" <<EOF
 {
   "object": {
     "resourceType": "workspace",
@@ -716,8 +745,7 @@ grpcurl -plaintext -d @ localhost:${PORT_NUMBER} kessel.inventory.v1beta2.Kessel
 }
 EOF
 
-echo "Team 2 should NO LONGER have access to service C (no longer desired directly)"
-grpcurl -plaintext -d @ localhost:${PORT_NUMBER} kessel.inventory.v1beta2.KesselInventoryService.Check <<EOF
+assert_check false "Team 2 should NO LONGER have access to service C (no longer desired directly)" <<EOF
 {
   "object": {
     "resourceType": "workspace",
@@ -739,8 +767,7 @@ grpcurl -plaintext -d @ localhost:${PORT_NUMBER} kessel.inventory.v1beta2.Kessel
 }
 EOF
 
-echo "Team 4 should NO LONGER have access to service C (auto-created resource, preference removed)"
-grpcurl -plaintext -d @ localhost:${PORT_NUMBER} kessel.inventory.v1beta2.KesselInventoryService.Check <<EOF
+assert_check false "Team 4 should NO LONGER have access to service C (auto-created resource, preference removed)" <<EOF
 {
   "object": {
     "resourceType": "workspace",
@@ -762,8 +789,7 @@ grpcurl -plaintext -d @ localhost:${PORT_NUMBER} kessel.inventory.v1beta2.Kessel
 }
 EOF
 
-echo "Team 1 should STILL have access to service A (unaffected by the removals)"
-grpcurl -plaintext -d @ localhost:${PORT_NUMBER} kessel.inventory.v1beta2.KesselInventoryService.Check <<EOF
+assert_check true "Team 1 should STILL have access to service A (unaffected by the removals)" <<EOF
 {
   "object": {
     "resourceType": "workspace",
@@ -810,3 +836,9 @@ assert_tuple_exists rbac/workspace:a0af6abc-b396-11f1-ae2b-6ae246604903 t_featur
 # this tally covers every tuple assertion in the entire run.
 # ---------------------------------------------------------------------------
 print_assert_summary
+
+# Exit non-zero when any assertion failed so scripted invocations can detect
+# a failing run; exit zero when everything passed.
+if [[ ${FAIL_COUNT} -gt 0 ]]; then
+  exit 1
+fi

@@ -8,6 +8,7 @@ import (
 	"github.com/go-kratos/kratos/v2/log"
 	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
+	relationsusecase "github.com/project-kessel/inventory-api/internal/biz/usecase/relationships"
 	"github.com/project-kessel/inventory-api/internal/biz/usecase/resources"
 	rpcstatus "google.golang.org/genproto/googleapis/rpc/status"
 	"google.golang.org/grpc/codes"
@@ -15,14 +16,20 @@ import (
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
+// InventoryService implements the v1beta2 KesselInventoryService for gRPC and
+// HTTP, delegating to the resource and relationship usecases.
 type InventoryService struct {
 	pb.UnimplementedKesselInventoryServiceServer
-	Ctl *resources.Usecase
+	Ctl                 *resources.Usecase
+	AddRelationshipsCtl *relationsusecase.AddResourceRelationshipsUseCase
 }
 
-func NewKesselInventoryServiceV1beta2(c *resources.Usecase) *InventoryService {
+// NewKesselInventoryServiceV1beta2 constructs the v1beta2 inventory service
+// from the resource usecase and the add-relationships usecase.
+func NewKesselInventoryServiceV1beta2(c *resources.Usecase, addRelationships *relationsusecase.AddResourceRelationshipsUseCase) *InventoryService {
 	return &InventoryService{
-		Ctl: c,
+		Ctl:                 c,
+		AddRelationshipsCtl: addRelationships,
 	}
 }
 

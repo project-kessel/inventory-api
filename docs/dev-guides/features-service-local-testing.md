@@ -264,7 +264,8 @@ Things worth knowing:
 
 - **Add merges, it does not replace.** The account still pays for the first service; only the named values changed.
 - The request names the resource directly (`localResourceId` at the top level) rather than through a `representations` block.
-- These endpoints are for relationship fields only (`services`, `direct_billing_account`, `direct_service_preferences`). On this local stack a field that is not in the schema is rejected with `INVALID_ARGUMENT`; a field that exists in the schema but is not a relationship is accepted silently but has no effect on permissions. Either way, stick to the relationship fields.
+- A field that is not in the schema is rejected with `INVALID_ARGUMENT`. Stick to the relationship fields used above (`services`, `direct_billing_account`, `direct_service_preferences`).
+- The boolean fields are valid too, and affect permissions. With `desire_all_services` set to true, the workspace desires every service (see [Desiring every service](#desiring-every-service)); the `ignore_inherited_*` flags work the same way. Think of them as switches: true turns one on, and false or an omitted field leaves it off. To turn a flag off, remove its stored true value or re-report the resource. Add cannot replace a stored value; conflicting values fail with `INVALID_ARGUMENT`.
 - Calling `AddResourceRelationships` for a resource that doesn't exist yet will create the resource as well.
 
 ## Remove relationships
@@ -341,7 +342,7 @@ After replication, the billing account's relationships are cleaned up and checks
 
 - **A `Check` result looks stale** - writes replicate asynchronously. Wait and retry before debugging further.
 - **`INVALID_ARGUMENT ... api_href: must be at least 1 characters`** - `apiHref` is required on `ReportResource`; the examples above include it.
-- **`INVALID_ARGUMENT ... Additional property ... is not allowed`** - the field is not part of the resource's schema at all. The Add/Remove endpoints are for relationship fields (`services`, `direct_billing_account`, `direct_service_preferences`); note that a schema field that is not a relationship (e.g. `desire_all_services`) is accepted on this local stack but does not affect permissions.
+- **`INVALID_ARGUMENT ... Additional property ... is not allowed`** - the field is not part of the resource's schema at all. Stick to the relationship fields used in the examples (`services`, `direct_billing_account`, `direct_service_preferences`). The boolean fields (`desire_all_services`, `ignore_inherited_desired_services`, `ignore_inherited_paid_services`) are also valid and affect permissions; see [Desiring every service](#desiring-every-service).
 - **Workspaces are not linked to each other** - the hierarchy comes from the setup script (via RBAC). Inventory-reported workspaces have no parent link unless the workspace was created through the script or RBAC.
 - **Need a clean slate** - `make kessel-down` stops the stack and removes all local data; `make kessel-up` then starts fresh.
 - **Stack logs** - `podman logs -f full-kessel-inventory-api-1` and `podman logs -f full-kessel-inventory-consumer-1` are the usual suspects.
@@ -349,3 +350,5 @@ After replication, the billing account's relationships are cleaned up and checks
 ## Going further
 
 The test script `development/unified-schema/features-service-schema-tester.sh` runs a similar automated version of this entire walkthrough (report → check → add → remove, with assertions) against the unified-schema stack (`make kessel-up-unified`). It is a good next step once the manual flow above feels comfortable.
+
+Note that the unified schema is actively under development, so behavior there may vary from this guide. In particular, wildcard fields such as `desire_all_services` are not yet supported on that stack - they are accepted but do not affect permissions there; support is planned.

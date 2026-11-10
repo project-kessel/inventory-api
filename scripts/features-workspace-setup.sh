@@ -39,11 +39,13 @@ fi
 # authentication on this stack.
 X_RH_IDENTITY=$(printf '{"identity":{"account_number":"12345","org_id":"%s","type":"User","user":{"user_id":"features-tester","email":"features@example.com","username":"features","is_org_admin":true}}}' "$ORG_ID" | base64 | tr -d '\n')
 
-# find_workspace NAME prints the id of the first workspace with that name,
-# or nothing when no workspace has it.
+# find_workspace NAME PARENT_ID prints the id of the first workspace with
+# that name under that parent, or nothing when no such child exists. Matching
+# on the parent matters: a same-named workspace elsewhere in the tree must
+# not be reused, or the hierarchy the guide relies on silently breaks.
 find_workspace() {
   curl -sf -H "x-rh-identity: ${X_RH_IDENTITY}" "${RBAC_HTTP}/api/rbac/v2/workspaces/" |
-    jq -r --arg name "$1" '.data[] | select(.name == $name) | .id' | head -1
+    jq -r --arg name "$1" --arg parent "$2" '.data[] | select(.name == $name and .parent_id == $parent) | .id' | head -1
 }
 
 # create_workspace NAME PARENT_ID creates a workspace under the parent and
@@ -54,11 +56,11 @@ create_workspace() {
     "${RBAC_HTTP}/api/rbac/v2/workspaces/" | jq -r '.id'
 }
 
-# ensure_workspace NAME PARENT_ID prints the id of the named workspace,
-# creating it under the parent when it does not exist yet.
+# ensure_workspace NAME PARENT_ID prints the id of the workspace named NAME
+# under PARENT_ID, creating it when no such child exists yet.
 ensure_workspace() {
   local name="$1" parent="$2" id
-  id=$(find_workspace "$name") || true
+  id=$(find_workspace "$name" "$parent") || true
   if [[ -n "${id:-}" ]]; then
     echo "  ${name}: already exists (${id})" >&2
   else

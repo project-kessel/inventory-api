@@ -1,9 +1,6 @@
 # Unified Schema Test Setup
 
-This is a temporary, isolated unified-schema test setup for validating the
-Inventory service before unified schema migration is complete. It deliberately
-does not modify the shared production schema artifacts or the default Kessel
-development stack.
+This is a temporary, isolated unified-schema test setup for validating the Inventory service before unified schema migration is complete. It deliberately does not modify the shared production schema artifacts or the default Kessel development stack.
 
 Start it with:
 
@@ -11,39 +8,47 @@ Start it with:
 make kessel-up-unified
 ```
 
-The setup mounts `resources/` into the Inventory container and uses
-`configs/inventory-api.yaml`, which selects `in-memory.type: unified`.
+The setup mounts `resources/` into the Inventory container and uses `configs/inventory-api.yaml`, which selects `in-memory.type: unified`.
 
-The normal `make kessel-up` flow is unchanged and continues to use the legacy
-JSON schema cache.
+The normal `make kessel-up` flow is unchanged and continues to use the legacy JSON schema cache.
 
 ## Files
 
 - `configs/inventory-api.yaml` selects unified YAML loading for the local stack.
-- `resources/*.yaml` contains unified test artifacts for host, workspace, service,
-  billing_account, k8s_cluster, k8s_policy, and notifications_integration.
+- `resources/*.yaml` contains unified test artifacts for host, workspace, service, billing_account, k8s_cluster, k8s_policy, and notifications_integration.
 - `docker-compose.override.yaml` mounts the temporary config and resource path.
-- `kessel-inventory-ephem-unified.yaml` is a development-only ephemeral template
-  that accepts a parameterized unified-schema tarball.
+- `kessel-inventory-ephem-unified.yaml` is a development-only ephemeral template that accepts a parameterized unified-schema tarball.
+- `features-service-schema-tester.sh` is an automated end-to-end test for the Features service model, usable against both the JSON and unified schema stacks (see below).
 
-These artifacts are local test fixtures. They are not part of the production
-schema set and should not be copied into `data/schema/resources`.
+These artifacts are local test fixtures. They are not part of the production schema set and should not be copied into `data/schema/resources`.
 
 > [!NOTE]
-> Some of the test resources (k8s-cluster, k8s-policy, notifications_integration) are there
-> for validating schema loading but are not defined in the default schema.zed used in
-> this compose setup. If you wish to test those resources, you'll need to create a custom
-> schema.zed from the [current stage config](https://raw.githubusercontent.com/project-kessel/rbac-config/refs/heads/master/configs/stage/schemas/schema.zed)
-> and add the missing definitions (available in [./deploy/schema.zed](../../deploy/schema.zed)),
-> then update the **SCHEMA_ZED_FILE** variable in the full-kessel [.env](../full-kessel/.env) file to use it
+> Some of the test resources (k8s-cluster, k8s-policy, notifications_integration) are there for validating schema loading but are not defined in the default schema.zed used in this compose setup. If you wish to test those resources, you'll need to create a custom schema.zed from the [current stage config](https://raw.githubusercontent.com/project-kessel/rbac-config/refs/heads/master/configs/stage/schemas/schema.zed) and add the missing definitions (available in [./deploy/schema.zed](../../deploy/schema.zed)), then update the **SCHEMA_ZED_FILE** variable in the full-kessel [.env](../full-kessel/.env) file to use it
+
+## Features Service Schema Tester
+
+`features-service-schema-tester.sh` runs an automated end-to-end test of the Features service enhancements being developed alongside unified schema including the relationship delta endpoints. The script seeds a workspace hierarchy in SpiceDB, reports billing accounts and workspaces, exercises `AddResourceRelationships` (including auto-creating a never-reported resource) and `RemoveResourceRelationships`, and verifies both the `enabled_services` permission checks and the underlying SpiceDB tuples with PASS/FAIL assertions. It exits non-zero when any assertion fails.
+
+The same script works against both schema modes:
+
+```shell
+make kessel-up          # legacy JSON schema stack
+make kessel-up-unified  # unified schema stack
+
+./development/unified-schema/features-service-schema-tester.sh 9081
+```
+
+The argument is the Inventory API gRPC port. The script requires `grpcurl` on PATH and `zed` configured (`zed context set`) against the stack's SpiceDB instance. Reporter-side relationship tuples require the consumer's `load-reporter-representation` setting, which both local stack configs already enable.
+
+Note that strict attribute-field rejection on the delta endpoints is enforced only under unified schema; the JSON schema stack skips that check, so the script's assertions pass under both modes but only the unified stack rejects non-relationship fields.
+
+For a similar step-by-step manual walkthrough of the same API surface - including a variant that sets up workspaces through RBAC instead of zed - see the [Features Service Local Testing guide](../../docs/dev-guides/features-service-local-testing.md).
 
 ## Ephemeral Tarball
 
-The ephemeral template expects the unified YAML files in a base64-encoded
-tarball passed through the `UNIFIED_RESOURCES_TARBALL` template parameter.
+The ephemeral template expects the unified YAML files in a base64-encoded tarball passed through the `UNIFIED_RESOURCES_TARBALL` template parameter.
 
-Configure Bonfire to use this local template. Add or update the Kessel Inventory
-component in `~/.config/bonfire/config.yaml`:
+Configure Bonfire to use this local template. Add or update the Kessel Inventory component in `~/.config/bonfire/config.yaml`:
 
 ```yaml
 apps:
@@ -74,9 +79,7 @@ bonfire deploy kessel \
   --set-parameter kessel-inventory/UNIFIED_RESOURCES_TARBALL="${UNIFIED_RESOURCES_TARBALL}"
 ```
 
-The `--set-parameter` syntax is useful for the tarball because the base64 value
-should remain local and should not be committed to the Bonfire config. Other values
-can be defined in the config if preferred.
+The `--set-parameter` syntax is useful for the tarball because the base64 value should remain local and should not be committed to the Bonfire config. Other values can be defined in the config if preferred.
 
 Verify that the ConfigMap contains the expected YAML artifacts:
 
@@ -95,11 +98,6 @@ oc logs <inventory-api-pod> | grep 'Using unified YAML in-memory schema reposito
 
 ## Future Migration
 
-Once unified schema migration is complete, the approved unified schema artifacts
-and configuration should move into the common deployment and `kessel-up`
-setup. This temporary directory, its compose override, and its ephemeral
-template should then be deprecated and removed.
+Once unified schema migration is complete, the approved unified schema artifacts and configuration should move into the common deployment and `kessel-up` setup. This temporary directory, its compose override, and its ephemeral template should then be deprecated and removed.
 
-The full-Kessel stack uses the image configured by
-`development/full-kessel/.env`. Set `INVENTORY_API_IMAGE` or
-`COMPOSE_PULL_MODE=missing` as needed when testing a locally built image.
+The full-Kessel stack uses the image configured by `development/full-kessel/.env`. Set `INVENTORY_API_IMAGE` or `COMPOSE_PULL_MODE=missing` as needed when testing a locally built image.

@@ -43,6 +43,8 @@ make kessel-up
 
 This starts all services using the compose file at `development/full-kessel/docker-compose.yaml`. The SpiceDB schema is automatically downloaded from the [stage rbac-config repo](https://raw.githubusercontent.com/project-kessel/rbac-config/refs/heads/master/configs/stage/schemas/schema.zed) at startup. The RBAC-specific Compose override is downloaded from the [insights-rbac repository](https://raw.githubusercontent.com/project-kessel/insights-rbac/master/scripts/local_stack/full-kessel.rbac-override.yml), so the RBAC repository does not need to be cloned.
 
+The full-Kessel configuration enables the Inventory consumer's `load-reporter-representation` setting (see `development/full-kessel/configs/inventory-api.yaml`), so reporter-side relationship fields replicate to SpiceDB — matching the stage configuration. Deployments that have not opted in keep the setting disabled, and reporter-side relationship tuples will not replicate there.
+
 ### Ports
 
 | Port | Service |

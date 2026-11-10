@@ -9,7 +9,7 @@ Every command is copy-pasteable. No prior Kessel knowledge is assumed.
 - `podman` (or Docker) with the compose plugin
 - A clone of this repository
 - [`grpcurl`](https://github.com/fullstorydev/grpcurl) - used for all inventory API calls
-- `curl`, `jq` - used by the workspace setup script
+- `curl`, `jq`, `yq` - used by the stack startup and the workspace setup script
 
 The examples below talk to two local ports:
 
@@ -26,8 +26,7 @@ From the repository root:
 make kessel-up
 ```
 
-This starts the full local stack (Inventory API, SpiceDB, the Inventory Consumer, Kafka, and the RBAC service) using pre-built images. The command waits until every service is healthy; when it
-returns, the stack is ready. Startup takes a few minutes the first time while images are pulled.
+This starts the full local stack (Inventory API, SpiceDB, the Inventory Consumer, Kafka, and the RBAC service) using pre-built images. Startup takes a few minutes the first time while images are pulled.
 
 To stop everything later (and wipe all local data for a clean slate):
 
@@ -178,30 +177,7 @@ grpcurl -plaintext -d @ localhost:9081 kessel.inventory.v1beta2.KesselInventoryS
 EOF
 ```
 
-**Variant: desiring every service.** Instead of listing services one by one, the team can set `desire_all_services` to true and skip the preferences list entirely. The team then desires every service, so its enabled services become exactly the services its reachable billing accounts pay for:
-
-```shell
-grpcurl -plaintext -d @ localhost:9081 kessel.inventory.v1beta2.KesselInventoryService.ReportResource <<EOF
-{
-    "type": "workspace",
-    "reporterType": "features",
-    "reporterInstanceId": "features-local-testing",
-    "representations": {
-      "metadata": {
-        "localResourceId": "$TEAM_ID",
-        "apiHref": "https://api.example.com/workspaces/team",
-        "consoleHref": "https://console.example.com/workspaces/team",
-        "reporterVersion": "1.0.0"
-      },
-      "reporter": {
-        "desire_all_services": true
-      }
-    }
-}
-EOF
-```
-
-With this variant the `Check` in the next section returns `ALLOWED_TRUE` for any service the billing account pays for, without naming them in preferences. Desire without payment still denies: a service nobody pays for returns `ALLOWED_FALSE`. Both fields can also be combined in one report - `desire_all_services` widens the desire, `direct_service_preferences` adds specific entries on top.
+**Variant: desiring every service.** See [Desiring every service](#desiring-every-service) after the Add and Remove sections - the variant changes the team's desire state, which would change the outcomes of those examples, so it is covered separately there.
 
 Each call should return `{}` (an empty success response). A few field notes:
 
@@ -310,6 +286,35 @@ EOF
 ```
 
 The account still pays for the service, but the team no longer desires it. After a few seconds the `Check` for the second service returns `ALLOWED_FALSE`. Removing a value that is not present is a harmless no-op.
+
+## Desiring every service
+
+Instead of listing services one by one, a workspace can set `desire_all_services` to true. The workspace then desires every service, so its enabled services become exactly the services its reachable billing accounts pay for:
+
+```shell
+grpcurl -plaintext -d @ localhost:9081 kessel.inventory.v1beta2.KesselInventoryService.ReportResource <<EOF
+{
+    "type": "workspace",
+    "reporterType": "features",
+    "reporterInstanceId": "features-local-testing",
+    "representations": {
+      "metadata": {
+        "localResourceId": "$TEAM_ID",
+        "apiHref": "https://api.example.com/workspaces/team",
+        "consoleHref": "https://console.example.com/workspaces/team",
+        "reporterVersion": "1.0.0"
+      },
+      "reporter": {
+        "desire_all_services": true
+      }
+    }
+}
+EOF
+```
+
+With this in place a `Check` returns `ALLOWED_TRUE` for any service the billing account pays for, without naming them in preferences. Desire without payment still denies: a service nobody pays for returns `ALLOWED_FALSE`. Both fields can also be combined in one report - `desire_all_services` widens the desire, `direct_service_preferences` adds specific entries on top.
+
+Note that this example is placed after the Add and Remove sections on purpose: `ReportResource` replaces the team's whole representation, and with `desire_all_services` set the Remove example above would keep returning `ALLOWED_TRUE` (the team still desires everything). To go back to the explicit preferences state, re-run the original team report from the reporting section.
 
 ## Delete a resource
 

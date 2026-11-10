@@ -10,7 +10,7 @@ make kessel-up-unified
 
 The setup mounts `resources/` into the Inventory container and uses `configs/inventory-api.yaml`, which selects `in-memory.type: unified`.
 
-The normal `make kessel-up` flow is unchanged and continues to use the legacy JSON schema cache.
+The normal `make kessel-up` flow continues to use the legacy JSON schema cache. Note that the shared full-Kessel configuration enables the consumer's `load-reporter-representation` setting (required for reporter-side relationship tuples, and matching the stage configuration); deployments that have not opted in keep the setting disabled.
 
 ## Files
 
@@ -29,16 +29,19 @@ These artifacts are local test fixtures. They are not part of the production sch
 
 `features-service-schema-tester.sh` runs an automated end-to-end test of the Features service enhancements being developed alongside unified schema including the relationship delta endpoints. The script seeds a workspace hierarchy in SpiceDB, reports billing accounts and workspaces, exercises `AddResourceRelationships` (including auto-creating a never-reported resource) and `RemoveResourceRelationships`, and verifies both the `enabled_services` permission checks and the underlying SpiceDB tuples with PASS/FAIL assertions. It exits non-zero when any assertion fails.
 
-The same script works against both schema modes:
+The same script works against both schema modes - start one or the other, then run the tester against it (the argument is the Inventory API gRPC port):
 
 ```shell
 make kessel-up          # legacy JSON schema stack
+# or
 make kessel-up-unified  # unified schema stack
 
 ./development/unified-schema/features-service-schema-tester.sh 9081
 ```
 
-The argument is the Inventory API gRPC port. The script requires `grpcurl` on PATH and `zed` configured (`zed context set`) against the stack's SpiceDB instance. Reporter-side relationship tuples require the consumer's `load-reporter-representation` setting, which both local stack configs already enable.
+Make sure to run the tester against a clean stack: some changes may persist between runs, and on a re-run the auto-creation check silently degrades into a merge-into-existing test. Use `make kessel-down` followed by `make kessel-up` (or `kessel-up-unified`) to reset.
+
+The script requires `grpcurl` on PATH and `zed` configured (`zed context set`) against the stack's SpiceDB instance. Reporter-side relationship tuples require the consumer's `load-reporter-representation` setting, which both local stack configs already enable.
 
 Note that strict attribute-field rejection on the delta endpoints is enforced only under unified schema; the JSON schema stack skips that check, so the script's assertions pass under both modes but only the unified stack rejects non-relationship fields.
 
@@ -100,4 +103,4 @@ oc logs <inventory-api-pod> | grep 'Using unified YAML in-memory schema reposito
 
 Once unified schema migration is complete, the approved unified schema artifacts and configuration should move into the common deployment and `kessel-up` setup. This temporary directory, its compose override, and its ephemeral template should then be deprecated and removed.
 
-The full-Kessel stack uses the image configured by `development/full-kessel/.env`. Set `INVENTORY_API_IMAGE` or `COMPOSE_PULL_MODE=missing` as needed when testing a locally built image.
+The full-Kessel stack uses the image configured by `development/full-kessel/.env`. To test a locally built image, edit that file to set `INVENTORY_API_IMAGE` - passing the variable on the `make` command line does not work, because the startup script loads the `.env` values over the caller's environment. Set `COMPOSE_PULL_MODE=missing` in the same file as well when the image only exists locally, so compose does not try to pull it.

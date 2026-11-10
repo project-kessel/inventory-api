@@ -26,6 +26,14 @@ RBAC_HTTP="${RBAC_HTTP:-localhost:9080}"
 ORG_ID="${1:-features-local-test}"
 OUT_FILE="${OUT_FILE:-./features-test-workspaces.env}"
 
+# Restrict inputs to safe character sets: ORG_ID is embedded in the identity
+# header and the generated env file, so anything outside [A-Za-z0-9_-] is
+# rejected rather than escaped.
+if [[ ! "$ORG_ID" =~ ^[A-Za-z0-9_-]+$ ]]; then
+  echo "ERROR: org_id must contain only letters, digits, underscores and hyphens (got: ${ORG_ID})" >&2
+  exit 1
+fi
+
 # The RBAC service identifies the caller (and the tenant) through the
 # x-rh-identity header; the Inventory API gRPC calls in the guide need no
 # authentication on this stack.
@@ -73,11 +81,20 @@ echo "Ensuring the test hierarchy exists..."
 DEPARTMENT_ID=$(ensure_workspace "Features Department" "$DEFAULT_ID")
 TEAM_ID=$(ensure_workspace "Features Team" "$DEPARTMENT_ID")
 
+# The workspace IDs are written into a sourceable env file, so they are
+# validated as UUIDs before use: anything else could inject shell syntax
+# when the file is sourced.
+for id in "$DEFAULT_ID" "$DEPARTMENT_ID" "$TEAM_ID"; do
+  if [[ ! "$id" =~ ^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$ ]]; then
+    echo "ERROR: refusing to write non-UUID workspace id to ${OUT_FILE} (got: ${id})" >&2
+    exit 1
+  fi
+done
+
 cat > "$OUT_FILE" <<EOF
-# Workspace IDs for local Features service testing (org_id=${ORG_ID})
+# Workspace IDs for local Features service testing
 # Source this file, then use \$DEPARTMENT_ID and \$TEAM_ID as the
-# localResourceId values in the guide's grpcurl examples:
-#   source ${OUT_FILE}
+# localResourceId values in the guide's grpcurl examples.
 export DEFAULT_ID="${DEFAULT_ID}"
 export DEPARTMENT_ID="${DEPARTMENT_ID}"
 export TEAM_ID="${TEAM_ID}"

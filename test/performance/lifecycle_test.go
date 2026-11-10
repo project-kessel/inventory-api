@@ -221,7 +221,7 @@ func TestResourceLifecyclePerformance(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		pb.RegisterKesselInventoryServiceServer(srv, service.NewKesselInventoryServiceV1beta2(uc, nil))
+		pb.RegisterKesselInventoryServiceServer(srv, service.NewKesselInventoryServiceV1beta2(uc, nil, nil))
 		startErr := make(chan error, 1)
 		go func() { startErr <- srv.Start(context.Background()) }()
 		t.Cleanup(func() { _ = srv.Stop(context.Background()) })

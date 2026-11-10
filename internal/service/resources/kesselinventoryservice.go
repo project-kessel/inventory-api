@@ -20,16 +20,18 @@ import (
 // HTTP, delegating to the resource and relationship usecases.
 type InventoryService struct {
 	pb.UnimplementedKesselInventoryServiceServer
-	Ctl                 *resources.Usecase
-	AddRelationshipsCtl *relationsusecase.AddResourceRelationshipsUseCase
+	Ctl                    *resources.Usecase
+	AddRelationshipsCtl    *relationsusecase.AddResourceRelationshipsUseCase
+	RemoveRelationshipsCtl *relationsusecase.RemoveResourceRelationshipsUseCase
 }
 
 // NewKesselInventoryServiceV1beta2 constructs the v1beta2 inventory service
-// from the resource usecase and the add-relationships usecase.
-func NewKesselInventoryServiceV1beta2(c *resources.Usecase, addRelationships *relationsusecase.AddResourceRelationshipsUseCase) *InventoryService {
+// from the resource usecase and the add- and remove-relationships usecases.
+func NewKesselInventoryServiceV1beta2(c *resources.Usecase, addRelationships *relationsusecase.AddResourceRelationshipsUseCase, removeRelationships *relationsusecase.RemoveResourceRelationshipsUseCase) *InventoryService {
 	return &InventoryService{
-		Ctl:                 c,
-		AddRelationshipsCtl: addRelationships,
+		Ctl:                    c,
+		AddRelationshipsCtl:    addRelationships,
+		RemoveRelationshipsCtl: removeRelationships,
 	}
 }
 

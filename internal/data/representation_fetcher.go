@@ -7,8 +7,8 @@ import (
 )
 
 // representationFetcher defines the interface for fetching representations from storage.
-// This abstraction allows both the real repository (SQL) and fake repository (in-memory)
-// to share the same control flow logic while using different storage backends.
+// It separates storage queries from the control flow that selects current and
+// previous versions across the common and reporter streams.
 type representationFetcher interface {
 	fetchCommon(version uint) (bizmodel.Representation, *bizmodel.Version, error)
 	fetchReporter(version uint, generation uint) (bizmodel.Representation, *bizmodel.Version, error)

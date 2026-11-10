@@ -11,18 +11,18 @@ We follow a **no-mocks** approach to testing. This means no "method-verifying" m
 The preference order for test doubles is:
 
 1. **Use the real instance.** If an object is not coupled to external I/O, there is no reason not to reuse it. It is the least work and the best coverage.
-2. **Use a fake.** In-memory fakes are a useful feature of the application ("Kessel in a box"), so the investment pays for itself quickly. When implementing fakes (or any second implementation of an interface), define a set of **contract tests** at the interface layer first.
+2. **Use the real database adapter for persistence.** Resource use-case, service, consumer, and repository tests use migrated databases and the real transaction manager, rather than reimplementing storage semantics in a fake. PostgreSQL is the default; SQLite is an explicit fallback.
 3. **Use stubs or dummies** judiciously when the interaction is trivial.
 
 ### Hermetic Testing
 
-When external dependencies are needed, leverage testcontainers to download and run them locally. This should only be for when it is essential. For example, we can't test a `PostgresStore` without a Postgres — writing a "fake" Postgres is absurd. But if you need to test business logic that involves a repository, using a real Postgres is overkill. Just use the in-memory fake (e.g., a custom in-memory implementation, or SQLite with an in-memory database).
+When external dependencies are needed, leverage testcontainers to download and run them locally. Business logic that uses resource persistence must exercise the real repository and transaction manager too: an in-memory reimplementation can hide bugs in queries, constraints, version selection, and transaction behavior. Keep pure domain tests free of I/O, and reuse production in-memory adapters such as the schema repository where applicable.
 
 For further reading on the principles behind this approach, see: [The secret world of testing without mocking](https://www.alechenninger.com/2020/11/the-secret-world-of-testing-without.html) by Alec Henninger.
 
 ### Database Backend Selection
 
-Tests that verify database behavior (repositories, migrations, constraints, transaction handling) run against **PostgreSQL by default**, because that is what production runs and SQLite cannot reproduce PostgreSQL-specific behavior such as JSONB constraints, advisory locks, and transaction conflicts (RHCLOUD-51816). Tests of business logic keep using the in-memory fakes; SQLite remains available as an explicit fallback for environments without a container runtime.
+Tests that verify database behavior (repositories, migrations, constraints, transaction handling) run against **PostgreSQL by default**, because that is what production runs and SQLite cannot reproduce PostgreSQL-specific behavior such as JSONB constraints, advisory locks, and transaction conflicts (RHCLOUD-51816). Tests of business logic that use resource persistence also use the real database adapter; SQLite remains available as an explicit fallback for environments without a container runtime.
 
 Select the backend with `TEST_DB`:
 
@@ -151,7 +151,7 @@ defer cancel()
 2. **Database sharing**: Each test should get isolated database
 3. **Global state**: Avoid package-level variables that leak between tests
 4. **Time dependencies**: Use mocked time where possible
-5. **Reaching for a real DB when a fake suffices**: If you're testing business logic, use the in-memory fake. Reserve SQLite/Postgres for tests that specifically exercise data layer behavior.
+5. **Reimplementing persistence in tests**: Use the real resource repository and transaction manager even when testing business logic. Fakes with their own storage logic can pass while production behavior is broken.
 6. **Faking what shouldn't be faked**: Don't write a fake for something that inherently requires the real thing (e.g., Postgres SQL semantics). Use testcontainers or in-memory SQLite instead.
 7. **Transaction leakage**: Ensure transactions are properly committed/rolled back
 
@@ -159,7 +159,7 @@ defer cancel()
 
 - **Unit test coverage**: Reported automatically via `make test`
 - **Integration coverage**: E2E tests validate full request flows  
-- **Contract test coverage**: Ensure fakes are validated against real implementations via shared contract tests
+- **Persistence coverage**: Exercise resource behavior through real database adapters, including commit, rollback, constraints, and representation history
 - **Metrics verification**: Use `metricscollector.Get*Count()` for event tracking
 
 This repository prioritizes thorough lifecycle testing, dual-protocol validation, and comprehensive authorization testing over simple unit test coverage numbers.

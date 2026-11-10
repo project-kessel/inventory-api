@@ -54,8 +54,8 @@ func newTestHarness(t *testing.T, opts ...harnessOption) *testHarness {
 		o(cfg)
 	}
 
-	resourceRepo := data.NewFakeResourceRepository()
 	mc := metricscollector.NewFakeMetricsCollector()
+	resourceRepo := newTestResourceRepository(t, mc)
 	var metaAuth metaauthorizer.MetaAuthorizer
 	if cfg.meta != nil {
 		metaAuth = cfg.meta
@@ -1484,7 +1484,7 @@ func TestReportResource_SchemaValidation(t *testing.T) {
 			require.NoError(t, err)
 
 			usecase := New(
-				data.NewFakeResourceRepository(),
+				newTestResourceRepository(t, metricscollector.NewFakeMetricsCollector()),
 				schemaRepository,
 				&data.AllowAllRelationsRepository{},
 				"test-topic",
@@ -1607,7 +1607,7 @@ func TestResolveConsistency(t *testing.T) {
 			featureFlagEnabled: false,
 			consistency:        model.NewConsistencyAtLeastAsAcknowledged(),
 			resourceExists:     true,
-			expectedToken:      "", // fake repo returns empty consistency token
+			expectedToken:      "", // saved fixture has an empty consistency token
 			expectedError:      false,
 		},
 		{
@@ -1615,7 +1615,7 @@ func TestResolveConsistency(t *testing.T) {
 			featureFlagEnabled: true,
 			consistency:        model.NewConsistencyUnspecified(),
 			resourceExists:     true,
-			expectedToken:      "", // fake repo returns empty consistency token
+			expectedToken:      "", // saved fixture has an empty consistency token
 			expectedError:      false,
 		},
 		{
@@ -1655,7 +1655,7 @@ func TestResolveConsistency(t *testing.T) {
 			featureFlagEnabled: true,
 			consistency:        model.NewConsistencyAtLeastAsAcknowledged(),
 			resourceExists:     true,
-			expectedToken:      "", // fake repo returns empty consistency token
+			expectedToken:      "", // saved fixture has an empty consistency token
 			expectedError:      false,
 		},
 	}
@@ -1729,7 +1729,7 @@ func TestResolveConsistency_OverrideFeatureFlag(t *testing.T) {
 			featureFlagEnabled: true,
 			consistency:        model.NewConsistencyAtLeastAsAcknowledged(),
 			resourceExists:     true,
-			expectedToken:      "", // fake repo returns empty consistency token
+			expectedToken:      "", // saved fixture has an empty consistency token
 			expectedError:      false,
 		},
 	}

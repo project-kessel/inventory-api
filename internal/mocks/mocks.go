@@ -7,7 +7,6 @@ import (
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
 	"github.com/go-kratos/kratos/v2/transport"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
-	"github.com/project-kessel/inventory-api/internal/pubsub"
 
 	"github.com/stretchr/testify/mock"
 )
@@ -121,22 +120,6 @@ func (m *MockConsumer) AssignmentLost() bool {
 	return args.Get(0).(bool)
 }
 
-type MockedReporterResourceRepository struct {
-	mock.Mock
-}
-
-type MockedInventoryResourceRepository struct {
-	mock.Mock
-}
-
-type MockedListenManager struct {
-	mock.Mock
-}
-
-type MockedSubscription struct {
-	mock.Mock
-}
-
 type MockLookupObjectsStream struct {
 	Responses []model.LookupObjectsItem
 	current   int
@@ -149,35 +132,6 @@ func (m *MockLookupObjectsStream) Recv() (model.LookupObjectsItem, error) {
 	res := m.Responses[m.current]
 	m.current++
 	return res, nil
-}
-
-func (m *MockedListenManager) Subscribe(txid string) pubsub.Subscription {
-	args := m.Called(txid)
-	return args.Get(0).(pubsub.Subscription)
-}
-
-func (m *MockedListenManager) WaitAndDistribute(ctx context.Context) error {
-	args := m.Called(ctx)
-	return args.Error(0)
-}
-
-func (m *MockedListenManager) Run(ctx context.Context) error {
-	args := m.Called(ctx)
-	return args.Error(0)
-}
-
-func (m *MockedSubscription) NotificationC() <-chan []byte {
-	args := m.Called()
-	return args.Get(0).(chan []byte)
-}
-
-func (m *MockedSubscription) Unsubscribe() {
-	m.Called()
-}
-
-func (m *MockedSubscription) BlockForNotification(ctx context.Context) error {
-	args := m.Called(ctx)
-	return args.Error(0)
 }
 
 // MockTransporter is a test helper that implements transport.Transporter

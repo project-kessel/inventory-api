@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	bizmodel "github.com/project-kessel/inventory-api/internal/biz/model"
+	"github.com/project-kessel/inventory-api/internal/metricscollector"
 	"github.com/stretchr/testify/require"
 )
 
@@ -12,7 +13,7 @@ import (
 // lookups retain them, and neither includes the boundary itself.
 func TestLastLiveReporterBeforeBoundaries(t *testing.T) {
 	db := setupRepositoryDB(t)
-	repo := NewResourceRepository(db, NewFakeTransactionManager(3), testOutboxPublisher())
+	repo := NewResourceRepository(db, NewGormTransactionManager(metricscollector.NewFakeMetricsCollector(), 3), testOutboxPublisher())
 	resource := createTestResourceWithLocalId(t, "history-boundaries")
 	require.NoError(t, repo.Save(db, resource, bizmodel.OperationTypeCreated, bizmodel.NewTransactionId("history-seed")))
 	key := createContractReporterResourceKey(t, "history-boundaries", "k8s_cluster", "ocm", "ocm-instance-1")

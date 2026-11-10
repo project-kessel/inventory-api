@@ -153,9 +153,10 @@ type testUsecaseConfig struct {
 // newTestUsecase constructs a Usecase with test defaults.
 // Override specific fields via testUsecaseConfig; unset fields use defaults.
 func newTestUsecase(t *testing.T, cfg testUsecaseConfig) *usecase.Usecase {
+	t.Helper()
 	repo := cfg.Repo
 	if repo == nil {
-		repo = data.NewFakeResourceRepository()
+		repo, _ = newTestRepo(t)
 	}
 
 	schemaRepo := cfg.SchemaRepo
@@ -1863,8 +1864,8 @@ func TestInventoryService_DeleteResource_WithReporterInstanceId(t *testing.T) {
 }
 
 func TestInventoryService_DeleteResource_WithoutReporterInstanceId(t *testing.T) {
-	// Test that deleting without reporter instance ID uses empty string for instance,
-	// which creates a different reporter key than the original resource.
+	// Test that deleting without a reporter instance ID can find the resource
+	// reported with a specific instance ID.
 	runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
 		claims := &authnapi.Claims{
 			SubjectId: authnapi.SubjectId("reporter-service"),
@@ -1895,12 +1896,8 @@ func TestInventoryService_DeleteResource_WithoutReporterInstanceId(t *testing.T)
 			},
 		}
 
-		// Delete without instance ID (nil)
-		// FIXME: THIS IS BROKEN.
-		// Note: The current implementation uses empty string for instance ID when nil is provided,
-		// which creates a different reporter key. However, the FakeResourceRepository
-		// implementation seems to match by local_resource_id alone, allowing the delete.
-		// In a real implementation with a proper database, this might behave differently.
+		// Delete without instance ID (nil). The database repository leaves the
+		// reporter instance unconstrained when no instance ID is provided.
 		deleteReq := &pb.DeleteResourceRequest{
 			Reference: &pb.ResourceReference{
 				ResourceType: "host",
@@ -1920,7 +1917,7 @@ func TestInventoryService_DeleteResource_WithoutReporterInstanceId(t *testing.T)
 			res1 := tr.Invoke(ctx, withBody(reportReq, ReportResource, httpEndpoint("POST /api/kessel/v1beta2/resources")))
 			Assert(t, res1, requireSuccess())
 			res2 := tr.Invoke(ctx, withBody(deleteReq, DeleteResource, httpEndpoint("DELETE /api/kessel/v1beta2/resources")))
-			// The delete succeeds with the FakeResourceRepository, which matches on local_resource_id
+			// The delete succeeds even though the report supplied an instance ID.
 			Assert(t, res2, requireSuccess())
 		}
 	})

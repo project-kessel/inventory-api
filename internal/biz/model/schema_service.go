@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sort"
+	"strings"
 
 	"github.com/go-kratos/kratos/v2/log"
 )
@@ -135,6 +137,95 @@ func (sc *SchemaService) CalculateTuplesForResource(ctx context.Context, current
 	}
 
 	return NewTuplesToReplicate(allCreates, allDeletes)
+}
+
+// ValidateRelationshipFields verifies that every field named in the given
+// partial representations is a relationship-typed field belonging to the
+// same representation stream: reporter struct fields must be reporter
+// relation fields, and common struct fields must be common relation fields.
+// Relation metadata is collected from both the reporter schema and the
+// resource (common) schema, either of which may carry fields for either
+// stream. Schemas without relation metadata (JSON-schema-only
+// implementations) report no relation fields for either stream and the
+// check is skipped; strict field enforcement is therefore applied only
+// under schemas that carry relation metadata (e.g. unified schema).
+func (sc *SchemaService) ValidateRelationshipFields(ctx context.Context, resourceType ResourceType, reporterType ReporterType, commonRepresentation, reporterRepresentation *Representation) error {
+	if commonRepresentation == nil && reporterRepresentation == nil {
+		return nil
+	}
+
+	reporter, err := sc.schemaRepository.GetReporterSchema(ctx, resourceType, reporterType)
+	if err != nil {
+		if errors.Is(err, ErrReporterSchemaNotFound) || errors.Is(err, ErrResourceSchemaNotFound) {
+			// Unknown reporter/resource combinations are rejected by
+			// ValidateReportAgainstSchema with a dedicated message; skip the
+			// field check so that error takes precedence.
+			return nil
+		}
+		return err
+	}
+
+	// Collect the relation fields per representation stream from both schema
+	// instances: the reporter schema and the resource (common) schema may
+	// each carry metadata for either stream.
+	var reporterFields, commonFields []string
+	if reporter.Schema() != nil {
+		reporterFields = append(reporterFields, reporter.Schema().ReporterRelationFields(reporterType)...)
+		commonFields = append(commonFields, reporter.Schema().CommonRelationFields()...)
+	}
+	resource, err := sc.schemaRepository.GetResourceSchema(ctx, resourceType)
+	if err != nil {
+		if !errors.Is(err, ErrResourceSchemaNotFound) {
+			return err
+		}
+	} else if resource.Schema() != nil {
+		reporterFields = append(reporterFields, resource.Schema().ReporterRelationFields(reporterType)...)
+		commonFields = append(commonFields, resource.Schema().CommonRelationFields()...)
+	}
+
+	if len(reporterFields) == 0 && len(commonFields) == 0 {
+		return nil
+	}
+
+	reporterAllowed := make(map[string]struct{}, len(reporterFields))
+	for _, field := range reporterFields {
+		reporterAllowed[field] = struct{}{}
+	}
+	commonAllowed := make(map[string]struct{}, len(commonFields))
+	for _, field := range commonFields {
+		commonAllowed[field] = struct{}{}
+	}
+
+	var unknown []string
+	if reporterRepresentation != nil {
+		for field := range *reporterRepresentation {
+			if _, ok := reporterAllowed[field]; !ok {
+				if _, ok := commonAllowed[field]; ok {
+					unknown = append(unknown, fmt.Sprintf("reporter field %q is a common relationship field, not a reporter one", field))
+				} else {
+					unknown = append(unknown, fmt.Sprintf("reporter field %q is not a relationship field", field))
+				}
+			}
+		}
+	}
+	if commonRepresentation != nil {
+		for field := range *commonRepresentation {
+			if _, ok := commonAllowed[field]; !ok {
+				if _, ok := reporterAllowed[field]; ok {
+					unknown = append(unknown, fmt.Sprintf("common field %q is a reporter relationship field, not a common one", field))
+				} else {
+					unknown = append(unknown, fmt.Sprintf("common field %q is not a relationship field", field))
+				}
+			}
+		}
+	}
+	if len(unknown) > 0 {
+		// Sort so map iteration order cannot change the error message.
+		sort.Strings(unknown)
+		return fmt.Errorf("invalid fields: %s", strings.Join(unknown, ", "))
+	}
+
+	return nil
 }
 
 // ValidateReportAgainstSchema validates that a resource report conforms to the configured schemas.

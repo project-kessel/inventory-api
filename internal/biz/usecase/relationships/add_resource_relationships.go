@@ -120,6 +120,13 @@ func (uc *AddResourceRelationshipsUseCase) AddResourceRelationships(ctx context.
 		return status.Error(codes.InvalidArgument, "at least one of reporter or common relationship fields must be provided")
 	}
 
+	// Reject attribute (non-relationship) fields before any transaction work:
+	// the endpoint contract allows only relationship-typed fields. Schemas
+	// without relation metadata skip this check.
+	if err := uc.schemaService.ValidateRelationshipFields(ctx, cmd.ResourceType, cmd.ReporterType, cmd.CommonRepresentation, cmd.ReporterRepresentation); err != nil {
+		return status.Errorf(codes.InvalidArgument, "failed validation for add resource relationships: %v", err)
+	}
+
 	var subscription pubsub.Subscription
 
 	txid, err := getNextTransactionID()

@@ -8,6 +8,18 @@ import "fmt"
 type Schema interface {
 	Validate(data interface{}) (bool, error)
 	CalculateTuples(currentRepresentation, previousRepresentation *Representations, key ReporterResourceKey) (TuplesToReplicate, error)
+	// CommonRelationFields returns the names of relationship-typed fields
+	// that belong to the common representation stream. Implementations
+	// without relation metadata (JSON-schema-only) return an empty slice;
+	// callers treat an empty result as "unknown" and skip strict field
+	// enforcement for that stream.
+	CommonRelationFields() []string
+	// ReporterRelationFields returns the names of relationship-typed fields
+	// that belong to the reporter representation stream for the given
+	// reporter type. Implementations without relation metadata
+	// (JSON-schema-only) return an empty slice; callers treat an empty
+	// result as "unknown" and skip strict field enforcement for that stream.
+	ReporterRelationFields(reporterType ReporterType) []string
 }
 
 // DefaultSchema provides the default tuple calculation behavior for resource types
@@ -23,6 +35,20 @@ func NewDefaultSchema() Schema {
 
 func (d DefaultSchema) Validate(_ interface{}) (bool, error) {
 	return true, nil
+}
+
+// CommonRelationFields returns an empty slice: DefaultSchema carries no
+// relation metadata, so strict field enforcement cannot be applied for
+// resource types without a registered schema.
+func (d DefaultSchema) CommonRelationFields() []string {
+	return nil
+}
+
+// ReporterRelationFields returns an empty slice: DefaultSchema carries no
+// relation metadata, so strict field enforcement cannot be applied for
+// resource types without a registered schema.
+func (d DefaultSchema) ReporterRelationFields(_ ReporterType) []string {
+	return nil
 }
 
 func (d DefaultSchema) CalculateTuples(currentRepresentation, previousRepresentation *Representations, key ReporterResourceKey) (TuplesToReplicate, error) {

@@ -868,3 +868,149 @@ func TestCalculateTuplesForResource_NoWorkspaceDuplication(t *testing.T) {
 		assert.Equal(t, "workspace-old-id", deleteTuple.Subject().Resource().ResourceId().Serialize())
 	})
 }
+
+// TestValidateRelationshipFields verifies that partial representations are
+// rejected when they name fields that are not relationship-typed in the
+// schema, and that schemas without relation metadata skip the check.
+func TestValidateRelationshipFields(t *testing.T) {
+	ctx := context.Background()
+
+	resourceType, err := model.NewResourceType("host")
+	require.NoError(t, err)
+	reporterType, err := model.NewReporterType("HBI")
+	require.NoError(t, err)
+	unknownReporterType, err := model.NewReporterType("UNKNOWN")
+	require.NoError(t, err)
+
+	jsonOnlySchema := data.NewJsonSchemaWithWorkspacesFromString(`{"type": "object"}`)
+	unifiedSchema := data.NewUnifiedSchemaImpl(
+		map[string]interface{}{"type": "object"},
+		[]data.UnifiedSchemaRelation{
+			{Name: "workspace", Target: "rbac/workspace", Field: "workspace_id", Cardinality: "one"},
+		},
+		map[string][]data.UnifiedSchemaRelation{
+			"hbi": {
+				{Name: "service_preference", Target: "features/service", Field: "service_preferences", Cardinality: "many"},
+			},
+		})
+
+	setupRepo := func(reporterSchema model.Schema) *data.InMemorySchemaRepository {
+		repo := data.NewInMemorySchemaRepository()
+		resourceRep, err := model.NewResourceSchemaRepresentation(resourceType, jsonOnlySchema)
+		require.NoError(t, err)
+		require.NoError(t, repo.CreateResourceSchema(ctx, resourceRep))
+		reporterRep, err := model.NewReporterSchemaRepresentation(resourceType, reporterType, reporterSchema)
+		require.NoError(t, err)
+		require.NoError(t, repo.CreateReporterSchema(ctx, reporterRep))
+		return repo
+	}
+
+	// setupRepoWithCommonRelations registers the common relations on the
+	// resource (common) schema, mirroring how the unified schema repository
+	// wires common and reporter relations onto separate schema instances.
+	setupRepoWithCommonRelations := func(reporterSchema model.Schema) *data.InMemorySchemaRepository {
+		repo := data.NewInMemorySchemaRepository()
+		resourceRep, err := model.NewResourceSchemaRepresentation(resourceType, unifiedSchema)
+		require.NoError(t, err)
+		require.NoError(t, repo.CreateResourceSchema(ctx, resourceRep))
+		reporterRep, err := model.NewReporterSchemaRepresentation(resourceType, reporterType, reporterSchema)
+		require.NoError(t, err)
+		require.NoError(t, repo.CreateReporterSchema(ctx, reporterRep))
+		return repo
+	}
+
+	t.Run("relation fields in the reporter representation pass", func(t *testing.T) {
+		sc := model.NewSchemaService(setupRepo(unifiedSchema), log.NewHelper(log.DefaultLogger))
+		reporter := model.Representation(map[string]interface{}{"service_preferences": []interface{}{"service-a"}})
+		err := sc.ValidateRelationshipFields(ctx, resourceType, reporterType, nil, &reporter)
+		assert.NoError(t, err)
+	})
+
+	t.Run("relation fields in the common representation pass", func(t *testing.T) {
+		sc := model.NewSchemaService(setupRepo(unifiedSchema), log.NewHelper(log.DefaultLogger))
+		common := model.Representation(map[string]interface{}{"workspace_id": "workspace-1"})
+		err := sc.ValidateRelationshipFields(ctx, resourceType, reporterType, &common, nil)
+		assert.NoError(t, err)
+	})
+
+	t.Run("attribute field in the reporter representation is rejected", func(t *testing.T) {
+		sc := model.NewSchemaService(setupRepo(unifiedSchema), log.NewHelper(log.DefaultLogger))
+		reporter := model.Representation(map[string]interface{}{
+			"service_preferences": []interface{}{"service-a"},
+			"display_name":        "not a relationship",
+		})
+		err := sc.ValidateRelationshipFields(ctx, resourceType, reporterType, nil, &reporter)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), `reporter field "display_name" is not a relationship field`)
+	})
+
+	t.Run("attribute field in the common representation is rejected", func(t *testing.T) {
+		sc := model.NewSchemaService(setupRepo(unifiedSchema), log.NewHelper(log.DefaultLogger))
+		common := model.Representation(map[string]interface{}{
+			"workspace_id": "workspace-1",
+			"display_name": "not a relationship",
+		})
+		err := sc.ValidateRelationshipFields(ctx, resourceType, reporterType, &common, nil)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), `common field "display_name" is not a relationship field`)
+	})
+
+	t.Run("reporter relation field supplied in the common struct is rejected as the wrong stream", func(t *testing.T) {
+		sc := model.NewSchemaService(setupRepo(unifiedSchema), log.NewHelper(log.DefaultLogger))
+		common := model.Representation(map[string]interface{}{"service_preferences": []interface{}{"service-a"}})
+		err := sc.ValidateRelationshipFields(ctx, resourceType, reporterType, &common, nil)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), `common field "service_preferences" is a reporter relationship field, not a common one`)
+	})
+
+	t.Run("common relation field supplied in the reporter struct is rejected as the wrong stream", func(t *testing.T) {
+		sc := model.NewSchemaService(setupRepo(unifiedSchema), log.NewHelper(log.DefaultLogger))
+		reporter := model.Representation(map[string]interface{}{"workspace_id": "workspace-1"})
+		err := sc.ValidateRelationshipFields(ctx, resourceType, reporterType, nil, &reporter)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), `reporter field "workspace_id" is a common relationship field, not a reporter one`)
+	})
+
+	t.Run("common relation fields from the resource schema are accepted", func(t *testing.T) {
+		sc := model.NewSchemaService(setupRepoWithCommonRelations(unifiedSchema), log.NewHelper(log.DefaultLogger))
+		common := model.Representation(map[string]interface{}{"workspace_id": "workspace-1"})
+		reporter := model.Representation(map[string]interface{}{"service_preferences": []interface{}{"service-a"}})
+		err := sc.ValidateRelationshipFields(ctx, resourceType, reporterType, &common, &reporter)
+		assert.NoError(t, err)
+	})
+
+	t.Run("attribute field in the common representation is rejected when the resource schema carries relations", func(t *testing.T) {
+		sc := model.NewSchemaService(setupRepoWithCommonRelations(unifiedSchema), log.NewHelper(log.DefaultLogger))
+		common := model.Representation(map[string]interface{}{"display_name": "not a relationship"})
+		err := sc.ValidateRelationshipFields(ctx, resourceType, reporterType, &common, nil)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), `common field "display_name"`)
+	})
+
+	t.Run("common relations are enforced even when the reporter schema has none", func(t *testing.T) {
+		sc := model.NewSchemaService(setupRepoWithCommonRelations(jsonOnlySchema), log.NewHelper(log.DefaultLogger))
+		common := model.Representation(map[string]interface{}{"workspace_id": "workspace-1"})
+		err := sc.ValidateRelationshipFields(ctx, resourceType, reporterType, &common, nil)
+		assert.NoError(t, err)
+	})
+
+	t.Run("json-schema-only schemas skip the check", func(t *testing.T) {
+		sc := model.NewSchemaService(setupRepo(jsonOnlySchema), log.NewHelper(log.DefaultLogger))
+		reporter := model.Representation(map[string]interface{}{"display_name": "attribute fields pass through"})
+		err := sc.ValidateRelationshipFields(ctx, resourceType, reporterType, nil, &reporter)
+		assert.NoError(t, err)
+	})
+
+	t.Run("both representations nil passes", func(t *testing.T) {
+		sc := model.NewSchemaService(setupRepo(unifiedSchema), log.NewHelper(log.DefaultLogger))
+		err := sc.ValidateRelationshipFields(ctx, resourceType, reporterType, nil, nil)
+		assert.NoError(t, err)
+	})
+
+	t.Run("unknown reporter type defers to report validation", func(t *testing.T) {
+		sc := model.NewSchemaService(setupRepo(unifiedSchema), log.NewHelper(log.DefaultLogger))
+		reporter := model.Representation(map[string]interface{}{"display_name": "not a relationship"})
+		err := sc.ValidateRelationshipFields(ctx, resourceType, unknownReporterType, nil, &reporter)
+		assert.NoError(t, err)
+	})
+}

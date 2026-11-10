@@ -115,11 +115,19 @@ assert_tuple_absent() {
 
 # assert_check EXPECTED_ALLOWED DESCRIPTION
 #   Reads a Check request (JSON) from stdin, invokes the Check endpoint, and
-#   asserts that the response's "allowed" value equals EXPECTED_ALLOWED
-#   ("true" or "false"). PASS/FAIL is recorded like the tuple assertions; a
-#   failed grpcurl call is recorded as a failure rather than a pass.
+#   asserts that the response's "allowed" enum equals the expectation
+#   ("true" or "false"). grpcurl renders the proto Allowed enum as its name
+#   string (ALLOWED_TRUE / ALLOWED_FALSE), so the expectation is mapped to
+#   the enum name before matching. PASS/FAIL is recorded like the tuple
+#   assertions; a failed grpcurl call is recorded as a failure rather than
+#   a pass.
 assert_check() {
-  local expected="$1" description="$2"
+  local expected="$1" description="$2" expected_enum
+  case "$expected" in
+    true)  expected_enum="ALLOWED_TRUE" ;;
+    false) expected_enum="ALLOWED_FALSE" ;;
+    *)     echo "FAIL: $description — invalid expectation '$expected'"; FAIL_COUNT=$((FAIL_COUNT + 1)); return ;;
+  esac
   local response
   if ! response=$(grpcurl -plaintext -d @ localhost:${PORT_NUMBER} kessel.inventory.v1beta2.KesselInventoryService.Check 2>&1); then
     echo "FAIL: $description — Check call failed"
@@ -128,11 +136,11 @@ assert_check() {
     FAIL_COUNT=$((FAIL_COUNT + 1))
     return
   fi
-  if echo "$response" | grep -Eq "\"allowed\": *${expected}"; then
-    echo "PASS: $description — allowed=${expected}, as expected"
+  if echo "$response" | grep -Eq "\"allowed\": *\"${expected_enum}\""; then
+    echo "PASS: $description — allowed=${expected_enum}, as expected"
     PASS_COUNT=$((PASS_COUNT + 1))
   else
-    echo "FAIL: $description — expected allowed=${expected}"
+    echo "FAIL: $description — expected allowed=${expected_enum}"
     echo "      response:"
     echo "$response" | sed 's/^/        /'
     FAIL_COUNT=$((FAIL_COUNT + 1))

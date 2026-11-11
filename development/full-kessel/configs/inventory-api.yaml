@@ -54,6 +54,7 @@ schema:
     path: schema_cache.json
 consumer:
   enabled: true
+  load-reporter-representation: true
   bootstrap-servers: kafka:9093
   retry-options:
     consumer-max-retries: 3

@@ -194,8 +194,8 @@ stringData:
               enable: true
               transport:
                 http: true
-                grpc: false   
-            - type: allow-unauthenticated # This is a special authenticator that allows unauthenticated access - mainly for Local-dev/Test 
+                grpc: false
+            - type: allow-unauthenticated # This is a special authenticator that allows unauthenticated access - mainly for Local-dev/Test
               enable: true
               transport:
                 http: false
@@ -219,6 +219,7 @@ stringData:
         bootstrap-servers: "my-cluster-kafka-bootstrap.default.svc.cluster.local:9092"
     consumer:
       enabled: true
+      load-reporter-representation: true
       bootstrap-servers: "my-cluster-kafka-bootstrap.default.svc.cluster.local:9092"
       topic: outbox.event.kessel.tuples
       retry-options:

@@ -1681,6 +1681,12 @@ func TestInventoryAPIHTTP_v1beta2_CheckBulk_OrderAndEcho(t *testing.T) {
 	assert.True(t, observed, "CheckBulk order/echo expectations not met within timeout")
 }
 
+// deltaTestTimeout bounds every RPC issued by the relationship delta tests,
+// including the polling retry loops inside waitForCheckAllowed, so a single
+// stalled call cannot outlast the tests' retry loops. It is sized to cover
+// the worst case of one ~30s retry loop per checked expectation.
+const deltaTestTimeout = 10 * time.Minute
+
 // deltaE2EClient connects to the Inventory API with the e2e bearer token and
 // returns the client and connection.
 func deltaE2EClient(t *testing.T) (pbv1beta2.KesselInventoryServiceClient, *grpc.ClientConn) {
@@ -1765,7 +1771,8 @@ func deltaFeaturesCheck(workspaceId, serviceId string) *pbv1beta2.CheckRequest {
 // for missing and tombstoned resources.
 func TestInventoryAPIHTTP_v1beta2_RelationshipDeltas_Features(t *testing.T) {
 	enableShortMode(t)
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), deltaTestTimeout)
+	t.Cleanup(cancel)
 
 	client, _ := deltaE2EClient(t)
 
@@ -1853,6 +1860,15 @@ func TestInventoryAPIHTTP_v1beta2_RelationshipDeltas_Features(t *testing.T) {
 	waitForCheckAllowed(t, ctx, client, deltaFeaturesCheck(workspaceId, svcB), pbv1beta2.Allowed_ALLOWED_FALSE, "removed tuple for svc-b")
 	waitForCheckAllowed(t, ctx, client, deltaFeaturesCheck(workspaceId, svcC), pbv1beta2.Allowed_ALLOWED_FALSE, "removed tuple for svc-c")
 
+	// Removing a value that is not present is a no-op that succeeds only
+	// when the resource exists (Step 8 shows missing resources return
+	// NOT_FOUND), so this proves the workspace persisted the remove-all
+	// and Step 6 cannot mask a failed persistence check by recreating a
+	// missing workspace through AddResourceRelationships.
+	t.Log("5.5. Probing the workspace still exists via a no-op removal")
+	_, err = client.RemoveResourceRelationships(ctx, removePrefs(svcA))
+	require.NoError(t, err, "RemoveResourceRelationships (existence probe) failed")
+
 	t.Log("6. Re-adding a preference proves the resource still exists after all relationships were removed")
 	_, err = client.AddResourceRelationships(ctx, addPrefs(svcB))
 	require.NoError(t, err, "AddResourceRelationships after remove-all failed")
@@ -1916,7 +1932,8 @@ func mustPrefsStruct(t *testing.T, service string) *structpb.Struct {
 // conflict rejection, and NOT_FOUND for tombstoned resources.
 func TestInventoryAPIHTTP_v1beta2_RelationshipDeltas_Host(t *testing.T) {
 	enableShortMode(t)
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), deltaTestTimeout)
+	t.Cleanup(cancel)
 
 	client, _ := deltaE2EClient(t)
 

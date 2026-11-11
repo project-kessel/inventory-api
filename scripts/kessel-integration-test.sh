@@ -33,6 +33,10 @@ RBAC_HTTP="localhost:9080"
 KAFKA_BOOTSTRAP="localhost:9092"
 KAFKA_CONNECT="localhost:8083"
 
+# Maximum time (in seconds) for a single grpcurl invocation, so an
+# unresponsive RPC cannot block the integration run indefinitely.
+GRPCURL_MAX_TIME=30
+
 # Test identity
 ORG_ID="test-org-kessel-e2e"
 X_RH_IDENTITY=$(echo -n "{\"identity\":{\"account_number\":\"12345\",\"org_id\":\"${ORG_ID}\",\"type\":\"User\",\"user\":{\"user_id\":\"test-user-1\",\"email\":\"test@example.com\",\"username\":\"testuser\",\"is_org_admin\":true}}}" | base64 | tr -d '\n')
@@ -402,7 +406,7 @@ DELTA_WORKSPACE_ID="delta-integration-$(uuidgen)"
 DELTA_SERVICE_ID="11111111-1111-1111-1111-111111111111"
 
 log_info "Auto-creating a workspace with a service preference via AddResourceRelationships"
-ADD_DELTA_RESPONSE=$(grpcurl -plaintext -d @ "${INVENTORY_GRPC}" kessel.inventory.v1beta2.KesselInventoryService/AddResourceRelationships <<EOF
+ADD_DELTA_RESPONSE=$(grpcurl -plaintext -max-time "${GRPCURL_MAX_TIME}" -d @ "${INVENTORY_GRPC}" kessel.inventory.v1beta2.KesselInventoryService/AddResourceRelationships <<EOF
 {
   "type": "workspace",
   "reporterType": "features",
@@ -441,7 +445,7 @@ else
 fi
 
 log_info "Removing the service preference via RemoveResourceRelationships"
-REMOVE_DELTA_RESPONSE=$(grpcurl -plaintext -d @ "${INVENTORY_GRPC}" kessel.inventory.v1beta2.KesselInventoryService/RemoveResourceRelationships <<EOF
+REMOVE_DELTA_RESPONSE=$(grpcurl -plaintext -max-time "${GRPCURL_MAX_TIME}" -d @ "${INVENTORY_GRPC}" kessel.inventory.v1beta2.KesselInventoryService/RemoveResourceRelationships <<EOF
 {
   "type": "workspace",
   "reporterType": "features",
@@ -480,7 +484,7 @@ else
 fi
 
 log_info "Deleting the delta test workspace"
-grpcurl -plaintext -d @ "${INVENTORY_GRPC}" kessel.inventory.v1beta2.KesselInventoryService/DeleteResource <<EOF
+grpcurl -plaintext -max-time "${GRPCURL_MAX_TIME}" -d @ "${INVENTORY_GRPC}" kessel.inventory.v1beta2.KesselInventoryService/DeleteResource <<EOF
 {
   "reference": {
     "resourceType": "workspace",

@@ -5,10 +5,6 @@ scrape_configs:
    static_configs:
     - targets:
        - inventory-api:8081
- - job_name: kessel-relations-api
-   static_configs:
-    - targets:
-       - relations-api:8000
  - job_name: kessel-inventory-consumer
    static_configs:
     - targets:

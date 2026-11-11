@@ -18,12 +18,13 @@ authn:
           http: true
           grpc: true
 authz:
-  impl: kessel
-  kessel:
-    insecure-client: true
-    url: relations-api:9000
-    enable-oidc-auth: false
-    principal-user-domain: 0.0.0.0:8084
+  impl: spicedb
+  spicedb:
+    endpoint: spicedb:50051
+    token: foobar
+    schema-file: /schema.zed
+    use-tls: false
+    fully-consistent: true
 consistency:
   default-to-at-least-as-acknowledged: true
 selfSubjectStrategy:

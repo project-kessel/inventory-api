@@ -1,5 +1,5 @@
 ### Full Kessel Local Deployment
-### Deploys Inventory API, Relations API, Inventory Consumer, and all dependencies
+### Deploys Inventory API, SpiceDB, Inventory Consumer, and all dependencies
 ### via a single compose file using pre-built images.
 ###
 ### Usage:
@@ -10,7 +10,6 @@
 ###   INVENTORY_API_IMAGE=localhost/kessel-inventory:dev
 ###
 ### Profiles:
-###   relations  - Relations API + SpiceDB (remove when Relations merges into Inventory)
 ###   consumer   - Inventory Consumer
 ###   monitoring - Prometheus, Grafana, and Alertmanager (make kessel-up-monitoring)
 
@@ -81,7 +80,7 @@ services:
       bin/kafka-topics.sh --bootstrap-server kafka:9093 --create --if-not-exists --topic host-inventory.hbi.hosts --replication-factor 1 --partitions 6
       bin/kafka-topics.sh --bootstrap-server kafka:9093 --create --if-not-exists --topic outbox.event.hbi.hosts --replication-factor 1 --partitions 1
 
-      # RBAC outbox topic (Debezium CDC from RBAC → Relations API)
+      # RBAC outbox topic (Debezium CDC from RBAC → Inventory API)
       bin/kafka-topics.sh --bootstrap-server kafka:9093 --create --if-not-exists --topic outbox.event.relations-replication-event --replication-factor 1 --partitions 1
 
       echo -e 'Successfully created the following topics:'
@@ -134,11 +133,15 @@ services:
     depends_on:
       invmigrate:
         condition: service_completed_successfully
+      spicedb:
+        condition: service_started
     environment:
       INVENTORY_API_CONFIG: /inventory-api-compose.yaml
+      INVENTORY_API_AUTHZ_SPICEDB_TOKEN: "${SPICEDB_GRPC_PRESHARED_KEY}"
     volumes:
       - ./configs/inventory-api.yaml:/inventory-api-compose.yaml:ro,z
       - ../../schema_cache.json:/schema_cache.json:ro,z
+      - ./configs/schema.zed:/schema.zed:ro,z
     command: ["serve"]
     restart: "always"
     ports:
@@ -192,12 +195,11 @@ services:
     networks:
       - kessel
 
-  ### ---------- Relations API Stack (profile: relations) ----------
+  ### ---------- SpiceDB Stack ----------
 
-  relations-database:
+  spicedb-database:
     image: "postgres"
     command: -c track_commit_timestamp=on
-    profiles: ["relations"]
     ports:
       - "5432:5432"
     environment:
@@ -214,13 +216,12 @@ services:
   spicedb-migrate:
     image: "authzed/spicedb"
     command: "migrate head"
-    profiles: ["relations"]
     restart: "on-failure"
     environment:
       - "SPICEDB_DATASTORE_ENGINE=postgres"
-      - "SPICEDB_DATASTORE_CONN_URI=postgres://postgres:${POSTGRES_PASSWORD}@relations-database:5432/spicedb?sslmode=disable"
+      - "SPICEDB_DATASTORE_CONN_URI=postgres://postgres:${POSTGRES_PASSWORD}@spicedb-database:5432/spicedb?sslmode=disable"
     depends_on:
-      relations-database:
+      spicedb-database:
         condition: service_healthy
     networks:
       - kessel
@@ -228,36 +229,16 @@ services:
   spicedb:
     image: "authzed/spicedb"
     command: "serve"
-    profiles: ["relations"]
     restart: "always"
     ports:
       - "50051:50051"
     environment:
       - "SPICEDB_GRPC_PRESHARED_KEY=${SPICEDB_GRPC_PRESHARED_KEY}"
       - "SPICEDB_DATASTORE_ENGINE=postgres"
-      - "SPICEDB_DATASTORE_CONN_URI=postgres://postgres:${POSTGRES_PASSWORD}@relations-database:5432/spicedb?sslmode=disable"
+      - "SPICEDB_DATASTORE_CONN_URI=postgres://postgres:${POSTGRES_PASSWORD}@spicedb-database:5432/spicedb?sslmode=disable"
     depends_on:
       spicedb-migrate:
         condition: service_completed_successfully
-    networks:
-      - kessel
-
-  relations-api:
-    image: "${RELATIONS_API_IMAGE}"
-    profiles: ["relations"]
-    environment:
-      - "SPICEDB_PRESHARED=${SPICEDB_GRPC_PRESHARED_KEY}"
-      - "SPICEDB_SCHEMA_FILE=/schema_file"
-      - "SPICEDB_ENDPOINT=spicedb:50051"
-    volumes:
-      - ./configs/schema.zed:/schema_file:ro,z
-    restart: "always"
-    depends_on:
-      spicedb:
-        condition: service_started
-    ports:
-      - "8000:8000"
-      - "9000:9000"
     networks:
       - kessel
 
@@ -364,7 +345,8 @@ services:
       - PGSSLMODE=disable
       - REDIS_HOST=redis
       - DEVELOPMENT=True
-      - RELATION_API_SERVER=relations-api:9000
+      - INVENTORY_API_SERVER=inventory-api:9081
+      - INVENTORY_API_LOCAL=True
       - REPLICATION_TO_RELATION_ENABLED=True
     depends_on:
       redis:
@@ -432,7 +414,6 @@ services:
       - V2_APIS_ENABLED=True
       - V2_READ_ONLY_API_MODE=False
       - V2_BOOTSTRAP_TENANT=True
-      - RELATION_API_SERVER=relations-api:9000
       - INVENTORY_API_SERVER=inventory-api:9081
       - INVENTORY_API_LOCAL=True
       - REPLICATION_TO_RELATION_ENABLED=True
@@ -487,7 +468,6 @@ services:
       - RBAC_KAFKA_CONSUMER_TOPIC=outbox.event.relations-replication-event
       - RBAC_KAFKA_CONSUMER_GROUP_ID=rbac-consumer-group
       - RBAC_KAFKA_CUSTOM_CONSUMER_BROKER=kafka:9093
-      - RELATION_API_SERVER=relations-api:9000
       - INVENTORY_API_SERVER=inventory-api:9081
       - INVENTORY_API_LOCAL=True
       - REPLICATION_TO_RELATION_ENABLED=True
@@ -500,8 +480,6 @@ services:
       rbac-server:
         condition: service_healthy
       inventory-api:
-        condition: service_healthy
-      relations-api:
         condition: service_healthy
     restart: "always"
     networks:

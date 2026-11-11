@@ -162,9 +162,9 @@ print_assert_summary() {
 # department a   8adc4a2a-b396-11f1-8aa5-6ae246604903
 # department b   9015d2ae-b396-11f1-9308-6ae246604903
 # team 1         9554d7a6-b396-11f1-8fa2-6ae246604903
-# team 2         9a4cd31c-b396-11f1-af2e-6ae246604903
+# team 2         (per-run UUID: auto-created by AddResourceRelationships)
 # team 3         a0af6abc-b396-11f1-ae2b-6ae246604903
-# team 4         c3d4e5f6-b396-11f1-9c1d-6ae246604903  (never reported; auto-created by AddResourceRelationships)
+# team 4         (per-run UUID: auto-created by AddResourceRelationships)
 
 # Test Services info
 #service a          4f829a2c-b398-11f1-ba8e-6ae246604903
@@ -175,6 +175,14 @@ print_assert_summary() {
 # Test Accounts Info
 #main account       3055cc32-b398-11f1-bdd0-6ae246604903
 #special account    3ba27996-b398-11f1-bf17-6ae246604903
+
+# The two workspaces the script creates through the Add endpoint (teams 2 and
+# 4) use fresh UUIDs on every run. This keeps the script idempotent: the
+# auto-creation path is genuinely exercised each time, and no assertion can be
+# skewed by resources left over from a previous run, however it ended. The
+# workspaces are cleaned up at the end of the run.
+TEAM2_ID=$(uuidgen)
+TEAM4_ID=$(uuidgen)
 
 # The workspace hierarchy is seeded directly into SpiceDB with zed rather than
 # through the inventory API: the t_parent tuples form the org tree that both
@@ -196,7 +204,7 @@ zed relationship create rbac/workspace:8456f286-b396-11f1-9527-6ae246604903 t_pa
 zed relationship create rbac/workspace:8adc4a2a-b396-11f1-8aa5-6ae246604903 t_parent rbac/workspace:8456f286-b396-11f1-9527-6ae246604903  # dept a to default
 zed relationship create rbac/workspace:9015d2ae-b396-11f1-9308-6ae246604903 t_parent rbac/workspace:8456f286-b396-11f1-9527-6ae246604903  # dept b to default
 zed relationship create rbac/workspace:9554d7a6-b396-11f1-8fa2-6ae246604903 t_parent rbac/workspace:8adc4a2a-b396-11f1-8aa5-6ae246604903  # team 1 to dept a
-zed relationship create rbac/workspace:9a4cd31c-b396-11f1-af2e-6ae246604903 t_parent rbac/workspace:9015d2ae-b396-11f1-9308-6ae246604903  # team 2 to dept b
+zed relationship create rbac/workspace:${TEAM2_ID} t_parent rbac/workspace:9015d2ae-b396-11f1-9308-6ae246604903  # team 2 to dept b
 zed relationship create rbac/workspace:a0af6abc-b396-11f1-ae2b-6ae246604903 t_parent rbac/workspace:9015d2ae-b396-11f1-9308-6ae246604903  # team 3 to dept b
 
 
@@ -443,7 +451,7 @@ assert_check false "Team 2 should NOT have access to service C" <<EOF
 {
   "object": {
     "resourceType": "workspace",
-    "resourceId": "9a4cd31c-b396-11f1-af2e-6ae246604903",
+    "resourceId": "${TEAM2_ID}",
     "reporter": {
         "type": "features"
     }
@@ -505,7 +513,7 @@ assert_tuple_exists rbac/workspace:8456f286-b396-11f1-9527-6ae246604903 t_parent
 assert_tuple_exists rbac/workspace:8adc4a2a-b396-11f1-8aa5-6ae246604903 t_parent 8456f286-b396-11f1-9527-6ae246604903 "dept a's parent is default"
 assert_tuple_exists rbac/workspace:9015d2ae-b396-11f1-9308-6ae246604903 t_parent 8456f286-b396-11f1-9527-6ae246604903 "dept b's parent is default"
 assert_tuple_exists rbac/workspace:9554d7a6-b396-11f1-8fa2-6ae246604903 t_parent 8adc4a2a-b396-11f1-8aa5-6ae246604903 "team 1's parent is dept a"
-assert_tuple_exists rbac/workspace:9a4cd31c-b396-11f1-af2e-6ae246604903 t_parent 9015d2ae-b396-11f1-9308-6ae246604903 "team 2's parent is dept b"
+assert_tuple_exists rbac/workspace:${TEAM2_ID} t_parent 9015d2ae-b396-11f1-9308-6ae246604903 "team 2's parent is dept b"
 assert_tuple_exists rbac/workspace:a0af6abc-b396-11f1-ae2b-6ae246604903 t_parent 9015d2ae-b396-11f1-9308-6ae246604903 "team 3's parent is dept b"
 
 echo "-- Desire: workspace preferences and billing links --"
@@ -515,7 +523,7 @@ assert_tuple_exists rbac/workspace:8adc4a2a-b396-11f1-8aa5-6ae246604903 t_featur
 assert_tuple_exists rbac/workspace:9015d2ae-b396-11f1-9308-6ae246604903 t_features_workspace_direct_billing_account 3ba27996-b398-11f1-bf17-6ae246604903 "dept b is billed by the special account"
 assert_tuple_exists rbac/workspace:9554d7a6-b396-11f1-8fa2-6ae246604903 t_features_workspace_direct_service_preferences 5e118fc6-b398-11f1-857a-6ae246604903 "team 1 desires service d"
 assert_tuple_exists rbac/workspace:a0af6abc-b396-11f1-ae2b-6ae246604903 t_features_workspace_direct_service_preferences 59be7c18-b398-11f1-9781-6ae246604903 "team 3 desires service c"
-assert_tuple_absent rbac/workspace:9a4cd31c-b396-11f1-af2e-6ae246604903 t_features_workspace_direct_service_preferences 59be7c18-b398-11f1-9781-6ae246604903 "team 2 desires nothing yet (why its check was denied)"
+assert_tuple_absent rbac/workspace:${TEAM2_ID} t_features_workspace_direct_service_preferences 59be7c18-b398-11f1-9781-6ae246604903 "team 2 desires nothing yet (why its check was denied)"
 
 
 echo ""
@@ -549,7 +557,7 @@ grpcurl -plaintext -d @ localhost:${PORT_NUMBER} kessel.inventory.v1beta2.Kessel
     "type": "workspace",
     "reporterType": "features",
     "reporterInstanceId": "3ba27996-b398-11f1-bf17-6ae246604903",
-    "localResourceId": "9a4cd31c-b396-11f1-af2e-6ae246604903",
+    "localResourceId": "${TEAM2_ID}",
     "reporter": {
       "direct_service_preferences": ["59be7c18-b398-11f1-9781-6ae246604903"]
     }
@@ -563,7 +571,7 @@ grpcurl -plaintext -d @ localhost:${PORT_NUMBER} kessel.inventory.v1beta2.Kessel
     "type": "workspace",
     "reporterType": "features",
     "reporterInstanceId": "3ba27996-b398-11f1-bf17-6ae246604903",
-    "localResourceId": "c3d4e5f6-b396-11f1-9c1d-6ae246604903",
+    "localResourceId": "${TEAM4_ID}",
     "reporter": {
       "direct_service_preferences": ["59be7c18-b398-11f1-9781-6ae246604903"]
     }
@@ -574,7 +582,7 @@ EOF
 # auto-created resource gets its desire tuple from the Add above, but the
 # t_parent link to dept b is needed so inherited PAYMENT (dept b's special
 # account paying for service c) can reach team 4 during permission checks.
-zed relationship create rbac/workspace:c3d4e5f6-b396-11f1-9c1d-6ae246604903 t_parent rbac/workspace:9015d2ae-b396-11f1-9308-6ae246604903  # team 4 to dept b
+zed relationship create rbac/workspace:${TEAM4_ID} t_parent rbac/workspace:9015d2ae-b396-11f1-9308-6ae246604903  # team 4 to dept b
 
 # Same async replication wait as after ReportResource
 echo "Giving the deltas time to replicate...sleeping for 20 seconds"
@@ -609,7 +617,7 @@ assert_check true "Team 2 SHOULD NOW have access to service C (now desired direc
 {
   "object": {
     "resourceType": "workspace",
-    "resourceId": "9a4cd31c-b396-11f1-af2e-6ae246604903",
+    "resourceId": "${TEAM2_ID}",
     "reporter": {
         "type": "features"
     }
@@ -636,7 +644,7 @@ assert_check true "Team 4 (auto-created) SHOULD have access to service C (own de
 {
   "object": {
     "resourceType": "workspace",
-    "resourceId": "c3d4e5f6-b396-11f1-9c1d-6ae246604903",
+    "resourceId": "${TEAM4_ID}",
     "reporter": {
         "type": "features"
     }
@@ -662,14 +670,14 @@ assert_tuple_exists features/billing_account:3055cc32-b398-11f1-bdd0-6ae24660490
 assert_tuple_exists features/billing_account:3055cc32-b398-11f1-bdd0-6ae246604903 t_services 54c3d5a0-b398-11f1-9332-6ae246604903 "main account STILL pays for service b (Add merges, does not replace)"
 
 echo "-- Add: desire (service c onto team 2) --"
-assert_tuple_exists rbac/workspace:9a4cd31c-b396-11f1-af2e-6ae246604903 t_features_workspace_direct_service_preferences 59be7c18-b398-11f1-9781-6ae246604903 "team 2 now desires service c"
+assert_tuple_exists rbac/workspace:${TEAM2_ID} t_features_workspace_direct_service_preferences 59be7c18-b398-11f1-9781-6ae246604903 "team 2 now desires service c"
 
 echo "-- Add: auto-create (team 4, never reported) --"
 # The auto-created resource's relationship must replicate exactly like a
 # reported one: the consumer diffs the initial (empty) representation against
 # the version the Add created and writes the tuple.
-assert_tuple_exists rbac/workspace:c3d4e5f6-b396-11f1-9c1d-6ae246604903 t_features_workspace_direct_service_preferences 59be7c18-b398-11f1-9781-6ae246604903 "auto-created team 4 desires service c"
-assert_tuple_exists rbac/workspace:c3d4e5f6-b396-11f1-9c1d-6ae246604903 t_parent 9015d2ae-b396-11f1-9308-6ae246604903 "team 4's hierarchy link to dept b (zed-seeded)"
+assert_tuple_exists rbac/workspace:${TEAM4_ID} t_features_workspace_direct_service_preferences 59be7c18-b398-11f1-9781-6ae246604903 "auto-created team 4 desires service c"
+assert_tuple_exists rbac/workspace:${TEAM4_ID} t_parent 9015d2ae-b396-11f1-9308-6ae246604903 "team 4's hierarchy link to dept b (zed-seeded)"
 
 echo "-- Unrelated state must be untouched by the Adds --"
 assert_tuple_exists rbac/workspace:a0af6abc-b396-11f1-ae2b-6ae246604903 t_features_workspace_direct_service_preferences 59be7c18-b398-11f1-9781-6ae246604903 "team 3 still desires service c (unrelated resource unchanged)"
@@ -703,7 +711,7 @@ grpcurl -plaintext -d @ localhost:${PORT_NUMBER} kessel.inventory.v1beta2.Kessel
     "type": "workspace",
     "reporterType": "features",
     "reporterInstanceId": "3ba27996-b398-11f1-bf17-6ae246604903",
-    "localResourceId": "9a4cd31c-b396-11f1-af2e-6ae246604903",
+    "localResourceId": "${TEAM2_ID}",
     "reporter": {
       "direct_service_preferences": ["59be7c18-b398-11f1-9781-6ae246604903"]
     }
@@ -717,7 +725,7 @@ grpcurl -plaintext -d @ localhost:${PORT_NUMBER} kessel.inventory.v1beta2.Kessel
     "type": "workspace",
     "reporterType": "features",
     "reporterInstanceId": "3ba27996-b398-11f1-bf17-6ae246604903",
-    "localResourceId": "c3d4e5f6-b396-11f1-9c1d-6ae246604903",
+    "localResourceId": "${TEAM4_ID}",
     "reporter": {
       "direct_service_preferences": ["59be7c18-b398-11f1-9781-6ae246604903"]
     }
@@ -757,7 +765,7 @@ assert_check false "Team 2 should NO LONGER have access to service C (no longer 
 {
   "object": {
     "resourceType": "workspace",
-    "resourceId": "9a4cd31c-b396-11f1-af2e-6ae246604903",
+    "resourceId": "${TEAM2_ID}",
     "reporter": {
         "type": "features"
     }
@@ -779,7 +787,7 @@ assert_check false "Team 4 should NO LONGER have access to service C (auto-creat
 {
   "object": {
     "resourceType": "workspace",
-    "resourceId": "c3d4e5f6-b396-11f1-9c1d-6ae246604903",
+    "resourceId": "${TEAM4_ID}",
     "reporter": {
         "type": "features"
     }
@@ -827,23 +835,54 @@ assert_tuple_exists features/billing_account:3055cc32-b398-11f1-bdd0-6ae24660490
 assert_tuple_exists features/billing_account:3055cc32-b398-11f1-bdd0-6ae246604903 t_services 54c3d5a0-b398-11f1-9332-6ae246604903 "main account still pays for service b (Remove only touches named values)"
 
 echo "-- Remove: desire (service c off team 2) --"
-assert_tuple_absent rbac/workspace:9a4cd31c-b396-11f1-af2e-6ae246604903 t_features_workspace_direct_service_preferences 59be7c18-b398-11f1-9781-6ae246604903 "team 2 no longer desires service c"
+assert_tuple_absent rbac/workspace:${TEAM2_ID} t_features_workspace_direct_service_preferences 59be7c18-b398-11f1-9781-6ae246604903 "team 2 no longer desires service c"
 
 echo "-- Remove: auto-created resource (service c off team 4) --"
-assert_tuple_absent rbac/workspace:c3d4e5f6-b396-11f1-9c1d-6ae246604903 t_features_workspace_direct_service_preferences 59be7c18-b398-11f1-9781-6ae246604903 "auto-created team 4 no longer desires service c"
-assert_tuple_exists rbac/workspace:c3d4e5f6-b396-11f1-9c1d-6ae246604903 t_parent 9015d2ae-b396-11f1-9308-6ae246604903 "team 4's hierarchy link to dept b remains (zed-seeded, not managed by the API)"
+assert_tuple_absent rbac/workspace:${TEAM4_ID} t_features_workspace_direct_service_preferences 59be7c18-b398-11f1-9781-6ae246604903 "auto-created team 4 no longer desires service c"
+assert_tuple_exists rbac/workspace:${TEAM4_ID} t_parent 9015d2ae-b396-11f1-9308-6ae246604903 "team 4's hierarchy link to dept b remains (zed-seeded, not managed by the API)"
 
 echo "-- Unrelated state must be untouched by the Removes --"
 assert_tuple_exists rbac/workspace:a0af6abc-b396-11f1-ae2b-6ae246604903 t_features_workspace_direct_service_preferences 59be7c18-b398-11f1-9781-6ae246604903 "team 3 still desires service c (unrelated resource unchanged)"
 
 # ---------------------------------------------------------------------------
 # Final state: the removes fully reversed the adds, so every tuple should
-# match the first validation block from before the Add section, with ONE
-# expected leftover — team 4's zed-seeded t_parent link, which the API has no
-# endpoint to remove. The assertions above each verified one slice of that;
-# this tally covers every tuple assertion in the entire run.
+# match the first validation block from before the Add section. The per-run
+# cleanup below then removes this run's auto-created workspaces and their
+# zed-seeded hierarchy links, leaving only the fixed baseline state behind.
+# The assertions above each verified one slice of that; this tally covers
+# every tuple assertion in the entire run.
 # ---------------------------------------------------------------------------
 print_assert_summary
+
+# ---------------------------------------------------------------------------
+# Best-effort cleanup of this run's auto-created workspaces so repeated runs
+# do not accumulate live test resources. Failures here do not affect the
+# results above; the next run uses fresh UUIDs either way.
+# ---------------------------------------------------------------------------
+echo ""
+echo "Cleaning up this run's auto-created workspaces..."
+grpcurl -plaintext -d @ localhost:${PORT_NUMBER} kessel.inventory.v1beta2.KesselInventoryService.DeleteResource <<EOF
+{
+  "reference": {
+    "resourceType": "workspace",
+    "resourceId": "${TEAM2_ID}",
+    "reporter": { "type": "features", "instanceId": "3ba27996-b398-11f1-bf17-6ae246604903" }
+  }
+}
+EOF
+grpcurl -plaintext -d @ localhost:${PORT_NUMBER} kessel.inventory.v1beta2.KesselInventoryService.DeleteResource <<EOF
+{
+  "reference": {
+    "resourceType": "workspace",
+    "resourceId": "${TEAM4_ID}",
+    "reporter": { "type": "features", "instanceId": "3ba27996-b398-11f1-bf17-6ae246604903" }
+  }
+}
+EOF
+# The zed-seeded hierarchy links are not managed by the API; remove them
+# directly so raw zed reads stay clean.
+zed relationship delete rbac/workspace:${TEAM2_ID} t_parent rbac/workspace:9015d2ae-b396-11f1-9308-6ae246604903 2>/dev/null || true
+zed relationship delete rbac/workspace:${TEAM4_ID} t_parent rbac/workspace:9015d2ae-b396-11f1-9308-6ae246604903 2>/dev/null || true
 
 # Exit non-zero when any assertion failed so scripted invocations can detect
 # a failing run; exit zero when everything passed.

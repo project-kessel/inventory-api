@@ -364,7 +364,7 @@ objects:
 parameters:
   - description: Load reporter representations while processing consumer tuple events
     name: CONSUMER_LOAD_REPORTER_REPRESENTATION
-    value: "false"
+    value: "true"
   - description: ClowdEnvironment name (ephemeral, stage, prod)
     name: ENV_NAME
     required: true

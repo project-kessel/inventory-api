@@ -12,7 +12,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	grpcinsecure "google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/structpb"
 
@@ -1677,4 +1679,332 @@ func TestInventoryAPIHTTP_v1beta2_CheckBulk_OrderAndEcho(t *testing.T) {
 		}
 	}
 	assert.True(t, observed, "CheckBulk order/echo expectations not met within timeout")
+}
+
+// deltaTestTimeout bounds every RPC issued by the relationship delta tests,
+// including the polling retry loops inside waitForCheckAllowed, so a single
+// stalled call cannot outlast the tests' retry loops. It is sized to cover
+// the worst case of one ~30s retry loop per checked expectation.
+const deltaTestTimeout = 10 * time.Minute
+
+// deltaE2EClient connects to the Inventory API with the e2e bearer token and
+// returns the client and connection.
+func deltaE2EClient(t *testing.T) (pbv1beta2.KesselInventoryServiceClient, *grpc.ClientConn) {
+	t.Helper()
+	conn, err := grpc.NewClient(
+		inventoryapi_grpc_url,
+		grpc.WithTransportCredentials(grpcinsecure.NewCredentials()),
+		grpc.WithPerRPCCredentials(&bearerAuth{token: "1234"}),
+	)
+	require.NoError(t, err, "Failed to create gRPC client")
+	t.Cleanup(func() {
+		if connErr := conn.Close(); connErr != nil {
+			t.Logf("Failed to close gRPC connection: %v", connErr)
+		}
+	})
+	return pbv1beta2.NewKesselInventoryServiceClient(conn), conn
+}
+
+// waitForCheckAllowed polls a Check request until the allowed value matches
+// the expectation, tolerating connection errors while the consumer processes
+// the write. Fails the test when the expectation is not met in time.
+func waitForCheckAllowed(t *testing.T, ctx context.Context, client pbv1beta2.KesselInventoryServiceClient, req *pbv1beta2.CheckRequest, want pbv1beta2.Allowed, desc string) {
+	t.Helper()
+	connErrors := 0
+	for i := 0; i < 30; i++ {
+		checkResp, err := client.Check(ctx, req)
+		if err == nil && checkResp.GetAllowed() == want {
+			t.Logf("✓ %s: %v (attempt %d)", desc, want, i+1)
+			return
+		}
+		if err != nil {
+			t.Logf("Check request failed (attempt %d): %v", i+1, err)
+			if isConnectionError(err) {
+				connErrors++
+				if connErrors >= maxConsecutiveConnErrors {
+					t.Fatalf("Service unreachable after %d consecutive connection errors, aborting", connErrors)
+				}
+			}
+		} else {
+			connErrors = 0
+			t.Logf("%s returned %v (attempt %d), expected %v", desc, checkResp.GetAllowed(), i+1, want)
+		}
+		if i < 29 {
+			time.Sleep(1 * time.Second)
+		}
+	}
+	t.Fatalf("%s: expected %v within timeout", desc, want)
+}
+
+// deltaFeaturesCheck builds a Check request against the raw
+// features_workspace_direct_service_preferences relation, exposing whether
+// the tuple for the given service exists.
+func deltaFeaturesCheck(workspaceId, serviceId string) *pbv1beta2.CheckRequest {
+	return &pbv1beta2.CheckRequest{
+		Object: &pbv1beta2.ResourceReference{
+			ResourceType: "workspace",
+			ResourceId:   workspaceId,
+			Reporter: &pbv1beta2.ReporterReference{
+				Type: "features",
+			},
+		},
+		Relation: "features_workspace_direct_service_preferences",
+		Subject: &pbv1beta2.SubjectReference{
+			Resource: &pbv1beta2.ResourceReference{
+				ResourceType: "service",
+				ResourceId:   serviceId,
+				Reporter: &pbv1beta2.ReporterReference{
+					Type: "features",
+				},
+			},
+		},
+	}
+}
+
+// TestInventoryAPIHTTP_v1beta2_RelationshipDeltas_Features exercises the
+// AddResourceRelationships and RemoveResourceRelationships endpoints against
+// reporter-side relationship fields (workspace/features service
+// preferences), verifying tuple creates and deletes through permission
+// checks. Covers the delta endpoint user stories: auto-create, multi-value
+// add, merge without affecting existing values, idempotent add, targeted
+// removal, remove-all with the resource persisting, no-op removal, NOT_FOUND
+// for missing and tombstoned resources.
+func TestInventoryAPIHTTP_v1beta2_RelationshipDeltas_Features(t *testing.T) {
+	enableShortMode(t)
+	ctx, cancel := context.WithTimeout(context.Background(), deltaTestTimeout)
+	t.Cleanup(cancel)
+
+	client, _ := deltaE2EClient(t)
+
+	workspaceId := fmt.Sprintf("delta-e2e-features-%d", time.Now().UnixNano())
+	// The features workspace reporter schema validates preference values as
+	// UUIDs; the workspace ID is the unique-per-run part, so fixed service
+	// UUIDs are safe.
+	svcA := "11111111-1111-1111-1111-111111111111"
+	svcB := "22222222-2222-2222-2222-222222222222"
+	svcC := "33333333-3333-3333-3333-333333333333"
+
+	addPrefs := func(services ...string) *pbv1beta2.AddResourceRelationshipsRequest {
+		values := make([]interface{}, len(services))
+		for i, s := range services {
+			values[i] = s
+		}
+		prefs, err := structpb.NewStruct(map[string]interface{}{
+			"direct_service_preferences": values,
+		})
+		require.NoError(t, err)
+		return &pbv1beta2.AddResourceRelationshipsRequest{
+			Type:               "workspace",
+			ReporterType:       "features",
+			ReporterInstanceId: "delta-e2e-instance",
+			LocalResourceId:    workspaceId,
+			Reporter:           prefs,
+		}
+	}
+
+	removePrefs := func(services ...string) *pbv1beta2.RemoveResourceRelationshipsRequest {
+		values := make([]interface{}, len(services))
+		for i, s := range services {
+			values[i] = s
+		}
+		prefs, err := structpb.NewStruct(map[string]interface{}{
+			"direct_service_preferences": values,
+		})
+		require.NoError(t, err)
+		return &pbv1beta2.RemoveResourceRelationshipsRequest{
+			Type:               "workspace",
+			ReporterType:       "features",
+			ReporterInstanceId: "delta-e2e-instance",
+			LocalResourceId:    workspaceId,
+			Reporter:           prefs,
+		}
+	}
+
+	// Step 1: auto-create the resource with multiple relationship values.
+	t.Logf("1. Adding preferences [%s, %s] to never-reported workspace %s (auto-create)", svcA, svcB, workspaceId)
+	_, err := client.AddResourceRelationships(ctx, addPrefs(svcA, svcB))
+	require.NoError(t, err, "AddResourceRelationships (auto-create) failed")
+
+	waitForCheckAllowed(t, ctx, client, deltaFeaturesCheck(workspaceId, svcA), pbv1beta2.Allowed_ALLOWED_TRUE, "auto-created tuple for svc-a")
+	waitForCheckAllowed(t, ctx, client, deltaFeaturesCheck(workspaceId, svcB), pbv1beta2.Allowed_ALLOWED_TRUE, "auto-created tuple for svc-b")
+
+	// Step 2: add another value; existing values must be untouched.
+	t.Logf("2. Adding preference %s (merge; existing values must be untouched)", svcC)
+	_, err = client.AddResourceRelationships(ctx, addPrefs(svcC))
+	require.NoError(t, err, "AddResourceRelationships (merge) failed")
+
+	waitForCheckAllowed(t, ctx, client, deltaFeaturesCheck(workspaceId, svcC), pbv1beta2.Allowed_ALLOWED_TRUE, "merged tuple for svc-c")
+	waitForCheckAllowed(t, ctx, client, deltaFeaturesCheck(workspaceId, svcA), pbv1beta2.Allowed_ALLOWED_TRUE, "existing tuple for svc-a after merge")
+	waitForCheckAllowed(t, ctx, client, deltaFeaturesCheck(workspaceId, svcB), pbv1beta2.Allowed_ALLOWED_TRUE, "existing tuple for svc-b after merge")
+
+	// Step 3: adding an existing value is an idempotent no-op.
+	t.Logf("3. Adding existing preference %s again (idempotent)", svcA)
+	_, err = client.AddResourceRelationships(ctx, addPrefs(svcA))
+	require.NoError(t, err, "AddResourceRelationships (idempotent) failed")
+	waitForCheckAllowed(t, ctx, client, deltaFeaturesCheck(workspaceId, svcA), pbv1beta2.Allowed_ALLOWED_TRUE, "tuple for svc-a after idempotent add")
+
+	// Step 4: remove one value; the others must be untouched.
+	t.Logf("4. Removing preference %s (others must be untouched)", svcA)
+	_, err = client.RemoveResourceRelationships(ctx, removePrefs(svcA))
+	require.NoError(t, err, "RemoveResourceRelationships failed")
+
+	waitForCheckAllowed(t, ctx, client, deltaFeaturesCheck(workspaceId, svcA), pbv1beta2.Allowed_ALLOWED_FALSE, "removed tuple for svc-a")
+	waitForCheckAllowed(t, ctx, client, deltaFeaturesCheck(workspaceId, svcB), pbv1beta2.Allowed_ALLOWED_TRUE, "tuple for svc-b after removing svc-a")
+	waitForCheckAllowed(t, ctx, client, deltaFeaturesCheck(workspaceId, svcC), pbv1beta2.Allowed_ALLOWED_TRUE, "tuple for svc-c after removing svc-a")
+
+	// Step 5: remove multiple values in one call; the resource persists.
+	t.Logf("5. Removing preferences [%s, %s] in one call (resource must persist)", svcB, svcC)
+	_, err = client.RemoveResourceRelationships(ctx, removePrefs(svcB, svcC))
+	require.NoError(t, err, "RemoveResourceRelationships (multiple) failed")
+
+	waitForCheckAllowed(t, ctx, client, deltaFeaturesCheck(workspaceId, svcB), pbv1beta2.Allowed_ALLOWED_FALSE, "removed tuple for svc-b")
+	waitForCheckAllowed(t, ctx, client, deltaFeaturesCheck(workspaceId, svcC), pbv1beta2.Allowed_ALLOWED_FALSE, "removed tuple for svc-c")
+
+	// Removing a value that is not present is a no-op that succeeds only
+	// when the resource exists (Step 8 shows missing resources return
+	// NOT_FOUND), so this proves the workspace persisted the remove-all
+	// and Step 6 cannot mask a failed persistence check by recreating a
+	// missing workspace through AddResourceRelationships.
+	t.Log("5.5. Probing the workspace still exists via a no-op removal")
+	_, err = client.RemoveResourceRelationships(ctx, removePrefs(svcA))
+	require.NoError(t, err, "RemoveResourceRelationships (existence probe) failed")
+
+	t.Log("6. Re-adding a preference proves the resource still exists after all relationships were removed")
+	_, err = client.AddResourceRelationships(ctx, addPrefs(svcB))
+	require.NoError(t, err, "AddResourceRelationships after remove-all failed")
+	waitForCheckAllowed(t, ctx, client, deltaFeaturesCheck(workspaceId, svcB), pbv1beta2.Allowed_ALLOWED_TRUE, "re-added tuple for svc-b")
+
+	// Step 7: removing a value that is not present is a no-op.
+	t.Log("7. Removing preference that is not present (idempotent no-op)")
+	_, err = client.RemoveResourceRelationships(ctx, removePrefs(svcA))
+	require.NoError(t, err, "RemoveResourceRelationships (no-op) failed")
+	waitForCheckAllowed(t, ctx, client, deltaFeaturesCheck(workspaceId, svcB), pbv1beta2.Allowed_ALLOWED_TRUE, "tuple for svc-b after no-op removal")
+
+	// Step 8: removing from a resource that does not exist returns NOT_FOUND.
+	t.Log("8. Removing from a never-reported workspace (expect NOT_FOUND)")
+	_, err = client.RemoveResourceRelationships(ctx, &pbv1beta2.RemoveResourceRelationshipsRequest{
+		Type:               "workspace",
+		ReporterType:       "features",
+		ReporterInstanceId: "delta-e2e-instance",
+		LocalResourceId:    "delta-e2e-missing-" + fmt.Sprintf("%d", time.Now().UnixNano()),
+		Reporter:           mustPrefsStruct(t, svcA),
+	})
+	require.Error(t, err, "RemoveResourceRelationships on missing resource should fail")
+	assert.Equal(t, codes.NotFound, status.Code(err), "expected NOT_FOUND for missing resource")
+
+	// Step 9: tombstoned resources reject both endpoints with NOT_FOUND.
+	t.Log("9. Deleting the workspace, then adding and removing (expect NOT_FOUND)")
+	_, err = client.DeleteResource(ctx, &pbv1beta2.DeleteResourceRequest{
+		Reference: &pbv1beta2.ResourceReference{
+			ResourceType: "workspace",
+			ResourceId:   workspaceId,
+			Reporter: &pbv1beta2.ReporterReference{
+				Type:       "features",
+				InstanceId: proto.String("delta-e2e-instance"),
+			},
+		},
+	})
+	require.NoError(t, err, "DeleteResource failed")
+
+	_, err = client.AddResourceRelationships(ctx, addPrefs(svcA))
+	require.Error(t, err, "AddResourceRelationships on tombstoned resource should fail")
+	assert.Equal(t, codes.NotFound, status.Code(err), "expected NOT_FOUND for tombstoned add")
+
+	_, err = client.RemoveResourceRelationships(ctx, removePrefs(svcB))
+	require.Error(t, err, "RemoveResourceRelationships on tombstoned resource should fail")
+	assert.Equal(t, codes.NotFound, status.Code(err), "expected NOT_FOUND for tombstoned remove")
+}
+
+// mustPrefsStruct builds a reporter struct carrying a single
+// direct_service_preferences value, failing the test on invalid input.
+func mustPrefsStruct(t *testing.T, service string) *structpb.Struct {
+	t.Helper()
+	prefs, err := structpb.NewStruct(map[string]interface{}{
+		"direct_service_preferences": []interface{}{service},
+	})
+	require.NoError(t, err)
+	return prefs
+}
+
+// TestInventoryAPIHTTP_v1beta2_RelationshipDeltas_Host exercises the
+// relationship delta endpoints against common-stream relationship fields
+// (host/hbi workspace assignment): auto-create via Add, the single-valued
+// conflict rejection, and NOT_FOUND for tombstoned resources.
+func TestInventoryAPIHTTP_v1beta2_RelationshipDeltas_Host(t *testing.T) {
+	enableShortMode(t)
+	ctx, cancel := context.WithTimeout(context.Background(), deltaTestTimeout)
+	t.Cleanup(cancel)
+
+	client, _ := deltaE2EClient(t)
+
+	resourceId := fmt.Sprintf("delta-e2e-host-%d", time.Now().UnixNano())
+	workspace := fmt.Sprintf("delta-ws-%d", time.Now().UnixNano())
+	otherWorkspace := workspace + "-other"
+
+	addWorkspace := func(ws string) *pbv1beta2.AddResourceRelationshipsRequest {
+		common, err := structpb.NewStruct(map[string]interface{}{
+			"workspace_id": ws,
+		})
+		require.NoError(t, err)
+		return &pbv1beta2.AddResourceRelationshipsRequest{
+			Type:               "host",
+			ReporterType:       "hbi",
+			ReporterInstanceId: "delta-e2e-instance",
+			LocalResourceId:    resourceId,
+			Common:             common,
+		}
+	}
+
+	hostWorkspaceCheck := &pbv1beta2.CheckRequest{
+		Object: &pbv1beta2.ResourceReference{
+			ResourceType: "host",
+			ResourceId:   resourceId,
+			Reporter: &pbv1beta2.ReporterReference{
+				Type:       "hbi",
+				InstanceId: proto.String("delta-e2e-instance"),
+			},
+		},
+		Relation: "workspace",
+		Subject: &pbv1beta2.SubjectReference{
+			Resource: &pbv1beta2.ResourceReference{
+				ResourceType: "workspace",
+				ResourceId:   workspace,
+				Reporter: &pbv1beta2.ReporterReference{
+					Type: "rbac",
+				},
+			},
+		},
+	}
+
+	// Step 1: auto-create the host with its workspace relationship via Add.
+	t.Logf("1. Adding workspace %s to never-reported host %s (auto-create)", workspace, resourceId)
+	_, err := client.AddResourceRelationships(ctx, addWorkspace(workspace))
+	require.NoError(t, err, "AddResourceRelationships (auto-create) failed")
+
+	waitForCheckAllowed(t, ctx, client, hostWorkspaceCheck, pbv1beta2.Allowed_ALLOWED_TRUE, "auto-created host workspace tuple")
+
+	// Step 2: the workspace relationship is single-valued; adding a second
+	// value while one exists is rejected.
+	t.Logf("2. Adding a second workspace %s to a host that already has one (expect INVALID_ARGUMENT)", otherWorkspace)
+	_, err = client.AddResourceRelationships(ctx, addWorkspace(otherWorkspace))
+	require.Error(t, err, "AddResourceRelationships with conflicting single-valued relationship should fail")
+	assert.Equal(t, codes.InvalidArgument, status.Code(err), "expected INVALID_ARGUMENT for single-valued conflict")
+
+	// Step 3: tombstoned resources reject Add with NOT_FOUND.
+	t.Log("3. Deleting the host, then adding again (expect NOT_FOUND)")
+	_, err = client.DeleteResource(ctx, &pbv1beta2.DeleteResourceRequest{
+		Reference: &pbv1beta2.ResourceReference{
+			ResourceType: "host",
+			ResourceId:   resourceId,
+			Reporter: &pbv1beta2.ReporterReference{
+				Type:       "hbi",
+				InstanceId: proto.String("delta-e2e-instance"),
+			},
+		},
+	})
+	require.NoError(t, err, "DeleteResource failed")
+
+	_, err = client.AddResourceRelationships(ctx, addWorkspace(workspace))
+	require.Error(t, err, "AddResourceRelationships on tombstoned resource should fail")
+	assert.Equal(t, codes.NotFound, status.Code(err), "expected NOT_FOUND for tombstoned add")
 }

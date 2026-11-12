@@ -1,3 +1,10 @@
+definition features/billing_account {
+	permission services = t_services
+	relation t_services: features/service
+}
+
+definition features/service {}
+
   definition hbi/host {
     	permission update = t_workspace->inventory_host_update
     	permission view = t_workspace->inventory_host_view
@@ -463,6 +470,19 @@
 
   definition rbac/workspace {
   	permission binding = t_binding
+  	permission features_workspace__desired_services = (features_workspace_direct_service_preferences + features_workspace_desire_all_services + (t_parent->features_workspace__desired_services - features_workspace_ignore_inherited_desired_services))
+  	permission features_workspace__paid_services = (t_features_workspace_direct_billing_account->services + (t_parent->features_workspace__paid_services - features_workspace_ignore_inherited_paid_services))
+  	permission features_workspace_desire_all_services = t_features_workspace_desire_all_services
+  	relation t_features_workspace_desire_all_services: features/service:*
+  	permission features_workspace_direct_billing_account = t_features_workspace_direct_billing_account
+  	relation t_features_workspace_direct_billing_account: features/billing_account
+  	permission features_workspace_direct_service_preferences = t_features_workspace_direct_service_preferences
+  	relation t_features_workspace_direct_service_preferences: features/service
+  	permission features_workspace_enabled_services = (features_workspace__paid_services & features_workspace__desired_services)
+  	permission features_workspace_ignore_inherited_desired_services = t_features_workspace_ignore_inherited_desired_services
+  	relation t_features_workspace_ignore_inherited_desired_services: features/service:*
+  	permission features_workspace_ignore_inherited_paid_services = t_features_workspace_ignore_inherited_paid_services
+  	relation t_features_workspace_ignore_inherited_paid_services: features/service:*
   	relation t_binding: rbac/role_binding
   	permission inventory_host_update = t_binding->inventory_host_update + t_parent->inventory_host_update
   	permission inventory_host_view = t_binding->inventory_host_view + t_parent->inventory_host_view

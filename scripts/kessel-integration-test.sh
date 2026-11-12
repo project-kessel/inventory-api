@@ -33,6 +33,10 @@ RBAC_HTTP="localhost:9080"
 KAFKA_BOOTSTRAP="localhost:9092"
 KAFKA_CONNECT="localhost:8083"
 
+# Maximum time (in seconds) for a single grpcurl invocation, so an
+# unresponsive RPC cannot block the integration run indefinitely.
+GRPCURL_MAX_TIME=30
+
 # Test identity
 ORG_ID="test-org-kessel-e2e"
 X_RH_IDENTITY=$(echo -n "{\"identity\":{\"account_number\":\"12345\",\"org_id\":\"${ORG_ID}\",\"type\":\"User\",\"user\":{\"user_id\":\"test-user-1\",\"email\":\"test@example.com\",\"username\":\"testuser\",\"is_org_admin\":true}}}" | base64 | tr -d '\n')
@@ -394,7 +398,107 @@ else
   fail "Host-to-workspace relationship still present in SpiceDB after deletion"
 fi
 
-# ─── Step 9: Summary ─────────────────────────────────────────────────────────
+# ─── Step 9: Relationship Delta Endpoints ────────────────────────────────────
+
+log_step "Step 9: Relationship Delta Endpoints (Add/RemoveResourceRelationships)"
+
+DELTA_WORKSPACE_ID="delta-integration-$(uuidgen)"
+DELTA_SERVICE_ID="11111111-1111-1111-1111-111111111111"
+
+log_info "Auto-creating a workspace with a service preference via AddResourceRelationships"
+ADD_DELTA_RESPONSE=$(grpcurl -plaintext -max-time "${GRPCURL_MAX_TIME}" -d @ "${INVENTORY_GRPC}" kessel.inventory.v1beta2.KesselInventoryService/AddResourceRelationships <<EOF
+{
+  "type": "workspace",
+  "reporterType": "features",
+  "reporterInstanceId": "integration-test",
+  "localResourceId": "${DELTA_WORKSPACE_ID}",
+  "reporter": {
+    "direct_service_preferences": ["${DELTA_SERVICE_ID}"]
+  }
+}
+EOF
+) || {
+  fail "AddResourceRelationships request failed"
+  echo "  Response: ${ADD_DELTA_RESPONSE}"
+}
+
+if [[ -n "${ADD_DELTA_RESPONSE}" ]]; then
+  pass "Workspace auto-created with service preference via AddResourceRelationships"
+fi
+
+log_info "Polling SpiceDB for the preference relationship (up to 60s)..."
+DELTA_TUPLE_FOUND=false
+for ((i=1; i<=20; i++)); do
+  if DELTA_TUPLES_RESPONSE=$(read_spicedb_relationships "rbac/workspace:${DELTA_WORKSPACE_ID}" t_features_workspace_direct_service_preferences "features/service:${DELTA_SERVICE_ID}") &&
+    DELTA_RELATIONSHIP_COUNT=$(jq -s '[.[] | select(.relationship)] | length' <<< "$DELTA_TUPLES_RESPONSE") &&
+    [[ "$DELTA_RELATIONSHIP_COUNT" -gt 0 ]]; then
+    DELTA_TUPLE_FOUND=true
+    break
+  fi
+  sleep 3
+done
+
+if [[ "$DELTA_TUPLE_FOUND" == "true" ]]; then
+  pass "Service preference relationship created in SpiceDB by AddResourceRelationships"
+else
+  fail "Service preference relationship not found in SpiceDB after 60s"
+fi
+
+log_info "Removing the service preference via RemoveResourceRelationships"
+REMOVE_DELTA_RESPONSE=$(grpcurl -plaintext -max-time "${GRPCURL_MAX_TIME}" -d @ "${INVENTORY_GRPC}" kessel.inventory.v1beta2.KesselInventoryService/RemoveResourceRelationships <<EOF
+{
+  "type": "workspace",
+  "reporterType": "features",
+  "reporterInstanceId": "integration-test",
+  "localResourceId": "${DELTA_WORKSPACE_ID}",
+  "reporter": {
+    "direct_service_preferences": ["${DELTA_SERVICE_ID}"]
+  }
+}
+EOF
+) || {
+  fail "RemoveResourceRelationships request failed"
+  echo "  Response: ${REMOVE_DELTA_RESPONSE}"
+}
+
+if [[ -n "${REMOVE_DELTA_RESPONSE}" ]]; then
+  pass "Service preference removed via RemoveResourceRelationships"
+fi
+
+log_info "Polling SpiceDB for the preference relationship removal (up to 60s)..."
+DELTA_TUPLE_REMOVED=false
+for ((i=1; i<=20; i++)); do
+  if DELTA_TUPLES_RESPONSE=$(read_spicedb_relationships "rbac/workspace:${DELTA_WORKSPACE_ID}" t_features_workspace_direct_service_preferences "features/service:${DELTA_SERVICE_ID}") &&
+    DELTA_REMAINING_COUNT=$(jq -s '[.[] | select(.relationship)] | length' <<< "$DELTA_TUPLES_RESPONSE") &&
+    [[ "$DELTA_REMAINING_COUNT" -eq 0 ]]; then
+    DELTA_TUPLE_REMOVED=true
+    break
+  fi
+  sleep 3
+done
+
+if [[ "$DELTA_TUPLE_REMOVED" == "true" ]]; then
+  pass "Service preference relationship removed from SpiceDB by RemoveResourceRelationships"
+else
+  fail "Service preference relationship still present in SpiceDB after 60s"
+fi
+
+log_info "Deleting the delta test workspace"
+grpcurl -plaintext -max-time "${GRPCURL_MAX_TIME}" -d @ "${INVENTORY_GRPC}" kessel.inventory.v1beta2.KesselInventoryService/DeleteResource <<EOF
+{
+  "reference": {
+    "resourceType": "workspace",
+    "resourceId": "${DELTA_WORKSPACE_ID}",
+    "reporter": {
+      "type": "features",
+      "instanceId": "integration-test"
+    }
+  }
+}
+EOF
+pass "Delta test workspace deleted"
+
+# ─── Step 10: Summary ─────────────────────────────────────────────────────────
 
 log_step "Summary"
 

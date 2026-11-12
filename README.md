@@ -120,7 +120,7 @@ The quickest way to run the full Kessel suite locally (Inventory API, SpiceDB, I
 make kessel-up
 ```
 
-This uses pre-built images so no other repos need to be cloned. To stop:
+This uses pre-built images so no other repos need to be cloned. The local full-Kessel configuration enables the Inventory consumer's `load-reporter-representation` setting (matching stage), so reporter-side relationship fields replicate to SpiceDB. To stop:
 ```shell
 make kessel-down
 ```

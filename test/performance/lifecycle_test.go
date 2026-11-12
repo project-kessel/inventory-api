@@ -137,6 +137,10 @@ func config(t *testing.T) settings {
 	return s
 }
 
+// TestResourceLifecyclePerformance measures gRPC resource lifecycles against a
+// dedicated PostgreSQL instance with fresh and history-heavy data at two worker
+// counts, checking final state and configured performance baselines. It also runs
+// consumer-read measurements; the lifecycle path uses a no-op outbox publisher.
 func TestResourceLifecyclePerformance(t *testing.T) {
 	s := config(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
@@ -174,8 +178,8 @@ func TestResourceLifecyclePerformance(t *testing.T) {
 	if err := data.Migrate(db, nil); err != nil {
 		t.Fatal(err)
 	}
-	// Migrations bind a GORM session to a dedicated advisory-lock connection.
-	// Use a fresh handle for requests after that connection has been released.
+	// Use a fresh handle for requests so the request pool is independent of
+	// the connections used while applying migrations.
 	db, err = gorm.Open(postgres.Open(dsn), &gorm.Config{TranslateError: true})
 	if err != nil {
 		t.Fatal(err)

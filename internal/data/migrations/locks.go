@@ -74,9 +74,16 @@ func WithAdvisoryLock(ctx context.Context, db *gorm.DB, fn func(*gorm.DB) error)
 	// Create a new GORM DB session bound to the connection that holds the lock.
 	// This is CRITICAL: without binding to the locked connection, GORM would use
 	// random connections from the pool, defeating the purpose of the advisory lock.
+	// Context is set so gorm clones the Statement instead of sharing it: gorm's
+	// Session shares the parent's Statement unless Context, PrepareStmt, or
+	// SkipHooks is set, so without it the ConnPool assignment below would
+	// mutate the caller's handle and leave it bound to this dedicated
+	// connection even after the lock is released and the connection returned
+	// to the pool.
 	connDB := db.Session(&gorm.Session{
 		PrepareStmt: false,
 		NewDB:       true,
+		Context:     ctx,
 	})
 	connDB.Statement.ConnPool = &connWrapper{conn: conn}
 

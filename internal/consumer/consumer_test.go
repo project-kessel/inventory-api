@@ -64,11 +64,21 @@ const (
 	testDeleteMessage = `{"schema":{"type":"string","optional":false,"name":"io.debezium.data.Json","version":1},"payload":{"reporter_resource_key":{"local_resource_id":"test-resource-4321","resource_type":"integration","reporter":{"reporter_type":"notifications","reporter_instance_id":"test-instance-1"}},"common_version":1}}`
 )
 
-func setupInMemoryDB(t *testing.T) *gorm.DB {
-	db := testutil.NewSQLiteTestDB(t, &gorm.Config{})
-	err := data.Migrate(db, nil)
-	require.NoError(t, err)
-	return db
+// migrateConsumerDB brings a fresh test database up to the current schema.
+// It is a named function so the PostgreSQL test backend can key its template
+// database on a stable value and run the migrations only once per test
+// binary; see testutil.PostgresTestDSN.
+func migrateConsumerDB(db *gorm.DB) error {
+	return data.Migrate(db, nil)
+}
+
+// setupTestDB returns a fully migrated test database on the backend selected
+// through TEST_DB: PostgreSQL via Testcontainers (the default, matching
+// production) or in-memory SQLite (the dependency-free fallback, selected
+// explicitly with TEST_DB=sqlite).
+func setupTestDB(t *testing.T) *gorm.DB {
+	t.Helper()
+	return testutil.NewTestDB(t, &gorm.Config{}, migrateConsumerDB)
 }
 
 type TestCase struct {
@@ -114,7 +124,7 @@ func (t *TestCase) TestSetup(testingT *testing.T) []error {
 	relationsRepo := data.NewSimpleRelationsRepository()
 
 	consumer := &mocks.MockConsumer{}
-	db := setupInMemoryDB(testingT)
+	db := setupTestDB(testingT)
 	schemaRepository := data.NewInMemorySchemaRepository()
 
 	// Create consumer with real database first
@@ -124,9 +134,14 @@ func (t *TestCase) TestSetup(testingT *testing.T) []error {
 		return errs
 	}
 
-	// Replace the repository with one using a no-op outbox publisher for SQLite compatibility
-	noopPublisher := data.SetOutboxPublisher(storage.OutboxModeNone)
-	t.inv.ResourceRepository = data.NewResourceRepository(db, data.NewGormTransactionManager(t.inv.MetricsCollector, 3), noopPublisher)
+	// Replace the repository with one using the production outbox publisher
+	// for the active backend: WAL on PostgreSQL (the test container runs
+	// wal_level=logical), no-op on SQLite.
+	publisher := data.SetOutboxPublisher(storage.OutboxModeNone)
+	if testutil.UsingPostgres() {
+		publisher = data.SetOutboxPublisher(storage.OutboxModeWAL)
+	}
+	t.inv.ResourceRepository = data.NewResourceRepository(db, data.NewGormTransactionManager(t.inv.MetricsCollector, 3), publisher)
 
 	t.inv.SchemaService = model.NewSchemaService(schemaRepository, t.logger)
 

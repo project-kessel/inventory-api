@@ -102,7 +102,7 @@ type TransactionManager interface {
 ## Outbox Pattern Implementation
 
 ### Publisher Modes
-- **WAL Mode** (`outbox-mode=wal`): PostgreSQL logical decoding via `pg_logical_emit_message`. Required for the Debezium/Kafka consumer pipeline.
+- **WAL Mode** (`outbox-mode=wal`): PostgreSQL logical decoding via `pg_logical_emit_message`. Required for the Debezium/Kafka consumer pipeline. The PostgreSQL test container runs `wal_level=logical` so tests exercise the real publisher; `outboxeventsrepository_test.go` verifies the emitted message through a logical replication slot.
 - **None Mode** (`outbox-mode=none`): No-op publisher. Use with SQLite or any deployment without a consumer pipeline. Resource writes succeed but no events are emitted.
 
 ### WAL Implementation
@@ -113,7 +113,7 @@ if err := tx.Exec("SELECT pg_logical_emit_message(true, ?, ?)", prefix, content)
 }
 ```
 
-WAL mode only works with PostgreSQL. SQLite (used in development/testing) does not support `pg_logical_emit_message` — use `outbox-mode=none` instead.
+WAL mode only works with PostgreSQL. SQLite (available as an explicit test fallback via `TEST_DB=sqlite`, and for standalone deployments) does not support `pg_logical_emit_message` — use `outbox-mode=none` instead.
 
 ### Publisher Function Pattern
 ```go
@@ -148,6 +148,7 @@ func WithAdvisoryLock(ctx context.Context, db *gorm.DB, fn func(*gorm.DB) error)
   inside PostgreSQL because an advisory-lock waiter can deadlock with
   `CREATE INDEX CONCURRENTLY`
 - GORM operations bound to locked connection via `connWrapper`
+- The session passed the caller's context so gorm clones the `Statement` — gorm's `Session` shares the parent's `Statement` (and therefore `ConnPool`) unless `Context`, `PrepareStmt`, or `SkipHooks` is set; without the clone, binding the wrapper would poison the caller's handle after the lock is released
 - Prevents concurrent migrations across multiple instances
 - Enables non-transactional DDL like `CREATE INDEX CONCURRENTLY`
 
@@ -359,11 +360,13 @@ for _, impl := range implementations {
 See `internal/data/resource_repository_test.go` for the canonical example of this pattern.
 
 ### Database Testing
-- **In-memory SQLite**: Use `testutil.NewSQLiteTestDB(t, cfg)` for tests that need real SQL behavior
-- **Unique databases**: Each test gets isolated DB via test name + timestamp
-- **Migrations**: Run `data.Migrate(db, nil)` after DB creation for consistent schema
-- **Pattern**: `db := setupInMemoryDB(t)` helper in most test files
-- **When to use SQLite vs fake**: Use the fake repo for business logic tests. Use SQLite when the test specifically needs SQL/GORM behavior (e.g., testing query construction, migration logic, or constraint handling).
+- **Backend selection**: Use `testutil.NewTestDB(t, cfg, migrate)` (see `resource_repository_test.go`'s `setupRepositoryDB`) to get a fully migrated database on the backend selected through `TEST_DB`: PostgreSQL via Testcontainers (the default, matching production, RHCLOUD-51816) or in-memory SQLite (the explicit fallback, selected with `TEST_DB=sqlite`, for environments without a container runtime). Pass `nil` as migrate for tests that need no schema (see `transaction_manager_test.go`).
+- **PostgreSQL path**: one testcontainer per test binary, one migrated template database per migrate function, and a private database per test copied from that template; run through `make test` or `scripts/testcontainers-run.sh` so the container runtime is detected
+- **Isolation**: Each test gets a private database on PostgreSQL and a unique in-memory database on SQLite; databases are dropped with `WITH (FORCE)` on cleanup
+- **Migrations**: `NewTestDB` runs them for you (once per test binary on PostgreSQL, per test on SQLite); pass a package-level migrate function so the PostgreSQL template is reused
+- **Pattern**: `setupRepositoryDB(t)` / `setupTestDB(t)` helpers in test files replace the old `setupInMemoryDB`
+- **When to use SQLite vs fake**: Use the fake repo for business logic tests. Use the real database backend when the test specifically needs SQL/GORM behavior (e.g., testing query construction, migration logic, or constraint handling)
+- **Deliberate SQLite-only tests**: `migrations/locks_test.go`'s `TestWithAdvisoryLock_Sqlite*` verify the no-locking fallback outside PostgreSQL; the PostgreSQL locking behavior is verified by `TestWithAdvisoryLock_PostgresHoldsLock` on the postgres backend.
 
 ### Schema Testing
 - **In-memory repository**: `data.NewInMemorySchemaRepository()` for tests

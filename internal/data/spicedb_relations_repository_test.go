@@ -15,6 +15,7 @@ import (
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/go-kratos/kratos/v2/middleware/tracing"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
+	"github.com/project-kessel/inventory-api/internal/testutil"
 	"github.com/stretchr/testify/assert"
 	rpcstatus "google.golang.org/genproto/googleapis/rpc/status"
 	"google.golang.org/grpc/codes"
@@ -27,6 +28,8 @@ func TestMain(m *testing.M) {
 	os.Exit(run(m))
 }
 
+// run manages test dependencies and returns the test status after PostgreSQL
+// cleanup, allowing deferred SpiceDB cleanup to finish before TestMain exits.
 func run(m *testing.M) int {
 	flag.Parse()
 
@@ -52,7 +55,20 @@ func run(m *testing.M) int {
 		defer container.Close()
 	}
 
-	return m.Run()
+	code := m.Run()
+
+	// Stop the shared PostgreSQL testcontainer used by database tests on the
+	// postgres backend. scripts/testcontainers-run.sh disables Ryuk for
+	// Podman, so without this the container would outlive the test binary. On
+	// the sqlite fallback this is a no-op.
+	if err := testutil.TerminateSharedPostgres(); err != nil {
+		fmt.Fprintf(os.Stderr, "PostgreSQL test cleanup failed: %v\n", err)
+		if code == 0 {
+			code = 1
+		}
+	}
+
+	return code
 }
 
 // requireSpiceDBIntegration skips the test if running in short mode or if container is not available

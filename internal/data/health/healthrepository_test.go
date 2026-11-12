@@ -3,27 +3,34 @@ package health
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 
 	"github.com/project-kessel/inventory-api/internal/config/relations"
 	relationsGrpc "github.com/project-kessel/inventory-api/internal/config/relations/kessel"
 	"github.com/project-kessel/inventory-api/internal/data"
+	"github.com/project-kessel/inventory-api/internal/testutil"
 )
 
+// migrateHealthDB brings a fresh test database up to the current schema. It
+// is a named function so the PostgreSQL test backend can key its template
+// database on a stable value and run the migrations only once per test
+// binary; see testutil.PostgresTestDSN.
+func migrateHealthDB(db *gorm.DB) error {
+	return data.Migrate(db, log.NewHelper(log.DefaultLogger))
+}
+
+// setupGorm returns a fully migrated test database on the backend selected
+// through TEST_DB: PostgreSQL via Testcontainers (the default, matching
+// production) or in-memory SQLite (the dependency-free fallback, selected
+// explicitly with TEST_DB=sqlite).
 func setupGorm(t *testing.T) *gorm.DB {
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{TranslateError: true})
-	require.Nil(t, err)
-
-	err = data.Migrate(db, log.NewHelper(log.DefaultLogger))
-	require.Nil(t, err)
-
-	return db
+	t.Helper()
+	return testutil.NewTestDB(t, &gorm.Config{TranslateError: true}, migrateHealthDB)
 }
 
 func TestHealthInit(t *testing.T) {
@@ -47,6 +54,9 @@ func TestHealthInit(t *testing.T) {
 	assert.Equal(t, "RELATIONS-API UNHEALTHY", resp.Status())
 }
 
+// TestHealthRepo_IsBackendAvailable_AllCases verifies that storage and relations
+// failures are combined in the health response rather than returned as errors,
+// and that storage status identifies the selected database backend.
 func TestHealthRepo_IsBackendAvailable_AllCases(t *testing.T) {
 	ctx := context.TODO()
 	relationsConfig, _ := relations.NewConfig(relations.NewOptions()).Complete(ctx)
@@ -77,7 +87,9 @@ func TestHealthRepo_IsBackendAvailable_AllCases(t *testing.T) {
 	resp, err = healthRepo1.IsBackendAvailable(ctx)
 	assert.NoError(t, err)
 	assert.Equal(t, 200, resp.Code())
-	assert.Contains(t, resp.Status(), "Storage type sqlite")
+	// The reported storage type is the GORM dialector name, which matches the
+	// TEST_DB backend selection ("postgres" or "sqlite").
+	assert.Contains(t, resp.Status(), fmt.Sprintf("Storage type %s", testutil.TestDBBackend()))
 
 	db2 := setupGorm(t)
 	simpleRelations2 := data.NewSimpleRelationsRepository()
@@ -89,7 +101,7 @@ func TestHealthRepo_IsBackendAvailable_AllCases(t *testing.T) {
 	resp, err = healthRepo2.IsBackendAvailable(ctx)
 	assert.NoError(t, err)
 	assert.Equal(t, 500, resp.Code())
-	assert.Contains(t, resp.Status(), "STORAGE UNHEALTHY: sqlite")
+	assert.Contains(t, resp.Status(), fmt.Sprintf("STORAGE UNHEALTHY: %s", testutil.TestDBBackend()))
 	assert.NotContains(t, resp.Status(), "RELATIONS-API UNHEALTHY")
 
 	db3 := setupGorm(t)

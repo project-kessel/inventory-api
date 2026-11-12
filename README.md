@@ -317,11 +317,20 @@ authz:
 Tests can be run using:
 
 ```shell
+# Short-mode tests, excluding E2E and Kafka test patterns; database-backed
+# tests use PostgreSQL via Testcontainers (Docker or Podman required,
+# detected automatically)
 make test
+
+# Same short-mode suite and exclusions, with database-backed tests on
+# in-memory SQLite (no container runtime needed; PostgreSQL-specific tests
+# are skipped and PostgreSQL behavior is not reproduced)
+make test-sqlite
 
 # Run resource lifecycle performance tests and print a summary (ensure Docker or Podman is running)
 make test-performance
 ```
+
 
 For end-to-test info see [here](./test/README.md).
 

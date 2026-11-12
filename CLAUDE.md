@@ -15,8 +15,13 @@ This is the Kessel Inventory API, a Go-based microservice for resource inventory
 # Build the project
 make build
 
-# Run tests
+# Run short-mode tests, excluding E2E and Kafka test patterns
+# Database tests use PostgreSQL via Testcontainers (Docker or Podman required)
 make test
+
+# Same short-mode suite and exclusions, using in-memory SQLite
+# No container runtime required; PostgreSQL-specific tests are skipped
+make test-sqlite
 
 # Run resource lifecycle performance tests and print a summary (ensure Docker or Podman is running)
 make test-performance

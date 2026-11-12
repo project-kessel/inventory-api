@@ -19,6 +19,7 @@ import (
 	"github.com/project-kessel/inventory-api/internal/biz/usecase/metaauthorizer"
 	"github.com/project-kessel/inventory-api/internal/data"
 	"github.com/project-kessel/inventory-api/internal/metricscollector"
+	relationstest "github.com/project-kessel/inventory-api/internal/testutil/relations"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -320,10 +321,10 @@ func TestCheckForUpdateBulk_MetaAuthzDenied(t *testing.T) {
 }
 
 func TestCheckForUpdateBulk_MixedResults(t *testing.T) {
-	simpleAuthz := data.NewSimpleRelationsRepository()
-	simpleAuthz.Grant("user-1", "update", "hbi", "host", "host-1")
+	relationsRepo := relationstest.New(t)
+	relationstest.Grant(t, relationsRepo, "user-1", "update", "hbi", "host", "host-1")
 
-	h := newTestHarness(t, withMeta(true), withRelations(simpleAuthz))
+	h := newTestHarness(t, withMeta(true), withRelations(relationsRepo))
 
 	subject, err := buildTestSubjectReference("user-1")
 	require.NoError(t, err)
@@ -1836,11 +1837,11 @@ func TestCheck_AuthzDecisions(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			simpleAuthz := data.NewSimpleRelationsRepository()
+			relationsRepo := relationstest.New(t)
 			if tt.grantSubjectID != "" {
-				simpleAuthz.Grant(tt.grantSubjectID, "view", "hbi", "host", "host-1")
+				relationstest.Grant(t, relationsRepo, tt.grantSubjectID, "view", "hbi", "host", "host-1")
 			}
-			h := newTestHarness(t, withMeta(true), withRelations(simpleAuthz))
+			h := newTestHarness(t, withMeta(true), withRelations(relationsRepo))
 
 			subject, err := buildTestSubjectReference("user-1")
 			require.NoError(t, err)
@@ -1869,11 +1870,11 @@ func TestCheckForUpdate_AuthzDecisions(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			simpleAuthz := data.NewSimpleRelationsRepository()
+			relationsRepo := relationstest.New(t)
 			if tt.grantSubjectID != "" {
-				simpleAuthz.Grant(tt.grantSubjectID, "update", "hbi", "host", "host-1")
+				relationstest.Grant(t, relationsRepo, tt.grantSubjectID, "update", "hbi", "host", "host-1")
 			}
-			h := newTestHarness(t, withMeta(true), withRelations(simpleAuthz))
+			h := newTestHarness(t, withMeta(true), withRelations(relationsRepo))
 
 			subject, err := buildTestSubjectReference("user-1")
 			require.NoError(t, err)
@@ -1891,10 +1892,10 @@ func TestCheckForUpdate_AuthzDecisions(t *testing.T) {
 }
 
 func TestCheckBulk_RelationsMixedResults(t *testing.T) {
-	simpleAuthz := data.NewSimpleRelationsRepository()
-	simpleAuthz.Grant("user-1", "view", "hbi", "host", "host-1")
+	relationsRepo := relationstest.New(t)
+	relationstest.Grant(t, relationsRepo, "user-1", "view", "hbi", "host", "host-1")
 
-	h := newTestHarness(t, withMeta(true), withRelations(simpleAuthz))
+	h := newTestHarness(t, withMeta(true), withRelations(relationsRepo))
 
 	subject, err := buildTestSubjectReference("user-1")
 	require.NoError(t, err)
@@ -1942,11 +1943,11 @@ func TestLookupObjects_StreamResults(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			simpleAuthz := data.NewSimpleRelationsRepository()
+			relationsRepo := relationstest.New(t)
 			for _, g := range tt.grants {
-				simpleAuthz.Grant(g.subjectID, "view", "hbi", "host", g.resourceID)
+				relationstest.Grant(t, relationsRepo, g.subjectID, "view", "hbi", "host", g.resourceID)
 			}
-			h := newTestHarness(t, withMeta(true), withRelations(simpleAuthz))
+			h := newTestHarness(t, withMeta(true), withRelations(relationsRepo))
 
 			subject, err := buildTestSubjectReference("user-1")
 			require.NoError(t, err)
@@ -2005,11 +2006,11 @@ func TestLookupSubjects_StreamResults(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			simpleAuthz := data.NewSimpleRelationsRepository()
+			relationsRepo := relationstest.New(t)
 			for _, subjectID := range tt.grantSubjectIDs {
-				simpleAuthz.Grant(subjectID, "view", "hbi", "host", "host-1")
+				relationstest.Grant(t, relationsRepo, subjectID, "view", "hbi", "host", "host-1")
 			}
-			h := newTestHarness(t, withMeta(true), withRelations(simpleAuthz))
+			h := newTestHarness(t, withMeta(true), withRelations(relationsRepo))
 
 			key := createReporterResourceKey(t, "host-1", "host", "hbi", "instance-1")
 			relation, err := model.NewRelation("view")

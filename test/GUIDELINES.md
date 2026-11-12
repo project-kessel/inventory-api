@@ -16,13 +16,13 @@ The preference order for test doubles is:
 
 ### Hermetic Testing
 
-When external dependencies are needed, leverage testcontainers to download and run them locally. Business logic that uses resource persistence must exercise the real repository and transaction manager too: an in-memory reimplementation can hide bugs in queries, constraints, version selection, and transaction behavior. Keep pure domain tests free of I/O, and reuse production in-memory adapters such as the schema repository where applicable.
+When external dependencies are needed, leverage testcontainers to download and run them locally. Business logic that uses resource persistence must exercise the real repository and transaction manager too: an in-memory reimplementation can hide bugs in queries, constraints, version selection, and transaction behavior. Relations behavior must also use the real SpiceDB adapter against `serve-testing`, rather than reimplementing tuple storage, permission evaluation, or fencing. Keep pure domain tests free of I/O, and reuse production in-memory adapters such as the schema repository where applicable.
 
 For further reading on the principles behind this approach, see: [The secret world of testing without mocking](https://www.alechenninger.com/2020/11/the-secret-world-of-testing-without.html) by Alec Henninger.
 
 ### Database Backend Selection
 
-Tests that verify database behavior (repositories, migrations, constraints, transaction handling) run against **PostgreSQL by default**, because that is what production runs and SQLite cannot reproduce PostgreSQL-specific behavior such as JSONB constraints, advisory locks, and transaction conflicts (RHCLOUD-51816). Tests of business logic that use resource persistence also use the real database adapter; SQLite remains available as an explicit fallback for environments without a container runtime.
+Tests that verify database behavior (repositories, migrations, constraints, transaction handling) run against **PostgreSQL by default**, because that is what production runs and SQLite cannot reproduce PostgreSQL-specific behavior such as JSONB constraints, advisory locks, and transaction conflicts (RHCLOUD-51816). Tests of business logic that use resource persistence also use the real database adapter; SQLite remains available as an explicit persistence fallback. `TEST_DB=sqlite` intentionally skips tests that depend on SpiceDB, even when a container runtime is available, so SQLite tests need no runtime. The default/PostgreSQL suite requires a working runtime and must fail, not automatically skip tests, when it is unavailable.
 
 Select the backend with `TEST_DB`:
 
@@ -31,12 +31,12 @@ Select the backend with `TEST_DB`:
 make test                                   # short-mode suite, database tests on PostgreSQL
 TEST_DB=postgres ./scripts/testcontainers-run.sh go test ./internal/data/ -count=1 -race -short
 
-# In-memory SQLite (no container runtime needed) — the explicit fallback
-make test-sqlite                            # short-mode suite, database tests on SQLite
+# In-memory SQLite persistence (always skips SpiceDB, no runtime required)
+make test-sqlite                            # intentionally skips SpiceDB-dependent tests
 TEST_DB=sqlite go test ./internal/data/ -count=1 -race -short
 ```
 
-Both Make targets run with `-short` and explicitly skip the E2E/Kafka test patterns `TestInventoryAPIGRPC_*`, `TestInventoryAPIHTTP_*`, and `Test_ACMKafkaConsumer`; neither runs the full test suite. The SQLite fallback also skips PostgreSQL-specific tests.
+Both Make targets run with `-short` and explicitly skip the E2E/Kafka test patterns `TestInventoryAPIGRPC_*`, `TestInventoryAPIHTTP_*`, and `Test_ACMKafkaConsumer`; neither runs the full test suite. The SQLite fallback also skips PostgreSQL-specific tests. `make test-sqlite` runs Go tests directly with `TEST_DB=sqlite`, without the container wrapper. The wrapper (including `make test`) always requires a runtime, invalid `CONTAINER_RUNTIME` selections remain errors, and command failures retain their exit status. Run the hermetic wrapper regression checks with `sh scripts/testcontainers-run_test.sh`.
 
 `scripts/testcontainers-run.sh` detects Docker contexts and rootless Podman sockets and sets `DOCKER_HOST` accordingly; it disables Ryuk for Podman, so test binaries must stop their shared containers from `TestMain` via `testutil.TerminateSharedPostgres()`. `TEST_POSTGRES_IMAGE` (default `postgres:17.8`) overrides the container image. The container runs `wal_level=logical`, matching production's Debezium outbox pipeline, so tests exercise the real WAL outbox publisher (`pg_logical_emit_message`) — `outboxeventsrepository_test.go` verifies its output through a logical replication slot. Test helpers wire the WAL publisher on PostgreSQL and the no-op publisher on SQLite.
 
@@ -52,6 +52,71 @@ When adding database-backed tests:
 Tests that deliberately remain on SQLite verify SQLite-specific fallback behavior itself: `migrations/locks_test.go`'s `TestWithAdvisoryLock_Sqlite*` (no locking outside PostgreSQL). Portable database tests run on both backends, with PostgreSQL the default. PostgreSQL-specific tests (advisory locks, real serialization conflicts, WAL decoding, and container cleanup) explicitly skip the SQLite fallback.
 
 CI runs `make test` on every pull request (see `build-test.yml`).
+
+### SpiceDB Relations Testing
+
+`internal/testutil/relations` (package `relationstest`) provides the production
+SpiceDB adapter backed by SpiceDB's in-memory `serve-testing` server. It starts
+one container lazily per test binary, and `relationstest.New(t)` uses a unique
+bearer token to select a private datastore, including its schema. Connections
+are closed by test cleanup; shared containers must be stopped from `TestMain`
+with `relationstest.TerminateSharedSpiceDB()`, checking the returned error and
+preserving an already-failing exit status. This cleanup is required with Podman
+when Ryuk is disabled.
+
+- Use `relationstest.Grant(t, repo, subjectID, relation, reporterType, resourceType, resourceID)` for direct principal relationships, or write schema-valid tuples through the real repository for computed permissions and workspace relationships.
+- The helper embeds a test schema in `internal/testutil/relations/schema.zed`; this tests real SpiceDB semantics but does not assert compatibility with a deployed RBAC schema. Extend the fixture schema explicitly when a test needs more types or relations.
+- Default reads are fully consistent so ordinary state assertions do not need sleeps. Explicit consistency arguments retain their meaning. Use returned write/delete tokens for read-after-write tests.
+- An `at_least_as_fresh` token is a lower bound, not a request for a historical snapshot. Do not assert that an older token guarantees stale permission results.
+- Exercise fencing errors by acquiring the same lock again and attempting a write with the old token. Use narrow fault-injection stubs only for conditions that cannot be produced deterministically by the real server.
+- SpiceDB tests run in short mode too, except when `TEST_DB=sqlite` explicitly disables them. `relationstest.New(t)` intentionally skips dependent tests on SQLite regardless of runtime availability. Otherwise, the container-provider health probe, SpiceDB startup, and schema failures are fatal, not skips. Run the default/PostgreSQL suite through `scripts/testcontainers-run.sh` to configure the required runtime; `make test-sqlite` bypasses the wrapper and never starts SpiceDB.
+
+```bash
+./scripts/testcontainers-run.sh go test -count=1 -race -short \
+  ./internal/testutil/relations ./internal/biz/usecase/resources \
+  ./internal/service/resources ./internal/consumer ./internal/data/health
+```
+
+The helper shares the pinned image version used by the existing data-layer
+SpiceDB integration tests. The latter retain their separate bootstrap schema
+and existing non-short execution mode, but also intentionally skip on
+`TEST_DB=sqlite`, even without `-short`.
+
+#### Measured overhead (2026-11-10)
+
+Compared against commit `78f93947`, using rootless Podman, PostgreSQL, the pinned
+SpiceDB `v1.47.1` image, and `-race -short -count=1`. Three alternating
+before/after invocations used the same five packages, default Go package
+parallelism, warmed build caches and locally cached images. Each invocation
+started and stopped fresh shared containers; Go test-result caching was disabled.
+These are local measurements, not CI performance guarantees or cold-pull timings.
+
+| Package / measurement | Before median | After median | Change |
+|---|---:|---:|---:|
+| Resource use cases | 13.155 s | 13.809 s | +0.654 s |
+| Resource services | 25.994 s | 27.976 s | +1.982 s |
+| Consumer | 20.769 s | 21.787 s | +1.018 s |
+| Data | 17.300 s | 17.456 s | +0.156 s |
+| Data health | 9.111 s | 9.574 s | +0.463 s |
+| Whole five-package command, wall clock | 27.947 s | 29.979 s | **+2.032 s (+7.3%)** |
+
+The wall-clock samples were 27.947/28.016/27.477 s before and
+29.756/30.422/29.979 s after. Package durations overlap; do not sum them. The
+existing data package is included as a comparison: its non-short SpiceDB tests
+are unchanged, while the deleted fake's tests are no longer run.
+
+Reproduce the package selection with:
+
+```bash
+./scripts/testcontainers-run.sh go test -json -count=1 -race -short \
+  ./internal/biz/usecase/resources ./internal/service/resources \
+  ./internal/consumer ./internal/data ./internal/data/health
+```
+
+The new helper's own integration tests passed separately and in the full suite.
+A repository-wide short run with `-race -count=1` and the usual E2E/Kafka
+exclusions passed in 36.3 s wall clock (without coverage instrumentation); this
+was a single validation run, not a repeated whole-repository comparison.
 
 ## Test Organization & File Structure
 

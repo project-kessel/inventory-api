@@ -163,8 +163,9 @@ test:
 
 .PHONY: test-sqlite
 # run the same short-mode suite and exclusions with database-backed tests on
-# in-memory SQLite; needs no container runtime but skips PostgreSQL-specific
-# tests and does not reproduce PostgreSQL behavior (JSONB constraints,
+# in-memory SQLite; intentionally skip SpiceDB tests even if a runtime is available.
+# No container runtime is required.
+# Skips PostgreSQL-specific tests and does not reproduce its behavior (JSONB constraints,
 # advisory locks, transaction conflicts)
 test-sqlite:
 	@echo ""

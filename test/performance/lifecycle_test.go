@@ -211,7 +211,9 @@ func TestResourceLifecyclePerformance(t *testing.T) {
 	}
 	mc := metricscollector.NewFakeMetricsCollector()
 	repo := data.NewResourceRepository(db, data.NewGormTransactionManager(mc, 100), func(*gorm.DB, *model_legacy.OutboxEvent) error { return nil })
-	uc := usecase.New(repo, schema, data.NewSimpleRelationsRepository(), "rbac", log.NewStdLogger(io.Discard), nil, nil, usecase.NewUsecaseConfig(), mc, authorizer{}, nil)
+	// This persistence benchmark exercises report/delete, not permission checks;
+	// use the production allow-all adapter rather than starting an unused SpiceDB.
+	uc := usecase.New(repo, schema, data.NewAllowAllRelationsRepository(log.NewHelper(log.NewStdLogger(io.Discard))), "rbac", log.NewStdLogger(io.Discard), nil, nil, usecase.NewUsecaseConfig(), mc, authorizer{}, nil)
 	validator, err := protovalidate.New()
 	if err != nil {
 		t.Fatal(err)

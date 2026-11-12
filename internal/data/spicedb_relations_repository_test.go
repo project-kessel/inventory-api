@@ -33,9 +33,9 @@ func TestMain(m *testing.M) {
 func run(m *testing.M) int {
 	flag.Parse()
 
-	// Only set up SpiceDB container if not in short mode
-	// Individual tests will skip themselves in short mode
-	if !testing.Short() {
+	// SQLite explicitly excludes SpiceDB, even outside short mode. The
+	// integration tests skip themselves for SQLite or short-mode execution.
+	if !testing.Short() && testutil.UsingPostgres() {
 		var err error
 		logger := log.With(log.NewStdLogger(os.Stdout),
 			"ts", log.DefaultTimestamp,
@@ -71,15 +71,30 @@ func run(m *testing.M) int {
 	return code
 }
 
-// requireSpiceDBIntegration skips the test if running in short mode or if container is not available
+// requireSpiceDBIntegration skips explicitly excluded integration tests.
+// A missing container in the normal integration suite is a failure.
 func requireSpiceDBIntegration(t *testing.T) {
 	t.Helper()
+	if !testutil.UsingPostgres() {
+		t.Skip("SpiceDB tests are explicitly disabled with TEST_DB=sqlite")
+	}
 	if testing.Short() {
 		t.Skip("Skipping SpiceDB integration test in short mode")
 	}
 	if container == nil {
 		t.Fatal("SpiceDB container not initialized")
 	}
+}
+
+func TestRequireSpiceDBIntegrationSkipsForSQLite(t *testing.T) {
+	t.Setenv(testutil.TestDBBackendEnvVar, testutil.BackendSQLite)
+	var skipped bool
+	t.Run("SQLite", func(t *testing.T) {
+		defer func() { skipped = t.Skipped() }()
+		requireSpiceDBIntegration(t)
+		t.Fatal("SQLite must exclude SpiceDB regardless of runtime availability")
+	})
+	assert.True(t, skipped)
 }
 
 // uniqueID generates a unique identifier for the test by combining the base ID with the test name

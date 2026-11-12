@@ -89,7 +89,7 @@ auth := &DenyAuthenticator{}
 ```
 
 **Relations Repository** (for resource-level authorization):
-- **Simple relations repo**: `data.NewSimpleRelationsRepository()` - in-memory implementation with real tuple storage and authorization logic
+- **Real SpiceDB**: `relationstest.New(t)` from `internal/testutil/relations` - production adapter with an isolated in-memory `serve-testing` datastore. Seed schema-valid tuples with `relationstest.Grant` or `CreateTuples`; stop the shared container from `TestMain` via `relationstest.TerminateSharedSpiceDB()` and check its error.
 - **Allow all**: `&data.AllowAllRelationsRepository{}` - bypasses all authorization checks for logic tests
 
 **Meta-Authorization** (for endpoint/CRUD-level authorization):

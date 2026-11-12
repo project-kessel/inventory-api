@@ -6,14 +6,21 @@ import (
 	"testing"
 
 	"github.com/project-kessel/inventory-api/internal/testutil"
+	relationstest "github.com/project-kessel/inventory-api/internal/testutil/relations"
 )
 
-// TestMain stops the shared PostgreSQL testcontainer used by database tests on
-// the postgres backend. scripts/testcontainers-run.sh disables Ryuk for
-// Podman, so without this the container would outlive the test binary. On the
-// sqlite fallback this is a no-op.
+// TestMain stops the shared PostgreSQL and SpiceDB testcontainers.
+// scripts/testcontainers-run.sh disables Ryuk for Podman, so without this the
+// containers would outlive the test binary. PostgreSQL cleanup is a no-op on
+// the sqlite fallback.
 func TestMain(m *testing.M) {
 	code := m.Run()
+	if err := relationstest.TerminateSharedSpiceDB(); err != nil {
+		fmt.Fprintf(os.Stderr, "SpiceDB test cleanup failed: %v\n", err)
+		if code == 0 {
+			code = 1
+		}
+	}
 	if err := testutil.TerminateSharedPostgres(); err != nil {
 		fmt.Fprintf(os.Stderr, "PostgreSQL test cleanup failed: %v\n", err)
 		if code == 0 {

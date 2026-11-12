@@ -20,7 +20,8 @@ make build
 make test
 
 # Same short-mode suite and exclusions, using in-memory SQLite
-# No container runtime required; PostgreSQL-specific tests are skipped
+# Works containerless: intentionally skips PostgreSQL-specific and SpiceDB tests
+# SpiceDB stays skipped even when a container runtime is available
 make test-sqlite
 
 # Run resource lifecycle performance tests and print a summary (ensure Docker or Podman is running)
@@ -44,6 +45,13 @@ make api
 # Build container images
 make docker-build-push
 ```
+
+`make test-sqlite` runs `TEST_DB=sqlite go test` directly, without the runtime
+wrapper. `TEST_DB=sqlite` intentionally skips SpiceDB-dependent tests regardless
+of runtime availability. The default/PostgreSQL suite requires a working
+container runtime; provider-health, SpiceDB startup, and schema failures are
+fatal, not automatic skips. `make test` uses the strict
+`scripts/testcontainers-run.sh` wrapper, which preserves command failures.
 
 ## Development Guidelines
 

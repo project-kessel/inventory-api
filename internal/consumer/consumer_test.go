@@ -21,6 +21,7 @@ import (
 	datamodel "github.com/project-kessel/inventory-api/internal/data/model"
 	"github.com/project-kessel/inventory-api/internal/mocks"
 	"github.com/project-kessel/inventory-api/internal/testutil"
+	relationstest "github.com/project-kessel/inventory-api/internal/testutil/relations"
 
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/stretchr/testify/assert"
@@ -120,8 +121,7 @@ func (t *TestCase) TestSetup(testingT *testing.T) []error {
 
 	notifier := &pubsub.NotifierMock{}
 
-	// Use SimpleRelationsRepository instead of mock - actually stores tuples in memory
-	relationsRepo := data.NewSimpleRelationsRepository()
+	relationsRepo := relationstest.New(testingT)
 
 	consumer := &mocks.MockConsumer{}
 	db := setupTestDB(testingT)
@@ -133,6 +133,8 @@ func (t *TestCase) TestSetup(testingT *testing.T) []error {
 		errs = append(errs, err)
 		return errs
 	}
+
+	acquireConsumerTestLock(testingT, &t.inv, "test-consumer/0")
 
 	// Replace the repository with one using the production outbox publisher
 	// for the active backend: WAL on PostgreSQL (the test container runs
@@ -151,6 +153,52 @@ func (t *TestCase) TestSetup(testingT *testing.T) []error {
 	}
 
 	return errs
+}
+
+// acquireConsumerTestLock installs a real fencing token for tuple writes.
+func acquireConsumerTestLock(t *testing.T, consumer *InventoryConsumer, lockID string) {
+	t.Helper()
+	id, err := model.NewLockId(lockID)
+	require.NoError(t, err)
+	result, err := consumer.Relations.AcquireLock(context.Background(), id)
+	require.NoError(t, err)
+	consumer.lockId = id
+	consumer.lockToken = result.LockToken()
+}
+
+// invalidateConsumerTestLock simulates a new owner without updating the old owner's token.
+func invalidateConsumerTestLock(t *testing.T, consumer *InventoryConsumer) {
+	t.Helper()
+	result, err := consumer.Relations.AcquireLock(context.Background(), consumer.lockId)
+	require.NoError(t, err)
+	require.NotEqual(t, consumer.lockToken, result.LockToken())
+}
+
+// Valid lock acquisition has no deterministic server-side failure: each call
+// replaces the previous owner. Stub only that error path to exercise retries.
+type acquireLockErrorRepository struct {
+	*data.SpiceDBRelationsRepository
+	err error
+}
+
+func (r *acquireLockErrorRepository) AcquireLock(context.Context, model.LockId) (model.AcquireLockResult, error) {
+	return model.AcquireLockResult{}, r.err
+}
+
+// readConsumerTestTuples reads current relationship state without stream metadata.
+func readConsumerTestTuples(t *testing.T, repo model.RelationsRepository, filter model.TupleFilter) []model.RelationsTuple {
+	t.Helper()
+	stream, err := repo.ReadTuples(context.Background(), filter, nil, model.NewConsistencyUnspecified())
+	require.NoError(t, err)
+	var tuples []model.RelationsTuple
+	for {
+		item, err := stream.Recv()
+		if errors.Is(err, io.EOF) {
+			return tuples
+		}
+		require.NoError(t, err)
+		tuples = append(tuples, model.NewRelationsTuple(item.Object(), item.Relation(), item.Subject()))
+	}
 }
 
 func TestNewConsumerSetup(t *testing.T) {
@@ -601,13 +649,17 @@ func TestRebalanceCallback_AssignedPartitions(t *testing.T) {
 			errs := tester.TestSetup(t)
 			assert.Nil(t, errs)
 
-			// Use SimpleRelationsRepository instead of mock
-			relationsRepo := data.NewSimpleRelationsRepository()
-			if test.expectAcquireLockCall && test.lockError != nil {
-				// Configure error for failure case
-				relationsRepo.SetAcquireLockError(test.lockError)
+			if test.lockError != nil {
+				tester.inv.Relations = &acquireLockErrorRepository{
+					SpiceDBRelationsRepository: relationstest.New(t),
+					err:                        test.lockError,
+				}
 			}
-			tester.inv.Relations = relationsRepo
+			// Assignment, not test setup, must populate the consumer's lock fields.
+			var emptyLockID model.LockId
+			var emptyLockToken model.LockToken
+			tester.inv.lockId = emptyLockID
+			tester.inv.lockToken = emptyLockToken
 
 			event := kafka.AssignedPartitions{
 				Partitions: test.partitions,
@@ -617,7 +669,7 @@ func TestRebalanceCallback_AssignedPartitions(t *testing.T) {
 
 			assert.Equal(t, test.expectedError, err)
 			assert.Equal(t, test.expectedLockId, tester.inv.lockId.String())
-			// For successful case, verify token was set (SimpleRelationsRepository generates token-{lockId})
+			// Successful assignment must retain the token returned by SpiceDB.
 			if test.expectedError == nil && test.expectAcquireLockCall {
 				assert.NotEmpty(t, tester.inv.lockToken.String())
 			} else {
@@ -757,24 +809,8 @@ func TestFencingToken_WritingAfterRebalance(t *testing.T) {
 	assert.Nil(t, errsB)
 	testerB.inv.Config.ConsumerGroupID = "test-group"
 
-	relationsRepo := &mocks.MockRelationsRepository{}
-	createSuccessResponse := model.DeserializeConsistencyToken("test-token")
-	wantLock, err := model.NewLockId("test-group/0")
-	require.NoError(t, err)
-
-	consumerAToken := "token-A"
-	consumerBToken := "token-B"
-	lock1 := relationsRepo.On("AcquireLock", mock.Anything, wantLock).Return(model.NewAcquireLockResult(model.DeserializeLockToken(consumerAToken)), nil).Once()
-	lock2 := relationsRepo.On("AcquireLock", mock.Anything, wantLock).Return(model.NewAcquireLockResult(model.DeserializeLockToken(consumerBToken)), nil).Once()
-	lock2.NotBefore(lock1)
-
-	relationsRepo.On("CreateTuples", mock.Anything, mock.Anything, mock.Anything, mock.MatchedBy(func(fencing *model.FencingCheck) bool {
-		return fencing != nil && fencing.LockToken() == model.DeserializeLockToken(consumerBToken)
-	})).Return(model.NewTuplesResult(createSuccessResponse), nil)
-
-	relationsRepo.On("CreateTuples", mock.Anything, mock.Anything, mock.Anything, mock.MatchedBy(func(fencing *model.FencingCheck) bool {
-		return fencing != nil && fencing.LockToken() == model.DeserializeLockToken(consumerAToken)
-	})).Return(model.TuplesResult{}, errors.New("fencing token is invalid or expired"))
+	// Both owners must use the same real datastore for lock replacement to fence A.
+	relationsRepo := relationstest.New(t)
 
 	testerA.inv.Relations = relationsRepo
 	testerB.inv.Relations = relationsRepo
@@ -784,17 +820,17 @@ func TestFencingToken_WritingAfterRebalance(t *testing.T) {
 	}
 
 	// Consumer A acquires the lock first
-	err = testerA.inv.RebalanceCallback(nil, assignedPartitions)
+	err := testerA.inv.RebalanceCallback(nil, assignedPartitions)
 	assert.Nil(t, err)
 	assert.Equal(t, "test-group/0", testerA.inv.lockId.String())
-	assert.Equal(t, "token-A", testerA.inv.lockToken.String())
+	require.NotEmpty(t, testerA.inv.lockToken.String())
 	staleToken := testerA.inv.lockToken
 
 	// Consumer B acquires the lock, invalidating A's token
 	err = testerB.inv.RebalanceCallback(nil, assignedPartitions)
 	assert.Nil(t, err)
 	assert.Equal(t, "test-group/0", testerB.inv.lockId.String())
-	assert.Equal(t, "token-B", testerB.inv.lockToken.String())
+	require.NotEmpty(t, testerB.inv.lockToken.String())
 	assert.NotEqual(t, staleToken, testerB.inv.lockToken)
 
 	// Simulate consumer A waking up with the stale token
@@ -805,81 +841,71 @@ func TestFencingToken_WritingAfterRebalance(t *testing.T) {
 
 	// Try to create a tuple with the stale token
 	_, err = testerA.inv.CreateTuple(context.Background(), tuples)
-	assert.NotNil(t, err)
-	assert.Contains(t, err.Error(), "fencing token is invalid or expired")
+	require.Error(t, err)
+	assert.Equal(t, codes.FailedPrecondition, status.Code(err))
+	assert.Contains(t, err.Error(), "invalid fencing token")
+	assert.Empty(t, readConsumerTestTuples(t, relationsRepo, tupleToFilter(domainTuple)))
 
 	// Consumer B should be able to create a tuple with the valid token
 	resp, err := testerB.inv.CreateTuple(context.Background(), tuples)
-	assert.Nil(t, err)
-	assert.Equal(t, "test-token", resp)
-
-	relationsRepo.AssertExpectations(t)
+	require.NoError(t, err)
+	assert.NotEmpty(t, resp)
+	assert.Len(t, readConsumerTestTuples(t, relationsRepo, tupleToFilter(domainTuple)), 1)
 }
 
 func TestInventoryConsumer_CreateTuple_FailedPrecondition(t *testing.T) {
 	tester := TestCase{}
-	errs := tester.TestSetup(t)
-	assert.Nil(t, errs)
-
-	// Use SimpleRelationsRepository with configured error instead of mock
-	relationsRepo := data.NewSimpleRelationsRepository()
-	relationsRepo.SetCreateTuplesError(status.Error(codes.FailedPrecondition, "invalid fencing token"))
-
-	tester.inv.Relations = relationsRepo
-	tester.inv.lockToken = model.DeserializeLockToken("test-token")
+	require.Nil(t, tester.TestSetup(t))
+	invalidateConsumerTestLock(t, &tester.inv)
 
 	domainTuple := testConsumerSampleTuple(t)
 	tuples := &[]model.RelationsTuple{domainTuple}
 
 	resp, err := tester.inv.CreateTuple(context.Background(), tuples)
 
-	assert.NotNil(t, err)
-	assert.Equal(t, "", resp)
+	require.Error(t, err)
+	assert.Equal(t, codes.FailedPrecondition, status.Code(err))
+	assert.Empty(t, resp)
 	assert.Contains(t, err.Error(), "invalid fencing token")
+	assert.Empty(t, readConsumerTestTuples(t, tester.inv.Relations, tupleToFilter(domainTuple)))
 }
 
 func TestInventoryConsumer_UpdateTuple_FailedPrecondition(t *testing.T) {
 	tester := TestCase{}
-	errs := tester.TestSetup(t)
-	assert.Nil(t, errs)
-
-	// Use SimpleRelationsRepository with configured error instead of mock
-	relationsRepo := data.NewSimpleRelationsRepository()
-	relationsRepo.SetCreateTuplesError(status.Error(codes.FailedPrecondition, "invalid fencing token"))
-
-	tester.inv.Relations = relationsRepo
-	tester.inv.lockToken = model.DeserializeLockToken("test-token")
+	require.Nil(t, tester.TestSetup(t))
+	invalidateConsumerTestLock(t, &tester.inv)
 
 	domainTuple := testConsumerSampleTuple(t)
 	tuples := &[]model.RelationsTuple{domainTuple}
 
 	resp, err := tester.inv.UpdateTuple(context.Background(), tuples, nil)
 
-	assert.NotNil(t, err)
-	assert.Equal(t, "", resp)
+	require.Error(t, err)
+	assert.Equal(t, codes.FailedPrecondition, status.Code(err))
+	assert.Empty(t, resp)
 	assert.Contains(t, err.Error(), "invalid fencing token")
+	assert.Empty(t, readConsumerTestTuples(t, tester.inv.Relations, tupleToFilter(domainTuple)))
 }
 
 func TestInventoryConsumer_DeleteTuple_FailedPrecondition(t *testing.T) {
 	tester := TestCase{}
-	errs := tester.TestSetup(t)
-	assert.Nil(t, errs)
+	require.Nil(t, tester.TestSetup(t))
 
-	// Use SimpleRelationsRepository with configured error instead of mock
-	relationsRepo := data.NewSimpleRelationsRepository()
-	relationsRepo.SetDeleteTuplesError(status.Error(codes.FailedPrecondition, "invalid fencing token"))
-
-	tester.inv.Relations = relationsRepo
-	tester.inv.lockToken = model.DeserializeLockToken("test-token")
-
+	// Seed a tuple with the current token before another owner fences us out.
 	domainTuple := testConsumerSampleTuple(t)
+	_, err := tester.inv.CreateTuple(context.Background(), &[]model.RelationsTuple{domainTuple})
+	require.NoError(t, err)
+	invalidateConsumerTestLock(t, &tester.inv)
+
 	tuples := []model.RelationsTuple{domainTuple}
 
 	resp, err := tester.inv.DeleteTuple(context.Background(), tuples)
 
-	assert.NotNil(t, err)
-	assert.Equal(t, "", resp)
+	require.Error(t, err)
+	assert.Equal(t, codes.FailedPrecondition, status.Code(err))
+	assert.Empty(t, resp)
 	assert.Contains(t, err.Error(), "invalid fencing token")
+	assert.Len(t, readConsumerTestTuples(t, tester.inv.Relations, tupleToFilter(domainTuple)), 1, "A fenced delete must preserve the existing tuple")
 }
 
 func TestUpdateConsistencyTokenIfPresent(t *testing.T) {
@@ -975,9 +1001,17 @@ func TestInventoryConsumer_UpdateWithSameWorkspace_NoOp(t *testing.T) {
 
 	require.NoError(t, repo.Save(tester.inv.DB, *testData.Resource, model.OperationTypeUpdated, model.NewTransactionId("tx-update")))
 
-	// Use SimpleRelationsRepository to verify no operations occur
-	relationsRepo := data.NewSimpleRelationsRepository()
-	tester.inv.Relations = relationsRepo
+	// Seed the existing workspace relationship and verify the no-op preserves it.
+	representations, err := repo.FindLatestCommonRepresentation(nil, testData.Key)
+	require.NoError(t, err)
+	calculated, err := tester.inv.SchemaService.CalculateTuplesForResource(context.Background(), representations, nil, testData.Key)
+	require.NoError(t, err)
+	require.NotEmpty(t, *calculated.TuplesToCreate())
+	_, err = tester.inv.CreateTuple(context.Background(), calculated.TuplesToCreate())
+	require.NoError(t, err)
+	filter := tupleToFilter((*calculated.TuplesToCreate())[0])
+	before := readConsumerTestTuples(t, tester.inv.Relations, filter)
+	require.NotEmpty(t, before)
 	msg := &kafka.Message{
 		Key:   []byte(testMessageKey),
 		Value: []byte(testUpdateMessage),
@@ -991,8 +1025,7 @@ func TestInventoryConsumer_UpdateWithSameWorkspace_NoOp(t *testing.T) {
 
 	assert.Nil(t, err)
 	assert.Equal(t, "", resp)
-	// Verify no relations operations occurred - version should still be 1 (initial)
-	assert.Equal(t, int64(1), relationsRepo.Version(), "No relations operations should occur when workspace doesn't change")
+	assert.ElementsMatch(t, before, readConsumerTestTuples(t, tester.inv.Relations, filter), "The existing workspace relationship must remain unchanged")
 }
 
 // TestInventoryConsumer_VersionCombinations tests that the consumer correctly fetches
@@ -1239,8 +1272,7 @@ func TestInventoryConsumer_DeleteAfterCommonOnlyUpdate_TupleCleanup(t *testing.T
 	require.Nil(t, tester.TestSetup(t))
 	require.True(t, tester.inv.Config.LoadReporterRepresentation, "test premise: reporter loading enabled")
 
-	relations := data.NewSimpleRelationsRepository()
-	tester.inv.Relations = relations
+	relations := tester.inv.Relations
 	repo := tester.inv.ResourceRepository
 
 	const keyJSON = `"reporter_resource_key":{"local_resource_id":"gap-delete-resource","resource_type":"integration","reporter":{"reporter_type":"notifications","reporter_instance_id":"notif-instance-1"}}`
@@ -1251,19 +1283,15 @@ func TestInventoryConsumer_DeleteAfterCommonOnlyUpdate_TupleCleanup(t *testing.T
 		require.NoError(t, err)
 	}
 
-	readAllTuples := func() []model.ReadTuplesItem {
+	reporterType, err := model.NewReporterType("notifications")
+	require.NoError(t, err)
+	resourceType, err := model.NewResourceType("integration")
+	require.NoError(t, err)
+	// Scope reads to resource tuples; the real datastore also contains lock tuples.
+	filter := model.NewTupleFilter().WithReporterType(reporterType).WithObjectType(resourceType)
+	readAllTuples := func() []model.RelationsTuple {
 		t.Helper()
-		stream, err := relations.ReadTuples(context.Background(), model.TupleFilter{}, nil, model.NewConsistencyMinimizeLatency())
-		require.NoError(t, err)
-		var items []model.ReadTuplesItem
-		for {
-			item, err := stream.Recv()
-			if errors.Is(err, io.EOF) {
-				return items
-			}
-			require.NoError(t, err)
-			items = append(items, item)
-		}
+		return readConsumerTestTuples(t, relations, filter)
 	}
 
 	// Step 1: create the resource with reporter data at v0 and common workspace data.
@@ -1314,8 +1342,7 @@ func TestConsumerCommonOnlyCompatibility(t *testing.T) {
 			fixture, err := model.NewResourceFixture("test-resource-4321", "integration", "notifications", "test-instance-1", "workspace-v0")
 			require.NoError(t, err)
 			require.NoError(t, repo.Save(tester.inv.DB, *fixture.Resource, model.OperationTypeCreated, fixture.InitialTransactionId))
-			relations := data.NewSimpleRelationsRepository()
-			tester.inv.Relations = relations
+			relations := tester.inv.Relations
 			process := func(operation model.EventOperationType, payload string) {
 				t.Helper()
 				_, err := tester.inv.ProcessMessage(map[string]string{"operation": string(operation.OperationType())}, true, &kafka.Message{Value: []byte(payload)})
@@ -1339,7 +1366,7 @@ func TestConsumerCommonOnlyCompatibility(t *testing.T) {
 			require.NoError(t, err)
 			require.NotEmpty(t, *tuples.TuplesToCreate())
 			filter := tupleToFilter((*tuples.TuplesToCreate())[0])
-			stream, err := relations.ReadTuples(context.Background(), filter, nil, model.NewConsistencyMinimizeLatency())
+			stream, err := relations.ReadTuples(context.Background(), filter, nil, model.NewConsistencyUnspecified())
 			require.NoError(t, err)
 			_, err = stream.Recv()
 			require.NoError(t, err)
@@ -1350,7 +1377,7 @@ func TestConsumerCommonOnlyCompatibility(t *testing.T) {
 			message, err := json.Marshal(map[string]interface{}{"payload": payload})
 			require.NoError(t, err)
 			process(model.OperationTypeDeleted, string(message))
-			stream, err = relations.ReadTuples(context.Background(), filter, nil, model.NewConsistencyMinimizeLatency())
+			stream, err = relations.ReadTuples(context.Background(), filter, nil, model.NewConsistencyUnspecified())
 			require.NoError(t, err)
 			_, err = stream.Recv()
 			require.ErrorIs(t, err, io.EOF, "delete must remove the latest common tuple")

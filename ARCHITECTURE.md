@@ -87,13 +87,14 @@ Forbidden:
 - Asking an adapter "what type are you?" instead of reading a config/capability method
 
 Tests follow the same direction with one exception: infrastructure tests may
-construct other adapters (in-memory schema repo, simple relations repo).
+construct other adapters (in-memory schema repo, real SpiceDB relations repo).
 Application- and Presentation-layer tests may construct concrete
 `internal/data` adapters, including the real resource repository and transaction
 manager backed by an isolated migrated test database. Resource persistence must
 not be replaced by an in-memory fake: duplicated storage logic can hide bugs in
-the production adapter. Production in-memory schema and relations adapters may
-still be reused where appropriate. **Domain tests must not import
+the production adapter. Relations behavior uses the real SpiceDB adapter backed
+by an isolated `serve-testing` datastore, not an in-process reimplementation.
+The production in-memory schema adapter may still be reused where appropriate. **Domain tests must not import
 `internal/data`.** Inject `nil` or a domain-level dummy when the port is unused.
 
 Known pre-existing exceptions (do not re-file unless a PR adds *more* of these):
@@ -220,8 +221,8 @@ compiled check can.
 | Infrastructure | Adapter tests; contract tests defined next to the port, run per adapter |
 
 No method-verifying mocks (`EXPECT().Times(1)`). Prefer real instances. Use real
-database adapters for persistence at every test layer that exercises it; keep
-pure domain tests free of I/O. Lightweight stubs or recording spies remain
+database adapters for persistence at every test layer that exercises it, and
+real SpiceDB for relations behavior; keep pure domain tests free of I/O. Lightweight stubs or recording spies remain
 appropriate for unused collaborators or decorator argument capture.
 
 ## Report format for reviewers (human or AI)

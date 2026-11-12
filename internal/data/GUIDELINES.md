@@ -329,7 +329,12 @@ Use `NewGormTransactionManager` with an isolated test database. Verify persisted
 |----------------|----------|---------|
 
 | `NewFakeMetricsCollector()` | `internal/metricscollector/fake_metricscollector.go` | No-op OTEL counters for tests that need a `MetricsCollector` shape |
-| `NewSimpleRelationsRepository()` | `internal/data/relations_simple.go` | In-process relations behavior (tuples, checks, snapshots) |
+Relations behavior uses `relationstest.New(t)` from `internal/testutil/relations`,
+which constructs the production SpiceDB adapter against an isolated in-memory
+`serve-testing` datastore. Do not reintroduce a fake tuple store, permission
+engine, consistency snapshot implementation, or fencing implementation. Narrow
+stubs remain appropriate for faults that cannot be produced deterministically
+with the real server. See `test/GUIDELINES.md` for lifecycle and consistency rules.
 
 Note: `NewInMemorySchemaRepository()` (`internal/data/schema_inmemory.go`) is the **production** schema store, not a fake. It is used directly in tests as a real instance — a good example of preferring the real thing when no external I/O is involved.
 
@@ -342,7 +347,7 @@ Exercise resource repository contracts against the real adapter. Use `setupResou
 When a port has multiple supported production adapters, share contract tests across those adapters where practical; do not add a fake persistence adapter just for tests.
 
 ### Database Testing
-- **Backend selection**: Use `testutil.NewTestDB(t, cfg, migrate)` (see `resource_repository_test.go`'s `setupRepositoryDB`) to get a fully migrated database on the backend selected through `TEST_DB`: PostgreSQL via Testcontainers (the default, matching production, RHCLOUD-51816) or in-memory SQLite (the explicit fallback, selected with `TEST_DB=sqlite`, for environments without a container runtime). Pass `nil` as migrate for tests that need no schema (see `transaction_manager_test.go`).
+- **Backend selection**: Use `testutil.NewTestDB(t, cfg, migrate)` (see `resource_repository_test.go`'s `setupRepositoryDB`) to get a fully migrated database on the backend selected through `TEST_DB`: PostgreSQL via Testcontainers (the default, matching production, RHCLOUD-51816) or in-memory SQLite (the explicit persistence fallback, selected with `TEST_DB=sqlite`; SpiceDB relations tests are explicitly excluded regardless of runtime availability). Pass `nil` as migrate for tests that need no schema (see `transaction_manager_test.go`).
 - **PostgreSQL path**: one testcontainer per test binary, one migrated template database per migrate function, and a private database per test copied from that template; run through `make test` or `scripts/testcontainers-run.sh` so the container runtime is detected
 - **Isolation**: Each test gets a private database on PostgreSQL and a unique in-memory database on SQLite; databases are dropped with `WITH (FORCE)` on cleanup
 - **Migrations**: `NewTestDB` runs them for you (once per test binary on PostgreSQL, per test on SQLite); pass a package-level migrate function so the PostgreSQL template is reused

@@ -16,7 +16,10 @@ import (
 	"github.com/go-kratos/kratos/v2/middleware/tracing"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
 	"github.com/project-kessel/inventory-api/internal/testutil"
+	"github.com/project-kessel/inventory-api/internal/testutil/containerdebug"
 	"github.com/stretchr/testify/assert"
+	"github.com/testcontainers/testcontainers-go"
+	"github.com/testcontainers/testcontainers-go/wait"
 	rpcstatus "google.golang.org/genproto/googleapis/rpc/status"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -32,6 +35,11 @@ func TestMain(m *testing.M) {
 // cleanup, allowing deferred SpiceDB cleanup to finish before TestMain exits.
 func run(m *testing.M) int {
 	flag.Parse()
+	if err := containerdebug.Configure(); err != nil {
+		fmt.Fprintf(os.Stderr, "Test container debug setup failed: %v\n", err)
+		containerdebug.RecordResult(1)
+		return 1
+	}
 
 	// SQLite explicitly excludes SpiceDB, even outside short mode. The
 	// integration tests skip themselves for SQLite or short-mode execution.
@@ -50,12 +58,14 @@ func run(m *testing.M) int {
 
 		if err != nil {
 			fmt.Printf("Error initializing Docker container: %s", err)
+			containerdebug.RecordResult(-1)
 			return -1
 		}
 		defer container.Close()
 	}
 
 	code := m.Run()
+	containerdebug.RecordResult(code)
 
 	// Stop the shared PostgreSQL testcontainer used by database tests on the
 	// postgres backend. scripts/testcontainers-run.sh disables Ryuk for
@@ -68,6 +78,7 @@ func run(m *testing.M) int {
 		}
 	}
 
+	containerdebug.RecordResult(code)
 	return code
 }
 
@@ -81,6 +92,7 @@ func requireSpiceDBIntegration(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping SpiceDB integration test in short mode")
 	}
+	containerdebug.Observe(t)
 	if container == nil {
 		t.Fatal("SpiceDB container not initialized")
 	}
@@ -97,6 +109,37 @@ func TestRequireSpiceDBIntegrationSkipsForSQLite(t *testing.T) {
 	assert.True(t, skipped)
 }
 
+func TestCleanupFailedSpiceDBStartWithoutContainer(t *testing.T) {
+	startErr := errors.New("container creation failed")
+	assert.ErrorIs(t, cleanupFailedSpiceDBStart(nil, startErr), startErr)
+}
+
+func TestCleanupFailedSpiceDBStartAfterReadinessTimeout(t *testing.T) {
+	requireSpiceDBIntegration(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+	partial, startErr := testcontainers.Run(ctx, SpicedbImage+":"+SpicedbVersion,
+		testcontainers.WithCmd("serve-testing", "--skip-release-check=true"),
+		testcontainers.WithWaitStrategy(wait.ForLog("inventory-test-readiness-marker-never-emitted").WithStartupTimeout(100*time.Millisecond)),
+	)
+	if partial != nil {
+		t.Cleanup(func() { assert.NoError(t, testcontainers.TerminateContainer(partial)) })
+	}
+	if !assert.Error(t, startErr) || !assert.NotNil(t, partial) {
+		return
+	}
+	if _, err := partial.Inspect(ctx); !assert.NoError(t, err, "readiness failure must leave a partial container for this regression test") {
+		return
+	}
+
+	err := cleanupFailedSpiceDBStart(partial, startErr)
+	assert.ErrorIs(t, err, startErr)
+	assert.EqualError(t, err, "could not start spicedb resource: "+startErr.Error())
+	_, inspectErr := partial.Inspect(ctx)
+	assert.Error(t, inspectErr, "partial startup container must have been removed")
+}
+
 // uniqueID generates a unique identifier for the test by combining the base ID with the test name
 func uniqueID(t *testing.T, baseID string) string {
 	t.Helper()
@@ -111,7 +154,7 @@ func TestCreateRelationship(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
-	spiceDbRepo, err := container.CreateSpiceDbRepository()
+	spiceDbRepo, err := container.CreateSpiceDbRepository(t.Name())
 	assert.NoError(t, err)
 	defer spiceDbRepo.Close()
 
@@ -137,7 +180,7 @@ func TestCreateRelationshipWithConsistencyToken(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
-	spiceDbRepo, err := container.CreateSpiceDbRepository()
+	spiceDbRepo, err := container.CreateSpiceDbRepository(t.Name())
 	assert.NoError(t, err)
 	defer spiceDbRepo.Close()
 
@@ -162,7 +205,7 @@ func TestCreateRelationshipWithSubjectRelation(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
-	spiceDbRepo, err := container.CreateSpiceDbRepository()
+	spiceDbRepo, err := container.CreateSpiceDbRepository(t.Name())
 	assert.NoError(t, err)
 	defer spiceDbRepo.Close()
 
@@ -218,7 +261,7 @@ func TestSecondCreateRelationshipFailsWithUpsertFalse(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
-	spiceDbRepo, err := container.CreateSpiceDbRepository()
+	spiceDbRepo, err := container.CreateSpiceDbRepository(t.Name())
 	assert.NoError(t, err)
 	defer spiceDbRepo.Close()
 
@@ -248,7 +291,7 @@ func TestSecondCreateRelationshipSucceedsWithUpsertTrue(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
-	spiceDbRepo, err := container.CreateSpiceDbRepository()
+	spiceDbRepo, err := container.CreateSpiceDbRepository(t.Name())
 	assert.NoError(t, err)
 	defer spiceDbRepo.Close()
 
@@ -280,7 +323,7 @@ func TestFeaturesWorkspaceWildcardSpiceDB(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
-	spiceDbRepo, err := container.CreateSpiceDbRepository()
+	spiceDbRepo, err := container.CreateSpiceDbRepository(t.Name())
 	if !assert.NoError(t, err) {
 		return
 	}
@@ -340,7 +383,7 @@ func TestIsBackendAvailable(t *testing.T) {
 
 	t.Parallel()
 
-	spiceDbrepo, err := container.CreateSpiceDbRepository()
+	spiceDbrepo, err := container.CreateSpiceDbRepository(t.Name())
 	assert.NoError(t, err)
 	defer spiceDbrepo.Close()
 
@@ -422,7 +465,7 @@ func TestDoesNotCreateRelationshipWithSlashInSubjectType(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
-	spiceDbRepo, err := container.CreateSpiceDbRepository()
+	spiceDbRepo, err := container.CreateSpiceDbRepository(t.Name())
 	assert.NoError(t, err)
 	defer spiceDbRepo.Close()
 
@@ -442,7 +485,7 @@ func TestDoesNotCreateRelationshipWithSlashInObjectType(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
-	spiceDbRepo, err := container.CreateSpiceDbRepository()
+	spiceDbRepo, err := container.CreateSpiceDbRepository(t.Name())
 	assert.NoError(t, err)
 	defer spiceDbRepo.Close()
 
@@ -462,7 +505,7 @@ func TestCreateRelationshipFailsWithBadSubjectType(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
-	spiceDbRepo, err := container.CreateSpiceDbRepository()
+	spiceDbRepo, err := container.CreateSpiceDbRepository(t.Name())
 	assert.NoError(t, err)
 	defer spiceDbRepo.Close()
 
@@ -485,7 +528,7 @@ func TestCreateRelationshipFailsWithBadObjectType(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
-	spiceDbRepo, err := container.CreateSpiceDbRepository()
+	spiceDbRepo, err := container.CreateSpiceDbRepository(t.Name())
 	assert.NoError(t, err)
 	defer spiceDbRepo.Close()
 
@@ -508,7 +551,7 @@ func TestSupportedNsTypeTupleFilterCombinationsInReadRelationships(t *testing.T)
 	t.Parallel()
 
 	ctx := context.Background()
-	spiceDbRepo, err := container.CreateSpiceDbRepository()
+	spiceDbRepo, err := container.CreateSpiceDbRepository(t.Name())
 	if !assert.NoError(t, err) {
 		defer spiceDbRepo.Close()
 		return
@@ -632,7 +675,7 @@ func TestWriteAndReadBackRelationships(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
-	spiceDbRepo, err := container.CreateSpiceDbRepository()
+	spiceDbRepo, err := container.CreateSpiceDbRepository(t.Name())
 	if !assert.NoError(t, err) {
 		defer spiceDbRepo.Close()
 		return
@@ -674,7 +717,7 @@ func TestWriteReadBackDeleteAndReadBackRelationships(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
-	spiceDbRepo, err := container.CreateSpiceDbRepository()
+	spiceDbRepo, err := container.CreateSpiceDbRepository(t.Name())
 	if !assert.NoError(t, err) {
 		defer spiceDbRepo.Close()
 		return
@@ -731,7 +774,7 @@ func TestWriteReadBackDeleteAndReadBackRelationships_WithConsistencyToken(t *tes
 	t.Parallel()
 
 	ctx := context.Background()
-	spiceDbRepo, err := container.CreateSpiceDbRepository()
+	spiceDbRepo, err := container.CreateSpiceDbRepository(t.Name())
 	if !assert.NoError(t, err) {
 		defer spiceDbRepo.Close()
 		return
@@ -786,7 +829,7 @@ func TestSpiceDbRepository_CheckPermission_WithConsistencyToken(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
-	spiceDbRepo, err := container.CreateSpiceDbRepository()
+	spiceDbRepo, err := container.CreateSpiceDbRepository(t.Name())
 	if !assert.NoError(t, err) {
 		defer spiceDbRepo.Close()
 		return
@@ -827,7 +870,7 @@ func TestSpiceDbRepository_CheckForUpdatePermission(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
-	spiceDbRepo, err := container.CreateSpiceDbRepository()
+	spiceDbRepo, err := container.CreateSpiceDbRepository(t.Name())
 	if !assert.NoError(t, err) {
 		defer spiceDbRepo.Close()
 		return
@@ -867,7 +910,7 @@ func TestSpiceDbRepository_CheckPermission(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
-	spiceDbRepo, err := container.CreateSpiceDbRepository()
+	spiceDbRepo, err := container.CreateSpiceDbRepository(t.Name())
 	if !assert.NoError(t, err) {
 		defer spiceDbRepo.Close()
 		return
@@ -933,7 +976,7 @@ func TestSpiceDbRepository_NewEnemyProblem_Success(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
-	spiceDbRepo, err := container.CreateSpiceDbRepository()
+	spiceDbRepo, err := container.CreateSpiceDbRepository(t.Name())
 	if !assert.NoError(t, err) {
 		defer spiceDbRepo.Close()
 		return
@@ -1027,7 +1070,7 @@ func TestSpiceDbRepository_CheckPermission_MinimizeLatency(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
-	spiceDbRepo, err := container.CreateSpiceDbRepository()
+	spiceDbRepo, err := container.CreateSpiceDbRepository(t.Name())
 	if !assert.NoError(t, err) {
 		defer spiceDbRepo.Close()
 		return
@@ -1086,7 +1129,7 @@ func TestSpiceDbRepository_CheckBulk(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
-	spiceDbRepo, err := container.CreateSpiceDbRepository()
+	spiceDbRepo, err := container.CreateSpiceDbRepository(t.Name())
 	if !assert.NoError(t, err) {
 		defer spiceDbRepo.Close()
 		return
@@ -1141,7 +1184,7 @@ func TestSpiceDbRepository_CheckForUpdateBulk(t *testing.T) {
 
 	// Unique IDs so this test does not collide with CheckBulk or other tests
 	ctx := context.Background()
-	spiceDbRepo, err := container.CreateSpiceDbRepository()
+	spiceDbRepo, err := container.CreateSpiceDbRepository(t.Name())
 	if !assert.NoError(t, err) {
 		defer spiceDbRepo.Close()
 		return
@@ -1197,7 +1240,7 @@ func TestSpiceDbRepository_CreateRelationships_WithFencing(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
-	spiceDbRepo, err := container.CreateSpiceDbRepository()
+	spiceDbRepo, err := container.CreateSpiceDbRepository(t.Name())
 	assert.NoError(t, err)
 	defer spiceDbRepo.Close()
 
@@ -1245,7 +1288,7 @@ func TestSpiceDbRepository_DeleteRelationships_WithFencing(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
-	spiceDbRepo, err := container.CreateSpiceDbRepository()
+	spiceDbRepo, err := container.CreateSpiceDbRepository(t.Name())
 	assert.NoError(t, err)
 	defer spiceDbRepo.Close()
 
@@ -1307,7 +1350,7 @@ func TestSpiceDbRepository_AcquireLock_NewLock(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
-	spiceDbRepo, err := container.CreateSpiceDbRepository()
+	spiceDbRepo, err := container.CreateSpiceDbRepository(t.Name())
 	if !assert.NoError(t, err) {
 		defer spiceDbRepo.Close()
 		return
@@ -1327,7 +1370,7 @@ func TestSpiceDbRepository_AcquireLock_ReplaceExistingLock(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
-	spiceDbRepo, err := container.CreateSpiceDbRepository()
+	spiceDbRepo, err := container.CreateSpiceDbRepository(t.Name())
 	assert.NoError(t, err)
 	defer spiceDbRepo.Close()
 
@@ -1361,7 +1404,7 @@ func TestSpiceDbRepository_LookupResources(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
-	spiceDbRepo, err := container.CreateSpiceDbRepository()
+	spiceDbRepo, err := container.CreateSpiceDbRepository(t.Name())
 	if !assert.NoError(t, err) {
 		defer spiceDbRepo.Close()
 		return
@@ -1459,7 +1502,7 @@ func TestSpiceDbRepository_LookupSubjects(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
-	spiceDbRepo, err := container.CreateSpiceDbRepository()
+	spiceDbRepo, err := container.CreateSpiceDbRepository(t.Name())
 	if !assert.NoError(t, err) {
 		defer spiceDbRepo.Close()
 		return

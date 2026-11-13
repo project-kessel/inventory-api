@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"net"
 	"os"
 	"reflect"
 	"regexp"
@@ -17,6 +18,7 @@ import (
 	_ "github.com/jackc/pgx/v5/stdlib" // Register the pgx driver for database/sql maintenance connections
 	"github.com/moby/moby/api/types/container"
 	inventoryerrors "github.com/project-kessel/inventory-api/internal/errors"
+	"github.com/project-kessel/inventory-api/internal/testutil/containerdebug"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"
 	"gorm.io/driver/postgres"
@@ -106,8 +108,8 @@ func NewPostgresTestDB(t *testing.T, migrate func(*gorm.DB) error, cfg *gorm.Con
 // for each distinct migrate function, builds a template database by running
 // migrate once. Every call then copies the template into a private database,
 // giving tests full schema isolation without paying the migration cost per
-// test. Databases are dropped when their test finishes; the container is
-// stopped by TerminateSharedPostgres.
+// test. Databases are dropped when their test finishes, unless debug retention
+// preserves a failed test's data; TerminateSharedPostgres manages the container.
 //
 // Pass a stable function value (a package-level function, not a fresh
 // closure) as migrate so its template is reused; distinct functions get
@@ -116,6 +118,7 @@ func NewPostgresTestDB(t *testing.T, migrate func(*gorm.DB) error, cfg *gorm.Con
 func PostgresTestDSN(t *testing.T, migrate func(*gorm.DB) error) string {
 	t.Helper()
 
+	containerdebug.Observe(t)
 	srv := sharedPostgresServer(t)
 	tpl := templateFor(migrate)
 	tpl.ensure(t, srv, migrate)
@@ -125,7 +128,16 @@ func PostgresTestDSN(t *testing.T, migrate func(*gorm.DB) error) string {
 		t.Fatalf("create postgres test database: %v", err)
 	}
 
-	t.Cleanup(func() { dropDatabase(t, srv, name) })
+	t.Cleanup(func() {
+		if !containerdebug.PreserveTest(t) {
+			dropDatabase(t, srv, name)
+		}
+	})
+	if err := containerdebug.RegisterFixture(containerdebug.Fixture{
+		Kind: "postgres", ContainerID: srv.container.GetContainerID(), Test: t.Name(), Database: name,
+	}); err != nil {
+		t.Fatalf("register postgres test database: %v", err)
+	}
 
 	return srv.dsn(name)
 }
@@ -135,7 +147,9 @@ func PostgresTestDSN(t *testing.T, migrate func(*gorm.DB) error) string {
 // was created. Call it from TestMain after m.Run so the container is removed
 // even when Ryuk is disabled, which scripts/testcontainers-run.sh does for
 // Podman. Report any returned error and fail the test binary, even if m.Run
-// succeeded. Call only after all tests and their database cleanup have finished.
+// succeeded. Debug keep-on-failure mode closes the maintenance pool but retains
+// the container and failed databases for inspection. Call only after all tests
+// and their database cleanup have finished.
 func TerminateSharedPostgres() error {
 	postgresOnce.Do(func() {}) // never start the server just to stop it
 	if postgresShared == nil {
@@ -144,7 +158,18 @@ func TerminateSharedPostgres() error {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	if err := postgresShared.terminate(ctx); err != nil {
+	if containerdebug.KeepOnFailure() {
+		var cleanupErrors []error
+		if err := postgresShared.admin.Close(); err != nil {
+			cleanupErrors = append(cleanupErrors, fmt.Errorf("close postgres maintenance connection: %w", err))
+		}
+		if err := containerdebug.Retained(postgresShared.container.GetContainerID()); err != nil {
+			cleanupErrors = append(cleanupErrors, fmt.Errorf("report retained postgres container: %w", err))
+		}
+		if len(cleanupErrors) > 0 {
+			return inventoryerrors.NewAggregate(cleanupErrors)
+		}
+	} else if err := postgresShared.terminate(ctx); err != nil {
 		return err // retain the container handle so cleanup can be retried
 	}
 
@@ -188,6 +213,9 @@ func sharedPostgresServer(t *testing.T) *postgresServer {
 // maintenance pool. Failed setup cleans up the container; on success, the caller
 // owns termination.
 func startPostgresServer() (server *postgresServer, err error) {
+	if err := containerdebug.Configure(); err != nil {
+		return nil, fmt.Errorf("configure postgres container debugging: %w", err)
+	}
 	image := strings.TrimSpace(os.Getenv(PostgresImageEnvVar))
 	if image == "" {
 		image = DefaultPostgresImage
@@ -271,6 +299,13 @@ func startPostgresServer() (server *postgresServer, err error) {
 		_ = admin.Close()
 		return nil, fmt.Errorf("initialize postgres maintenance statements: %w", err)
 	}
+	if err := containerdebug.RegisterContainer(containerdebug.Container{
+		Kind: "postgres", ID: ctr.GetContainerID(), Endpoint: net.JoinHostPort(host, port.Port()),
+		Username: postgresTestUser, Password: password,
+	}); err != nil {
+		_ = admin.Close()
+		return nil, fmt.Errorf("register postgres container: %w", err)
+	}
 	srv.admin = admin
 	srv.maintenance = maintenance
 
@@ -333,6 +368,13 @@ func (tpl *postgresTemplate) ensure(t *testing.T, srv *postgresServer, migrate f
 		tpl.err = buildTemplate(tpl, srv, migrate)
 	})
 	if tpl.err != nil {
+		// Migration errors can leave useful schema and data in the template.
+		// Associate it with the failing test before reporting the setup error.
+		if err := containerdebug.RegisterFixture(containerdebug.Fixture{
+			Kind: "postgres", ContainerID: srv.container.GetContainerID(), Test: t.Name(), Database: tpl.name,
+		}); err != nil {
+			t.Fatalf("register failed postgres template database: %v (setup error: %v)", err, tpl.err)
+		}
 		t.Fatalf("prepare postgres template database: %v", tpl.err)
 	}
 }

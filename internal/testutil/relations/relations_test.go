@@ -12,6 +12,7 @@ import (
 
 	"github.com/project-kessel/inventory-api/internal/biz/model"
 	"github.com/project-kessel/inventory-api/internal/testutil"
+	"github.com/project-kessel/inventory-api/internal/testutil/containerdebug"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -19,6 +20,7 @@ import (
 
 func TestMain(m *testing.M) {
 	code := m.Run()
+	containerdebug.RecordResult(code)
 	if err := TerminateSharedSpiceDB(); err != nil {
 		fmt.Fprintf(os.Stderr, "SpiceDB test cleanup failed: %v\n", err)
 		if code == 0 {

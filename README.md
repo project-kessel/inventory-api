@@ -343,6 +343,17 @@ the strict runtime-detection wrapper, which preserves command failures.
 See [testing guidelines](test/GUIDELINES.md#spicedb-relations-testing) for setup
 and consistency semantics.
 
+To inspect shared PostgreSQL or SpiceDB test fixtures (including the legacy
+non-short data suite), enable `TEST_CONTAINERS_DEBUG=1`. Stdout contains only
+nonsecret metadata. `TEST_CONTAINERS_DEBUG_FILE=<base>` additionally creates an
+exclusive, owner-only `<base>.<binary>.<pid>.jsonl` credentials registry;
+`TEST_CONTAINERS_KEEP_ON_FAILURE=1` retains containers after failures. Either
+option implies debug output; passing runs still clean up normally. Use `-v` and
+`-count=1` to see fresh diagnostics. See the [test-container debugging
+guide](docs/dev-guides/test-container-debugging.md) for commands, host `psql` and
+Authzed `zed` access, retention behavior, and manual cleanup of containers and
+credential-sensitive files.
+
 For end-to-test info see [here](./test/README.md).
 
 ## Validating FIPS

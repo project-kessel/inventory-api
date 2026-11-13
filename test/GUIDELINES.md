@@ -82,6 +82,22 @@ SpiceDB integration tests. The latter retain their separate bootstrap schema
 and existing non-short execution mode, but also intentionally skip on
 `TEST_DB=sqlite`, even without `-short`.
 
+### Test Container Debugging
+
+The shared PostgreSQL and SpiceDB helpers and the legacy non-short data-layer
+SpiceDB helper use `internal/testutil/containerdebug`. See the
+[test-container debugging guide](../docs/dev-guides/test-container-debugging.md)
+for the JSONL registry schema, host `psql` / Authzed `zed` commands, and cleanup.
+
+- `TEST_CONTAINERS_DEBUG=1` prints nonsecret container endpoints, IDs, fixture associations, and inspect/log commands. Never print tokens, passwords, or credential-bearing DSNs.
+- `TEST_CONTAINERS_DEBUG_FILE=<base>` implies debug and exclusively creates `<base>.<binary>.<pid>.jsonl` with mode `0600`, including full credentials. Files persist after cleanup; delete them manually and treat them as secrets.
+- `TEST_CONTAINERS_KEEP_ON_FAILURE=1` implies debug and retains shared containers after observed fixture or package failures. Only failed tests' private PostgreSQL databases are kept; successful private databases are still dropped. SpiceDB's in-memory fixture datastores remain with the retained server. Successful runs still terminate containers normally.
+- Call `containerdebug.Configure()` before **any** Testcontainers operation (including health probes, configuration reads, session-ID and label helpers), so keep mode disables Ryuk before runtime configuration is cached. The wrapper also disables Ryuk in the launching environment for keep mode, covering package initializers that run before `TestMain`; set `TESTCONTAINERS_RYUK_DISABLED=true` yourself if bypassing it. A late `Configure()` cannot undo cached configuration or a running Ryuk. Propagate configuration/registry errors rather than silently losing diagnostics.
+- Call `containerdebug.Observe(t)` after explicit SQLite/short-mode skip guards and before fixture setup/cleanup. Register actual container IDs and host endpoints, and register fixture tokens before SpiceDB repository/schema initialization. PostgreSQL cleanup uses `PreserveTest(t)` before dropping each private database.
+- In `TestMain`, record `m.Run()`'s status with `containerdebug.RecordResult(code)` before deferred/shared-container cleanup, including mixed packages whose failing tests may not own a fixture. Record setup failures too. Container owners check `KeepOnFailure()` and report retained IDs with `Retained(id)` instead of terminating them; otherwise preserve normal strict cleanup and failure handling.
+- Use the wrapper with `-v -count=1` so successful-package stdout is visible and cached results cannot hide current containers. Do not add `-short` when debugging the legacy data-layer SpiceDB suite. SQLite always excludes SpiceDB, regardless of debug settings.
+- Stop retained containers explicitly with `podman rm -f -v <container-id>` to remove anonymous PostgreSQL volumes too; credential registry files require separate manual deletion. Keep mode disables Ryuk even on successful runs, so normal `TestMain` cleanup must remain in place.
+
 #### Measured overhead (2026-11-10)
 
 Compared against commit `78f93947`, using rootless Podman, PostgreSQL, the pinned

@@ -55,4 +55,10 @@ case "$DOCKER_HOST" in
 	*podman*) export TESTCONTAINERS_RYUK_DISABLED="${TESTCONTAINERS_RYUK_DISABLED:-true}" ;;
 esac
 
+# Retention must disable Ryuk before the Go binary can cache its configuration.
+# The Go debug helper validates the flag and still cleans up successful runs.
+case "${TEST_CONTAINERS_KEEP_ON_FAILURE:-}" in
+	1|t|T|true|TRUE|True) export TESTCONTAINERS_RYUK_DISABLED=true ;;
+esac
+
 exec "$@"

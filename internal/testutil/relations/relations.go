@@ -23,6 +23,7 @@ import (
 	"github.com/project-kessel/inventory-api/internal/biz/model"
 	"github.com/project-kessel/inventory-api/internal/data"
 	"github.com/project-kessel/inventory-api/internal/testutil"
+	"github.com/project-kessel/inventory-api/internal/testutil/containerdebug"
 	"github.com/stretchr/testify/require"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"
@@ -68,15 +69,20 @@ func New(t testing.TB) *data.SpiceDBRelationsRepository {
 	if testutil.TestDBBackend() == testutil.BackendSQLite {
 		t.Skip("SpiceDB tests are explicitly disabled with TEST_DB=sqlite")
 	}
+	containerdebug.Observe(t)
 	require.NoError(t, containerRuntimeHealth(), "SpiceDB tests require a running Docker or Podman runtime")
 	endpoint, err := sharedEndpoint()
 	require.NoError(t, err, "start shared SpiceDB")
 
 	schemaPath := filepath.Join(t.TempDir(), "schema.zed")
 	require.NoError(t, os.WriteFile(schemaPath, schema, 0600))
+	token := uuid.NewString()
+	require.NoError(t, containerdebug.RegisterFixture(containerdebug.Fixture{
+		Kind: "spicedb", ContainerID: shared.container.GetContainerID(), Test: t.Name(), Token: token,
+	}), "record SpiceDB debug fixture")
 	repo, cleanup, err := data.NewSpiceDBRelationsRepository(&data.SpiceDBConfig{
 		Endpoint:        endpoint,
-		Token:           uuid.NewString(),
+		Token:           token,
 		SchemaFile:      schemaPath,
 		FullyConsistent: true,
 	}, log.NewStdLogger(io.Discard))
@@ -108,11 +114,19 @@ func sharedEndpoint() (string, error) {
 		testcontainers.WithExposedPorts("50051/tcp"),
 		testcontainers.WithWaitStrategy(wait.ForListeningPort("50051/tcp").WithStartupTimeout(2*time.Minute)),
 	)
+	// Run can return a container together with a startup error. Keep ownership
+	// even then so TestMain either removes it or deliberately retains it.
+	shared.container = container
 	if err != nil {
+		if container != nil {
+			if debugErr := containerdebug.RegisterContainer(containerdebug.Container{
+				Kind: "spicedb", ID: container.GetContainerID(),
+			}); debugErr != nil {
+				return "", fmt.Errorf("start SpiceDB: %w; record container: %v", err, debugErr)
+			}
+		}
 		return "", fmt.Errorf("start SpiceDB: %w", err)
 	}
-	// Keep ownership even if endpoint discovery fails, so TestMain can clean up.
-	shared.container = container
 	host, err := container.Host(ctx)
 	if err != nil {
 		return "", fmt.Errorf("get SpiceDB host: %w", err)
@@ -122,6 +136,11 @@ func sharedEndpoint() (string, error) {
 		return "", fmt.Errorf("get SpiceDB port: %w", err)
 	}
 	shared.endpoint = net.JoinHostPort(host, port.Port())
+	if err := containerdebug.RegisterContainer(containerdebug.Container{
+		Kind: "spicedb", ID: container.GetContainerID(), Endpoint: shared.endpoint,
+	}); err != nil {
+		return "", err
+	}
 	return shared.endpoint, nil
 }
 
@@ -162,11 +181,20 @@ func resourceReference(t testing.TB, reporterType, resourceType, resourceID stri
 
 // TerminateSharedSpiceDB stops this binary's shared container, if started.
 // Call only after all tests and their repository cleanups have completed.
-// It is safe to call repeatedly; failed termination can be retried.
+// With TEST_CONTAINERS_KEEP_ON_FAILURE, a failing test binary retains the
+// container for manual inspection instead. Failed termination can be retried.
 func TerminateSharedSpiceDB() error {
 	shared.Lock()
 	defer shared.Unlock()
 	if shared.container == nil {
+		return nil
+	}
+	if containerdebug.KeepOnFailure() {
+		if err := containerdebug.Retained(shared.container.GetContainerID()); err != nil {
+			return err
+		}
+		shared.container = nil
+		shared.endpoint = ""
 		return nil
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)

@@ -6,12 +6,14 @@ import (
 	"testing"
 
 	"github.com/project-kessel/inventory-api/internal/testutil"
+	"github.com/project-kessel/inventory-api/internal/testutil/containerdebug"
 	relationstest "github.com/project-kessel/inventory-api/internal/testutil/relations"
 )
 
 // TestMain stops shared containers even when Podman runs without Ryuk.
 func TestMain(m *testing.M) {
 	code := m.Run()
+	containerdebug.RecordResult(code)
 	if err := relationstest.TerminateSharedSpiceDB(); err != nil {
 		fmt.Fprintf(os.Stderr, "SpiceDB test cleanup failed: %v\n", err)
 		if code == 0 {

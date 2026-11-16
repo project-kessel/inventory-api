@@ -19,6 +19,8 @@
 #   4. Asserts the expected SpiceDB tuples with targeted PASS/FAIL checks
 #   5. Exercises AddResourceRelationships, then re-verifies Check + tuples
 #   6. Exercises RemoveResourceRelationships, then re-verifies Check + tuples
+#   7. Exercises a boolean wildcard relation (desire_all_services) and
+#      verifies the typed wildcard tuple and permission outcomes
 #      (the removes reverse the adds, returning SpiceDB to its pre-Add state)
 #
 # Access model being tested:
@@ -835,6 +837,142 @@ assert_tuple_exists rbac/workspace:c3d4e5f6-b396-11f1-9c1d-6ae246604903 t_parent
 
 echo "-- Unrelated state must be untouched by the Removes --"
 assert_tuple_exists rbac/workspace:a0af6abc-b396-11f1-ae2b-6ae246604903 t_features_workspace_direct_service_preferences 59be7c18-b398-11f1-9781-6ae246604903 "team 3 still desires service c (unrelated resource unchanged)"
+
+echo ""
+echo "========================================================"
+echo "Testing boolean wildcard relations (desire_all_services)"
+echo "========================================================"
+
+# The Features boolean relations (desire_all_services, ignore_inherited_*)
+# are backed by typed wildcard tuples (features/service:*): a true field
+# value writes the tuple, false and omission both leave it absent. This
+# section verifies the behavior end to end and must produce identical
+# results on the JSON schema (make kessel-up) and unified schema
+# (make kessel-up-unified) paths.
+
+echo "Reporting team 2 with desire_all_services: true (wildcard desire)"
+grpcurl -plaintext -d @ localhost:${PORT_NUMBER} kessel.inventory.v1beta2.KesselInventoryService.ReportResource <<EOF
+{
+    "type": "workspace",
+    "reporterType": "features",
+    "reporterInstanceId": "3ba27996-b398-11f1-bf17-6ae246604903",
+    "representations": {
+      "metadata": {
+        "localResourceId": "9a4cd31c-b396-11f1-af2e-6ae246604903",
+        "apiHref": "https://api.example.com/workspaces/team-2",
+        "consoleHref": "https://console.example.com/workspaces/team-2",
+        "reporterVersion": "1.0.0"
+      },
+      "reporter": {
+        "desire_all_services": true
+      }
+    }
+}
+EOF
+
+echo "Giving the wildcard desire time to replicate...sleeping for 20 seconds"
+sleep 20
+
+echo "Validating the wildcard tuple and permission outcomes..."
+
+echo "-- Wildcard: the typed wildcard tuple exists --"
+assert_tuple_exists rbac/workspace:9a4cd31c-b396-11f1-af2e-6ae246604903 t_features_workspace_desire_all_services "features/service:*" "desire_all_services: true writes the features/service:* wildcard tuple"
+
+echo "-- Wildcard permission checks --"
+assert_check true "Team 2 with desire_all_services SHOULD have access to service C (wildcard desire + dept b's account pays for it)" <<EOF
+{
+  "object": {
+    "resourceType": "workspace",
+    "resourceId": "9a4cd31c-b396-11f1-af2e-6ae246604903",
+    "reporter": {
+        "type": "features"
+    }
+  },
+  "relation": "enabled_services",
+  "subject": {
+    "resource": {
+      "resourceType": "service",
+      "resourceId": "59be7c18-b398-11f1-9781-6ae246604903",
+      "reporter": {
+        "type": "features"
+      }
+    }
+  }
+}
+EOF
+
+assert_check false "Team 2 with desire_all_services should NOT have access to an unpaid service (wildcard desire without payment is not enough)" <<EOF
+{
+  "object": {
+    "resourceType": "workspace",
+    "resourceId": "9a4cd31c-b396-11f1-af2e-6ae246604903",
+    "reporter": {
+        "type": "features"
+    }
+  },
+  "relation": "enabled_services",
+  "subject": {
+    "resource": {
+      "resourceType": "service",
+      "resourceId": "44444444-4444-4444-4444-444444444444",
+      "reporter": {
+        "type": "features"
+      }
+    }
+  }
+}
+EOF
+
+echo "Reporting team 2 with desire_all_services: false (wildcard removal)"
+grpcurl -plaintext -d @ localhost:${PORT_NUMBER} kessel.inventory.v1beta2.KesselInventoryService.ReportResource <<EOF
+{
+    "type": "workspace",
+    "reporterType": "features",
+    "reporterInstanceId": "3ba27996-b398-11f1-bf17-6ae246604903",
+    "representations": {
+      "metadata": {
+        "localResourceId": "9a4cd31c-b396-11f1-af2e-6ae246604903",
+        "apiHref": "https://api.example.com/workspaces/team-2",
+        "consoleHref": "https://console.example.com/workspaces/team-2",
+        "reporterVersion": "1.0.0"
+      },
+      "reporter": {
+        "desire_all_services": false
+      }
+    }
+}
+EOF
+
+echo "Giving the wildcard removal time to replicate...sleeping for 20 seconds"
+sleep 20
+
+echo "Validating the wildcard tuple is gone..."
+
+echo "-- Wildcard: the typed wildcard tuple is removed --"
+assert_tuple_absent rbac/workspace:9a4cd31c-b396-11f1-af2e-6ae246604903 t_features_workspace_desire_all_services "features/service:*" "desire_all_services: false removes the wildcard tuple"
+
+echo "Team 2 should NO LONGER have access to service C (wildcard desire removed)"
+assert_check false "Team 2 should NO LONGER have access to service C (wildcard desire removed)" <<EOF
+{
+  "object": {
+    "resourceType": "workspace",
+    "resourceId": "9a4cd31c-b396-11f1-af2e-6ae246604903",
+    "reporter": {
+        "type": "features"
+    }
+  },
+  "relation": "enabled_services",
+  "subject": {
+    "resource": {
+      "resourceType": "service",
+      "resourceId": "59be7c18-b398-11f1-9781-6ae246604903",
+      "reporter": {
+        "type": "features"
+      }
+    }
+  }
+}
+EOF
 
 # ---------------------------------------------------------------------------
 # Final state: the removes fully reversed the adds, so every tuple should

@@ -160,11 +160,24 @@ func extractReporterRelationValues(representations *model.Representations, field
 	return extractRelationValues(representations.ReporterData()[field], cardinality)
 }
 
-// extractRelationValues converts a scalar or array field to relation values.
+// wildcardSubjectID is the subject ID of the typed wildcard tuple that a
+// boolean-backed wildcard relation materializes (e.g. features/service:*).
+const wildcardSubjectID = "*"
+
+// extractRelationValues converts a scalar, array, or boolean field to relation
+// values. A wildcard cardinality reads a boolean field: true materializes the
+// typed wildcard subject for the relation's target, while false and omission
+// both leave the relation absent.
 func extractRelationValues(value interface{}, cardinality string) []string {
 	if cardinality == "one" {
 		if value, ok := value.(string); ok && value != "" {
 			return []string{value}
+		}
+		return nil
+	}
+	if cardinality == "wildcard" {
+		if enabled, ok := value.(bool); ok && enabled {
+			return []string{wildcardSubjectID}
 		}
 		return nil
 	}

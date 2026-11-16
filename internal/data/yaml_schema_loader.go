@@ -228,6 +228,10 @@ func validateRelationFieldType(relation UnifiedSchemaRelation, fieldSchema inter
 		if !ok || items["type"] != "string" {
 			return fmt.Errorf("field %q must define string array items for cardinality many", relation.Field)
 		}
+	case "wildcard":
+		if fieldType != "boolean" {
+			return fmt.Errorf("field %q must have type boolean for cardinality wildcard", relation.Field)
+		}
 	default:
 		return fmt.Errorf("unsupported cardinality %q", relation.Cardinality)
 	}

@@ -102,7 +102,7 @@
           "pattern": "^[a-z][a-z0-9_]*$"
         },
         "cardinality": {
-          "enum": ["one", "many"]
+          "enum": ["one", "many", "wildcard"]
         },
         "description": {
           "type": "string",

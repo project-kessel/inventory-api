@@ -18,7 +18,8 @@ The normal `make kessel-up` flow continues to use the legacy JSON schema cache. 
 - `resources/*.yaml` contains unified test artifacts for host, workspace, service, billing_account, k8s_cluster, k8s_policy, and notifications_integration.
 - `docker-compose.override.yaml` mounts the temporary config and resource path.
 - `kessel-inventory-ephem-unified.yaml` is a development-only ephemeral template that accepts a parameterized unified-schema tarball.
-- `features-service-schema-tester.sh` is an automated end-to-end test for the Features service model, usable against both the JSON and unified schema stacks (see below).
+- `features-service-schema-tester.sh` is an automated end-to-end test for the Features service model driven through `ReportResource` and the relationship delta endpoints, usable against both the JSON and unified schema stacks (see below).
+- `features-service-tuple-api-tester.sh` covers the same access model through the tuple API (`CreateTuples`/`DeleteTuples`) instead, exercising the schema without creating inventory resources (see below).
 
 These artifacts are local test fixtures. They are not part of the production schema set and should not be copied into `data/schema/resources`.
 
@@ -46,6 +47,22 @@ The script requires `grpcurl` on PATH and `zed` configured (`zed context set`) a
 Note that strict attribute-field rejection on the delta endpoints is enforced only under unified schema; the JSON schema stack skips that check, so the script's assertions pass under both modes but only the unified stack rejects non-relationship fields.
 
 For a similar step-by-step manual walkthrough of the same API surface - including a variant that sets up workspaces through RBAC instead of zed - see the [Features Service Local Testing guide](../../docs/dev-guides/features-service-local-testing.md).
+
+## Features Service Tuple API Tester
+
+`features-service-tuple-api-tester.sh` covers the same Features access model, but writes every relationship through the tuple API (`KesselTupleService`'s `CreateTuples` and `DeleteTuples`) rather than `ReportResource`. Nothing goes through the reporter representation path or the consumer, so no inventory resources are created and what the run exercises is the schema itself. The script seeds the workspace hierarchy with `zed`, writes the billing account and workspace relationships with `CreateTuples`, flips two previously-denied checks by creating the tuples they were missing, reverses those with `DeleteTuples`, and asserts both the `enabled_services` checks and the underlying SpiceDB tuples with PASS/FAIL lines. It exits non-zero when any assertion fails.
+
+Because the writes bypass inventory, the `Check` calls cannot rely on the server's `at_least_as_acknowledged` default - that resolves a token by looking the resource up in the inventory database, and there is no resource to find. Each check instead passes the consistency token returned by the preceding write, so the script needs no replication sleeps and runs in a few seconds.
+
+Two naming conventions appear in the script: the grpcurl payloads use kessel names (`features/workspace#direct_service_preferences`, `features/billing_account#services`), while the `zed` seeds and tuple assertions use the serialized names those are rewritten into (`rbac/workspace#t_features_workspace_direct_service_preferences`, `features/billing_account#t_services`). The script's header comment explains the mapping.
+
+It runs against either stack, same as the schema tester:
+
+```shell
+./development/unified-schema/features-service-tuple-api-tester.sh 9081
+```
+
+Start from a clean stack here too: tuples persist between runs, and the delete assertions assume the state this script seeded. It needs the same `grpcurl` and `zed` setup.
 
 ## Ephemeral Tarball
 

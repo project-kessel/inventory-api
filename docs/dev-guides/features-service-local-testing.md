@@ -351,4 +351,6 @@ After replication, the billing account's relationships are cleaned up and checks
 
 The test script `development/unified-schema/features-service-schema-tester.sh` runs a similar automated version of this entire walkthrough (report → check → add → remove, with assertions) against the unified-schema stack (`make kessel-up-unified`). It is a good next step once the manual flow above feels comfortable.
 
+A second script, `development/unified-schema/features-service-tuple-api-tester.sh`, covers the same access model but writes the relationships straight through the tuple API (`CreateTuples`/`DeleteTuples`) instead of `ReportResource`. Nothing it writes becomes an inventory resource, so it tests the schema rather than the reporting path - useful when you want to confirm the permission logic itself without the consumer in the loop.
+
 Note that the unified schema is actively under development, so behavior there may vary from this guide. In particular, wildcard fields such as `desire_all_services` are not yet supported on that stack - they are accepted but do not affect permissions there; support is planned.

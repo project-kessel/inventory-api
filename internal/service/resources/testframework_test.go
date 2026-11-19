@@ -73,7 +73,6 @@ import (
 
 	addctl "github.com/project-kessel/inventory-api/internal/biz/usecase/relationships"
 	usecase "github.com/project-kessel/inventory-api/internal/biz/usecase/resources"
-	"github.com/project-kessel/inventory-api/internal/data"
 	"github.com/project-kessel/inventory-api/internal/metricscollector"
 )
 
@@ -371,15 +370,16 @@ func expectSuccess[Resp proto.Message](newResp func() Resp) Extraction[Resp] {
 }
 
 // resolveAddRelationshipsUsecase returns the configured add-relationships use
-// case, or a default built over fresh fakes for tests that do not exercise the
-// endpoint.
+// case, or a default backed by an isolated database and in-memory schemas for
+// tests that do not exercise the endpoint.
 func resolveAddRelationshipsUsecase(t *testing.T, cfg TestServerConfig) *addctl.AddResourceRelationshipsUseCase {
 	t.Helper()
 	if cfg.AddRelationshipsUsecase != nil {
 		return cfg.AddRelationshipsUsecase
 	}
+	repo, _ := newTestRepo(t)
 	return addctl.NewAddResourceRelationshipsUseCase(
-		data.NewFakeResourceRepository(),
+		repo,
 		newFakeSchemaRepository(t),
 		nil, // listen manager
 		nil, // circuit breaker
@@ -391,15 +391,16 @@ func resolveAddRelationshipsUsecase(t *testing.T, cfg TestServerConfig) *addctl.
 }
 
 // resolveRemoveRelationshipsUsecase returns the configured remove-relationships use
-// case, or a default built over fresh fakes for tests that do not exercise the
-// endpoint.
+// case, or a default backed by an isolated database and in-memory schemas for
+// tests that do not exercise the endpoint.
 func resolveRemoveRelationshipsUsecase(t *testing.T, cfg TestServerConfig) *addctl.RemoveResourceRelationshipsUseCase {
 	t.Helper()
 	if cfg.RemoveRelationshipsUsecase != nil {
 		return cfg.RemoveRelationshipsUsecase
 	}
+	repo, _ := newTestRepo(t)
 	return addctl.NewRemoveResourceRelationshipsUseCase(
-		data.NewFakeResourceRepository(),
+		repo,
 		newFakeSchemaRepository(t),
 		nil, // listen manager
 		nil, // circuit breaker

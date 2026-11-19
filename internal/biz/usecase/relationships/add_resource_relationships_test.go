@@ -37,9 +37,9 @@ type harnessConfig struct {
 	schemaRepo model.SchemaRepository
 }
 
-// newTestHarness creates a test harness with a fake resource repository,
-// in-memory schema repository, and configurable meta-authorizer for exercising
-// the AddResourceRelationships use case in isolation.
+// newTestHarness creates a test harness with an isolated database-backed resource
+// repository, in-memory schema repository, and configurable meta-authorizer for
+// exercising the AddResourceRelationships use case.
 func newTestHarness(t *testing.T, opts ...harnessOption) *testHarness {
 	t.Helper()
 	cfg := &harnessConfig{}
@@ -47,12 +47,12 @@ func newTestHarness(t *testing.T, opts ...harnessOption) *testHarness {
 		o(cfg)
 	}
 
-	resourceRepo := data.NewFakeResourceRepository()
+	mc := metricscollector.NewFakeMetricsCollector()
+	resourceRepo := newTestResourceRepository(t, mc)
 	schemaRepo := newFakeSchemaRepository(t)
 	if cfg.schemaRepo != nil {
 		schemaRepo = cfg.schemaRepo
 	}
-	mc := metricscollector.NewFakeMetricsCollector()
 	var metaAuth metaauthorizer.MetaAuthorizer
 	if cfg.meta != nil {
 		metaAuth = cfg.meta
@@ -363,7 +363,7 @@ func reportCommand(t *testing.T, localResourceId string, reporterData, commonDat
 }
 
 // reporterPreferences reads the current direct_service_preferences values
-// from the fake repository for merge assertions.
+// from the persisted representation for merge assertions.
 func reporterPreferences(t *testing.T, h *testHarness, localResourceId string) []interface{} {
 	t.Helper()
 	key := createReporterResourceKey(t, localResourceId, "workspace", "features", "features-instance-1")

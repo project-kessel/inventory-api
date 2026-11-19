@@ -13,6 +13,7 @@ import (
 	usecase "github.com/project-kessel/inventory-api/internal/biz/usecase/resources"
 	"github.com/project-kessel/inventory-api/internal/data"
 	"github.com/project-kessel/inventory-api/internal/metricscollector"
+	relationstest "github.com/project-kessel/inventory-api/internal/testutil/relations"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/codes"
@@ -21,14 +22,15 @@ import (
 )
 
 // newAddRelationshipsTestServer builds a TestServerConfig whose resources and
-// add-relationships use cases share the same fake repository and schema
+// add-relationships use cases share the same database-backed repository and schema
 // repository, so resources reported through ReportResource are visible to
 // AddResourceRelationships. The host common schema requires workspace_id so
 // that auto-create validation behavior is observable through the endpoint.
 func newAddRelationshipsTestServer(t *testing.T) (TestServerConfig, model.ResourceRepository) {
 	t.Helper()
 
-	repo := data.NewFakeResourceRepository()
+	relationsRepo := relationstest.New(t)
+	repo, _ := newTestRepo(t)
 	schemaRepo := data.NewInMemorySchemaRepository()
 
 	hostType, err := model.NewResourceType("host")
@@ -65,7 +67,7 @@ func newAddRelationshipsTestServer(t *testing.T) (TestServerConfig, model.Resour
 	resourcesUsecase := usecase.New(
 		repo,
 		schemaRepo,
-		data.NewSimpleRelationsRepository(),
+		relationsRepo,
 		"rbac",
 		logger,
 		nil, // listen manager

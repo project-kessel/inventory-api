@@ -30,7 +30,6 @@ func (m *MockHealthRepo) IsRelationsAvailable(ctx context.Context) (model.Health
 //   - CheckBulk: for response length mismatches
 //   - CheckForUpdateBulk: for per-pair errors
 
-//
 // Normal tests should use the real SpiceDB helper in internal/testutil/relations.
 // Prefer narrow embedding stubs for new fault-injection tests; do not extend
 // this legacy method-verifying mock.

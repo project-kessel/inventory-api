@@ -63,7 +63,7 @@ func TestPostgresDebugLifecycle(t *testing.T) {
 				defer cleanupCancel()
 				runtime, err := testcontainers.NewDockerClientWithOpts(cleanupCtx)
 				require.NoError(t, err)
-				defer runtime.Close()
+				defer func() { require.NoError(t, runtime.Close()) }()
 				id := string(data)
 				_, err = runtime.ContainerInspect(cleanupCtx, id, client.ContainerInspectOptions{})
 				if mode == "retain" {
@@ -178,7 +178,7 @@ func runPostgresDebugChild(t *testing.T) {
 		require.NoError(t, os.WriteFile(filepath.Join(directory, "container-id"), []byte(server.container.GetContainerID()), 0600))
 		db, err := sql.Open("pgx", dsn)
 		require.NoError(t, err)
-		defer db.Close()
+		defer func() { require.NoError(t, db.Close()) }()
 		require.NoError(t, db.QueryRow("SELECT current_database()").Scan(&passedDatabase))
 	}
 	t.Run("passing", passing)

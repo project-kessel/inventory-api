@@ -146,7 +146,11 @@ func readRecords(t *testing.T, path string) []map[string]string {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer file.Close()
+	defer func() {
+		if err := file.Close(); err != nil {
+			t.Errorf("close debug registry: %v", err)
+		}
+	}()
 	var records []map[string]string
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {

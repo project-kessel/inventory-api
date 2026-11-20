@@ -65,7 +65,7 @@ func TestSpiceDBDebugLifecycle(t *testing.T) {
 				defer cleanupCancel()
 				runtime, err := testcontainers.NewDockerClientWithOpts(cleanupCtx)
 				require.NoError(t, err)
-				defer runtime.Close()
+				defer func() { require.NoError(t, runtime.Close()) }()
 				_, inspectErr := runtime.ContainerInspect(cleanupCtx, string(id), client.ContainerInspectOptions{})
 				if inspectErr == nil {
 					_, err = runtime.ContainerRemove(cleanupCtx, string(id), client.ContainerRemoveOptions{Force: true, RemoveVolumes: true})
@@ -98,7 +98,7 @@ func TestSpiceDBDebugLifecycle(t *testing.T) {
 			require.Equal(t, os.FileMode(0600), info.Mode().Perm())
 			file, err := os.Open(paths[0])
 			require.NoError(t, err)
-			defer file.Close()
+			defer func() { require.NoError(t, file.Close()) }()
 			var endpoint, token string
 			retained := false
 			decoder := json.NewDecoder(file)

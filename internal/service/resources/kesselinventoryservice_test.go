@@ -141,7 +141,8 @@ func newTestServer(t *testing.T, cfg TestServerConfig) pb.KesselInventoryService
 }
 
 // testUsecaseConfig holds optional overrides for constructing a test Usecase.
-// All fields have sensible defaults when left as zero values.
+// Repo defaults to nil for tests that do not exercise persistence; other fields
+// have sensible defaults when left as zero values.
 type testUsecaseConfig struct {
 	Repo           model.ResourceRepository
 	SchemaRepo     model.SchemaRepository
@@ -153,12 +154,10 @@ type testUsecaseConfig struct {
 
 // newTestUsecase constructs a Usecase with test defaults.
 // Override specific fields via testUsecaseConfig; unset fields use defaults.
+// Tests exercising persistence must explicitly supply Repo from newTestRepo(t).
+// Otherwise Repo remains nil as an unused collaborator.
 func newTestUsecase(t *testing.T, cfg testUsecaseConfig) *usecase.Usecase {
 	t.Helper()
-	repo := cfg.Repo
-	if repo == nil {
-		repo, _ = newTestRepo(t)
-	}
 
 	schemaRepo := cfg.SchemaRepo
 	if schemaRepo == nil {
@@ -188,7 +187,7 @@ func newTestUsecase(t *testing.T, cfg testUsecaseConfig) *usecase.Usecase {
 	}
 
 	return usecase.New(
-		repo,
+		cfg.Repo,
 		schemaRepo,
 		authzImpl,
 		namespace,
@@ -1114,8 +1113,9 @@ func TestInventoryService_ReportResource_Success(t *testing.T) {
 	}
 
 	runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
+		repo, _ := newTestRepo(t)
 		return TestServerConfig{
-			Usecase:       newTestUsecase(t, testUsecaseConfig{}),
+			Usecase:       newTestUsecase(t, testUsecaseConfig{Repo: repo}),
 			Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
 		}, func(t *testing.T, tr *Transport) {
 			ctx := context.Background()
@@ -1190,9 +1190,10 @@ func TestInventoryService_DeleteResource_Success(t *testing.T) {
 			},
 		},
 	}
-	uc := newTestUsecase(t, testUsecaseConfig{})
 
 	runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
+		repo, _ := newTestRepo(t)
+		uc := newTestUsecase(t, testUsecaseConfig{Repo: repo})
 		return TestServerConfig{
 			Usecase:       uc,
 			Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
@@ -1332,9 +1333,10 @@ func TestInventoryService_ReportResource_Update(t *testing.T) {
 			},
 		},
 	}
-	uc := newTestUsecase(t, testUsecaseConfig{})
 
 	runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
+		repo, _ := newTestRepo(t)
+		uc := newTestUsecase(t, testUsecaseConfig{Repo: repo})
 		return TestServerConfig{
 			Usecase:       uc,
 			Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
@@ -1492,9 +1494,10 @@ func TestInventoryService_ReportResource_Update_DifferentReporterInstance(t *tes
 			},
 		},
 	}
-	uc := newTestUsecase(t, testUsecaseConfig{})
 
 	runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
+		repo, _ := newTestRepo(t)
+		uc := newTestUsecase(t, testUsecaseConfig{Repo: repo})
 		return TestServerConfig{
 			Usecase:       uc,
 			Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
@@ -1680,18 +1683,18 @@ func TestInventoryService_CheckBulk_ConsistencyToken(t *testing.T) {
 			require.Len(t, resp.Pairs, 2)
 			assert.Contains(t, []pb.Allowed{pb.Allowed_ALLOWED_TRUE, pb.Allowed_ALLOWED_FALSE}, resp.Pairs[0].GetItem().Allowed)
 			assert.Equal(t, pb.Allowed_ALLOWED_TRUE, resp.Pairs[1].GetItem().Allowed, "the unchanged grant is visible at any revision since the grant token")
-						require.NotEmpty(t, resp.GetConsistencyToken().GetToken())
+			require.NotEmpty(t, resp.GetConsistencyToken().GetToken())
 
-						// An invalid opaque token must reach SpiceDB, rather than silently
-						// falling back to the helper's fully consistent default.
-						reqWithToken.Consistency.GetAtLeastAsFresh().Token = "invalid-spicedb-token"
-						res = tr.Invoke(ctx, withBody(reqWithToken, CheckBulk, httpEndpoint("POST /api/kessel/v1beta2/checkbulk")))
-						Assert(t, res, requireError(codes.InvalidArgument))
-					}
-				})
-			}
+			// An invalid opaque token must reach SpiceDB, rather than silently
+			// falling back to the helper's fully consistent default.
+			reqWithToken.Consistency.GetAtLeastAsFresh().Token = "invalid-spicedb-token"
+			res = tr.Invoke(ctx, withBody(reqWithToken, CheckBulk, httpEndpoint("POST /api/kessel/v1beta2/checkbulk")))
+			Assert(t, res, requireError(codes.InvalidArgument))
+		}
+	})
+}
 
-			func TestInventoryService_CheckSelfBulk_ConsistencyToken(t *testing.T) {
+func TestInventoryService_CheckSelfBulk_ConsistencyToken(t *testing.T) {
 	runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
 		// The testSelfSubjectStrategy converts claims.SubjectId to rbac/principal/{subjectId}
 		// So we use subject IDs that match what we grant in the authorizer.
@@ -1819,18 +1822,18 @@ func TestInventoryService_CheckBulk_ConsistencyToken(t *testing.T) {
 			require.Len(t, resp.Pairs, 2)
 			assert.Contains(t, []pb.Allowed{pb.Allowed_ALLOWED_TRUE, pb.Allowed_ALLOWED_FALSE}, resp.Pairs[0].GetItem().Allowed)
 			assert.Equal(t, pb.Allowed_ALLOWED_TRUE, resp.Pairs[1].GetItem().Allowed, "the unchanged grant is visible at any revision since the grant token")
-						require.NotEmpty(t, resp.GetConsistencyToken().GetToken())
+			require.NotEmpty(t, resp.GetConsistencyToken().GetToken())
 
-						// Rejecting this token proves the self endpoint forwards consistency
-						// to SpiceDB instead of using the default read consistency.
-						reqWithToken.Consistency.GetAtLeastAsFresh().Token = "invalid-spicedb-token"
-						res = tr.Invoke(ctx, withBody(reqWithToken, CheckSelfBulk, httpEndpoint("POST /api/kessel/v1beta2/checkselfbulk")))
-						Assert(t, res, requireError(codes.InvalidArgument))
-					}
-				})
-			}
+			// Rejecting this token proves the self endpoint forwards consistency
+			// to SpiceDB instead of using the default read consistency.
+			reqWithToken.Consistency.GetAtLeastAsFresh().Token = "invalid-spicedb-token"
+			res = tr.Invoke(ctx, withBody(reqWithToken, CheckSelfBulk, httpEndpoint("POST /api/kessel/v1beta2/checkselfbulk")))
+			Assert(t, res, requireError(codes.InvalidArgument))
+		}
+	})
+}
 
-			// Note: CheckForUpdateResponse in v1beta2 does not include a consistency token.
+// Note: CheckForUpdateResponse in v1beta2 does not include a consistency token.
 
 // --- ReporterInstanceId Tests ---
 
@@ -1840,7 +1843,8 @@ func TestInventoryService_DeleteResource_WithReporterInstanceId(t *testing.T) {
 			SubjectId: authnapi.SubjectId("reporter-service"),
 			AuthType:  authnapi.AuthTypeXRhIdentity,
 		}
-		uc := newTestUsecase(t, testUsecaseConfig{})
+		repo, _ := newTestRepo(t)
+		uc := newTestUsecase(t, testUsecaseConfig{Repo: repo})
 
 		// First, report a resource with specific instance ID
 		reportReq := &pb.ReportResourceRequest{
@@ -1899,7 +1903,8 @@ func TestInventoryService_DeleteResource_WithoutReporterInstanceId(t *testing.T)
 			SubjectId: authnapi.SubjectId("reporter-service"),
 			AuthType:  authnapi.AuthTypeXRhIdentity,
 		}
-		uc := newTestUsecase(t, testUsecaseConfig{})
+		repo, _ := newTestRepo(t)
+		uc := newTestUsecase(t, testUsecaseConfig{Repo: repo})
 
 		// First, report a resource with specific instance ID
 		reportReq := &pb.ReportResourceRequest{
@@ -2356,8 +2361,9 @@ func TestInventoryService_DeleteResource_ResourceNotFound(t *testing.T) {
 	}
 
 	runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
+		repo, _ := newTestRepo(t)
 		return TestServerConfig{
-			Usecase:       newTestUsecase(t, testUsecaseConfig{}),
+			Usecase:       newTestUsecase(t, testUsecaseConfig{Repo: repo}),
 			Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
 		}, func(t *testing.T, tr *Transport) {
 			ctx := context.Background()
@@ -2796,7 +2802,7 @@ func TestInventoryService_CheckForUpdateBulk_AllAllowed(t *testing.T) {
 			assert.Equal(t, pb.Allowed_ALLOWED_TRUE, resp.Pairs[0].GetItem().Allowed)
 			assert.Equal(t, pb.Allowed_ALLOWED_TRUE, resp.Pairs[1].GetItem().Allowed)
 			assert.NotNil(t, resp.ConsistencyToken)
-				require.NotEmpty(t, resp.ConsistencyToken.GetToken())
+			require.NotEmpty(t, resp.ConsistencyToken.GetToken())
 		}
 	})
 }
@@ -3152,8 +3158,10 @@ func TestInventoryService_ReportResource_MetaAuthzProtocolBehavior(t *testing.T)
 	}
 
 	runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
+		repo, _ := newTestRepo(t)
 		return TestServerConfig{
 			Usecase: newTestUsecase(t, testUsecaseConfig{
+				Repo:           repo,
 				MetaAuthorizer: metaauthorizer.NewSimpleMetaAuthorizer(),
 			}),
 			Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
@@ -4214,8 +4222,9 @@ func makeAuthzConfig(t *testing.T, authz model.RelationsRepository, subjectId st
 
 func makeReportConfig(t *testing.T) TestServerConfig {
 	t.Helper()
+	repo, _ := newTestRepo(t)
 	return TestServerConfig{
-		Usecase: newTestUsecase(t, testUsecaseConfig{}),
+		Usecase: newTestUsecase(t, testUsecaseConfig{Repo: repo}),
 		Authenticator: &StubAuthenticator{
 			Claims:   &authnapi.Claims{SubjectId: authnapi.SubjectId("reporter-service"), AuthType: authnapi.AuthTypeXRhIdentity},
 			Decision: authnapi.Allow,

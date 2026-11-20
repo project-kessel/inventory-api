@@ -101,3 +101,5 @@ See `internal/middleware/GUIDELINES.md` for the validation middleware implementa
 - **Request building**: `withBody(req, Check, httpEndpoint("POST /path"))`
 - **Assertions**: `Assert(t, res, requireError(codes.InvalidArgument))`
 - **Response extraction**: `resp := Extract(t, res, expectSuccess(func() *pb.Response{}))`
+- **Explicit fixtures**: `newTestUsecase` leaves `Repo` nil unless supplied. Tests that reach persistence must create a real `newTestRepo(t)` inside the per-protocol factory and pass it through `testUsecaseConfig.Repo`; authorization-only and pre-persistence validation tests do not need a database.
+- **Unused endpoints**: Set only the use cases exercised by the test in `TestServerConfig`. Registering unrelated routes must not provision extra databases. Relationship endpoint tests supply their own database-backed use cases.

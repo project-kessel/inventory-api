@@ -272,3 +272,89 @@ func TestJSONSchemaImplementations_StreamRelationFields_Empty(t *testing.T) {
 		})
 	}
 }
+
+// TestUnifiedSchemaImpl_CalculateTuples_WildcardRelation covers boolean-backed
+// wildcard relations (cardinality "wildcard"): true materializes the typed
+// wildcard subject, false and omission both leave it absent.
+func TestUnifiedSchemaImpl_CalculateTuples_WildcardRelation(t *testing.T) {
+	key := newUnifiedSchemaTestKey(t, "features")
+	implementation := NewUnifiedSchemaImpl(map[string]interface{}{}, nil, map[string][]UnifiedSchemaRelation{
+		"features": {
+			{
+				Name:        "desire_all_services",
+				Target:      "features/service",
+				Field:       "desire_all_services",
+				Cardinality: "wildcard",
+			},
+		},
+	})
+
+	t.Run("true creates the wildcard tuple", func(t *testing.T) {
+		current := newUnifiedSchemaRepresentations(t, nil, map[string]interface{}{"desire_all_services": true})
+
+		tuples, err := implementation.CalculateTuples(current, nil, key)
+
+		require.NoError(t, err)
+		require.Len(t, *tuples.TuplesToCreate(), 1)
+		tuple := (*tuples.TuplesToCreate())[0]
+		assert.Equal(t, "desire_all_services", tuple.Relation().String())
+		assert.Equal(t, "*", tuple.Subject().Resource().ResourceId().String())
+		assert.Equal(t, "features", tuple.Subject().Resource().Reporter().ReporterType().String())
+	})
+
+	t.Run("true to false deletes the wildcard tuple", func(t *testing.T) {
+		current := newUnifiedSchemaRepresentations(t, nil, map[string]interface{}{"desire_all_services": false})
+		previous := newUnifiedSchemaRepresentations(t, nil, map[string]interface{}{"desire_all_services": true})
+
+		tuples, err := implementation.CalculateTuples(current, previous, key)
+
+		require.NoError(t, err)
+		assert.False(t, tuples.HasTuplesToCreate())
+		require.Len(t, *tuples.TuplesToDelete(), 1)
+		assert.Equal(t, "*", (*tuples.TuplesToDelete())[0].Subject().Resource().ResourceId().String())
+	})
+
+	t.Run("true to omitted deletes the wildcard tuple", func(t *testing.T) {
+		// The reporter stream advanced but the field is absent: an empty
+		// representation with a version models omission under snapshot reporting.
+		omittedVersion := model.NewVersion(2)
+		current, err := model.NewRepresentations(nil, nil, model.Representation{}, &omittedVersion)
+		require.NoError(t, err)
+		previous := newUnifiedSchemaRepresentations(t, nil, map[string]interface{}{"desire_all_services": true})
+
+		tuples, err := implementation.CalculateTuples(current, previous, key)
+
+		require.NoError(t, err)
+		assert.False(t, tuples.HasTuplesToCreate())
+		require.Len(t, *tuples.TuplesToDelete(), 1)
+	})
+
+	t.Run("false without a previous true produces nothing", func(t *testing.T) {
+		current := newUnifiedSchemaRepresentations(t, nil, map[string]interface{}{"desire_all_services": false})
+
+		tuples, err := implementation.CalculateTuples(current, nil, key)
+
+		require.NoError(t, err)
+		assert.True(t, tuples.IsEmpty())
+	})
+
+	t.Run("unchanged true produces nothing", func(t *testing.T) {
+		current := newUnifiedSchemaRepresentations(t, nil, map[string]interface{}{"desire_all_services": true})
+		previous := newUnifiedSchemaRepresentations(t, nil, map[string]interface{}{"desire_all_services": true})
+
+		tuples, err := implementation.CalculateTuples(current, previous, key)
+
+		require.NoError(t, err)
+		assert.True(t, tuples.IsEmpty())
+	})
+
+	t.Run("resource deletion deletes the wildcard tuple", func(t *testing.T) {
+		previous := newUnifiedSchemaRepresentations(t, nil, map[string]interface{}{"desire_all_services": true})
+
+		tuples, err := implementation.CalculateTuples(nil, previous, key)
+
+		require.NoError(t, err)
+		assert.False(t, tuples.HasTuplesToCreate())
+		require.Len(t, *tuples.TuplesToDelete(), 1)
+	})
+}

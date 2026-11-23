@@ -41,3 +41,18 @@ reporters:
         field: direct_service_preferences
         cardinality: many
         description: "Direct service preference relations"
+      - name: desire_all_services
+        target: features/service
+        field: desire_all_services
+        cardinality: wildcard
+        description: "Desire all services (typed wildcard) relation"
+      - name: ignore_inherited_desired_services
+        target: features/service
+        field: ignore_inherited_desired_services
+        cardinality: wildcard
+        description: "Ignore inherited desired services (typed wildcard) relation"
+      - name: ignore_inherited_paid_services
+        target: features/service
+        field: ignore_inherited_paid_services
+        cardinality: wildcard
+        description: "Ignore inherited paid services (typed wildcard) relation"

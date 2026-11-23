@@ -74,6 +74,8 @@ updatedCmd := fixture(t).Updated(resourceType, reporterType, instance, id, works
 txCmd := fixture(t).WithTransactionId(params..., "tx-123")
 ```
 
+In `usecase/resources`, `newTestHarness` does not provision a resource repository by default. Tests that reach persistence must opt in with `withResourceRepository()`; authorization-only, configuration, and early-rejection paths should leave it unused. The harness uses the production allow-all relations adapter unless the test explicitly supplies real SpiceDB with `withRelations(...)`.
+
 ### Authorization Testing Patterns
 
 **Authentication Stubs:**

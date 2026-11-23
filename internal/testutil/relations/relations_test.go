@@ -3,7 +3,7 @@ package relationstest
 import (
 	"context"
 	"errors"
-	"fmt"
+
 	"io"
 	"os"
 	"os/exec"
@@ -12,22 +12,14 @@ import (
 
 	"github.com/project-kessel/inventory-api/internal/biz/model"
 	"github.com/project-kessel/inventory-api/internal/testutil"
-	"github.com/project-kessel/inventory-api/internal/testutil/containerdebug"
+	"github.com/project-kessel/inventory-api/internal/testutil/testlifecycle"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
 
 func TestMain(m *testing.M) {
-	code := m.Run()
-	containerdebug.RecordResult(code)
-	if err := TerminateSharedSpiceDB(); err != nil {
-		fmt.Fprintf(os.Stderr, "SpiceDB test cleanup failed: %v\n", err)
-		if code == 0 {
-			code = 1
-		}
-	}
-	os.Exit(code)
+	os.Exit(testlifecycle.Run(m, TerminateSharedSpiceDB))
 }
 
 func TestNewSkipsForSQLiteWithoutProbingRuntime(t *testing.T) {

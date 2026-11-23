@@ -45,8 +45,9 @@ The PostgreSQL backend (in `internal/testutil`, see `postgres_testdb.go`) starts
 When adding database-backed tests:
 
 - Get a migrated database through `testutil.NewTestDB(t, cfg, migrate)`, passing a **package-level** migrate function so its template is reused. Packages without schema needs (e.g. transaction-manager behavior tests) pass `nil`.
-- Stop the shared container from `TestMain` after `m.Run()` via `testutil.TerminateSharedPostgres()`. Check and report its returned error, and exit nonzero on cleanup failure even if the tests passed (see `internal/data/health/main_test.go`). Preserve a failing test exit status. This is normal-exit cleanup, not signal handling.
+- Use `testlifecycle.Run(m, testutil.TerminateSharedPostgres)` from `internal/testutil/testlifecycle` in a package-local `TestMain`, passing the returned code to `os.Exit`. The runner records test failures for retention, attempts all supplied cleanups, reports errors, and fails successful runs if cleanup fails without replacing an existing failing exit status. This is normal-exit cleanup, not signal handling.
 - Call repository methods with the returned handle as before; tests do not need to know which backend is active.
+- Provision expensive fixtures explicitly only when the tested path reaches them. Validation, authentication-denial, and mapping tests should leave unused collaborators nil or use a fail-fast dummy rather than acquire a database or SpiceDB fixture. The shared PostgreSQL and relations helpers start containers lazily; the presence of `TestMain` does not start them.
 - Branch on `testutil.UsingPostgres()` only for behavior that cannot be expressed on both backends, and document why in a comment. Examples: capping lock waits with `SET LOCAL lock_timeout` where SQLite would fail fast instead of blocking (`resource_repository_test.go`), asserting the real isolation level (`transaction_manager_test.go`), or asserting PostgreSQL-specific query results that SQLite cannot run (`cmd/jobs/metrics_collect_job_test.go`).
 
 Tests that deliberately remain on SQLite verify SQLite-specific fallback behavior itself: `migrations/locks_test.go`'s `TestWithAdvisoryLock_Sqlite*` (no locking outside PostgreSQL). Portable database tests run on both backends, with PostgreSQL the default. PostgreSQL-specific tests (advisory locks, real serialization conflicts, WAL decoding, and container cleanup) explicitly skip the SQLite fallback.
@@ -60,8 +61,8 @@ SpiceDB adapter backed by SpiceDB's in-memory `serve-testing` server. It starts
 one container lazily per test binary, and `relationstest.New(t)` uses a unique
 bearer token to select a private datastore, including its schema. Connections
 are closed by test cleanup; shared containers must be stopped from `TestMain`
-with `relationstest.TerminateSharedSpiceDB()`, checking the returned error and
-preserving an already-failing exit status. This cleanup is required with Podman
+by passing `relationstest.TerminateSharedSpiceDB` to `testlifecycle.Run`, which
+checks cleanup errors and preserves an already-failing exit status. This cleanup is required with Podman
 when Ryuk is disabled.
 
 - Use `relationstest.Grant(t, repo, subjectID, relation, reporterType, resourceType, resourceID)` for direct principal relationships, or write schema-valid tuples through the real repository for computed permissions and workspace relationships.
@@ -94,7 +95,7 @@ for the JSONL registry schema, host `psql` / Authzed `zed` commands, and cleanup
 - `TEST_CONTAINERS_KEEP_ON_FAILURE=1` implies debug and retains shared containers after observed fixture or package failures. Only failed tests' private PostgreSQL databases are kept; successful private databases are still dropped. SpiceDB's in-memory fixture datastores remain with the retained server. Successful runs still terminate containers normally.
 - Call `containerdebug.Configure()` before **any** Testcontainers operation (including health probes, configuration reads, session-ID and label helpers), so keep mode disables Ryuk before runtime configuration is cached. The wrapper also disables Ryuk in the launching environment for keep mode, covering package initializers that run before `TestMain`; set `TESTCONTAINERS_RYUK_DISABLED=true` yourself if bypassing it. A late `Configure()` cannot undo cached configuration or a running Ryuk. Propagate configuration/registry errors rather than silently losing diagnostics.
 - Call `containerdebug.Observe(t)` after explicit SQLite/short-mode skip guards and before fixture setup/cleanup. Register actual container IDs and host endpoints, and register fixture tokens before SpiceDB repository/schema initialization. PostgreSQL cleanup uses `PreserveTest(t)` before dropping each private database.
-- In `TestMain`, record `m.Run()`'s status with `containerdebug.RecordResult(code)` before deferred/shared-container cleanup, including mixed packages whose failing tests may not own a fixture. Record setup failures too. Container owners check `KeepOnFailure()` and report retained IDs with `Retained(id)` instead of terminating them; otherwise preserve normal strict cleanup and failure handling.
+- In `TestMain`, use `testlifecycle.Run(m, cleanupFunctions...)` to record `m.Run()`'s status before shared-container cleanup, including mixed packages whose failing tests may not own a fixture. Record custom setup failures with `containerdebug.RecordResult(code)` too. Container owners check `KeepOnFailure()` and report retained IDs with `Retained(id)` instead of terminating them; otherwise preserve normal strict cleanup and failure handling.
 - Use the wrapper with `-v -count=1` so successful-package stdout is visible and cached results cannot hide current containers. Do not add `-short` when debugging the legacy data-layer SpiceDB suite. SQLite always excludes SpiceDB, regardless of debug settings.
 - Stop retained containers explicitly with `podman rm -f -v <container-id>` to remove anonymous PostgreSQL volumes too; credential registry files require separate manual deletion. Keep mode disables Ryuk even on successful runs, so normal `TestMain` cleanup must remain in place.
 

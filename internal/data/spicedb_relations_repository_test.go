@@ -17,6 +17,7 @@ import (
 	"github.com/project-kessel/inventory-api/internal/biz/model"
 	"github.com/project-kessel/inventory-api/internal/testutil"
 	"github.com/project-kessel/inventory-api/internal/testutil/containerdebug"
+	"github.com/project-kessel/inventory-api/internal/testutil/testlifecycle"
 	"github.com/stretchr/testify/assert"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"
@@ -64,22 +65,11 @@ func run(m *testing.M) int {
 		defer container.Close()
 	}
 
-	code := m.Run()
-	containerdebug.RecordResult(code)
-
 	// Stop the shared PostgreSQL testcontainer used by database tests on the
 	// postgres backend. scripts/testcontainers-run.sh disables Ryuk for
 	// Podman, so without this the container would outlive the test binary. On
 	// the sqlite fallback this is a no-op.
-	if err := testutil.TerminateSharedPostgres(); err != nil {
-		fmt.Fprintf(os.Stderr, "PostgreSQL test cleanup failed: %v\n", err)
-		if code == 0 {
-			code = 1
-		}
-	}
-
-	containerdebug.RecordResult(code)
-	return code
+	return testlifecycle.Run(m, testutil.TerminateSharedPostgres)
 }
 
 // requireSpiceDBIntegration skips explicitly excluded integration tests.

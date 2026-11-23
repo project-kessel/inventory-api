@@ -36,11 +36,12 @@ type testHarness struct {
 type harnessOption func(*harnessConfig)
 
 type harnessConfig struct {
-	relationsRepo model.RelationsRepository
-	meta          *recordingMetaAuthorizer
-	usecaseConfig *UsecaseConfig
-	logger        log.Logger
-	namespace     string
+	withResourceRepository bool
+	relationsRepo          model.RelationsRepository
+	meta                   *recordingMetaAuthorizer
+	usecaseConfig          *UsecaseConfig
+	logger                 log.Logger
+	namespace              string
 }
 
 func newTestHarness(t *testing.T, opts ...harnessOption) *testHarness {
@@ -56,7 +57,10 @@ func newTestHarness(t *testing.T, opts ...harnessOption) *testHarness {
 	}
 
 	mc := metricscollector.NewFakeMetricsCollector()
-	resourceRepo := newTestResourceRepository(t, mc)
+	var resourceRepo model.ResourceRepository
+	if cfg.withResourceRepository {
+		resourceRepo = newTestResourceRepository(t, mc)
+	}
 	var metaAuth metaauthorizer.MetaAuthorizer
 	if cfg.meta != nil {
 		metaAuth = cfg.meta
@@ -223,7 +227,7 @@ func TestCheckSelf_MissingAuthzContext(t *testing.T) {
 }
 
 func TestReportResource_UsesReportRelation(t *testing.T) {
-	h := newTestHarness(t, withMeta(true))
+	h := newTestHarness(t, withResourceRepository(), withMeta(true))
 
 	cmd := fixture(t).Basic("host", "hbi", "instance-1", "host-1", "workspace-1")
 	err := h.usecase.ReportResource(h.ctx, cmd)
@@ -233,7 +237,7 @@ func TestReportResource_UsesReportRelation(t *testing.T) {
 }
 
 func TestDelete_UsesDeleteRelation(t *testing.T) {
-	h := newTestHarness(t, withMeta(true))
+	h := newTestHarness(t, withResourceRepository(), withMeta(true))
 
 	cmd := fixture(t).Basic("host", "hbi", "instance-1", "host-1", "workspace-1")
 	err := h.usecase.ReportResource(h.ctx, cmd)
@@ -522,7 +526,7 @@ func TestReportResource(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			h := newTestHarness(t, withNamespace("test-topic"))
+			h := newTestHarness(t, withResourceRepository(), withNamespace("test-topic"))
 
 			cmd := fixture(t).Basic(tt.resourceType, tt.reporterType, tt.reporterInstance, tt.localResourceId, tt.workspaceId)
 			err := h.usecase.ReportResource(h.ctx, cmd)
@@ -579,7 +583,7 @@ func TestReportResourceThenDelete(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			h := newTestHarness(t, withNamespace("test-topic"))
+			h := newTestHarness(t, withResourceRepository(), withNamespace("test-topic"))
 
 			cmd := fixture(t).Basic(tt.resourceType, tt.reporterType, tt.reporterInstanceId, tt.localResourceId, tt.workspaceId)
 			err := h.usecase.ReportResource(h.ctx, cmd)
@@ -606,7 +610,7 @@ func TestReportResourceThenDelete(t *testing.T) {
 }
 
 func TestDelete_ResourceNotFound(t *testing.T) {
-	h := newTestHarness(t, withNamespace("test-topic"))
+	h := newTestHarness(t, withResourceRepository(), withNamespace("test-topic"))
 
 	key := createReporterResourceKey(t, "non-existent-resource", "k8s_cluster", "ocm", "test-instance")
 	err := h.usecase.Delete(h.ctx, key)
@@ -614,7 +618,7 @@ func TestDelete_ResourceNotFound(t *testing.T) {
 }
 
 func TestReportFindDeleteFind_TombstoneLifecycle(t *testing.T) {
-	h := newTestHarness(t, withNamespace("test-topic"))
+	h := newTestHarness(t, withResourceRepository(), withNamespace("test-topic"))
 
 	cmd := fixture(t).Basic("k8s_cluster", "ocm", "lifecycle-instance", "lifecycle-resource", "lifecycle-workspace")
 	err := h.usecase.ReportResource(h.ctx, cmd)
@@ -636,7 +640,7 @@ func TestReportFindDeleteFind_TombstoneLifecycle(t *testing.T) {
 }
 
 func TestMultipleHostsLifecycle(t *testing.T) {
-	h := newTestHarness(t, withNamespace("test-topic"))
+	h := newTestHarness(t, withResourceRepository(), withNamespace("test-topic"))
 
 	cmd := fixture(t).Basic("host", "hbi", "hbi-instance-1", "host-1", "workspace-1")
 	err := h.usecase.ReportResource(h.ctx, cmd)
@@ -691,7 +695,7 @@ func TestMultipleHostsLifecycle(t *testing.T) {
 }
 
 func TestPartialDataScenarios(t *testing.T) {
-	h := newTestHarness(t, withNamespace("test-topic"))
+	h := newTestHarness(t, withResourceRepository(), withNamespace("test-topic"))
 
 	t.Run("Report resource with rich reporter data and minimal common data", func(t *testing.T) {
 		cmd := fixture(t).ReporterRich("k8s_cluster", "ocm", "ocm-instance-1", "reporter-rich-resource", "minimal-workspace")
@@ -745,7 +749,7 @@ func TestPartialDataScenarios(t *testing.T) {
 
 func TestResourceLifecycle_ReportUpdateDeleteReport(t *testing.T) {
 	t.Run("report new -> update -> delete -> report new", func(t *testing.T) {
-		h := newTestHarness(t, withNamespace("test-topic"))
+		h := newTestHarness(t, withResourceRepository(), withNamespace("test-topic"))
 
 		resourceType := "host"
 		reporterType := "hbi"
@@ -808,7 +812,7 @@ func TestResourceLifecycle_ReportUpdateDeleteReport(t *testing.T) {
 
 func TestResourceLifecycle_ReportUpdateDeleteReportDelete(t *testing.T) {
 	t.Run("report new -> update -> delete -> report new -> delete", func(t *testing.T) {
-		h := newTestHarness(t, withNamespace("test-topic"))
+		h := newTestHarness(t, withResourceRepository(), withNamespace("test-topic"))
 
 		resourceType := "k8s_cluster"
 		reporterType := "ocm"
@@ -887,7 +891,7 @@ func createReporterResourceKeyAllowEmptyInstance(t *testing.T, localResourceId, 
 
 func TestResourceLifecycle_ReportDeleteResubmitDelete(t *testing.T) {
 	t.Run("report -> delete -> resubmit same delete", func(t *testing.T) {
-		h := newTestHarness(t, withNamespace("test-topic"))
+		h := newTestHarness(t, withResourceRepository(), withNamespace("test-topic"))
 
 		resourceType := "k8s_cluster"
 		reporterType := "ocm"
@@ -935,7 +939,7 @@ func TestResourceLifecycle_ReportDeleteResubmitDelete(t *testing.T) {
 
 func TestResourceLifecycle_ReportResubmitDeleteResubmit(t *testing.T) {
 	t.Run("report -> resubmit same report -> delete -> resubmit same delete", func(t *testing.T) {
-		h := newTestHarness(t, withNamespace("test-topic"))
+		h := newTestHarness(t, withResourceRepository(), withNamespace("test-topic"))
 
 		resourceType := "host"
 		reporterType := "hbi"
@@ -997,7 +1001,7 @@ func TestResourceLifecycle_ReportResubmitDeleteResubmit(t *testing.T) {
 
 func TestResourceLifecycle_ComplexIdempotency(t *testing.T) {
 	t.Run("3 cycles of create+update+delete for same resource", func(t *testing.T) {
-		h := newTestHarness(t, withNamespace("test-topic"))
+		h := newTestHarness(t, withResourceRepository(), withNamespace("test-topic"))
 
 		resourceType := "k8s_cluster"
 		reporterType := "ocm"
@@ -1136,7 +1140,7 @@ func createTestRep(t *testing.T, version uint, data map[string]interface{}) *mod
 }
 
 func TestTransactionIdIdempotency(t *testing.T) {
-	h := newTestHarness(t, withNamespace("test-topic"))
+	h := newTestHarness(t, withResourceRepository(), withNamespace("test-topic"))
 
 	t.Run("Nil TransactionId in command resolves to generated ID and create succeeds", func(t *testing.T) {
 		cmd := fixture(t).Basic("host", "hbi", "nil-tx-instance", "local-nil-tx", "ws-nil-tx")
@@ -1275,7 +1279,7 @@ func TestTransactionIdIdempotency(t *testing.T) {
 }
 
 func TestReportResource_ValidationSuccess(t *testing.T) {
-	h := newTestHarness(t, withNamespace("test-topic"))
+	h := newTestHarness(t, withResourceRepository(), withNamespace("test-topic"))
 
 	cmd := fixture(t).WithData("host", "hbi", "instance-1", "test-host",
 		map[string]interface{}{
@@ -1292,8 +1296,6 @@ func TestReportResource_ValidationSuccess(t *testing.T) {
 }
 
 func TestReportResource_ValidationErrors(t *testing.T) {
-	h := newTestHarness(t, withNamespace("test-topic"))
-
 	tests := []struct {
 		name        string
 		cmd         ReportResourceCommand
@@ -1318,6 +1320,12 @@ func TestReportResource_ValidationErrors(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
+			opts := []harnessOption{withNamespace("test-topic")}
+			// Nil representations are rejected inside the persistence transaction.
+			if tc.cmd.ReporterRepresentation == nil && tc.cmd.CommonRepresentation == nil {
+				opts = append(opts, withResourceRepository())
+			}
+			h := newTestHarness(t, opts...)
 			err := h.usecase.ReportResource(h.ctx, tc.cmd)
 			if tc.expectError != "" {
 				assert.Error(t, err)
@@ -1484,8 +1492,12 @@ func TestReportResource_SchemaValidation(t *testing.T) {
 			err = schemaRepository.CreateReporterSchema(context.Background(), reporterSchema)
 			require.NoError(t, err)
 
+			var resourceRepo model.ResourceRepository
+			if !tc.expectError {
+				resourceRepo = newTestResourceRepository(t, metricscollector.NewFakeMetricsCollector())
+			}
 			usecase := New(
-				newTestResourceRepository(t, metricscollector.NewFakeMetricsCollector()),
+				resourceRepo,
 				schemaRepository,
 				&data.AllowAllRelationsRepository{},
 				"test-topic",
@@ -1520,7 +1532,7 @@ func TestReportResource_SchemaValidation(t *testing.T) {
 // They serve as a contract and must be updated if error formats change.
 
 func TestReportResource_BothRepresentationsNil(t *testing.T) {
-	h := newTestHarness(t, withNamespace("test-topic"))
+	h := newTestHarness(t, withResourceRepository(), withNamespace("test-topic"))
 
 	localResId, _ := model.NewLocalResourceId("test-host")
 	resType, _ := model.NewResourceType("host")
@@ -1665,11 +1677,17 @@ func TestResolveConsistency(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			cfg := NewUsecaseConfig()
 			cfg.DefaultToAtLeastAsAcknowledged = tt.featureFlagEnabled
-			h := newTestHarness(t, withNamespace("test-topic"), withUsecaseConfig(cfg))
+			needsDatabase := model.ConsistencyTypeOf(tt.consistency) == model.ConsistencyAtLeastAsAcknowledged ||
+				(tt.featureFlagEnabled && model.ConsistencyTypeOf(tt.consistency) == model.ConsistencyUnspecified)
+			opts := []harnessOption{withNamespace("test-topic"), withUsecaseConfig(cfg)}
+			if needsDatabase {
+				opts = append(opts, withResourceRepository())
+			}
+			h := newTestHarness(t, opts...)
 
 			reporterResourceKey := createReporterResourceKey(t, "test-resource-123", "host", "hbi", "test-instance")
 
-			if tt.resourceExists {
+			if needsDatabase && tt.resourceExists {
 				cmd := fixture(t).Basic("host", "hbi", "test-instance", "test-resource-123", "test-workspace")
 				err := h.usecase.ReportResource(h.ctx, cmd)
 				require.NoError(t, err)
@@ -1739,11 +1757,16 @@ func TestResolveConsistency_OverrideFeatureFlag(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			cfg := NewUsecaseConfig()
 			cfg.DefaultToAtLeastAsAcknowledged = tt.featureFlagEnabled
-			h := newTestHarness(t, withNamespace("test-topic"), withUsecaseConfig(cfg))
+			needsDatabase := model.ConsistencyTypeOf(tt.consistency) == model.ConsistencyAtLeastAsAcknowledged
+			opts := []harnessOption{withNamespace("test-topic"), withUsecaseConfig(cfg)}
+			if needsDatabase {
+				opts = append(opts, withResourceRepository())
+			}
+			h := newTestHarness(t, opts...)
 
 			reporterResourceKey := createReporterResourceKey(t, "test-resource-override", "host", "hbi", "test-instance")
 
-			if tt.resourceExists {
+			if needsDatabase && tt.resourceExists {
 				cmd := fixture(t).Basic("host", "hbi", "test-instance", "test-resource-override", "test-workspace")
 				err := h.usecase.ReportResource(h.ctx, cmd)
 				require.NoError(t, err)
@@ -1795,7 +1818,7 @@ func TestResolveConsistency_OverrideFeatureFlag_LogsEnabledWhenNotBypassed(t *te
 	var logBuf bytes.Buffer
 	cfg := NewUsecaseConfig()
 	cfg.DefaultToAtLeastAsAcknowledged = true
-	h := newTestHarness(t,
+	h := newTestHarness(t, withResourceRepository(),
 		withNamespace("test-topic"),
 		withLogger(log.NewStdLogger(&logBuf)),
 		withUsecaseConfig(cfg),
@@ -1838,8 +1861,10 @@ func TestCheck_AuthzDecisions(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			relationsRepo := relationstest.New(t)
+			consistency := model.NewConsistencyUnspecified()
 			if tt.grantSubjectID != "" {
-				relationstest.Grant(t, relationsRepo, tt.grantSubjectID, "view", "hbi", "host", "host-1")
+				grantToken := relationstest.Grant(t, relationsRepo, tt.grantSubjectID, "view", "hbi", "host", "host-1")
+				consistency = model.NewConsistencyAtLeastAsFresh(grantToken)
 			}
 			h := newTestHarness(t, withMeta(true), withRelations(relationsRepo))
 
@@ -1849,7 +1874,7 @@ func TestCheck_AuthzDecisions(t *testing.T) {
 			relation, err := model.NewRelation("view")
 			require.NoError(t, err)
 
-			result, err := h.usecase.Check(h.ctx, relation, subject, resourceRefFromKey(key), model.NewConsistencyUnspecified())
+			result, err := h.usecase.Check(h.ctx, relation, subject, resourceRefFromKey(key), consistency)
 			require.NoError(t, err)
 			assert.Equal(t, tt.wantAllowed, result.Allowed())
 			assert.NotEmpty(t, result.ConsistencyToken())

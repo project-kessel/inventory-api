@@ -141,8 +141,8 @@ func newTestServer(t *testing.T, cfg TestServerConfig) pb.KesselInventoryService
 }
 
 // testUsecaseConfig holds optional overrides for constructing a test Usecase.
-// Repo defaults to nil for tests that do not exercise persistence; other fields
-// have sensible defaults when left as zero values.
+// Repo and Relations default to nil for tests that do not exercise them; other
+// fields have sensible defaults when left as zero values.
 type testUsecaseConfig struct {
 	Repo           model.ResourceRepository
 	SchemaRepo     model.SchemaRepository
@@ -154,8 +154,9 @@ type testUsecaseConfig struct {
 
 // newTestUsecase constructs a Usecase with test defaults.
 // Override specific fields via testUsecaseConfig; unset fields use defaults.
-// Tests exercising persistence must explicitly supply Repo from newTestRepo(t).
-// Otherwise Repo remains nil as an unused collaborator.
+// Tests exercising persistence must explicitly supply Repo from newTestRepo(t),
+// and tests exercising relations must supply Relations from relationstest.New(t).
+// Otherwise these collaborators remain nil, without provisioning fixtures.
 func newTestUsecase(t *testing.T, cfg testUsecaseConfig) *usecase.Usecase {
 	t.Helper()
 
@@ -180,16 +181,10 @@ func newTestUsecase(t *testing.T, cfg testUsecaseConfig) *usecase.Usecase {
 		meta = &PermissiveMetaAuthorizer{}
 	}
 
-	// Default to real SpiceDB when Relations is nil
-	authzImpl := cfg.Relations
-	if authzImpl == nil {
-		authzImpl = relationstest.New(t)
-	}
-
 	return usecase.New(
 		cfg.Repo,
 		schemaRepo,
-		authzImpl,
+		cfg.Relations,
 		namespace,
 		krlog.NewStdLogger(io.Discard),
 		nil, // ListenManager
@@ -526,15 +521,23 @@ func TestInventoryService_CheckSelf_AuthzDecisions(t *testing.T) {
 
 			runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
 				relationsRepo := relationstest.New(t)
+				request := proto.Clone(protoReq).(*pb.CheckSelfRequest)
 				if tc.grantSubjectID != "" {
-					relationstest.Grant(t, relationsRepo, tc.grantSubjectID, "view", "hbi", "host", "dd1b73b9-3e33-4264-968c-e3ce55b9afec")
+					grantToken := relationstest.Grant(t, relationsRepo, tc.grantSubjectID, "view", "hbi", "host", "dd1b73b9-3e33-4264-968c-e3ce55b9afec")
+					// CheckSelf resolves unspecified consistency to minimize_latency,
+					// overriding the repository fixture's fully consistent default.
+					request.Consistency = &pb.Consistency{
+						Requirement: &pb.Consistency_AtLeastAsFresh{
+							AtLeastAsFresh: &pb.ConsistencyToken{Token: grantToken.Serialize()},
+						},
+					}
 				}
 				return TestServerConfig{
 					Usecase:       newTestUsecase(t, testUsecaseConfig{Relations: relationsRepo}),
 					Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
 				}, func(t *testing.T, tr *Transport) {
 					ctx := context.Background()
-					res := tr.Invoke(ctx, withBody(protoReq, CheckSelf, httpEndpoint("POST /api/kessel/v1beta2/checkself")))
+					res := tr.Invoke(ctx, withBody(request, CheckSelf, httpEndpoint("POST /api/kessel/v1beta2/checkself")))
 					resp := Extract(t, res, expectSuccess(func() *pb.CheckSelfResponse { return &pb.CheckSelfResponse{} }))
 					assert.Equal(t, tc.wantAllowed, resp.Allowed)
 					assert.NotEmpty(t, resp.ConsistencyToken.GetToken())
@@ -829,13 +832,19 @@ func TestInventoryService_Check_Allowed(t *testing.T) {
 
 	runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
 		relationsRepo := relationstest.New(t)
-		relationstest.Grant(t, relationsRepo, "subject-456", "view", "hbi", "host", "resource-abc")
+		grantToken := relationstest.Grant(t, relationsRepo, "subject-456", "view", "hbi", "host", "resource-abc")
+		request := proto.Clone(protoReq).(*pb.CheckRequest)
+		request.Consistency = &pb.Consistency{
+			Requirement: &pb.Consistency_AtLeastAsFresh{
+				AtLeastAsFresh: &pb.ConsistencyToken{Token: grantToken.Serialize()},
+			},
+		}
 		return TestServerConfig{
 			Usecase:       newTestUsecase(t, testUsecaseConfig{Relations: relationsRepo}),
 			Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
 		}, func(t *testing.T, tr *Transport) {
 			ctx := context.Background()
-			res := tr.Invoke(ctx, withBody(protoReq, Check, httpEndpoint("POST /api/kessel/v1beta2/check")))
+			res := tr.Invoke(ctx, withBody(request, Check, httpEndpoint("POST /api/kessel/v1beta2/check")))
 			resp := Extract(t, res, expectSuccess(func() *pb.CheckResponse { return &pb.CheckResponse{} }))
 			assert.Equal(t, pb.Allowed_ALLOWED_TRUE, resp.Allowed)
 			assert.NotNil(t, resp.ConsistencyToken)
@@ -868,7 +877,7 @@ func TestInventoryService_Check_Denied(t *testing.T) {
 
 	runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
 		return TestServerConfig{
-			Usecase:       newTestUsecase(t, testUsecaseConfig{}),
+			Usecase:       newTestUsecase(t, testUsecaseConfig{Relations: relationstest.New(t)}),
 			Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
 		}, func(t *testing.T, tr *Transport) {
 			ctx := context.Background()
@@ -976,7 +985,7 @@ func TestInventoryService_CheckForUpdate_Denied(t *testing.T) {
 
 	runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
 		return TestServerConfig{
-			Usecase:       newTestUsecase(t, testUsecaseConfig{}),
+			Usecase:       newTestUsecase(t, testUsecaseConfig{Relations: relationstest.New(t)}),
 			Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
 		}, func(t *testing.T, tr *Transport) {
 			ctx := context.Background()
@@ -1984,7 +1993,12 @@ func TestInventoryService_Check_ReporterWithInstanceId(t *testing.T) {
 			},
 		}
 		relationsRepo := relationstest.New(t)
-		relationstest.Grant(t, relationsRepo, "subject-456", "view", "hbi", "host", "resource-with-instance")
+		grantToken := relationstest.Grant(t, relationsRepo, "subject-456", "view", "hbi", "host", "resource-with-instance")
+		protoReq.Consistency = &pb.Consistency{
+			Requirement: &pb.Consistency_AtLeastAsFresh{
+				AtLeastAsFresh: &pb.ConsistencyToken{Token: grantToken.Serialize()},
+			},
+		}
 		return TestServerConfig{
 			Usecase:       newTestUsecase(t, testUsecaseConfig{Relations: relationsRepo}),
 			Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
@@ -2000,10 +2014,7 @@ func TestInventoryService_Check_ReporterWithInstanceId(t *testing.T) {
 // --- StreamedListObjects with NoIdentity ---
 
 func TestInventoryService_StreamedListObjects_NoIdentity(t *testing.T) {
-	relationsRepo := relationstest.New(t)
-	relationstest.Grant(t, relationsRepo, "subject-xyz", "view", "hbi", "host", "host-1")
-
-	uc := newTestUsecase(t, testUsecaseConfig{Relations: relationsRepo})
+	uc := newTestUsecase(t, testUsecaseConfig{})
 	// Use DenyAuthenticator to simulate unauthenticated streaming request
 	client := newTestServer(t, TestServerConfig{
 		Usecase:       uc,
@@ -2199,8 +2210,7 @@ func TestInventoryService_StreamedListObjects_ProtoPatternRejectsHyphen(t *testi
 		AuthType:  authnapi.AuthTypeXRhIdentity,
 	}
 
-	relationsRepo := relationstest.New(t)
-	uc := newTestUsecase(t, testUsecaseConfig{Relations: relationsRepo})
+	uc := newTestUsecase(t, testUsecaseConfig{})
 	client := newTestServer(t, TestServerConfig{
 		Usecase:       uc,
 		Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
@@ -2239,8 +2249,7 @@ func TestInventoryService_StreamedListSubjects_ProtoPatternRejectsHyphen(t *test
 		AuthType:  authnapi.AuthTypeXRhIdentity,
 	}
 
-	relationsRepo := relationstest.New(t)
-	uc := newTestUsecase(t, testUsecaseConfig{Relations: relationsRepo})
+	uc := newTestUsecase(t, testUsecaseConfig{})
 	client := newTestServer(t, TestServerConfig{
 		Usecase:       uc,
 		Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
@@ -3619,8 +3628,7 @@ func TestInventoryService_ReportResource_ValidationErrorFormats(t *testing.T) {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
-				repo, _ := newTestRepo(t)
-				uc := newTestUsecase(t, testUsecaseConfig{Repo: repo})
+				uc := newTestUsecase(t, testUsecaseConfig{})
 				req := &pb.ReportResourceRequest{
 					Type:               tc.resourceType,
 					ReporterType:       tc.reporterType,
@@ -4369,12 +4377,18 @@ func TestInventoryService_CaseInsensitiveTypes(t *testing.T) {
 				t.Parallel()
 				runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
 					authz := relationstest.New(t)
-					relationstest.Grant(t, authz, "subject-456", "view", "hbi", "host", "resource-abc")
+					grantToken := relationstest.Grant(t, authz, "subject-456", "view", "hbi", "host", "resource-abc")
 					return makeAuthzConfig(t, authz, "user-123"), func(t *testing.T, tr *Transport) {
 						res := tr.Invoke(context.Background(), withBody(&pb.CheckRequest{
 							Relation: "view",
 							Object:   makeResourceRef("resource-abc", tc.resourceType, tc.reporterType),
 							Subject:  makeSubjectRef("subject-456"),
+
+							Consistency: &pb.Consistency{
+								Requirement: &pb.Consistency_AtLeastAsFresh{
+									AtLeastAsFresh: &pb.ConsistencyToken{Token: grantToken.Serialize()},
+								},
+							},
 						}, Check, httpEndpoint("POST /api/kessel/v1beta2/check")))
 						resp := Extract(t, res, expectSuccess(func() *pb.CheckResponse { return &pb.CheckResponse{} }))
 						require.NotEmpty(t, resp.ConsistencyToken.GetToken())
@@ -4421,11 +4435,17 @@ func TestInventoryService_CaseInsensitiveTypes(t *testing.T) {
 				t.Parallel()
 				runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
 					authz := relationstest.New(t)
-					relationstest.Grant(t, authz, "user-123", "view", "hbi", "host", "resource-abc")
+					grantToken := relationstest.Grant(t, authz, "user-123", "view", "hbi", "host", "resource-abc")
 					return makeAuthzConfig(t, authz, "user-123"), func(t *testing.T, tr *Transport) {
 						res := tr.Invoke(context.Background(), withBody(&pb.CheckSelfRequest{
 							Relation: "view",
 							Object:   makeResourceRef("resource-abc", tc.resourceType, tc.reporterType),
+
+							Consistency: &pb.Consistency{
+								Requirement: &pb.Consistency_AtLeastAsFresh{
+									AtLeastAsFresh: &pb.ConsistencyToken{Token: grantToken.Serialize()},
+								},
+							},
 						}, CheckSelf, httpEndpoint("POST /api/kessel/v1beta2/checkself")))
 						resp := Extract(t, res, expectSuccess(func() *pb.CheckSelfResponse { return &pb.CheckSelfResponse{} }))
 						require.NotEmpty(t, resp.ConsistencyToken.GetToken())

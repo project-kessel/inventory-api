@@ -54,6 +54,100 @@ Tests that deliberately remain on SQLite verify SQLite-specific fallback behavio
 
 CI runs `make test` on every pull request (see `build-test.yml`).
 
+### Shared Container Lifecycle (Required)
+
+Every test package that uses the shared PostgreSQL or SpiceDB fixtures must
+register the matching cleanup in a package-local `TestMain`. Otherwise containers
+can leak when Ryuk is disabled (including our Podman wrapper and retention mode).
+Register **only the resources the package uses**:
+
+```go
+package example_test
+
+import (
+    "os"
+    "testing"
+
+    "github.com/project-kessel/inventory-api/internal/testutil"
+    relationstest "github.com/project-kessel/inventory-api/internal/testutil/relations"
+    "github.com/project-kessel/inventory-api/internal/testutil/testlifecycle"
+)
+
+func TestMain(m *testing.M) {
+    os.Exit(testlifecycle.Run(m,
+        relationstest.TerminateSharedSpiceDB,
+        testutil.TerminateSharedPostgres,
+    ))
+}
+```
+
+- `testutil.NewTestDB`, `NewPostgresTestDB`, and `PostgresTestDSN` require
+  `testutil.TerminateSharedPostgres`, even when developing with `TEST_DB=sqlite`.
+- `relationstest.New` requires `relationstest.TerminateSharedSpiceDB`.
+- Database-only packages omit the SpiceDB import and cleanup; SpiceDB-only
+  packages omit the root `testutil` import and PostgreSQL cleanup.
+- Keep the returned exit code: use `os.Exit(testlifecycle.Run(...))`, or return
+  the runner's code from a custom lifecycle helper to `TestMain`'s `os.Exit`.
+- Cleanup is package-wide, but startup remains lazy. Tests that never request a
+  fixture do not start its container.
+
+`test/architecture` enforces this convention in the normal `go test ./...` suite,
+so both `make test` and `make test-sqlite` check it. Run the guard alone without
+containers:
+
+```bash
+go test ./test/architecture -run '^TestSharedContainerLifecycle$' -count=1
+```
+
+A failure names the missing registration and prints a tailored snippet, e.g.:
+
+```text
+example/database_test.go:12: package example uses shared PostgreSQL fixtures but TestMain does not register testutil.TerminateSharedPostgres with testlifecycle.Run.
+Add or update main_test.go (import os, testing, and the helper packages):
+
+func TestMain(m *testing.M) {
+    os.Exit(testlifecycle.Run(m, testutil.TerminateSharedPostgres))
+}
+
+See test/GUIDELINES.md#shared-container-lifecycle-required for imports, examples, and cleanup requirements.
+```
+
+The guard resolves named import aliases and follows named function references
+through local and imported helpers. Cleanup registration must be in a
+`testlifecycle.Run` call reachable through named calls from `TestMain`; mentioning
+cleanup elsewhere or putting it in an unused closure does not count. Use named
+imports for fixture and lifecycle packages, and pass cleanup functions directly
+to the runner. This is a bounded source-level convention check, not a proof of
+arbitrary control flow, interface/method dispatch, reflection, or dynamically
+assembled cleanup lists. It does not cover raw Testcontainers or independently
+owned container helpers; new shared fixture APIs must be added to its rules.
+
+The guard discovers the nearest repository root by walking up to `go.mod`,
+derives the module import prefix from its module directive, and verifies that
+this documentation file and lifecycle heading exist. A missing or invalid root
+or a stale documentation target fails the check rather than silently scanning
+an unrelated directory. Fixture API names remain explicit rule configuration.
+Source discovery skips hidden directories, `vendor`, `node_modules`, and
+`testdata`.
+
+There are no package-wide exceptions. Three declaration-specific PostgreSQL
+exceptions are recorded with reasons in
+`test/architecture/container_lifecycle_check_test.go`:
+
+- `internal/testutil/postgres_testdb_test.go:TestPostgresDebugLifecycle` owns
+  cleanup of retained subprocess containers.
+- `internal/testutil/postgres_testdb_test.go:runPostgresDebugChild` registers
+  explicit test cleanup to exercise retention behavior.
+- `internal/testutil/testdb_test.go:TestTestDBBackend_Invalid` verifies that an
+  invalid backend panics before a container can start.
+
+Exceptions match an exact file, declaration, and fixture, and do not exempt
+callers or other declarations in the same file or package. If a declaration is
+renamed, moved, removed, or stops referencing the excepted fixture, the stale
+exception fails the guard and must be removed or updated.
+The legacy data-layer SpiceDB container remains explicitly owned by that suite;
+its shared PostgreSQL fixture is checked normally.
+
 ### SpiceDB Relations Testing
 
 `internal/testutil/relations` (package `relationstest`) provides the production

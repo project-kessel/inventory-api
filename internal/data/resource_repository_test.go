@@ -3,6 +3,7 @@ package data
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"strings"
 	"testing"
@@ -100,10 +101,14 @@ func testRepositoryContract(t *testing.T, repo bizmodel.ResourceRepository, db *
 		require.NotNil(t, foundResource)
 
 		// Update the resource
-		apiHref, _ := bizmodel.NewApiHref("https://api.example.com/updated")
-		consoleHref, _ := bizmodel.NewConsoleHref("https://console.example.com/updated")
-		reporterData, _ := bizmodel.NewRepresentation(map[string]interface{}{"updated": true})
-		commonData, _ := bizmodel.NewRepresentation(map[string]interface{}{"workspace_id": "updated-workspace"})
+		apiHref, err := bizmodel.NewApiHref("https://api.example.com/updated")
+		require.NoError(t, err)
+		consoleHref, err := bizmodel.NewConsoleHref("https://console.example.com/updated")
+		require.NoError(t, err)
+		reporterData, err := bizmodel.NewRepresentation(map[string]interface{}{"updated": true})
+		require.NoError(t, err)
+		commonData, err := bizmodel.NewRepresentation(map[string]interface{}{"workspace_id": "updated-workspace"})
+		require.NoError(t, err)
 		transactionId := newUniqueTxID("test-transaction-id-update-contract")
 
 		err = foundResource.Update(key, apiHref, &consoleHref, nil, &reporterData, &commonData, transactionId)
@@ -220,10 +225,14 @@ func testRepositoryContract(t *testing.T, repo bizmodel.ResourceRepository, db *
 		foundResource, err := repo.FindResourceByKeys(db, key)
 		require.NoError(t, err, "Find for update should succeed")
 
-		apiHref, _ := bizmodel.NewApiHref("https://api.example.com/contract-updated")
-		consoleHref, _ := bizmodel.NewConsoleHref("https://console.example.com/contract-updated")
-		reporterData, _ := bizmodel.NewRepresentation(map[string]interface{}{"contract": "updated"})
-		commonData, _ := bizmodel.NewRepresentation(map[string]interface{}{"workspace_id": "contract-workspace"})
+		apiHref, err := bizmodel.NewApiHref("https://api.example.com/contract-updated")
+		require.NoError(t, err)
+		consoleHref, err := bizmodel.NewConsoleHref("https://console.example.com/contract-updated")
+		require.NoError(t, err)
+		reporterData, err := bizmodel.NewRepresentation(map[string]interface{}{"contract": "updated"})
+		require.NoError(t, err)
+		commonData, err := bizmodel.NewRepresentation(map[string]interface{}{"workspace_id": "contract-workspace"})
+		require.NoError(t, err)
 		transactionId := newUniqueTxID("test-transaction-id-lifecycle-contract")
 
 		err = foundResource.Update(key, apiHref, &consoleHref, nil, &reporterData, &commonData, transactionId)
@@ -270,14 +279,22 @@ func testRepositoryContract(t *testing.T, repo bizmodel.ResourceRepository, db *
 	// Helper to build a resource with or without common rep for use inside contract tests.
 	makeResource := func(t *testing.T, localID, txPrefix string, withCommon bool) (bizmodel.Resource, bizmodel.ReporterResourceKey) {
 		t.Helper()
-		rID, _ := bizmodel.NewResourceId(uuid.New())
-		rrID, _ := bizmodel.NewReporterResourceId(uuid.New())
-		lid, _ := bizmodel.NewLocalResourceId(localID)
-		rt, _ := bizmodel.NewResourceType("k8s_cluster")
-		rpt, _ := bizmodel.NewReporterType("ocm")
-		rinst, _ := bizmodel.NewReporterInstanceId("ocm-instance-1")
-		api, _ := bizmodel.NewApiHref("https://api.example.com/cv-contract")
-		con, _ := bizmodel.NewConsoleHref("https://console.example.com/cv-contract")
+		rID, err := bizmodel.NewResourceId(uuid.New())
+		require.NoError(t, err)
+		rrID, err := bizmodel.NewReporterResourceId(uuid.New())
+		require.NoError(t, err)
+		lid, err := bizmodel.NewLocalResourceId(localID)
+		require.NoError(t, err)
+		rt, err := bizmodel.NewResourceType("k8s_cluster")
+		require.NoError(t, err)
+		rpt, err := bizmodel.NewReporterType("ocm")
+		require.NoError(t, err)
+		rinst, err := bizmodel.NewReporterInstanceId("ocm-instance-1")
+		require.NoError(t, err)
+		api, err := bizmodel.NewApiHref("https://api.example.com/cv-contract")
+		require.NoError(t, err)
+		con, err := bizmodel.NewConsoleHref("https://console.example.com/cv-contract")
+		require.NoError(t, err)
 		rep := bizmodel.Representation(internal.JsonObject{"cluster_id": localID})
 		var common *bizmodel.Representation
 		if withCommon {
@@ -293,8 +310,10 @@ func testRepositoryContract(t *testing.T, repo bizmodel.ResourceRepository, db *
 
 	doUpdate := func(t *testing.T, found *bizmodel.Resource, key bizmodel.ReporterResourceKey, txPrefix string, withCommon bool) {
 		t.Helper()
-		api, _ := bizmodel.NewApiHref("https://api.example.com/cv-updated")
-		con, _ := bizmodel.NewConsoleHref("https://console.example.com/cv-updated")
+		api, err := bizmodel.NewApiHref("https://api.example.com/cv-updated")
+		require.NoError(t, err)
+		con, err := bizmodel.NewConsoleHref("https://console.example.com/cv-updated")
+		require.NoError(t, err)
 		rep := bizmodel.Representation(internal.JsonObject{"cluster_id": "updated"})
 		var common *bizmodel.Representation
 		if withCommon {
@@ -722,10 +741,14 @@ func TestUniqueConstraint_ReporterResourceCompositeKey(t *testing.T) {
 		)
 		require.NoError(t, err)
 
-		apiHref, _ := bizmodel.NewApiHref("https://api.example.com/updated")
-		consoleHref, _ := bizmodel.NewConsoleHref("https://console.example.com/updated")
-		reporterData, _ := bizmodel.NewRepresentation(map[string]interface{}{"update": "1"})
-		commonData, _ := bizmodel.NewRepresentation(map[string]interface{}{"update": "1"})
+		apiHref, err := bizmodel.NewApiHref("https://api.example.com/updated")
+		require.NoError(t, err)
+		consoleHref, err := bizmodel.NewConsoleHref("https://console.example.com/updated")
+		require.NoError(t, err)
+		reporterData, err := bizmodel.NewRepresentation(map[string]interface{}{"update": "1"})
+		require.NoError(t, err)
+		commonData, err := bizmodel.NewRepresentation(map[string]interface{}{"update": "1"})
+		require.NoError(t, err)
 		transactionId := newUniqueTxID("test-transaction-id-version-unique")
 
 		err = resource.Update(key, apiHref, &consoleHref, nil, &reporterData, &commonData, transactionId)
@@ -863,10 +886,14 @@ func TestResourceRepository_IdempotentOperations(t *testing.T) {
 		require.NoError(t, err, "Should find resource for update")
 		require.NotNil(t, foundResource1)
 
-		apiHref, _ := bizmodel.NewApiHref("https://api.example.com/duplicate")
-		consoleHref, _ := bizmodel.NewConsoleHref("https://console.example.com/duplicate")
-		reporterData, _ := bizmodel.NewRepresentation(map[string]interface{}{"duplicate": "report"})
-		commonData, _ := bizmodel.NewRepresentation(map[string]interface{}{"workspace_id": "duplicate-workspace"})
+		apiHref, err := bizmodel.NewApiHref("https://api.example.com/duplicate")
+		require.NoError(t, err)
+		consoleHref, err := bizmodel.NewConsoleHref("https://console.example.com/duplicate")
+		require.NoError(t, err)
+		reporterData, err := bizmodel.NewRepresentation(map[string]interface{}{"duplicate": "report"})
+		require.NoError(t, err)
+		commonData, err := bizmodel.NewRepresentation(map[string]interface{}{"workspace_id": "duplicate-workspace"})
+		require.NoError(t, err)
 		transactionId := newUniqueTxID("test-transaction-id-duplicate-idempotent")
 
 		err = foundResource1.Update(key, apiHref, &consoleHref, nil, &reporterData, &commonData, transactionId)
@@ -934,10 +961,14 @@ func TestResourceRepository_IdempotentOperations(t *testing.T) {
 				require.NotNil(t, foundResource)
 				t.Logf("Cycle %d: Updating existing resource (generation should increment if tombstoned)", cycle)
 
-				apiHref, _ := bizmodel.NewApiHref(fmt.Sprintf("https://api.example.com/cycle-%d", cycle))
-				consoleHref, _ := bizmodel.NewConsoleHref(fmt.Sprintf("https://console.example.com/cycle-%d", cycle))
-				reporterData, _ := bizmodel.NewRepresentation(map[string]interface{}{"cycle": cycle})
-				commonData, _ := bizmodel.NewRepresentation(map[string]interface{}{"workspace_id": fmt.Sprintf("cycle-%d-workspace", cycle)})
+				apiHref, err := bizmodel.NewApiHref(fmt.Sprintf("https://api.example.com/cycle-%d", cycle))
+				require.NoError(t, err)
+				consoleHref, err := bizmodel.NewConsoleHref(fmt.Sprintf("https://console.example.com/cycle-%d", cycle))
+				require.NoError(t, err)
+				reporterData, err := bizmodel.NewRepresentation(map[string]interface{}{"cycle": cycle})
+				require.NoError(t, err)
+				commonData, err := bizmodel.NewRepresentation(map[string]interface{}{"workspace_id": fmt.Sprintf("cycle-%d-workspace", cycle)})
+				require.NoError(t, err)
 				transactionId := newUniqueTxID(fmt.Sprintf("test-transaction-id-cycle-%d-idempotent", cycle))
 
 				err = foundResource.Update(key, apiHref, &consoleHref, nil, &reporterData, &commonData, transactionId)
@@ -1271,7 +1302,11 @@ func TestSerializableCreateFails(t *testing.T) {
 	// Begin a conflicting serializable transaction and create the same resource
 	conflictTx := db.Begin(&sql.TxOptions{Isolation: sql.LevelSerializable})
 	require.NoError(t, conflictTx.Error)
-	defer conflictTx.Rollback()
+	defer func() {
+		if err := conflictTx.Rollback().Error; !errors.Is(err, sql.ErrTxDone) {
+			assert.NoError(t, err, "rollback conflicting transaction")
+		}
+	}()
 	// Do a read to simulate how a service would before creating
 	foundResource, err := repo.FindResourceByKeys(conflictTx, resource.ReporterResources()[0].ReporterResourceKey)
 	assert.NotNil(t, err)
@@ -1337,17 +1372,25 @@ func TestSerializableUpdateFails(t *testing.T) {
 	// Prepare an updated version
 	key, err := bizmodel.NewReporterResourceKey("serializable-update-conflict", "k8s_cluster", "ocm", "ocm-instance-1")
 	assert.NoError(t, err)
-	apiHref, _ := bizmodel.NewApiHref("https://api.example.com/updated")
-	consoleHref, _ := bizmodel.NewConsoleHref("https://console.example.com/updated")
-	repData, _ := bizmodel.NewRepresentation(map[string]interface{}{"name": "updated"})
-	comData, _ := bizmodel.NewRepresentation(map[string]interface{}{"workspace_id": "ws-serial"})
+	apiHref, err := bizmodel.NewApiHref("https://api.example.com/updated")
+	require.NoError(t, err)
+	consoleHref, err := bizmodel.NewConsoleHref("https://console.example.com/updated")
+	require.NoError(t, err)
+	repData, err := bizmodel.NewRepresentation(map[string]interface{}{"name": "updated"})
+	require.NoError(t, err)
+	comData, err := bizmodel.NewRepresentation(map[string]interface{}{"workspace_id": "ws-serial"})
+	require.NoError(t, err)
 	txId := bizmodel.TransactionId("transaction-id-serializable-update")
 	assert.NoError(t, resource.Update(key, apiHref, &consoleHref, nil, &repData, &comData, txId))
 
 	// Begin a conflicting serializable transaction and update the same resource
 	conflictTx := db.Begin(&sql.TxOptions{Isolation: sql.LevelSerializable})
 	require.NoError(t, conflictTx.Error)
-	defer conflictTx.Rollback()
+	defer func() {
+		if err := conflictTx.Rollback().Error; !errors.Is(err, sql.ErrTxDone) {
+			assert.NoError(t, err, "rollback conflicting transaction")
+		}
+	}()
 	// Do a read to simulate how a service would before saving
 	foundResource, err := repo.FindResourceByKeys(conflictTx, resource.ReporterResources()[0].ReporterResourceKey)
 	assert.Nil(t, err)
@@ -1921,18 +1964,20 @@ func TestFindCurrentAndPreviousVersionedRepresentations(t *testing.T) {
 
 	t.Run("GetCurrentAndPreviousWorkspaceID handles invalid workspace_id types", func(t *testing.T) {
 		// Test the function directly with invalid data
-		current, _ := bizmodel.NewRepresentations(
+		current, err := bizmodel.NewRepresentations(
 			bizmodel.Representation(map[string]interface{}{"workspace_id": 123}), // non-string
 			ptrVersion(1),
 			nil,
 			nil,
 		)
-		previous, _ := bizmodel.NewRepresentations(
+		require.NoError(t, err)
+		previous, err := bizmodel.NewRepresentations(
 			bizmodel.Representation(map[string]interface{}{"other_field": "value"}), // missing workspace_id
 			ptrVersion(0),
 			nil,
 			nil,
 		)
+		require.NoError(t, err)
 		currentWS, previousWS := GetCurrentAndPreviousWorkspaceID(current, previous)
 		assert.Equal(t, "", currentWS)
 		assert.Equal(t, "", previousWS)
@@ -2568,7 +2613,8 @@ func TestFindCurrentAndPreviousVersionedRepresentations_UpdateAfterCommonOnlyUpd
 	// Step 2: Common-only update (creates gap at v1)
 	found, err := repo.FindResourceByKeys(db, key)
 	require.NoError(t, err)
-	apiHref, _ := bizmodel.NewApiHref("https://api.example.com/common-update")
+	apiHref, err := bizmodel.NewApiHref("https://api.example.com/common-update")
+	require.NoError(t, err)
 	commonDataObj := internal.JsonObject{"workspace_id": "updated-workspace"}
 	commonData := bizmodel.Representation(commonDataObj)
 	err = found.Update(key, apiHref, nil, nil, nil, &commonData, bizmodel.NewTransactionId("tx-common"))
@@ -2579,7 +2625,8 @@ func TestFindCurrentAndPreviousVersionedRepresentations_UpdateAfterCommonOnlyUpd
 	// Step 3: Update with reporter data (v2)
 	found, err = repo.FindResourceByKeys(db, key)
 	require.NoError(t, err)
-	apiHref2, _ := bizmodel.NewApiHref("https://api.example.com/reporter-update")
+	apiHref2, err := bizmodel.NewApiHref("https://api.example.com/reporter-update")
+	require.NoError(t, err)
 	reporterDataObj := internal.JsonObject{"name": "updated-cluster"}
 	reporterData := bizmodel.Representation(reporterDataObj)
 	err = found.Update(key, apiHref2, nil, nil, &reporterData, nil, bizmodel.NewTransactionId("tx-reporter"))
@@ -2719,12 +2766,16 @@ func testTransactionIDUniqueConstraint(t *testing.T, repo bizmodel.ResourceRepos
 
 		// Update the resource to use our specific TransactionID
 		key1 := createContractReporterResourceKey(t, "duplicate-tx-test-1", "k8s_cluster", "ocm", "ocm-instance-1")
-		apiHref, _ := bizmodel.NewApiHref("https://api.example.com/duplicate")
-		consoleHref, _ := bizmodel.NewConsoleHref("https://console.example.com/duplicate")
-		reporterData, _ := bizmodel.NewRepresentation(map[string]interface{}{"duplicate": "test1"})
-		commonData, _ := bizmodel.NewRepresentation(map[string]interface{}{"workspace_id": "duplicate-workspace"})
+		apiHref, err := bizmodel.NewApiHref("https://api.example.com/duplicate")
+		require.NoError(t, err)
+		consoleHref, err := bizmodel.NewConsoleHref("https://console.example.com/duplicate")
+		require.NoError(t, err)
+		reporterData, err := bizmodel.NewRepresentation(map[string]interface{}{"duplicate": "test1"})
+		require.NoError(t, err)
+		commonData, err := bizmodel.NewRepresentation(map[string]interface{}{"workspace_id": "duplicate-workspace"})
+		require.NoError(t, err)
 
-		err := resource1.Update(key1, apiHref, &consoleHref, nil, &reporterData, &commonData, duplicateTxID)
+		err = resource1.Update(key1, apiHref, &consoleHref, nil, &reporterData, &commonData, duplicateTxID)
 		require.NoError(t, err)
 
 		err = repo.Save(db, resource1, bizmodel.OperationTypeCreated, bizmodel.NewTransactionId("tx-duplicate-1"))
@@ -3592,7 +3643,8 @@ func TestFindCurrentAndPreviousVersionedRepresentations_DeleteAfterCommonOnlyUpd
 	require.NoError(t, err)
 
 	// Update with only common data (reporter data = nil)
-	apiHref, _ := bizmodel.NewApiHref("https://api.example.com/updated")
+	apiHref, err := bizmodel.NewApiHref("https://api.example.com/updated")
+	require.NoError(t, err)
 	commonDataObj := internal.JsonObject{"workspace_id": "updated-workspace"}
 	commonData := bizmodel.Representation(commonDataObj)
 	err = found.Update(key, apiHref, nil, nil, nil, &commonData, bizmodel.NewTransactionId("tx-update-common"))

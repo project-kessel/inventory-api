@@ -4,6 +4,7 @@ package data
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"strings"
@@ -35,15 +36,35 @@ func setupTestDB(t *testing.T) *gorm.DB {
 		db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{
 			Logger: logger.Default.LogMode(logger.Silent),
 		})
-		assert.NoError(t, err)
+		require.NoError(t, err)
+		pool, err := db.DB()
+		require.NoError(t, err)
+		t.Cleanup(func() { assert.NoError(t, pool.Close(), "close SQLite test database pool") })
 
 		// Enable foreign keys for SQLite (PostgreSQL enforces them by default)
-		db.Exec("PRAGMA foreign_keys = ON")
+		require.NoError(t, db.Exec("PRAGMA foreign_keys = ON").Error)
 
 		return db
 	}
 
 	return testutil.NewTestDB(t, &gorm.Config{Logger: logger.Default.LogMode(logger.Silent)}, nil)
+}
+
+// TestSetupTestDB_ClosesPool verifies that the selected backend's pool is scoped
+// to the test that acquired it, not to the test binary's lifetime.
+func TestSetupTestDB_ClosesPool(t *testing.T) {
+	var pool *sql.DB
+	require.True(t, t.Run("database owner", func(t *testing.T) {
+		db := setupTestDB(t)
+		var err error
+		pool, err = db.DB()
+		require.NoError(t, err)
+		require.NoError(t, pool.Ping(), "pool must remain usable until the owning test finishes")
+	}))
+	require.NotNil(t, pool)
+	// Also close from the parent so a regression cannot leak the pool.
+	t.Cleanup(func() { assert.NoError(t, pool.Close()) })
+	require.ErrorContains(t, pool.Ping(), "database is closed", "owning test cleanup must close the pool")
 }
 
 // =============================================================================

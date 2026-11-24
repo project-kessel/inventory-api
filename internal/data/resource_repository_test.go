@@ -1010,8 +1010,8 @@ func TestResourceRepository_IdempotentOperations(t *testing.T) {
 }
 
 // TestSave checks that creation and subsequent updates remain retrievable in
-// the database, including safely skipping representations whose primary keys
-// are zero-valued.
+// the database, including persistence of initial representations whose version
+// and generation counters are zero.
 func TestSave(t *testing.T) {
 	t.Run("Save handles duplicate calls gracefully", func(t *testing.T) {
 		repo, db := setupResourceRepository(t)
@@ -1072,20 +1072,48 @@ func TestSave(t *testing.T) {
 		assert.Len(t, foundResource.ReporterResources(), 1, "should have one reporter resource")
 	})
 
-	t.Run("Save skips representations with zero value primary keys", func(t *testing.T) {
+	t.Run("Save persists initial representations with zero version counters", func(t *testing.T) {
 		repo, db := setupResourceRepository(t)
 
-		resource := createTestResourceWithLocalId(t, "zero-pk-test")
-		err := repo.Save(db, resource, bizmodel.OperationTypeCreated, bizmodel.NewTransactionId("test-tx-zero-pk"))
-		require.NoError(t, err, "Save should succeed and skip representations with zero value primary keys")
-
-		key, err := bizmodel.NewReporterResourceKey("zero-pk-test", "k8s_cluster", "ocm", "ocm-instance-1")
+		resource := createTestResourceWithLocalId(t, "zero-version-test")
+		_, _, reporterSnapshot, commonSnapshot, err := resource.Serialize()
 		require.NoError(t, err)
+		require.NotNil(t, reporterSnapshot)
+		require.NotNil(t, commonSnapshot)
+		require.NotEqual(t, uuid.Nil, reporterSnapshot.ReporterResourceID)
+		require.NotEqual(t, uuid.Nil, commonSnapshot.ResourceId)
+		require.Zero(t, reporterSnapshot.Version)
+		require.Zero(t, reporterSnapshot.Generation)
+		require.Zero(t, commonSnapshot.Version)
 
-		foundResource, err := repo.FindResourceByKeys(db, key)
-		require.NoError(t, err, "Resource should be found even if representations were skipped")
-		require.NotNil(t, foundResource)
+		require.NoError(t, repo.Save(db, resource, bizmodel.OperationTypeCreated, bizmodel.NewTransactionId("test-tx-zero-version")))
+
+		reporterRows, commonRows := readStoredRepresentations(t, db, resource)
+		require.Len(t, reporterRows, 1, "zero counters must not skip the initial reporter representation")
+		require.Len(t, commonRows, 1, "version zero must not skip the initial common representation")
+		assert.Equal(t, reporterSnapshot.ReporterResourceID, reporterRows[0].ReporterResourceID)
+		assert.Zero(t, reporterRows[0].Version)
+		assert.Zero(t, reporterRows[0].Generation)
+		assert.Equal(t, reporterSnapshot.Representation.Data, reporterRows[0].Data)
+		assert.Equal(t, commonSnapshot.ResourceId, commonRows[0].ResourceId)
+		assert.Zero(t, commonRows[0].Version)
+		assert.Equal(t, commonSnapshot.Representation.Data, commonRows[0].Data)
 	})
+}
+
+// readStoredRepresentations checks persisted payloads directly: FindResourceByKeys
+// reconstructs resource metadata without loading representation snapshots.
+func readStoredRepresentations(t *testing.T, db *gorm.DB, resource bizmodel.Resource) ([]datamodel.ReporterRepresentation, []datamodel.CommonRepresentation) {
+	t.Helper()
+	resourceSnapshot, reporterSnapshot, _, _, err := resource.Serialize()
+	require.NoError(t, err)
+	var reporterRows []datamodel.ReporterRepresentation
+	require.NoError(t, db.Where("reporter_resource_id = ?", reporterSnapshot.ID).
+		Order("generation, version").Find(&reporterRows).Error)
+	var commonRows []datamodel.CommonRepresentation
+	require.NoError(t, db.Where("resource_id = ?", resourceSnapshot.ID).
+		Order("version").Find(&commonRows).Error)
+	return reporterRows, commonRows
 }
 
 // TestResourceRepository_MultipleHostsLifecycle verifies that two distinct hosts
@@ -1183,38 +1211,58 @@ func TestResourceRepository_MultipleHostsLifecycle(t *testing.T) {
 	assert.True(t, foundHost2.ReporterResources()[0].Serialize().Tombstone, "Host2 should be tombstoned")
 }
 
-// TestResourceRepository_PartialDataScenarios checks that reporter-only and
-// common-only resources remain retrievable in the database, as does a
-// resource updated with progressively reduced representation payloads.
+// TestResourceRepository_PartialDataScenarios verifies minimal payload round trips
+// and that reporter-only and common-only updates append only the supplied stream
+// while preserving historical representations.
 func TestResourceRepository_PartialDataScenarios(t *testing.T) {
-	t.Run("Report resource with just reporter data and no common data", func(t *testing.T) {
+	t.Run("Report resource with reporter data and minimal common data", func(t *testing.T) {
 		repo, db := setupResourceRepository(t)
 
-		resource := createTestResourceWithReporterDataOnly(t, "reporter-only-resource")
+		resource := createTestResourceWithMinimalCommonData(t, "reporter-only-resource")
 		err := repo.Save(db, resource, bizmodel.OperationTypeCreated, bizmodel.NewTransactionId("tx-reporter-only"))
-		require.NoError(t, err, "Should save resource with only reporter data")
+		require.NoError(t, err, "Should save resource with minimal common data")
 
 		key, err := bizmodel.NewReporterResourceKey("reporter-only-resource", "k8s_cluster", "ocm", "ocm-instance-1")
 		require.NoError(t, err)
 
 		foundResource, err := repo.FindResourceByKeys(db, key)
-		require.NoError(t, err, "Should find resource with only reporter data")
+		require.NoError(t, err, "Should find resource with minimal common data")
 		require.NotNil(t, foundResource)
+		_, _, reporterSnapshot, commonSnapshot, err := resource.Serialize()
+		require.NoError(t, err)
+		require.NotNil(t, reporterSnapshot)
+		require.NotNil(t, commonSnapshot)
+		reporterRows, commonRows := readStoredRepresentations(t, db, *foundResource)
+		require.Len(t, reporterRows, 1)
+		require.Len(t, commonRows, 1)
+		assert.Equal(t, reporterSnapshot.Representation.Data, reporterRows[0].Data)
+		assert.Equal(t, commonSnapshot.Representation.Data, commonRows[0].Data)
+		assert.Equal(t, internal.JsonObject{"workspace_id": "minimal-workspace"}, commonRows[0].Data)
 	})
 
-	t.Run("Report resource with no reporter data but has common data", func(t *testing.T) {
+	t.Run("Report resource with minimal reporter data and common data", func(t *testing.T) {
 		repo, db := setupResourceRepository(t)
 
-		resource := createTestResourceWithCommonDataOnly(t, "common-only-resource")
+		resource := createTestResourceWithMinimalReporterData(t, "common-only-resource")
 		err := repo.Save(db, resource, bizmodel.OperationTypeCreated, bizmodel.NewTransactionId("tx-common-only"))
-		require.NoError(t, err, "Should save resource with only common data")
+		require.NoError(t, err, "Should save resource with minimal reporter data")
 
 		key, err := bizmodel.NewReporterResourceKey("common-only-resource", "k8s_cluster", "ocm", "ocm-instance-1")
 		require.NoError(t, err)
 
 		foundResource, err := repo.FindResourceByKeys(db, key)
-		require.NoError(t, err, "Should find resource with only common data")
+		require.NoError(t, err, "Should find resource with minimal reporter data")
 		require.NotNil(t, foundResource)
+		_, _, reporterSnapshot, commonSnapshot, err := resource.Serialize()
+		require.NoError(t, err)
+		require.NotNil(t, reporterSnapshot)
+		require.NotNil(t, commonSnapshot)
+		reporterRows, commonRows := readStoredRepresentations(t, db, *foundResource)
+		require.Len(t, reporterRows, 1)
+		require.Len(t, commonRows, 1)
+		assert.Equal(t, reporterSnapshot.Representation.Data, reporterRows[0].Data)
+		assert.Equal(t, commonSnapshot.Representation.Data, commonRows[0].Data)
+		assert.Equal(t, internal.JsonObject{"name": "minimal-cluster"}, reporterRows[0].Data)
 	})
 
 	t.Run("Report resource with both data, then just reporter data, then just common data", func(t *testing.T) {
@@ -1231,6 +1279,9 @@ func TestResourceRepository_PartialDataScenarios(t *testing.T) {
 		foundResource, err := repo.FindResourceByKeys(db, key)
 		require.NoError(t, err, "Should find resource after initial save")
 		require.NotNil(t, foundResource)
+		initialReporterRows, initialCommonRows := readStoredRepresentations(t, db, resourceBoth)
+		require.Len(t, initialReporterRows, 1)
+		require.Len(t, initialCommonRows, 1)
 
 		// 2. Update with just reporter data
 		apiHref, err := bizmodel.NewApiHref("https://api.example.com/reporter-update")
@@ -1242,27 +1293,32 @@ func TestResourceRepository_PartialDataScenarios(t *testing.T) {
 			"namespace": "reporter-updated",
 		})
 		require.NoError(t, err)
-		emptyCommonData, err := bizmodel.NewRepresentation(map[string]interface{}{
-			"workspace_id": "minimal-workspace",
-		})
-		require.NoError(t, err)
 
 		updatedTransactionId1 := newUniqueTxID("updated-transaction-id-partial-data-unique-reporter")
 
-		err = foundResource.Update(key, apiHref, &consoleHref, nil, &reporterOnlyData, &emptyCommonData, updatedTransactionId1)
+		err = foundResource.Update(key, apiHref, &consoleHref, nil, &reporterOnlyData, nil, updatedTransactionId1)
 		require.NoError(t, err, "Should update with reporter data only")
 
 		err = repo.Save(db, *foundResource, bizmodel.OperationTypeUpdated, bizmodel.NewTransactionId("tx-reporter-update"))
 		require.NoError(t, err, "Should save resource with reporter-only update")
 
-		// 3. Update with just common data
 		foundResource, err = repo.FindResourceByKeys(db, key)
 		require.NoError(t, err, "Should find resource after reporter-only update")
-
-		emptyReporterData, err := bizmodel.NewRepresentation(map[string]interface{}{
-			"name": "minimal-cluster",
-		})
+		require.NotNil(t, foundResource)
+		reporterRows, commonRows := readStoredRepresentations(t, db, *foundResource)
+		require.Len(t, reporterRows, 2)
+		require.Len(t, commonRows, 1, "omitted common payload must not append a common row")
+		assert.Equal(t, initialReporterRows[0], reporterRows[0], "reporter history must remain unchanged")
+		assert.Equal(t, initialCommonRows, commonRows, "common history must remain unchanged")
+		assert.Equal(t, internal.JsonObject(reporterOnlyData), reporterRows[1].Data)
+		assert.Equal(t, uint(1), reporterRows[1].Version)
+		assert.Zero(t, reporterRows[1].Generation)
+		assert.Nil(t, reporterRows[1].CommonVersion)
+		resourceSnapshot, _, _, _, err := foundResource.Serialize()
 		require.NoError(t, err)
+		assert.Nil(t, resourceSnapshot.CommonVersion, "omitting common data resets the current common version")
+
+		// 3. Update with just common data
 		commonOnlyData, err := bizmodel.NewRepresentation(map[string]interface{}{
 			"workspace_id": "common-updated-workspace",
 			"environment":  "common-updated",
@@ -1271,7 +1327,7 @@ func TestResourceRepository_PartialDataScenarios(t *testing.T) {
 
 		updatedTransactionId2 := newUniqueTxID("updated-transaction-id-partial-data-unique-common")
 
-		err = foundResource.Update(key, apiHref, &consoleHref, nil, &emptyReporterData, &commonOnlyData, updatedTransactionId2)
+		err = foundResource.Update(key, apiHref, &consoleHref, nil, nil, &commonOnlyData, updatedTransactionId2)
 		require.NoError(t, err, "Should update with common data only")
 
 		err = repo.Save(db, *foundResource, bizmodel.OperationTypeUpdated, bizmodel.NewTransactionId("tx-common-update"))
@@ -1281,6 +1337,17 @@ func TestResourceRepository_PartialDataScenarios(t *testing.T) {
 		finalResource, err := repo.FindResourceByKeys(db, key)
 		require.NoError(t, err, "Should find resource after all updates")
 		require.NotNil(t, finalResource)
+		finalReporterRows, finalCommonRows := readStoredRepresentations(t, db, *finalResource)
+		require.Len(t, finalReporterRows, 2, "omitted reporter payload must not append a reporter row")
+		require.Len(t, finalCommonRows, 2)
+		assert.Equal(t, reporterRows, finalReporterRows, "reporter history must remain unchanged")
+		assert.Equal(t, initialCommonRows[0], finalCommonRows[0], "common history must remain unchanged")
+		assert.Equal(t, internal.JsonObject(commonOnlyData), finalCommonRows[1].Data)
+		assert.Equal(t, uint(1), finalCommonRows[1].Version, "common version resumes after its previous value")
+		resourceSnapshot, _, _, _, err = finalResource.Serialize()
+		require.NoError(t, err)
+		require.NotNil(t, resourceSnapshot.CommonVersion)
+		assert.Equal(t, uint(1), *resourceSnapshot.CommonVersion)
 	})
 }
 
@@ -1598,7 +1665,8 @@ func createTestResourceWithLocalIdAndType(t *testing.T, localResourceId, resourc
 	return resource
 }
 
-func createTestResourceWithReporterDataOnly(t *testing.T, localResourceId string) bizmodel.Resource {
+func createTestResourceWithMinimalCommonData(t *testing.T, localResourceId string) bizmodel.Resource {
+	t.Helper()
 	resourceId := uuid.New()
 	reporterResourceId := uuid.New()
 
@@ -1609,7 +1677,7 @@ func createTestResourceWithReporterDataOnly(t *testing.T, localResourceId string
 		"memory":    "8Gi",
 	}
 
-	// Minimal common data (required for validation)
+	// Minimal nonempty common payload, distinct from an omitted representation.
 	commonData := internal.JsonObject{
 		"workspace_id": "minimal-workspace",
 	}
@@ -1652,11 +1720,12 @@ func createTestResourceWithReporterDataOnly(t *testing.T, localResourceId string
 	return resource
 }
 
-func createTestResourceWithCommonDataOnly(t *testing.T, localResourceId string) bizmodel.Resource {
+func createTestResourceWithMinimalReporterData(t *testing.T, localResourceId string) bizmodel.Resource {
+	t.Helper()
 	resourceId := uuid.New()
 	reporterResourceId := uuid.New()
 
-	// Minimal reporter data (required for validation)
+	// Minimal nonempty reporter payload, distinct from an omitted representation.
 	reporterData := internal.JsonObject{
 		"name": "minimal-cluster",
 	}

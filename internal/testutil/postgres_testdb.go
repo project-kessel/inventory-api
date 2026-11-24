@@ -57,6 +57,16 @@ type postgresServer struct {
 	admin       *sql.DB
 	maintenance *gorm.DB // identifier-aware statements over the same admin pool
 	dsnArgs     string   // host/port/credentials; dbname is appended per database
+
+	pendingMu sync.Mutex
+	// Keep-mode decisions wait until all cleanups have run, including those
+	// registered before the fixture that can still fail the test.
+	pendingDatabases []postgresTestDatabase
+}
+
+type postgresTestDatabase struct {
+	test *testing.T
+	name string
 }
 
 var (
@@ -108,8 +118,9 @@ func NewPostgresTestDB(t *testing.T, migrate func(*gorm.DB) error, cfg *gorm.Con
 // for each distinct migrate function, builds a template database by running
 // migrate once. Every call then copies the template into a private database,
 // giving tests full schema isolation without paying the migration cost per
-// test. Databases are dropped when their test finishes, unless debug retention
-// preserves a failed test's data; TerminateSharedPostgres manages the container.
+// test. Databases are dropped when their test finishes. In debug keep mode,
+// TerminateSharedPostgres instead resolves retention after all test cleanups,
+// dropping passing tests' databases and preserving failed tests' data.
 //
 // Pass a stable function value (a package-level function, not a fresh
 // closure) as migrate so its template is reused; distinct functions get
@@ -128,11 +139,13 @@ func PostgresTestDSN(t *testing.T, migrate func(*gorm.DB) error) string {
 		t.Fatalf("create postgres test database: %v", err)
 	}
 
-	t.Cleanup(func() {
-		if !containerdebug.PreserveTest(t) {
-			dropDatabase(t, srv, name)
-		}
-	})
+	if containerdebug.KeepEnabled() {
+		srv.pendingMu.Lock()
+		srv.pendingDatabases = append(srv.pendingDatabases, postgresTestDatabase{test: t, name: name})
+		srv.pendingMu.Unlock()
+	} else {
+		t.Cleanup(func() { dropDatabase(t, srv, name) })
+	}
 	if err := containerdebug.RegisterFixture(containerdebug.Fixture{
 		Kind: "postgres", ContainerID: srv.container.GetContainerID(), Test: t.Name(), Database: name,
 	}); err != nil {
@@ -156,21 +169,41 @@ func TerminateSharedPostgres() error {
 		return nil
 	}
 
+	var cleanupErrors []error
+	postgresShared.pendingMu.Lock()
+	pending := postgresShared.pendingDatabases
+	postgresShared.pendingDatabases = nil
+	postgresShared.pendingMu.Unlock()
+	// Test failure status is final only after m.Run, not during LIFO cleanup.
+	// Drain before closing the maintenance pool, even if another test failed.
+	for _, database := range pending {
+		if !containerdebug.PreserveTest(database.test) {
+			if err := dropPostgresDatabase(postgresShared, database.name); err != nil {
+				cleanupErrors = append(cleanupErrors, err)
+			}
+		}
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	if containerdebug.KeepOnFailure() {
-		var cleanupErrors []error
 		if err := postgresShared.admin.Close(); err != nil {
 			cleanupErrors = append(cleanupErrors, fmt.Errorf("close postgres maintenance connection: %w", err))
 		}
 		if err := containerdebug.Retained(postgresShared.container.GetContainerID()); err != nil {
 			cleanupErrors = append(cleanupErrors, fmt.Errorf("report retained postgres container: %w", err))
 		}
-		if len(cleanupErrors) > 0 {
-			return inventoryerrors.NewAggregate(cleanupErrors)
+	} else {
+		if err := postgresShared.terminate(ctx); err != nil {
+			cleanupErrors = append(cleanupErrors, err)
+		} else {
+			// A failed deferred DROP must not leave a successfully removed
+			// container eligible for retention on a subsequent cleanup call.
+			postgresShared = nil
 		}
-	} else if err := postgresShared.terminate(ctx); err != nil {
-		return err // retain the container handle so cleanup can be retried
+	}
+	if len(cleanupErrors) > 0 {
+		return inventoryerrors.NewAggregate(cleanupErrors)
 	}
 
 	postgresShared = nil
@@ -463,19 +496,27 @@ func createDatabase(srv *postgresServer, name, templateName string) error {
 func dropDatabase(t *testing.T, srv *postgresServer, name string) {
 	t.Helper()
 
+	if err := dropPostgresDatabase(srv, name); err != nil {
+		t.Logf("%v (container termination will clean it up)", err)
+	}
+}
+
+// dropPostgresDatabase returns errors to TestMain without logging to a finished test.
+func dropPostgresDatabase(srv *postgresServer, name string) error {
+	var dropErr error
 	for attempt := 1; attempt <= 3; attempt++ {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		err := srv.maintenance.WithContext(ctx).Exec("DROP DATABASE ? WITH (FORCE)", clause.Table{Name: name}).Error
 		cancel()
 		if err == nil {
-			return
+			return nil
 		}
-		if attempt == 3 {
-			t.Logf("drop test database %s: %v (container termination will clean it up)", name, err)
-			return
+		dropErr = err
+		if attempt < 3 {
+			time.Sleep(100 * time.Millisecond)
 		}
-		time.Sleep(100 * time.Millisecond)
 	}
+	return fmt.Errorf("drop test database %s: %w", name, dropErr)
 }
 
 // closePostgresTestDB closes the test handle's pool before the database-drop

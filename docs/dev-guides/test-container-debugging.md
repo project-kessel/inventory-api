@@ -117,7 +117,10 @@ unset PGPASSWORD PGUSER PGDATABASE PGHOST PGPORT
 ```
 
 Only failed tests' private PostgreSQL databases are preserved; successful tests'
-databases are still dropped. Shared template/maintenance databases can remain
+databases are still dropped. In keep mode, this decision happens in `TestMain`
+after `m.Run`, when all per-test cleanups have finished, so late cleanup failures
+also preserve their test's data. Without keep mode, databases are dropped during
+their test's cleanup as usual. Shared template/maintenance databases can remain
 inside a retained server. A package failure without a failed database fixture
 can retain the container without retaining any private test database.
 

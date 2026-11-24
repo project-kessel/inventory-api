@@ -15,10 +15,41 @@ import (
 	"github.com/containerd/errdefs"
 	"github.com/moby/moby/client"
 	"github.com/project-kessel/inventory-api/internal/testutil/containerdebug"
+	"github.com/project-kessel/inventory-api/internal/testutil/testlifecycle"
 	"github.com/stretchr/testify/require"
 	"github.com/testcontainers/testcontainers-go"
 	"gorm.io/gorm"
 )
+
+// TestMain resolves shared database retention after all test cleanups finish.
+func TestMain(m *testing.M) {
+	var server *postgresServer
+	os.Exit(testlifecycle.Run(m,
+		func() error { server = postgresShared; return nil },
+		TerminateSharedPostgres,
+		func() error { return verifyPostgresDebugCleanup(server) },
+	))
+}
+
+// verifyPostgresDebugCleanup checks teardown after m.Run, when it is safe
+// to finalize per-test retention. The parent requires the marker so intentional
+// child failures cannot mask a failed teardown assertion.
+func verifyPostgresDebugCleanup(server *postgresServer) error {
+	if server != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		if err := server.admin.PingContext(ctx); err == nil || !strings.Contains(err.Error(), "database is closed") {
+			return fmt.Errorf("maintenance pool must be closed after cleanup: %v", err)
+		}
+	}
+	if err := TerminateSharedPostgres(); err != nil {
+		return fmt.Errorf("shared cleanup must remain idempotent: %w", err)
+	}
+	if os.Getenv("TEST_POSTGRES_DEBUG_CHILD") == "1" {
+		fmt.Println("postgres-debug: maintenance pool closed and cleanup idempotent")
+	}
+	return nil
+}
 
 // TestPostgresDebugLifecycle exercises retention across a real process exit,
 // including the failed fixture's committed data and successful fixture cleanup.
@@ -31,7 +62,7 @@ func TestPostgresDebugLifecycle(t *testing.T) {
 		return
 	}
 	require.NoError(t, containerdebug.Configure())
-	for _, mode := range []string{"retain", "keep-passing", "no-debug"} {
+	for _, mode := range []string{"retain", "setup-failure", "drop-failure", "keep-passing", "no-debug"} {
 		t.Run(mode, func(t *testing.T) {
 			directory := t.TempDir()
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
@@ -56,9 +87,24 @@ func TestPostgresDebugLifecycle(t *testing.T) {
 			t.Cleanup(func() {
 				data, err := os.ReadFile(filepath.Join(directory, "container-id"))
 				if os.IsNotExist(err) {
-					return
+					files, globErr := filepath.Glob(filepath.Join(directory, "credentials.*.jsonl"))
+					require.NoError(t, globErr)
+					for _, file := range files {
+						registry, readErr := os.ReadFile(file)
+						require.NoError(t, readErr)
+						for _, line := range strings.Split(strings.TrimSpace(string(registry)), "\n") {
+							var record postgresDebugRecord
+							if json.Unmarshal([]byte(line), &record) == nil && record.Type == "container" && record.Kind == "postgres" {
+								data = []byte(record.ContainerID)
+							}
+						}
+					}
+					if len(data) == 0 {
+						return // setup failed before registering a container
+					}
+				} else {
+					require.NoError(t, err)
 				}
-				require.NoError(t, err)
 				cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), 30*time.Second)
 				defer cleanupCancel()
 				runtime, err := testcontainers.NewDockerClientWithOpts(cleanupCtx)
@@ -66,7 +112,7 @@ func TestPostgresDebugLifecycle(t *testing.T) {
 				defer func() { require.NoError(t, runtime.Close()) }()
 				id := string(data)
 				_, err = runtime.ContainerInspect(cleanupCtx, id, client.ContainerInspectOptions{})
-				if mode == "retain" {
+				if mode == "retain" || mode == "setup-failure" {
 					_, removeErr := runtime.ContainerRemove(cleanupCtx, id, client.ContainerRemoveOptions{Force: true, RemoveVolumes: true})
 					require.NoError(t, removeErr)
 					require.NoError(t, err, "failed test container must survive subprocess exit")
@@ -81,7 +127,8 @@ func TestPostgresDebugLifecycle(t *testing.T) {
 			})
 			output, err := command.CombinedOutput()
 			require.NoError(t, ctx.Err(), "subprocess timed out")
-			if mode == "retain" {
+			require.Contains(t, string(output), "postgres-debug: maintenance pool closed and cleanup idempotent")
+			if mode == "retain" || mode == "setup-failure" || mode == "drop-failure" {
 				var exitError *exec.ExitError
 				require.ErrorAs(t, err, &exitError, "%s", output)
 				require.Equal(t, 1, exitError.ExitCode(), "%s", output)
@@ -115,6 +162,14 @@ func TestPostgresDebugLifecycle(t *testing.T) {
 			require.False(t, strings.Contains(string(output), container.Password), "stdout must not contain the password")
 			retained := false
 			failedFixtures := 0
+			passingFixtures := 0
+			var maintenance *sql.DB
+			if mode == "retain" {
+				dsn := fmt.Sprintf("postgres://%s:%s@%s/%s?sslmode=disable", container.Username, container.Password, container.Endpoint, postgresMaintenanceDB)
+				maintenance, err = sql.Open("pgx", dsn)
+				require.NoError(t, err)
+				t.Cleanup(func() { require.NoError(t, maintenance.Close()) })
+			}
 			for _, record := range records[1:] {
 				require.Equal(t, container.ContainerID, record.ContainerID)
 				if record.Type == "retained" {
@@ -125,7 +180,19 @@ func TestPostgresDebugLifecycle(t *testing.T) {
 				require.Equal(t, "postgres", record.Kind)
 				require.NotEmpty(t, record.Database)
 				require.NotEmpty(t, record.Test)
-				if mode != "retain" || strings.Contains(record.Test, "/passing") {
+				if mode == "drop-failure" {
+					passingFixtures++
+					require.Contains(t, string(output), "drop test database "+record.Database+": sql: database is closed")
+				}
+				if mode != "retain" {
+					continue
+				}
+				if strings.Contains(record.Test, "/passing") {
+					passingFixtures++
+					var exists bool
+					require.NoError(t, maintenance.QueryRowContext(ctx,
+						"SELECT EXISTS (SELECT 1 FROM pg_database WHERE datname=$1)", record.Database).Scan(&exists))
+					require.False(t, exists, "passing database must be dropped even when another test fails")
 					continue
 				}
 				failedFixtures++
@@ -138,9 +205,20 @@ func TestPostgresDebugLifecycle(t *testing.T) {
 				require.NoError(t, db.QueryRowContext(ctx, "SELECT value FROM retained_row").Scan(&value))
 				require.Equal(t, "survives process exit", value)
 			}
-			require.Equal(t, mode == "retain", retained)
+			require.Equal(t, mode == "retain" || mode == "setup-failure", retained)
+			if mode == "drop-failure" {
+				require.Equal(t, 2, passingFixtures, "all database cleanup errors must be reported")
+				require.Contains(t, string(output), "--- PASS: TestPostgresDebugLifecycle", "only shared cleanup should fail")
+			}
+			if mode == "setup-failure" {
+				_, err := os.Stat(filepath.Join(directory, "container-id"))
+				require.True(t, os.IsNotExist(err), "cleanup must recover the ID exclusively from the registry")
+				require.Contains(t, string(output), "intentional setup failure before writing container ID")
+			}
 			if mode == "retain" {
-				require.Equal(t, 2, failedFixtures, "both test and initialization failures must retain data")
+				require.Equal(t, 3, failedFixtures, "test, late cleanup, and initialization failures must retain data")
+				require.Equal(t, 2, passingFixtures)
+				require.Contains(t, string(output), "intentional late cleanup failure")
 				require.Contains(t, string(output), "podman rm -f")
 			}
 		})
@@ -162,15 +240,10 @@ type postgresDebugRecord struct {
 func runPostgresDebugChild(t *testing.T) {
 	directory := os.Getenv("TEST_POSTGRES_DEBUG_DIRECTORY")
 	mode := os.Getenv("TEST_POSTGRES_DEBUG_MODE")
-	t.Cleanup(func() {
-		server := postgresShared
-		require.NotNil(t, server)
-		require.NoError(t, TerminateSharedPostgres())
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer cancel()
-		require.ErrorContains(t, server.admin.PingContext(ctx), "database is closed", "maintenance pool must be closed")
-		require.NoError(t, TerminateSharedPostgres(), "shared cleanup remains idempotent")
-	})
+	if mode == "setup-failure" {
+		sharedPostgresServer(t)
+		t.Fatal("intentional setup failure before writing container ID")
+	}
 	var passedDatabase string
 	passing := func(t *testing.T) {
 		dsn := PostgresTestDSN(t, nil)
@@ -183,8 +256,17 @@ func runPostgresDebugChild(t *testing.T) {
 	}
 	t.Run("passing", passing)
 	var exists bool
-	require.NoError(t, postgresShared.admin.QueryRow("SELECT EXISTS (SELECT 1 FROM pg_database WHERE datname=$1)", passedDatabase).Scan(&exists))
-	require.False(t, exists, "passing database must be dropped even with keep enabled")
+	if mode == "no-debug" {
+		require.NoError(t, postgresShared.admin.QueryRow("SELECT EXISTS (SELECT 1 FROM pg_database WHERE datname=$1)", passedDatabase).Scan(&exists))
+		require.False(t, exists, "off-mode cleanup must drop the database immediately")
+	}
+	if mode == "drop-failure" {
+		t.Run("passing-before-drop-failure", passing)
+		// Force real DROP failures after m.Run; teardown must report both and
+		// still remove the container rather than returning on the first error.
+		t.Cleanup(func() { require.NoError(t, postgresShared.admin.Close()) })
+		return
+	}
 	if mode != "retain" {
 		return
 	}
@@ -192,6 +274,12 @@ func runPostgresDebugChild(t *testing.T) {
 		db := NewPostgresTestDB(t, nil, nil)
 		require.NoError(t, db.Exec("CREATE TABLE retained_row (value text); INSERT INTO retained_row VALUES ('survives process exit')").Error)
 		t.Fatal("intentional failure to verify retention")
+	})
+	t.Run("late-cleanup-failure", func(t *testing.T) {
+		// Registered before the fixture, so this runs after its cleanup (LIFO).
+		t.Cleanup(func() { t.Error("intentional late cleanup failure") })
+		db := NewPostgresTestDB(t, nil, nil)
+		require.NoError(t, db.Exec("CREATE TABLE retained_row (value text); INSERT INTO retained_row VALUES ('survives process exit')").Error)
 	})
 	t.Run("initialization", func(t *testing.T) {
 		PostgresTestDSN(t, func(db *gorm.DB) error {
@@ -203,8 +291,6 @@ func runPostgresDebugChild(t *testing.T) {
 	})
 	// A previous failure retains the container, not later successful fixtures.
 	t.Run("passing-after-failure", passing)
-	require.NoError(t, postgresShared.admin.QueryRow("SELECT EXISTS (SELECT 1 FROM pg_database WHERE datname=$1)", passedDatabase).Scan(&exists))
-	require.False(t, exists, "passing database must be dropped after another test fails")
 }
 
 // TestTerminateSharedPostgres_Unused verifies that repeated cleanup without

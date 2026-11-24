@@ -69,14 +69,7 @@ type lifecycleException struct {
 // These declarations deliberately own cleanup or reject setup before any
 // container starts. Match exact declarations, never an entire package.
 var lifecycleExceptions = []lifecycleException{
-	{
-		file: "internal/testutil/postgres_testdb_test.go", declaration: "TestPostgresDebugLifecycle", fixture: "PostgreSQL",
-		reason: "launches the retention subprocess and removes its retained container explicitly",
-	},
-	{
-		file: "internal/testutil/postgres_testdb_test.go", declaration: "runPostgresDebugChild", fixture: "PostgreSQL",
-		reason: "subprocess registers TerminateSharedPostgres with t.Cleanup to test retention",
-	},
+
 	{
 		file: "internal/testutil/testdb_test.go", declaration: "TestTestDBBackend_Invalid", fixture: "PostgreSQL",
 		reason: "invalid TEST_DB must panic before fixture setup, so no container is started",

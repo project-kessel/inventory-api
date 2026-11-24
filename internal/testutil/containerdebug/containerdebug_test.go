@@ -188,6 +188,35 @@ func TestAppendErrorIsSafe(t *testing.T) {
 	}
 }
 
+func TestCredentialsFileAfterStdoutFailure(t *testing.T) {
+	for _, action := range []string{"stdout-error", "both-write-errors"} {
+		t.Run(action, func(t *testing.T) {
+			base := filepath.Join(t.TempDir(), "credentials")
+			output, err := runProcess(t, action, map[string]string{"TEST_CONTAINERS_DEBUG_FILE": base})
+			if err != nil || !strings.Contains(output, "WRITE_ERRORS_CHECKED") || strings.Contains(output, "SECRET") {
+				t.Fatalf("error=%v output=%s", err, output)
+			}
+			paths, err := filepath.Glob(base + ".*.jsonl")
+			if err != nil || len(paths) != 1 {
+				t.Fatalf("paths=%v error=%v", paths, err)
+			}
+			records := readRecords(t, paths[0])
+			if action == "both-write-errors" {
+				if len(records) != 0 {
+					t.Fatal("closed credentials file unexpectedly received records")
+				}
+				return
+			}
+			if len(records) != 3 {
+				t.Fatalf("got %d records after stdout failure; want 3", len(records))
+			}
+			if records[0]["password"] != "SECRET-password" || records[1]["token"] != "SECRET-token" || records[2]["type"] != "retained" {
+				t.Fatal("registry lost credentials or retention metadata after stdout failure")
+			}
+		})
+	}
+}
+
 func TestConcurrentRecords(t *testing.T) {
 	base := filepath.Join(t.TempDir(), "credentials")
 	output, err := runProcess(t, "concurrent", map[string]string{"TEST_CONTAINERS_DEBUG_FILE": base})
@@ -329,6 +358,9 @@ func TestProcess(t *testing.T) {
 		if second := Configure(); second != first {
 			t.Fatal("configuration error not cached")
 		}
+		if KeepEnabled() {
+			t.Fatal("retention enabled despite configuration failure")
+		}
 		if RegisterContainer(Container{Password: "SECRET-password"}) != first || RegisterFixture(Fixture{Token: "SECRET-token"}) != first || Retained("id") != first {
 			t.Fatal("registry did not propagate cached error")
 		}
@@ -364,6 +396,9 @@ func TestProcess(t *testing.T) {
 	}
 	switch action {
 	case "result":
+		if KeepEnabled() != (os.Getenv("TEST_CONTAINERS_KEEP_ON_FAILURE") == "1") {
+			t.Fatal("incorrect retention configuration before any failures")
+		}
 		code, err := strconv.Atoi(os.Getenv("CONTAINERDEBUG_EXIT_CODE"))
 		if err != nil {
 			t.Fatal(err)
@@ -391,6 +426,37 @@ func TestProcess(t *testing.T) {
 			t.Fatal("success cleared earlier package failure")
 		}
 		fmt.Println("RESULT_OK")
+	case "stdout-error", "both-write-errors":
+		closedOutput, err := os.CreateTemp(t.TempDir(), "closed-output")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := closedOutput.Close(); err != nil {
+			t.Fatal(err)
+		}
+		if action == "both-write-errors" {
+			if err := state.file.Close(); err != nil {
+				t.Fatal(err)
+			}
+		}
+		originalStdout := os.Stdout
+		os.Stdout = closedOutput
+		defer func() { os.Stdout = originalStdout }()
+		writeErrors := []error{
+			RegisterContainer(Container{ID: "id", Password: "SECRET-password"}),
+			RegisterFixture(Fixture{ContainerID: "id", Token: "SECRET-token"}),
+			Retained("id"),
+		}
+		os.Stdout = originalStdout
+		for _, err := range writeErrors {
+			if err == nil || !strings.Contains(err.Error(), "cannot write diagnostic summary") || strings.Contains(err.Error(), "SECRET") {
+				t.Fatalf("unsafe or missing stdout error: %v", err)
+			}
+			if action == "both-write-errors" && !strings.Contains(err.Error(), "cannot append credentials record") {
+				t.Fatalf("missing independent registry error: %v", err)
+			}
+		}
+		fmt.Println("WRITE_ERRORS_CHECKED")
 	case "write-error":
 		if err := state.file.Close(); err != nil {
 			t.Fatal(err)

@@ -40,7 +40,7 @@ Both Make targets run with `-short` and explicitly skip the E2E/Kafka test patte
 
 `scripts/testcontainers-run.sh` detects Docker contexts and rootless Podman sockets and sets `DOCKER_HOST` accordingly; it disables Ryuk for Podman, so test binaries must stop their shared containers from `TestMain` via `testutil.TerminateSharedPostgres()`. `TEST_POSTGRES_IMAGE` (default `postgres:17.8`) overrides the container image. The container runs `wal_level=logical`, matching production's Debezium outbox pipeline, so tests exercise the real WAL outbox publisher (`pg_logical_emit_message`) — `outboxeventsrepository_test.go` verifies its output through a logical replication slot. Test helpers wire the WAL publisher on PostgreSQL and the no-op publisher on SQLite.
 
-The PostgreSQL backend (in `internal/testutil`, see `postgres_testdb.go`) starts **one container per test binary**, migrates a **template database once per distinct migrate function**, and copies that template into a **private database per test** — isolation without per-test migration cost. Databases are dropped with `WITH (FORCE)` on test cleanup.
+The PostgreSQL backend (in `internal/testutil`, see `postgres_testdb.go`) starts **one container per test binary**, migrates a **template database once per distinct migrate function**, and copies that template into a **private database per test** — isolation without per-test migration cost. Databases are dropped with `WITH (FORCE)` on test cleanup. In keep-on-failure mode, database drop decisions wait until `TestMain` cleanup after `m.Run`, so even failures in cleanups registered before the fixture preserve their test's data. Passing databases are still dropped before retaining a failed run's container.
 
 When adding database-backed tests:
 
@@ -130,14 +130,10 @@ an unrelated directory. Fixture API names remain explicit rule configuration.
 Source discovery skips hidden directories, `vendor`, `node_modules`, and
 `testdata`.
 
-There are no package-wide exceptions. Three declaration-specific PostgreSQL
-exceptions are recorded with reasons in
+There are no package-wide exceptions. One declaration-specific PostgreSQL
+exception is recorded with a reason in
 `test/architecture/container_lifecycle_check_test.go`:
 
-- `internal/testutil/postgres_testdb_test.go:TestPostgresDebugLifecycle` owns
-  cleanup of retained subprocess containers.
-- `internal/testutil/postgres_testdb_test.go:runPostgresDebugChild` registers
-  explicit test cleanup to exercise retention behavior.
 - `internal/testutil/testdb_test.go:TestTestDBBackend_Invalid` verifies that an
   invalid backend panics before a container can start.
 

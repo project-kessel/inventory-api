@@ -18,6 +18,7 @@ import (
 	"sync"
 	"testing"
 
+	inventoryerrors "github.com/project-kessel/inventory-api/internal/errors"
 	"github.com/testcontainers/testcontainers-go"
 )
 
@@ -175,34 +176,39 @@ func writeRecord(entry record) error {
 	if err != nil {
 		return errors.New("containerdebug: cannot encode diagnostic summary")
 	}
+	var writeErrors []error
 	if _, err := fmt.Fprintf(os.Stdout, "containerdebug: %s\n", summary); err != nil {
-		return errors.New("containerdebug: cannot write diagnostic summary")
+		writeErrors = append(writeErrors, errors.New("containerdebug: cannot write diagnostic summary"))
 	}
 	if entry.Type == "container" || entry.Type == "retained" {
 		// Shell quoting keeps even unusual IDs inert when commands are copied.
 		id := "'" + strings.ReplaceAll(entry.ContainerID, "'", "'\"'\"'") + "'"
 		for _, runtime := range []string{"podman", "docker"} {
 			if _, err := fmt.Fprintf(os.Stdout, "containerdebug: %s inspect %s; %s logs %s\n", runtime, id, runtime, id); err != nil {
-				return errors.New("containerdebug: cannot write inspection commands")
+				writeErrors = append(writeErrors, errors.New("containerdebug: cannot write inspection commands"))
 			}
 			if entry.Type == "retained" {
 				if _, err := fmt.Fprintf(os.Stdout, "containerdebug: cleanup: %s rm -f -v %s\n", runtime, id); err != nil {
-					return errors.New("containerdebug: cannot write cleanup command")
+					writeErrors = append(writeErrors, errors.New("containerdebug: cannot write cleanup command"))
 				}
 			}
 		}
 	}
 	if state.file != nil {
 		if err := json.NewEncoder(state.file).Encode(entry); err != nil {
-			return errors.New("containerdebug: cannot append credentials record")
+			writeErrors = append(writeErrors, errors.New("containerdebug: cannot append credentials record"))
 		}
+	}
+	if len(writeErrors) > 0 {
+		return inventoryerrors.NewAggregate(writeErrors)
 	}
 	return nil
 }
 
 // Observe registers cleanup to remember a test's failure for package-level
 // retention. Register it before fixture cleanup so later cleanup failures are
-// observed too (testing runs cleanups in reverse registration order).
+// observed too (testing runs cleanups in reverse registration order). RecordResult
+// captures failures in cleanups registered before Observe.
 func Observe(t testing.TB) {
 	t.Helper()
 	if err := Configure(); err != nil {
@@ -212,8 +218,9 @@ func Observe(t testing.TB) {
 }
 
 // PreserveTest records whether t has failed and returns true only when keeping
-// failed fixtures is enabled and this test failed. PostgreSQL fixture cleanup
-// uses it to avoid dropping a failed test's private database.
+// failed fixtures is enabled and this test failed. PostgreSQL finalization calls
+// it after m.Run to avoid dropping a failed test's private database, including
+// failures reported by the test's last cleanup.
 func PreserveTest(t testing.TB) bool {
 	t.Helper()
 	failed := t.Failed()
@@ -233,6 +240,17 @@ func RecordResult(exitCode int) {
 	state.mutex.Lock()
 	defer state.mutex.Unlock()
 	state.failed = state.failed || exitCode != 0
+}
+
+// KeepEnabled reports whether failure retention is configured, even before a
+// test fails. Fixture owners use it to defer retention decisions until all test
+// cleanups have completed. Configuration errors return false; setup must still
+// check Configure's error before acquiring fixtures.
+func KeepEnabled() bool {
+	if err := Configure(); err != nil {
+		return false
+	}
+	return state.keep
 }
 
 // KeepOnFailure reports whether keep mode is enabled and an observed test or

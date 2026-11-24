@@ -100,27 +100,23 @@ func CreateContainer(ctx context.Context, opts *ContainerOptions) (*LocalSpiceDb
 
 	port, err := ctr.MappedPort(ctx, "50051")
 	if err != nil {
-		_ = testcontainers.TerminateContainer(ctr)
-		return nil, fmt.Errorf("could not get spicedb port: %w", err)
+		return nil, cleanupFailedSpiceDBStart(ctr, fmt.Errorf("could not get spicedb port: %w", err))
 	}
 
 	host, err := ctr.Host(ctx)
 	if err != nil {
-		_ = testcontainers.TerminateContainer(ctr)
-		return nil, fmt.Errorf("could not get spicedb host: %w", err)
+		return nil, cleanupFailedSpiceDBStart(ctr, fmt.Errorf("could not get spicedb host: %w", err))
 	}
 	endpoint := net.JoinHostPort(host, port.Port())
 	if err := containerdebug.RegisterContainer(containerdebug.Container{
 		Kind: "spicedb", ID: ctr.GetContainerID(), Endpoint: endpoint,
 	}); err != nil {
-		_ = testcontainers.TerminateContainer(ctr)
-		return nil, fmt.Errorf("register spicedb container: %w", err)
+		return nil, cleanupFailedSpiceDBStart(ctr, fmt.Errorf("register spicedb container: %w", err))
 	}
 
 	inspect, err := ctr.Inspect(ctx)
 	if err != nil {
-		_ = testcontainers.TerminateContainer(ctr)
-		return nil, fmt.Errorf("could not inspect spicedb container: %w", err)
+		return nil, cleanupFailedSpiceDBStart(ctr, fmt.Errorf("could not inspect spicedb container: %w", err))
 	}
 	name := inspect.Name
 
@@ -140,12 +136,16 @@ func CreateContainer(ctx context.Context, opts *ContainerOptions) (*LocalSpiceDb
 	}, nil
 }
 
-// cleanupFailedSpiceDBStart owns any partial container returned on readiness
+// cleanupFailedSpiceDBStart owns any container left by a startup or setup
 // failure. It is not a usable fixture, so clean it up even in keep mode.
 func cleanupFailedSpiceDBStart(ctr *testcontainers.DockerContainer, startErr error) error {
 	err := fmt.Errorf("could not start spicedb resource: %w", startErr)
 	if ctr != nil {
-		if cleanupErr := testcontainers.TerminateContainer(ctr); cleanupErr != nil {
+		cleanupCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		// In the pinned Testcontainers API, StopContext only bounds stopping;
+		// direct Terminate also passes this deadline to removal and its hooks.
+		if cleanupErr := ctr.Terminate(cleanupCtx); cleanupErr != nil {
 			return errors.Join(err, fmt.Errorf("terminate partially started spicedb container %s (remove manually): %w", ctr.GetContainerID(), cleanupErr))
 		}
 	}

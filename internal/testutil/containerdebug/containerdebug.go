@@ -104,8 +104,14 @@ func Configure() error {
 			}
 			// Keep this descriptor for the process lifetime: appends must continue to
 			// target the exclusively created file, even if its pathname is replaced.
+			if _, err := fmt.Printf("containerdebug: credentials file %q\n", path); err != nil {
+				state.err = errors.New("containerdebug: cannot announce credentials file")
+				if err := file.Close(); err != nil {
+					state.err = errors.Join(state.err, errors.New("containerdebug: cannot close credentials file after announcement failure"))
+				}
+				return
+			}
 			state.file = file
-			fmt.Printf("containerdebug: credentials file %q\n", path)
 		}
 		state.enabled = debug || keep || base != ""
 		state.keep = keep

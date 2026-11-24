@@ -82,6 +82,14 @@ func init() {}`,
 			files: map[string]string{"example/example_test.go": postgresTest, "example/main_test.go": postgresMain},
 		},
 		{
+			name: "TestMain in a non-test file does not count",
+			files: map[string]string{
+				"example/example_test.go": postgresTest,
+				"example/lifecycle.go":    strings.ReplaceAll(postgresMain, "package example_test", "package example"),
+			},
+			missing: []string{"PostgreSQL"},
+		},
+		{
 			name:  "TestMain can be in the internal test package",
 			files: map[string]string{"example/example_test.go": postgresTest, "example/main_test.go": strings.ReplaceAll(postgresMain, "package example_test", "package example")},
 		},

@@ -185,7 +185,7 @@ func checkContainerLifecycle(tree fs.FS, exceptions ...lifecycleException) ([]st
 				if decl.Body != nil {
 					add(name, decl.Body)
 				}
-				if decl.Recv == nil && name == "TestMain" {
+				if decl.Recv == nil && name == "TestMain" && strings.HasSuffix(file.name, "_test.go") {
 					mains[path.Dir(file.name)] = append(mains[path.Dir(file.name)], symbol{file.pkg, name})
 				}
 			case *ast.GenDecl:

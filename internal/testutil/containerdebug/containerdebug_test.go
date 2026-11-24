@@ -86,8 +86,31 @@ func TestConfiguration(t *testing.T) {
 	}
 }
 
+func credentialsFiles(t *testing.T, directory string) []string {
+	t.Helper()
+	entries, err := os.ReadDir(directory)
+	if err != nil {
+		t.Fatalf("read credentials directory: %v", err)
+	}
+	var paths []string
+	for _, entry := range entries {
+		matched, err := filepath.Match("credentials.*.jsonl", entry.Name())
+		if err != nil {
+			t.Fatalf("match credentials filename: %v", err)
+		}
+		if matched && !entry.IsDir() {
+			paths = append(paths, filepath.Join(directory, entry.Name()))
+		}
+	}
+	return paths
+}
+
 func TestCredentialsFile(t *testing.T) {
-	base := filepath.Join(t.TempDir(), "credentials")
+	directory := filepath.Join(t.TempDir(), "literal[")
+	if err := os.Mkdir(directory, 0700); err != nil {
+		t.Fatal(err)
+	}
+	base := filepath.Join(directory, "credentials")
 	settings := map[string]string{"TEST_CONTAINERS_DEBUG_FILE": base}
 	output, err := runProcess(t, "registry", settings)
 	if err != nil {
@@ -96,9 +119,9 @@ func TestCredentialsFile(t *testing.T) {
 	if strings.Contains(output, "SECRET") {
 		t.Fatalf("secret in output: %s", output)
 	}
-	paths, err := filepath.Glob(base + ".*.jsonl")
-	if err != nil || len(paths) != 1 {
-		t.Fatalf("paths=%v error=%v", paths, err)
+	paths := credentialsFiles(t, filepath.Dir(base))
+	if len(paths) != 1 {
+		t.Fatalf("paths=%v", paths)
 	}
 	executable, err := os.Executable()
 	if err != nil {
@@ -134,7 +157,7 @@ func TestCredentialsFile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("second process: %v\n%s", err, output)
 	}
-	paths, _ = filepath.Glob(base + ".*.jsonl")
+	paths = credentialsFiles(t, filepath.Dir(base))
 	if len(paths) != 2 {
 		t.Fatalf("process filenames not unique: %v", paths)
 	}
@@ -196,9 +219,9 @@ func TestCredentialsFileAfterStdoutFailure(t *testing.T) {
 			if err != nil || !strings.Contains(output, "WRITE_ERRORS_CHECKED") || strings.Contains(output, "SECRET") {
 				t.Fatalf("error=%v output=%s", err, output)
 			}
-			paths, err := filepath.Glob(base + ".*.jsonl")
-			if err != nil || len(paths) != 1 {
-				t.Fatalf("paths=%v error=%v", paths, err)
+			paths := credentialsFiles(t, filepath.Dir(base))
+			if len(paths) != 1 {
+				t.Fatalf("paths=%v", paths)
 			}
 			records := readRecords(t, paths[0])
 			if action == "both-write-errors" {
@@ -223,7 +246,7 @@ func TestConcurrentRecords(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error=%v output=%s", err, output)
 	}
-	paths, _ := filepath.Glob(base + ".*.jsonl")
+	paths := credentialsFiles(t, filepath.Dir(base))
 	if len(paths) != 1 {
 		t.Fatalf("paths=%v", paths)
 	}
@@ -301,6 +324,15 @@ func TestRecordResult(t *testing.T) {
 	}
 }
 
+func TestCredentialsFileAnnouncementFailure(t *testing.T) {
+	output, err := runProcess(t, "announcement-error", map[string]string{
+		"TEST_CONTAINERS_DEBUG_FILE": filepath.Join(t.TempDir(), "credentials"),
+	})
+	if err != nil || !strings.Contains(output, "ANNOUNCEMENT_ERROR_CHECKED") {
+		t.Fatalf("error=%v output=%s", err, output)
+	}
+}
+
 func TestProcess(t *testing.T) {
 	action := os.Getenv("CONTAINERDEBUG_ACTION")
 	if action == "" {
@@ -327,6 +359,30 @@ func TestProcess(t *testing.T) {
 			fmt.Println(err)
 		}
 		fmt.Println("RYUK_CHECKED")
+		return
+	}
+	if action == "announcement-error" {
+		closedOutput, err := os.CreateTemp(t.TempDir(), "closed-output")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := closedOutput.Close(); err != nil {
+			t.Fatal(err)
+		}
+		originalStdout := os.Stdout
+		os.Stdout = closedOutput
+		first := Configure()
+		os.Stdout = originalStdout
+		if first == nil || !strings.Contains(first.Error(), "cannot announce credentials file") {
+			t.Fatalf("expected announcement error, got %v", first)
+		}
+		if Configure() != first {
+			t.Fatal("announcement error not cached")
+		}
+		if state.file != nil || state.enabled || state.keep {
+			t.Fatal("failed configuration retained registry or enabled diagnostics")
+		}
+		fmt.Println("ANNOUNCEMENT_ERROR_CHECKED")
 		return
 	}
 	if action == "collision" {

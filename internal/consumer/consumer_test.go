@@ -6,6 +6,7 @@ import (
 	"errors"
 	"io"
 	"testing"
+	"time"
 
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
 	"github.com/google/uuid"
@@ -161,7 +162,9 @@ func acquireConsumerTestLock(t *testing.T, consumer *InventoryConsumer, lockID s
 	t.Helper()
 	id, err := model.NewLockId(lockID)
 	require.NoError(t, err)
-	result, err := consumer.Relations.AcquireLock(context.Background(), id)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	result, err := consumer.Relations.AcquireLock(ctx, id)
 	require.NoError(t, err)
 	consumer.lockId = id
 	consumer.lockToken = result.LockToken()
@@ -170,7 +173,9 @@ func acquireConsumerTestLock(t *testing.T, consumer *InventoryConsumer, lockID s
 // invalidateConsumerTestLock simulates a new owner without updating the old owner's token.
 func invalidateConsumerTestLock(t *testing.T, consumer *InventoryConsumer) {
 	t.Helper()
-	result, err := consumer.Relations.AcquireLock(context.Background(), consumer.lockId)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	result, err := consumer.Relations.AcquireLock(ctx, consumer.lockId)
 	require.NoError(t, err)
 	require.NotEqual(t, consumer.lockToken, result.LockToken())
 }
@@ -189,7 +194,9 @@ func (r *acquireLockErrorRepository) AcquireLock(context.Context, model.LockId) 
 // readConsumerTestTuples reads current relationship state without stream metadata.
 func readConsumerTestTuples(t *testing.T, repo model.RelationsRepository, filter model.TupleFilter) []model.RelationsTuple {
 	t.Helper()
-	stream, err := repo.ReadTuples(context.Background(), filter, nil, model.NewConsistencyUnspecified())
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	stream, err := repo.ReadTuples(ctx, filter, nil, model.NewConsistencyUnspecified())
 	require.NoError(t, err)
 	var tuples []model.RelationsTuple
 	for {
@@ -467,8 +474,12 @@ func TestInventoryConsumer_ProcessMessage(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			var relationsRepo model.RelationsRepository
+			if test.relationsEnabled && (test.expectedOperation == string(model.OperationTypeCreated) || test.expectedOperation == string(model.OperationTypeUpdated) || test.expectedOperation == string(model.OperationTypeDeleted)) {
+				relationsRepo = relationstest.New(t)
+			}
 			tester := TestCase{}
-			errs := tester.TestSetup(t, relationstest.New(t))
+			errs := tester.TestSetup(t, relationsRepo)
 			assert.Nil(t, errs)
 
 			if test.setupData != nil {
@@ -646,8 +657,12 @@ func TestRebalanceCallback_AssignedPartitions(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			var relationsRepo model.RelationsRepository
+			if len(test.partitions) > 0 {
+				relationsRepo = relationstest.New(t)
+			}
 			tester := TestCase{}
-			errs := tester.TestSetup(t, relationstest.New(t))
+			errs := tester.TestSetup(t, relationsRepo)
 			assert.Nil(t, errs)
 
 			if test.lockError != nil {
@@ -801,12 +816,12 @@ func TestRebalanceCallback_RevokedPartitions(t *testing.T) {
 func TestFencingToken_WritingAfterRebalance(t *testing.T) {
 	// Setup two consumers
 	testerA := TestCase{}
-	errsA := testerA.TestSetup(t, relationstest.New(t))
+	errsA := testerA.TestSetup(t, nil)
 	assert.Nil(t, errsA)
 	testerA.inv.Config.ConsumerGroupID = "test-group"
 
 	testerB := TestCase{}
-	errsB := testerB.TestSetup(t, relationstest.New(t))
+	errsB := testerB.TestSetup(t, nil)
 	assert.Nil(t, errsB)
 	testerB.inv.Config.ConsumerGroupID = "test-group"
 

@@ -695,6 +695,7 @@ func TestFindResourceByKeys_TombstoneFilter(t *testing.T) {
 
 	// The resource should still be the same one we deleted
 	assert.Equal(t, "tombstoned-resource", reporterResources[0].LocalResourceId())
+	assert.True(t, reporterResources[0].Serialize().Tombstone)
 }
 
 // TestUniqueConstraint_ReporterResourceCompositeKey checks that the repository
@@ -886,13 +887,13 @@ func TestResourceRepository_IdempotentOperations(t *testing.T) {
 		require.NoError(t, err, "Should find resource for update")
 		require.NotNil(t, foundResource1)
 
-		apiHref, err := bizmodel.NewApiHref("https://api.example.com/duplicate")
+		apiHref, err := bizmodel.NewApiHref("https://api.example.com/resource/123")
 		require.NoError(t, err)
-		consoleHref, err := bizmodel.NewConsoleHref("https://console.example.com/duplicate")
+		consoleHref, err := bizmodel.NewConsoleHref("https://console.example.com/resource/123")
 		require.NoError(t, err)
-		reporterData, err := bizmodel.NewRepresentation(map[string]interface{}{"duplicate": "report"})
+		reporterData, err := bizmodel.NewRepresentation(map[string]interface{}{"name": "test-cluster", "namespace": "default"})
 		require.NoError(t, err)
-		commonData, err := bizmodel.NewRepresentation(map[string]interface{}{"workspace_id": "duplicate-workspace"})
+		commonData, err := bizmodel.NewRepresentation(map[string]interface{}{"workspace_id": "test-workspace", "labels": map[string]interface{}{"env": "test"}})
 		require.NoError(t, err)
 		transactionId := newUniqueTxID("test-transaction-id-duplicate-idempotent")
 

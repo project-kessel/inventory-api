@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -64,7 +65,8 @@ func TestPostgresDebugLifecycle(t *testing.T) {
 	require.NoError(t, containerdebug.Configure())
 	for _, mode := range []string{"retain", "setup-failure", "drop-failure", "keep-passing", "no-debug"} {
 		t.Run(mode, func(t *testing.T) {
-			directory := t.TempDir()
+			directory := filepath.Join(t.TempDir(), "literal[")
+			require.NoError(t, os.Mkdir(directory, 0700))
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 			defer cancel()
 			executable, err := os.Executable()
@@ -85,45 +87,7 @@ func TestPostgresDebugLifecycle(t *testing.T) {
 			// Recover the ID even if an assertion or subprocess setup fails, so a
 			// retained container is always removed by the parent, not by Ryuk.
 			t.Cleanup(func() {
-				data, err := os.ReadFile(filepath.Join(directory, "container-id"))
-				if os.IsNotExist(err) {
-					files, globErr := filepath.Glob(filepath.Join(directory, "credentials.*.jsonl"))
-					require.NoError(t, globErr)
-					for _, file := range files {
-						registry, readErr := os.ReadFile(file)
-						require.NoError(t, readErr)
-						for _, line := range strings.Split(strings.TrimSpace(string(registry)), "\n") {
-							var record postgresDebugRecord
-							if json.Unmarshal([]byte(line), &record) == nil && record.Type == "container" && record.Kind == "postgres" {
-								data = []byte(record.ContainerID)
-							}
-						}
-					}
-					if len(data) == 0 {
-						return // setup failed before registering a container
-					}
-				} else {
-					require.NoError(t, err)
-				}
-				cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), 30*time.Second)
-				defer cleanupCancel()
-				runtime, err := testcontainers.NewDockerClientWithOpts(cleanupCtx)
-				require.NoError(t, err)
-				defer func() { require.NoError(t, runtime.Close()) }()
-				id := string(data)
-				_, err = runtime.ContainerInspect(cleanupCtx, id, client.ContainerInspectOptions{})
-				if mode == "retain" || mode == "setup-failure" {
-					_, removeErr := runtime.ContainerRemove(cleanupCtx, id, client.ContainerRemoveOptions{Force: true, RemoveVolumes: true})
-					require.NoError(t, removeErr)
-					require.NoError(t, err, "failed test container must survive subprocess exit")
-				} else {
-					// Remove unexpected leftovers before reporting the regression.
-					if err == nil {
-						_, removeErr := runtime.ContainerRemove(cleanupCtx, id, client.ContainerRemoveOptions{Force: true, RemoveVolumes: true})
-						require.NoError(t, removeErr)
-					}
-					require.True(t, errdefs.IsNotFound(err), "successful test container must be removed")
-				}
+				cleanupPostgresDebugChild(t, directory, mode == "retain" || mode == "setup-failure")
 			})
 			output, err := command.CombinedOutput()
 			require.NoError(t, ctx.Err(), "subprocess timed out")
@@ -139,7 +103,7 @@ func TestPostgresDebugLifecycle(t *testing.T) {
 				require.NotContains(t, string(output), "containerdebug:")
 				return
 			}
-			files, err := filepath.Glob(filepath.Join(directory, "credentials.*.jsonl"))
+			files, err := postgresDebugRegistryFiles(directory)
 			require.NoError(t, err)
 			require.Len(t, files, 1)
 			info, err := os.Stat(files[0])
@@ -221,6 +185,151 @@ func TestPostgresDebugLifecycle(t *testing.T) {
 				require.Contains(t, string(output), "intentional late cleanup failure")
 				require.Contains(t, string(output), "podman rm -f")
 			}
+		})
+	}
+}
+
+func postgresDebugRegistryFiles(directory string) ([]string, error) {
+	entries, err := os.ReadDir(directory)
+	if err != nil {
+		return nil, err
+	}
+	var paths []string
+	for _, entry := range entries {
+		matched, err := filepath.Match("credentials.*.jsonl", entry.Name())
+		if err != nil {
+			return nil, err
+		}
+		if matched && !entry.IsDir() {
+			paths = append(paths, filepath.Join(directory, entry.Name()))
+		}
+	}
+	return paths, nil
+}
+
+// postgresDebugContainerIDs keeps every known ID, even if another discovery
+// source is unreadable, so a partial setup failure cannot prevent cleanup.
+func postgresDebugContainerIDs(t *testing.T, directory string) []string {
+	t.Helper()
+	var ids []string
+	add := func(id string) {
+		id = strings.TrimSpace(id)
+		if id == "" {
+			return
+		}
+		for _, existing := range ids {
+			if existing == id {
+				return
+			}
+		}
+		ids = append(ids, id)
+	}
+	data, err := os.ReadFile(filepath.Join(directory, "container-id"))
+	if err == nil {
+		add(string(data))
+	} else if !os.IsNotExist(err) {
+		t.Errorf("read child container ID: %v", err)
+	}
+	files, err := postgresDebugRegistryFiles(directory)
+	if err != nil {
+		t.Errorf("find child registries: %v", err)
+	}
+	for _, path := range files {
+		file, err := os.Open(path)
+		if err != nil {
+			t.Errorf("open child registry: %v", err)
+			continue
+		}
+		decoder := json.NewDecoder(file)
+		for {
+			var record postgresDebugRecord
+			if err := decoder.Decode(&record); err != nil {
+				if err != io.EOF {
+					t.Errorf("decode child registry: %v", err)
+				}
+				break
+			}
+			if record.Kind == "postgres" {
+				add(record.ContainerID)
+			}
+		}
+		if err := file.Close(); err != nil {
+			t.Errorf("close child registry: %v", err)
+		}
+	}
+	return ids
+}
+
+// cleanupPostgresDebugChild reports child retention independently of parent
+// removal. Inspection failures must not gate removal or consume its deadline.
+func cleanupPostgresDebugChild(t *testing.T, directory string, wantRetained bool) {
+	t.Helper()
+	ids := postgresDebugContainerIDs(t, directory)
+	if len(ids) == 0 {
+		return // setup failed before registering a container
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	runtime, err := testcontainers.NewDockerClientWithOpts(ctx)
+	cancel()
+	if err != nil {
+		t.Errorf("connect for child cleanup; remove containers %v manually: %v", ids, err)
+		return
+	}
+	defer func() {
+		if err := runtime.Close(); err != nil {
+			t.Errorf("close cleanup runtime client: %v", err)
+		}
+	}()
+	for _, id := range ids {
+		inspectCtx, inspectCancel := context.WithTimeout(context.Background(), 30*time.Second)
+		_, inspectErr := runtime.ContainerInspect(inspectCtx, id, client.ContainerInspectOptions{})
+		inspectCancel()
+
+		if !errdefs.IsNotFound(inspectErr) {
+			cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), 30*time.Second)
+			_, removeErr := runtime.ContainerRemove(cleanupCtx, id, client.ContainerRemoveOptions{Force: true, RemoveVolumes: true})
+			cleanupCancel()
+			if removeErr != nil && !errdefs.IsNotFound(removeErr) {
+				t.Errorf("remove child container %s (remove manually): %v", id, removeErr)
+			}
+			verifyCtx, verifyCancel := context.WithTimeout(context.Background(), 30*time.Second)
+			_, verifyErr := runtime.ContainerInspect(verifyCtx, id, client.ContainerInspectOptions{})
+			verifyCancel()
+			if !errdefs.IsNotFound(verifyErr) {
+				t.Errorf("child container %s removal not verified (remove manually): %v", id, verifyErr)
+			}
+		}
+		if wantRetained {
+			if inspectErr != nil {
+				t.Errorf("failed test container %s must survive subprocess exit: %v", id, inspectErr)
+			}
+		} else if !errdefs.IsNotFound(inspectErr) {
+			t.Errorf("successful test container %s must be removed: %v", id, inspectErr)
+		}
+	}
+}
+
+// TestPostgresDebugContainerIDs verifies literal-directory discovery, ID
+// deduplication, and recovery of every PostgreSQL container from the registry.
+func TestPostgresDebugContainerIDs(t *testing.T) {
+	for _, withIDFile := range []bool{false, true} {
+		name := "registry-only"
+		if withIDFile {
+			name = "with-id-file"
+		}
+		t.Run(name, func(t *testing.T) {
+			directory := filepath.Join(t.TempDir(), "literal[")
+			require.NoError(t, os.Mkdir(directory, 0700))
+			if withIDFile {
+				require.NoError(t, os.WriteFile(filepath.Join(directory, "container-id"), []byte("postgres-id\n"), 0600))
+			}
+			registry := `{"type":"container","kind":"postgres","container_id":"postgres-id"}
+{"type":"fixture","kind":"postgres","container_id":"postgres-id"}
+{"type":"container","kind":"spicedb","container_id":"other-id"}
+{"type":"container","kind":"postgres","container_id":"second-postgres-id"}
+`
+			require.NoError(t, os.WriteFile(filepath.Join(directory, "credentials.child.1.jsonl"), []byte(registry), 0600))
+			require.Equal(t, []string{"postgres-id", "second-postgres-id"}, postgresDebugContainerIDs(t, directory))
 		})
 	}
 }

@@ -21,6 +21,24 @@ import (
 	"github.com/testcontainers/testcontainers-go"
 )
 
+func spiceDBDebugRegistryFiles(directory string) ([]string, error) {
+	entries, err := os.ReadDir(directory)
+	if err != nil {
+		return nil, err
+	}
+	var paths []string
+	for _, entry := range entries {
+		matched, err := filepath.Match("connections.*.jsonl", entry.Name())
+		if err != nil {
+			return nil, err
+		}
+		if matched && !entry.IsDir() {
+			paths = append(paths, filepath.Join(directory, entry.Name()))
+		}
+	}
+	return paths, nil
+}
+
 // spiceDBDebugContainerIDs recovers registry IDs even when setup failed before
 // the child could write container-id. Discovery errors must not discard IDs
 // already found or prevent cleanup of the other registry files.
@@ -45,7 +63,7 @@ func spiceDBDebugContainerIDs(t *testing.T, directory string) []string {
 	} else if !os.IsNotExist(err) {
 		t.Errorf("read child container ID: %v", err)
 	}
-	paths, err := filepath.Glob(filepath.Join(directory, "connections.*.jsonl"))
+	paths, err := spiceDBDebugRegistryFiles(directory)
 	if err != nil {
 		t.Errorf("find child registries: %v", err)
 	}
@@ -136,7 +154,8 @@ func TestSpiceDBDebugContainerIDs(t *testing.T) {
 			name = "with-id-file"
 		}
 		t.Run(name, func(t *testing.T) {
-			directory := t.TempDir()
+			directory := filepath.Join(t.TempDir(), "literal[")
+			require.NoError(t, os.Mkdir(directory, 0700))
 			if withIDFile {
 				require.NoError(t, os.WriteFile(filepath.Join(directory, "container-id"), []byte("spicedb-id\n"), 0600))
 			}
@@ -171,7 +190,8 @@ func TestSpiceDBDebugLifecycle(t *testing.T) {
 	for _, mode := range []string{"retain", "retain-registry-only", "keep-passing", "debug-failing", "no-debug"} {
 		t.Run(mode, func(t *testing.T) {
 			wantRetained := mode == "retain" || mode == "retain-registry-only"
-			directory := t.TempDir()
+			directory := filepath.Join(t.TempDir(), "literal[")
+			require.NoError(t, os.Mkdir(directory, 0700))
 			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
 			defer cancel()
 			command := exec.CommandContext(ctx, os.Args[0], "-test.run=^TestSpiceDBDebugLifecycle$", "-test.v")
@@ -209,7 +229,7 @@ func TestSpiceDBDebugLifecycle(t *testing.T) {
 				require.NotContains(t, string(output), "containerdebug:")
 				return
 			}
-			paths, err := filepath.Glob(filepath.Join(directory, "connections.*.jsonl"))
+			paths, err := spiceDBDebugRegistryFiles(directory)
 			require.NoError(t, err)
 			require.Len(t, paths, 1)
 			info, err := os.Stat(paths[0])

@@ -25,15 +25,17 @@ var globalFakeState = &fakeMetricsState{}
 func NewFakeMetricsCollector() *MetricsCollector {
 	globalFakeState.Reset()
 	mc := &MetricsCollector{
-		SerializationFailures:    &fakeCounter{counterType: "serialization_failures"},
-		SerializationExhaustions: &fakeCounter{counterType: "serialization_exhaustions"},
-		OutboxEventWrites:        &fakeCounter{counterType: "outbox_event_writes"},
-		MsgsProcessed:            &fakeCounter{counterType: "msgs_processed"},
-		MsgProcessFailures:       &fakeCounter{counterType: "msg_process_failures"},
-		ConsumerErrors:           &fakeCounter{counterType: "consumer_errors"},
-		KafkaErrorEvents:         &fakeCounter{counterType: "kafka_error_events"},
-		ResourcesPerWorkspace:    &fakeHistogram{},
-		ResourceCount:            &fakeGauge{},
+		SerializationFailures:        &fakeCounter{counterType: "serialization_failures"},
+		SerializationExhaustions:     &fakeCounter{counterType: "serialization_exhaustions"},
+		OutboxEventWrites:            &fakeCounter{counterType: "outbox_event_writes"},
+		MsgsProcessed:                &fakeCounter{counterType: "msgs_processed"},
+		MsgProcessFailures:           &fakeCounter{counterType: "msg_process_failures"},
+		ConsumerErrors:               &fakeCounter{counterType: "consumer_errors"},
+		KafkaErrorEvents:             &fakeCounter{counterType: "kafka_error_events"},
+		FetchRepresentationsDuration: &fakeHistogram{},
+		MessageProcessingDuration:    &fakeHistogram{},
+		ResourcesPerWorkspace:        &fakeHistogram{},
+		ResourceCount:                &fakeGauge{},
 	}
 	return mc
 }

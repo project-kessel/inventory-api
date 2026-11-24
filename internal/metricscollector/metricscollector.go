@@ -2,6 +2,7 @@ package metricscollector
 
 import (
 	"context"
+	"time"
 
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
@@ -16,6 +17,11 @@ const (
 	// prefix should be used for all other metrics unrelated to the consumer
 	prefix = "kessel_inventory_"
 )
+
+// consumerLatencyBuckets are the histogram bucket boundaries, in seconds, for the
+// consumer latency histograms. They span a fast indexed lookup (5ms) up to the
+// multi-second representation queries seen during the consumer-lag incident.
+var consumerLatencyBuckets = []float64{0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10}
 
 // LabelSet adds desired attributes to each metric recorded from stats messages to ensure consistent labeling.
 func (s *StatsData) LabelSet(key string) metric.MeasurementOption {
@@ -93,10 +99,22 @@ type MetricsCollector struct {
 	assignmentSize metric.Int64Gauge
 
 	// App Specific Metrics
-	MsgsProcessed            metric.Int64Counter
-	MsgProcessFailures       metric.Int64Counter
-	ConsumerErrors           metric.Int64Counter
-	KafkaErrorEvents         metric.Int64Counter
+	MsgsProcessed      metric.Int64Counter
+	MsgProcessFailures metric.Int64Counter
+	ConsumerErrors     metric.Int64Counter
+	KafkaErrorEvents   metric.Int64Counter
+
+	// FetchRepresentationsDuration times the representation fetch that precedes
+	// tuple calculation in the consumer, and MessageProcessingDuration times the
+	// whole relations message. Both are labelled by operation and outcome.
+	//
+	// These metrics are temporary (RHCLOUD-53646): they watch for the slow
+	// representation queries behind the consumer-lag incident while tombstone
+	// cleanup is paused, and can be removed once HBI writes through the tuple
+	// endpoints.
+	FetchRepresentationsDuration metric.Float64Histogram
+	MessageProcessingDuration    metric.Float64Histogram
+
 	OutboxEventWrites        metric.Int64Counter
 	SerializationFailures    metric.Int64Counter
 	SerializationExhaustions metric.Int64Counter
@@ -169,6 +187,24 @@ func (m *MetricsCollector) New(meter metric.Meter) error {
 		return err
 	}
 	if m.KafkaErrorEvents, err = meter.Int64Counter(consumerPrefix + "kafka_error_events"); err != nil {
+		return err
+	}
+
+	// The names already end in _seconds, so no unit is set. The Prometheus
+	// exporter would not double the suffix for WithUnit("s"), but leaving the
+	// unit off keeps the exposed name independent of its suffix rules.
+	if m.FetchRepresentationsDuration, err = meter.Float64Histogram(
+		consumerPrefix+"fetch_representations_duration_seconds",
+		metric.WithDescription("Duration of the representation fetch before consumer tuple calculation (temporary, RHCLOUD-53646)"),
+		metric.WithExplicitBucketBoundaries(consumerLatencyBuckets...),
+	); err != nil {
+		return err
+	}
+	if m.MessageProcessingDuration, err = meter.Float64Histogram(
+		consumerPrefix+"message_processing_duration_seconds",
+		metric.WithDescription("Duration of processing one consumer relations message (temporary, RHCLOUD-53646)"),
+		metric.WithExplicitBucketBoundaries(consumerLatencyBuckets...),
+	); err != nil {
 		return err
 	}
 
@@ -258,4 +294,18 @@ func Incr(counter metric.Int64Counter, operation string, extraAttrs ...attribute
 	}
 	attrs = append(attrs, extraAttrs...)
 	counter.Add(ctx, 1, metric.WithAttributes(attrs...))
+}
+
+// RecordDuration records the seconds elapsed since start on histogram, labelled
+// with operation and an outcome of "error" when err is non-nil or "success"
+// otherwise.
+func RecordDuration(histogram metric.Float64Histogram, start time.Time, operation string, err error) {
+	outcome := "success"
+	if err != nil {
+		outcome = "error"
+	}
+	histogram.Record(context.Background(), time.Since(start).Seconds(), metric.WithAttributes(
+		attribute.String("operation", operation),
+		attribute.String("outcome", outcome),
+	))
 }

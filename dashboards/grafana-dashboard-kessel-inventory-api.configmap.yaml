@@ -3230,7 +3230,7 @@ data:
       "timezone": "browser",
       "title": "Kessel - Inventory API",
       "uid": "ddxs3i6o0xpmof",
-      "version": 12
+      "version": 13
     }
 kind: ConfigMap
 metadata:

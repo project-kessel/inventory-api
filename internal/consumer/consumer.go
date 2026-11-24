@@ -379,7 +379,12 @@ func (i *InventoryConsumer) processRelationsOperation(
 	txid string,
 	msg *kafka.Message,
 	config operationConfig,
-) (string, error) {
+) (_ string, err error) {
+	start := time.Now()
+	defer func() {
+		metricscollector.RecordDuration(i.MetricsCollector.MessageProcessingDuration, start, operation, err)
+	}()
+
 	i.Logger.Infof("processing message: operation=%s, txid=%s", operation, txid)
 	i.Logger.Debugf("processed message tuple=%s", msg.Value)
 
@@ -409,7 +414,9 @@ func (i *InventoryConsumer) processRelationsOperation(
 		versions = model.NewRepresentationVersions(versions.CommonVersion(), nil, nil)
 	}
 
+	fetchStart := time.Now()
 	current, previous, err := config.fetchRepresentations(i, key, versions)
+	metricscollector.RecordDuration(i.MetricsCollector.FetchRepresentationsDuration, fetchStart, operation, err)
 	if err != nil {
 		metricscollector.Incr(i.MetricsCollector.MsgProcessFailures, "FindRepresentations")
 		i.Logger.Errorf("failed to find representations: %v", err)

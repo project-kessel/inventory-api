@@ -54,6 +54,25 @@ func spiceFixture() { authz.New(nil) }
 			missing: []string{"PostgreSQL"},
 		},
 		{
+			name: "multiple init functions in one file retain fixture requirements",
+			files: map[string]string{"example/example_test.go": `package example
+import db "example.com/inventory/internal/testutil"
+func init() { db.NewTestDB(nil, nil, nil) }
+func init() {}`},
+			missing: []string{"PostgreSQL"},
+		},
+		{
+			name: "multiple init functions across files retain fixture requirements",
+			files: map[string]string{
+				"example/a_test.go": `package example
+import db "example.com/inventory/internal/testutil"
+func init() { db.NewTestDB(nil, nil, nil) }`,
+				"example/z_test.go": `package example
+func init() {}`,
+			},
+			missing: []string{"PostgreSQL"},
+		},
+		{
 			name:    "both fixtures without TestMain",
 			files:   map[string]string{"example/db_test.go": postgresTest, "example/spice_test.go": spiceTest},
 			missing: []string{"PostgreSQL", "SpiceDB"},

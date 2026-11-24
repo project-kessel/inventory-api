@@ -94,7 +94,8 @@ type TestCase struct {
 }
 
 // TestSetup creates a test struct that calls most of the initial constructor methods we intend to test in unit tests.
-func (t *TestCase) TestSetup(testingT *testing.T) []error {
+// Pass nil for relationsRepo when the tested path does not use relations or fencing.
+func (t *TestCase) TestSetup(testingT *testing.T, relationsRepo model.RelationsRepository) []error {
 	t.options = NewOptions()
 	t.options.LoadReporterRepresentation = true
 	t.options.BootstrapServers = []string{"localhost:9092"}
@@ -121,8 +122,6 @@ func (t *TestCase) TestSetup(testingT *testing.T) []error {
 
 	notifier := &pubsub.NotifierMock{}
 
-	relationsRepo := relationstest.New(testingT)
-
 	consumer := &mocks.MockConsumer{}
 	db := setupTestDB(testingT)
 	schemaRepository := data.NewInMemorySchemaRepository()
@@ -134,7 +133,9 @@ func (t *TestCase) TestSetup(testingT *testing.T) []error {
 		return errs
 	}
 
-	acquireConsumerTestLock(testingT, &t.inv, "test-consumer/0")
+	if relationsRepo != nil {
+		acquireConsumerTestLock(testingT, &t.inv, "test-consumer/0")
+	}
 
 	// Replace the repository with one using the production outbox publisher
 	// for the active backend: WAL on PostgreSQL (the test container runs
@@ -206,7 +207,7 @@ func TestNewConsumerSetup(t *testing.T) {
 		name:        "TestNewConsumerSetup",
 		description: "ensures setting up a new consumer, including options and configs functions",
 	}
-	errs := test.TestSetup(t)
+	errs := test.TestSetup(t, nil)
 	assert.Nil(t, errs)
 }
 
@@ -365,7 +366,7 @@ func TestInventoryConsumer_Retry(t *testing.T) {
 				name:        "TestInventoryConsumer-Retry",
 				description: test.description,
 			}
-			errs := tester.TestSetup(t)
+			errs := tester.TestSetup(t, nil)
 			assert.Nil(t, errs)
 
 			result, err := tester.inv.Retry(test.funcToExecute, tester.inv.MetricsCollector.MsgProcessFailures)
@@ -467,7 +468,7 @@ func TestInventoryConsumer_ProcessMessage(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			tester := TestCase{}
-			errs := tester.TestSetup(t)
+			errs := tester.TestSetup(t, relationstest.New(t))
 			assert.Nil(t, errs)
 
 			if test.setupData != nil {
@@ -584,7 +585,7 @@ func TestCommitStoredOffsets(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			tester := TestCase{}
-			errs := tester.TestSetup(t)
+			errs := tester.TestSetup(t, nil)
 			assert.Nil(t, errs)
 
 			c := &mocks.MockConsumer{}
@@ -646,7 +647,7 @@ func TestRebalanceCallback_AssignedPartitions(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			tester := TestCase{}
-			errs := tester.TestSetup(t)
+			errs := tester.TestSetup(t, relationstest.New(t))
 			assert.Nil(t, errs)
 
 			if test.lockError != nil {
@@ -766,7 +767,7 @@ func TestRebalanceCallback_RevokedPartitions(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			tester := TestCase{}
-			errs := tester.TestSetup(t)
+			errs := tester.TestSetup(t, nil)
 			assert.Nil(t, errs)
 
 			consumer := &mocks.MockConsumer{}
@@ -800,12 +801,12 @@ func TestRebalanceCallback_RevokedPartitions(t *testing.T) {
 func TestFencingToken_WritingAfterRebalance(t *testing.T) {
 	// Setup two consumers
 	testerA := TestCase{}
-	errsA := testerA.TestSetup(t)
+	errsA := testerA.TestSetup(t, relationstest.New(t))
 	assert.Nil(t, errsA)
 	testerA.inv.Config.ConsumerGroupID = "test-group"
 
 	testerB := TestCase{}
-	errsB := testerB.TestSetup(t)
+	errsB := testerB.TestSetup(t, relationstest.New(t))
 	assert.Nil(t, errsB)
 	testerB.inv.Config.ConsumerGroupID = "test-group"
 
@@ -855,7 +856,7 @@ func TestFencingToken_WritingAfterRebalance(t *testing.T) {
 
 func TestInventoryConsumer_CreateTuple_FailedPrecondition(t *testing.T) {
 	tester := TestCase{}
-	require.Nil(t, tester.TestSetup(t))
+	require.Nil(t, tester.TestSetup(t, relationstest.New(t)))
 	invalidateConsumerTestLock(t, &tester.inv)
 
 	domainTuple := testConsumerSampleTuple(t)
@@ -872,7 +873,7 @@ func TestInventoryConsumer_CreateTuple_FailedPrecondition(t *testing.T) {
 
 func TestInventoryConsumer_UpdateTuple_FailedPrecondition(t *testing.T) {
 	tester := TestCase{}
-	require.Nil(t, tester.TestSetup(t))
+	require.Nil(t, tester.TestSetup(t, relationstest.New(t)))
 	invalidateConsumerTestLock(t, &tester.inv)
 
 	domainTuple := testConsumerSampleTuple(t)
@@ -889,7 +890,7 @@ func TestInventoryConsumer_UpdateTuple_FailedPrecondition(t *testing.T) {
 
 func TestInventoryConsumer_DeleteTuple_FailedPrecondition(t *testing.T) {
 	tester := TestCase{}
-	require.Nil(t, tester.TestSetup(t))
+	require.Nil(t, tester.TestSetup(t, relationstest.New(t)))
 
 	// Seed a tuple with the current token before another owner fences us out.
 	domainTuple := testConsumerSampleTuple(t)
@@ -940,7 +941,7 @@ func TestUpdateConsistencyTokenIfPresent(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			tester := TestCase{}
-			errs := tester.TestSetup(t)
+			errs := tester.TestSetup(t, nil)
 			require.Nil(t, errs)
 
 			// Create a resource with an initial consistency token
@@ -977,7 +978,7 @@ func TestUpdateConsistencyTokenIfPresent(t *testing.T) {
 
 func TestInventoryConsumer_UpdateWithSameWorkspace_NoOp(t *testing.T) {
 	tester := TestCase{}
-	errs := tester.TestSetup(t)
+	errs := tester.TestSetup(t, relationstest.New(t))
 	assert.Nil(t, errs)
 
 	const sameWorkspace = "test-workspace-same"
@@ -1183,7 +1184,7 @@ func TestInventoryConsumer_VersionCombinations(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			tester := TestCase{}
-			errs := tester.TestSetup(t)
+			errs := tester.TestSetup(t, relationstest.New(t))
 			require.Nil(t, errs)
 
 			// Setup test data
@@ -1227,7 +1228,7 @@ func TestInventoryConsumer_VersionCombinations(t *testing.T) {
 
 func TestProcessMessage_LoadReporterRepresentationDisabled(t *testing.T) {
 	tester := TestCase{}
-	require.Nil(t, tester.TestSetup(t))
+	require.Nil(t, tester.TestSetup(t, nil))
 	tester.inv.Config.LoadReporterRepresentation = false
 
 	// A reporter-only event must not fetch reporter data or block the partition.
@@ -1244,7 +1245,7 @@ func TestProcessMessage_LoadReporterRepresentationDisabled(t *testing.T) {
 // zero; the common representation is still replicated.
 func TestProcessMessage_LegacyEventWithoutReporterGeneration(t *testing.T) {
 	tester := TestCase{}
-	require.Nil(t, tester.TestSetup(t))
+	require.Nil(t, tester.TestSetup(t, relationstest.New(t)))
 	require.True(t, tester.inv.Config.LoadReporterRepresentation)
 
 	fixture, err := model.NewResourceFixture("legacy-no-generation", "integration", "notifications", "notif-instance-1", "workspace-v0")
@@ -1269,7 +1270,7 @@ func TestProcessMessage_LegacyEventWithoutReporterGeneration(t *testing.T) {
 // leaves the resource authorized after deletion.
 func TestInventoryConsumer_DeleteAfterCommonOnlyUpdate_TupleCleanup(t *testing.T) {
 	tester := TestCase{}
-	require.Nil(t, tester.TestSetup(t))
+	require.Nil(t, tester.TestSetup(t, relationstest.New(t)))
 	require.True(t, tester.inv.Config.LoadReporterRepresentation, "test premise: reporter loading enabled")
 
 	relations := tester.inv.Relations
@@ -1334,7 +1335,7 @@ func TestConsumerCommonOnlyCompatibility(t *testing.T) {
 		}
 		t.Run(eventName, func(t *testing.T) {
 			tester := TestCase{}
-			require.Nil(t, tester.TestSetup(t))
+			require.Nil(t, tester.TestSetup(t, relationstest.New(t)))
 			tester.inv.Config.LoadReporterRepresentation = NewOptions().LoadReporterRepresentation
 			require.False(t, tester.inv.Config.LoadReporterRepresentation)
 

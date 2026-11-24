@@ -13,7 +13,6 @@ import (
 	usecase "github.com/project-kessel/inventory-api/internal/biz/usecase/resources"
 	"github.com/project-kessel/inventory-api/internal/data"
 	"github.com/project-kessel/inventory-api/internal/metricscollector"
-	relationstest "github.com/project-kessel/inventory-api/internal/testutil/relations"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/codes"
@@ -29,7 +28,6 @@ import (
 func newAddRelationshipsTestServer(t *testing.T) (TestServerConfig, model.ResourceRepository) {
 	t.Helper()
 
-	relationsRepo := relationstest.New(t)
 	repo, _ := newTestRepo(t)
 	schemaRepo := data.NewInMemorySchemaRepository()
 
@@ -67,7 +65,7 @@ func newAddRelationshipsTestServer(t *testing.T) (TestServerConfig, model.Resour
 	resourcesUsecase := usecase.New(
 		repo,
 		schemaRepo,
-		relationsRepo,
+		nil, // relations are unused by reporting and relationship persistence
 		"rbac",
 		logger,
 		nil, // listen manager

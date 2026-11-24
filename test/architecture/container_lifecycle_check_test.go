@@ -184,8 +184,9 @@ func checkContainerLifecycle(tree fs.FS, exceptions ...lifecycleException) ([]st
 			switch decl := decl.(type) {
 			case *ast.FuncDecl:
 				name := decl.Name.Name
-				if decl.Recv != nil {
+				if decl.Recv != nil || name == "init" {
 					// Methods are roots too; their bodies may directly acquire fixtures.
+					// Position-qualified identities also keep multiple init functions distinct.
 					name = fmt.Sprintf("%s@%d", name, decl.Pos())
 				}
 				if decl.Body != nil {

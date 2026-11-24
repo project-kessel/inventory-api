@@ -10,6 +10,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/mattn/go-sqlite3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gorm.io/gorm"
@@ -183,14 +184,26 @@ func testRepositoryContract(t *testing.T, repo bizmodel.ResourceRepository, db *
 	t.Run("Transaction handling", func(t *testing.T) {
 		// Real repository test - use actual db transaction
 		resource := createTestResourceWithLocalId(t, "contract-real-tx-test")
-		err := repo.Save(db, resource, bizmodel.OperationTypeCreated, bizmodel.NewTransactionId("contract-real-tx"))
-		require.NoError(t, err, "Save with db transaction should succeed in real repo")
-
 		key := createContractReporterResourceKey(t, "contract-real-tx-test", "k8s_cluster", "ocm", "ocm-instance-1")
+		transactionManager := NewGormTransactionManager(metricscollector.NewFakeMetricsCollector(), 3)
+		err := transactionManager.HandleSerializableTransaction("contract_transaction_handling", db, func(tx *gorm.DB) error {
+			if err := repo.Save(tx, resource, bizmodel.OperationTypeCreated, bizmodel.NewTransactionId("contract-real-tx")); err != nil {
+				return err
+			}
+			foundResource, err := repo.FindResourceByKeys(tx, key)
+			if err != nil {
+				return err
+			}
+			assert.Equal(t, resource.ReporterResources()[0].Id(), foundResource.ReporterResources()[0].Id())
+			return nil
+		})
+		require.NoError(t, err, "Transaction should commit successfully")
 
+		// Read through the root handle to verify the committed resource is persisted.
 		foundResource, err := repo.FindResourceByKeys(db, key)
-		require.NoError(t, err, "Find with db transaction should succeed in real repo")
+		require.NoError(t, err, "Find after commit should succeed")
 		require.NotNil(t, foundResource)
+		assert.Equal(t, resource.ReporterResources()[0].Id(), foundResource.ReporterResources()[0].Id())
 	})
 
 	t.Run("Lifecycle: Create-Update-Delete-Recreate", func(t *testing.T) {
@@ -727,12 +740,12 @@ func TestUniqueConstraint_ReporterResourceCompositeKey(t *testing.T) {
 		repo, db := setupResourceRepository(t)
 
 		// Create first resource with k8s_cluster type
-		resource1 := createTestResourceWithLocalIdAndType(t, "multi-type-test", "k8s_cluster")
+		resource1 := createTestResourceWithTypeAndReporter(t, "multi-type-test", "k8s_cluster", "ocm", "ocm-instance-1")
 		err := repo.Save(db, resource1, bizmodel.OperationTypeCreated, bizmodel.NewTransactionId("test-tx-1"))
 		require.NoError(t, err, "First save should succeed")
 
-		// Create second resource with same local ID but different resource type
-		resource2 := createTestResourceWithLocalIdAndType(t, "multi-type-test", "host")
+		// Vary only resource type; keep every other composite-key field identical.
+		resource2 := createTestResourceWithTypeAndReporter(t, "multi-type-test", "host", "ocm", "ocm-instance-1")
 		err = repo.Save(db, resource2, bizmodel.OperationTypeCreated, bizmodel.NewTransactionId("test-tx-2"))
 		require.NoError(t, err, "Save with different resource type should succeed")
 	})
@@ -745,8 +758,8 @@ func TestUniqueConstraint_ReporterResourceCompositeKey(t *testing.T) {
 		err := repo.Save(db, resource1, bizmodel.OperationTypeCreated, bizmodel.NewTransactionId("test-tx-1"))
 		require.NoError(t, err, "First save should succeed")
 
-		// Create resource with same local ID but different reporter type
-		resource2 := createTestResourceWithReporter(t, "reporter-test", "hbi", "hbi-instance-1")
+		// Vary only reporter type; keep every other composite-key field identical.
+		resource2 := createTestResourceWithReporter(t, "reporter-test", "hbi", "ocm-instance-1")
 		err = repo.Save(db, resource2, bizmodel.OperationTypeCreated, bizmodel.NewTransactionId("test-tx-2"))
 		require.NoError(t, err, "Save with different reporter type should succeed")
 	})
@@ -804,45 +817,33 @@ func TestResourceRepository_IdempotentOperations(t *testing.T) {
 
 		// Verify delete state
 		afterDelete1, err := repo.FindResourceByKeys(db, key)
-		if err == gorm.ErrRecordNotFound {
-			// If tombstone filter is active, we can't verify the exact state
-			// but the delete succeeded, which is what we're testing
-			t.Log("Delete succeeded, resource not found due to tombstone filter")
-		} else {
-			require.NoError(t, err, "Should find tombstoned resource")
-			require.NotNil(t, afterDelete1)
-			deleteState1 := afterDelete1.ReporterResources()[0].Serialize()
-			assert.Equal(t, uint(1), deleteState1.RepresentationVersion, "RepresentationVersion should increment after delete")
-			assert.Equal(t, uint(0), deleteState1.Generation, "Generation should remain 0 after delete")
-			assert.True(t, deleteState1.Tombstone, "Resource should be tombstoned")
-		}
+		require.NoError(t, err, "Should find tombstoned resource")
+		require.NotNil(t, afterDelete1)
+		deleteState1 := afterDelete1.ReporterResources()[0].Serialize()
+		assert.Equal(t, uint(1), deleteState1.RepresentationVersion, "RepresentationVersion should increment after delete")
+		assert.Equal(t, uint(0), deleteState1.Generation, "Generation should remain 0 after delete")
+		assert.True(t, deleteState1.Tombstone, "Resource should be tombstoned")
 
 		// 3. RESUBMIT SAME DELETE: Should succeed (handle duplicate gracefully)
 		foundResource2, err := repo.FindResourceByKeys(db, key)
-		if err == gorm.ErrRecordNotFound {
-			// With tombstone filter, we expect this behavior
-			t.Log("Cannot resubmit delete - resource not found due to tombstone filter (expected)")
-		} else {
-			require.NoError(t, err, "Should find resource for duplicate delete")
-			require.NotNil(t, foundResource2)
+		require.NoError(t, err, "Should find resource for duplicate delete")
+		require.NotNil(t, foundResource2)
 
-			err = foundResource2.Delete(key)
-			require.NoError(t, err, "Duplicate delete operation should succeed")
+		err = foundResource2.Delete(key)
+		require.NoError(t, err, "Duplicate delete operation should succeed")
 
-			err = repo.Save(db, *foundResource2, bizmodel.OperationTypeDeleted, bizmodel.NewTransactionId("repo-delete-2"))
-			require.NoError(t, err, "Duplicate delete save should succeed")
+		err = repo.Save(db, *foundResource2, bizmodel.OperationTypeDeleted, bizmodel.NewTransactionId("repo-delete-2"))
+		require.NoError(t, err, "Duplicate delete save should succeed")
 
-			// Verify state after duplicate delete
-			afterDelete2, err := repo.FindResourceByKeys(db, key)
-			if err != gorm.ErrRecordNotFound {
-				require.NoError(t, err, "Should find resource after duplicate delete")
-				require.NotNil(t, afterDelete2)
-				deleteState2 := afterDelete2.ReporterResources()[0].Serialize()
-				// RepresentationVersion should NOT increment for duplicate deletes on already tombstoned resources
-				assert.Equal(t, uint(1), deleteState2.RepresentationVersion, "RepresentationVersion should remain unchanged for duplicate delete on tombstoned resource")
-				assert.True(t, deleteState2.Tombstone, "Resource should still be tombstoned")
-			}
-		}
+		// Verify state after duplicate delete
+		afterDelete2, err := repo.FindResourceByKeys(db, key)
+		require.NoError(t, err, "Should find resource after duplicate delete")
+		require.NotNil(t, afterDelete2)
+		deleteState2 := afterDelete2.ReporterResources()[0].Serialize()
+		// RepresentationVersion should NOT increment for duplicate deletes on already tombstoned resources
+		assert.Equal(t, uint(1), deleteState2.RepresentationVersion, "RepresentationVersion should remain unchanged for duplicate delete on tombstoned resource")
+		assert.Equal(t, deleteState1.Generation, deleteState2.Generation, "Generation should remain unchanged for duplicate delete")
+		assert.True(t, deleteState2.Tombstone, "Resource should still be tombstoned")
 	})
 
 	t.Run("report -> resubmit same report -> delete -> resubmit same delete", func(t *testing.T) {
@@ -887,19 +888,25 @@ func TestResourceRepository_IdempotentOperations(t *testing.T) {
 
 		// 4. RESUBMIT SAME DELETE: Should succeed
 		foundResource3, err := repo.FindResourceByKeys(db, key)
-		if err == gorm.ErrRecordNotFound {
-			// With tombstone filter, we expect this behavior
-			t.Log("Cannot resubmit delete - resource not found due to tombstone filter (expected)")
-		} else {
-			require.NoError(t, err, "Should find resource for duplicate delete")
-			require.NotNil(t, foundResource3)
+		require.NoError(t, err, "Should find resource for duplicate delete")
+		require.NotNil(t, foundResource3)
+		deleteState1 := foundResource3.ReporterResources()[0].Serialize()
+		assert.Equal(t, uint(2), deleteState1.RepresentationVersion, "Report update and delete should each advance the version")
+		assert.True(t, deleteState1.Tombstone, "Resource should be tombstoned")
 
-			err = foundResource3.Delete(key)
-			require.NoError(t, err, "Duplicate delete operation should succeed")
+		err = foundResource3.Delete(key)
+		require.NoError(t, err, "Duplicate delete operation should succeed")
 
-			err = repo.Save(db, *foundResource3, bizmodel.OperationTypeDeleted, bizmodel.NewTransactionId("repo-delete-2"))
-			require.NoError(t, err, "Duplicate delete save should succeed")
-		}
+		err = repo.Save(db, *foundResource3, bizmodel.OperationTypeDeleted, bizmodel.NewTransactionId("repo-delete-2"))
+		require.NoError(t, err, "Duplicate delete save should succeed")
+
+		afterDelete2, err := repo.FindResourceByKeys(db, key)
+		require.NoError(t, err, "Should find resource after duplicate delete")
+		require.NotNil(t, afterDelete2)
+		deleteState2 := afterDelete2.ReporterResources()[0].Serialize()
+		assert.Equal(t, deleteState1.RepresentationVersion, deleteState2.RepresentationVersion, "RepresentationVersion should remain unchanged for duplicate delete")
+		assert.Equal(t, deleteState1.Generation, deleteState2.Generation, "Generation should remain unchanged for duplicate delete")
+		assert.True(t, deleteState2.Tombstone, "Resource should still be tombstoned")
 	})
 
 	t.Run("complex idempotency: multiple report and delete cycles", func(t *testing.T) {
@@ -1295,12 +1302,15 @@ func TestSerializableCreateFails(t *testing.T) {
 		assert.Nil(t, foundResource)
 		return repo.Save(tx, resource, bizmodel.OperationTypeCreated, bizmodel.NewTransactionId("tx-create"))
 	})
-	assert.Error(t, err)
-	assert.ErrorContains(t, err, "transaction failed")
+	require.Error(t, err)
 	if testutil.UsingPostgres() {
 		var pgError *pgconn.PgError
 		require.ErrorAs(t, err, &pgError)
 		assert.Equal(t, "55P03", pgError.SQLState(), "the uncommitted insert must cause a lock timeout")
+	} else {
+		var sqliteError sqlite3.Error
+		require.ErrorAs(t, err, &sqliteError)
+		assert.Contains(t, []sqlite3.ErrNo{sqlite3.ErrLocked, sqlite3.ErrBusy}, sqliteError.Code, "the uncommitted insert must cause SQLite lock contention")
 	}
 
 	// Cleanup
@@ -1365,12 +1375,15 @@ func TestSerializableUpdateFails(t *testing.T) {
 		}
 		return repo.Save(tx, resource, bizmodel.OperationTypeUpdated, bizmodel.NewTransactionId("tx-update"))
 	})
-	assert.Error(t, err)
-	assert.ErrorContains(t, err, "transaction failed")
+	require.Error(t, err)
 	if testutil.UsingPostgres() {
 		var pgError *pgconn.PgError
 		require.ErrorAs(t, err, &pgError)
 		assert.Equal(t, "55P03", pgError.SQLState(), "the uncommitted update must cause a lock timeout")
+	} else {
+		var sqliteError sqlite3.Error
+		require.ErrorAs(t, err, &sqliteError)
+		assert.Contains(t, []sqlite3.ErrNo{sqlite3.ErrLocked, sqlite3.ErrBusy}, sqliteError.Code, "the uncommitted update must cause SQLite lock contention")
 	}
 
 	// Cleanup
@@ -1703,6 +1716,12 @@ func createTestResourceWithMixedCase(t *testing.T) bizmodel.Resource {
 }
 
 func createTestResourceWithReporter(t *testing.T, localResourceId, reporterType, reporterInstanceId string) bizmodel.Resource {
+	t.Helper()
+	return createTestResourceWithTypeAndReporter(t, localResourceId, "k8s_cluster", reporterType, reporterInstanceId)
+}
+
+func createTestResourceWithTypeAndReporter(t *testing.T, localResourceId, resourceTypeName, reporterType, reporterInstanceId string) bizmodel.Resource {
+	t.Helper()
 	resourceId := uuid.New()
 	reporterResourceId := uuid.New()
 
@@ -1719,7 +1738,7 @@ func createTestResourceWithReporter(t *testing.T, localResourceId, reporterType,
 	localResourceIdType, err := bizmodel.NewLocalResourceId(localResourceId)
 	require.NoError(t, err)
 
-	resourceType, err := bizmodel.NewResourceType("k8s_cluster")
+	resourceType, err := bizmodel.NewResourceType(resourceTypeName)
 	require.NoError(t, err)
 
 	reporterTypeType, err := bizmodel.NewReporterType(reporterType)

@@ -362,3 +362,5 @@ openssl list -providers | grep -A 3 fips
 
 For online cleanup of expired tombstoned reporters and their newly orphaned data,
 see the [tombstone cleanup runbook](docs/runbooks/tombstone-cleanup-job.md). The job is preview-only by default and is not started by Compose.
+
+# TESTING NEW SNYK PIPELINE - IGNORE THIS COMMENT

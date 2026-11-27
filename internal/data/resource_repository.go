@@ -256,11 +256,10 @@ func (r *resourceRepository) FindResourceByKeys(tx *gorm.DB, key bizmodel.Report
 		JOIN resource AS res ON res.id = rr2.resource_id
 	`)
 
-	// ORDER BY aligns with the fake repository's deterministic tie-breaking:
-	// non-tombstoned rows first, then highest representation_version, then generation.
-	// This ensures results[0] (used as the primary resource snapshot) is the same
-	// "latest" row the fake selects. We do not LIMIT 1 here because all rr2 rows
-	// are intentionally collected as reporter resource snapshots.
+	// Select the primary resource snapshot deterministically: non-tombstoned rows
+	// first, then highest representation_version, then generation. We do not
+	// LIMIT 1 here because all rr2 rows are intentionally collected as reporter
+	// resource snapshots.
 	err := r.buildReporterResourceKeyQuery(query, key).
 		Order("rr2.tombstone ASC, rr2.representation_version DESC, rr2.generation DESC").
 		Find(&results).Error
@@ -326,7 +325,7 @@ func (r *resourceRepository) FindCurrentAndPreviousVersionedRepresentations(
 // The version predicate is a single equality match instead of an IN list so that
 // PostgreSQL can use the (resource_id, version) primary key. Current and previous
 // versions are therefore fetched with two statements; see
-// resource_repository_query_test.go for the query-shape guard.
+// resource_repository_plan_test.go for the PostgreSQL execution-plan guard.
 func (r *resourceRepository) fetchCommonRepresentation(db *gorm.DB, key bizmodel.ReporterResourceKey, version uint) (bizmodel.Representation, *bizmodel.Version, error) {
 	type commonRepresentationRow struct {
 		Data    internal.JsonObject

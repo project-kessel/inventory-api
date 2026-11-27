@@ -7,7 +7,6 @@ import (
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
 	"github.com/go-kratos/kratos/v2/transport"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
-	"github.com/project-kessel/inventory-api/internal/pubsub"
 
 	"github.com/stretchr/testify/mock"
 )
@@ -27,13 +26,13 @@ func (m *MockHealthRepo) IsRelationsAvailable(ctx context.Context) (model.Health
 }
 
 // MockRelationsRepository is a minimal mock for RelationsRepository.
-// It only implements methods needed for edge-case tests that SimpleRelationsRepository cannot produce:
+// It supports edge-case responses that a real SpiceDB repository cannot produce:
 //   - CheckBulk: for response length mismatches
 //   - CheckForUpdateBulk: for per-pair errors
-//   - AcquireLock: for complex fencing token validation scenarios
-//   - CreateTuples: for complex fencing token validation scenarios
-//
-// All other methods panic to enforce use of SimpleRelationsRepository (a fake) for normal test cases.
+
+// Normal tests should use the real SpiceDB helper in internal/testutil/relations.
+// Prefer narrow embedding stubs for new fault-injection tests; do not extend
+// this legacy method-verifying mock.
 type MockRelationsRepository struct {
 	mock.Mock
 }
@@ -64,27 +63,27 @@ func (m *MockRelationsRepository) Check(ctx context.Context, rel model.Relations
 }
 
 func (m *MockRelationsRepository) Health(_ context.Context) (model.HealthResult, error) {
-	panic("MockRelationsRepository.Health() is not supported - use SimpleRelationsRepository instead")
+	panic("MockRelationsRepository.Health() is not supported - use the real SpiceDB test repository instead")
 }
 
 func (m *MockRelationsRepository) ReadTuples(_ context.Context, _ model.TupleFilter, _ *model.Pagination, _ model.Consistency) (model.ResultStream[model.ReadTuplesItem], error) {
-	panic("MockRelationsRepository.ReadTuples() is not supported - use SimpleRelationsRepository instead")
+	panic("MockRelationsRepository.ReadTuples() is not supported - use the real SpiceDB test repository instead")
 }
 
 func (m *MockRelationsRepository) CheckForUpdate(_ context.Context, _ model.Relationship) (model.CheckResult, error) {
-	panic("MockRelationsRepository.CheckForUpdate() is not supported - use SimpleRelationsRepository instead")
+	panic("MockRelationsRepository.CheckForUpdate() is not supported - use the real SpiceDB test repository instead")
 }
 
 func (m *MockRelationsRepository) LookupObjects(_ context.Context, _ model.RepresentationType, _ model.Relation, _ model.SubjectReference, _ *model.Pagination, _ model.Consistency) (model.ResultStream[model.LookupObjectsItem], error) {
-	panic("MockRelationsRepository.LookupObjects() is not supported - use SimpleRelationsRepository instead")
+	panic("MockRelationsRepository.LookupObjects() is not supported - use the real SpiceDB test repository instead")
 }
 
 func (m *MockRelationsRepository) LookupSubjects(_ context.Context, _ model.ResourceReference, _ model.Relation, _ model.RepresentationType, _ *model.Relation, _ *model.Pagination, _ model.Consistency) (model.ResultStream[model.LookupSubjectsItem], error) {
-	panic("MockRelationsRepository.LookupSubjects() is not supported - use SimpleRelationsRepository instead")
+	panic("MockRelationsRepository.LookupSubjects() is not supported - use the real SpiceDB test repository instead")
 }
 
 func (m *MockRelationsRepository) DeleteTuples(_ context.Context, _ model.TupleFilter, _ *model.FencingCheck) (model.TuplesResult, error) {
-	panic("MockRelationsRepository.DeleteTuples() is not supported - use SimpleRelationsRepository instead")
+	panic("MockRelationsRepository.DeleteTuples() is not supported - use the real SpiceDB test repository instead")
 }
 
 type MockConsumer struct {
@@ -121,22 +120,6 @@ func (m *MockConsumer) AssignmentLost() bool {
 	return args.Get(0).(bool)
 }
 
-type MockedReporterResourceRepository struct {
-	mock.Mock
-}
-
-type MockedInventoryResourceRepository struct {
-	mock.Mock
-}
-
-type MockedListenManager struct {
-	mock.Mock
-}
-
-type MockedSubscription struct {
-	mock.Mock
-}
-
 type MockLookupObjectsStream struct {
 	Responses []model.LookupObjectsItem
 	current   int
@@ -149,35 +132,6 @@ func (m *MockLookupObjectsStream) Recv() (model.LookupObjectsItem, error) {
 	res := m.Responses[m.current]
 	m.current++
 	return res, nil
-}
-
-func (m *MockedListenManager) Subscribe(txid string) pubsub.Subscription {
-	args := m.Called(txid)
-	return args.Get(0).(pubsub.Subscription)
-}
-
-func (m *MockedListenManager) WaitAndDistribute(ctx context.Context) error {
-	args := m.Called(ctx)
-	return args.Error(0)
-}
-
-func (m *MockedListenManager) Run(ctx context.Context) error {
-	args := m.Called(ctx)
-	return args.Error(0)
-}
-
-func (m *MockedSubscription) NotificationC() <-chan []byte {
-	args := m.Called()
-	return args.Get(0).(chan []byte)
-}
-
-func (m *MockedSubscription) Unsubscribe() {
-	m.Called()
-}
-
-func (m *MockedSubscription) BlockForNotification(ctx context.Context) error {
-	args := m.Called(ctx)
-	return args.Error(0)
 }
 
 // MockTransporter is a test helper that implements transport.Transporter

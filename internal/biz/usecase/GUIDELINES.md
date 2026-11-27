@@ -74,6 +74,8 @@ updatedCmd := fixture(t).Updated(resourceType, reporterType, instance, id, works
 txCmd := fixture(t).WithTransactionId(params..., "tx-123")
 ```
 
+In `usecase/resources`, `newTestHarness` does not provision a resource repository by default. Tests that reach persistence must opt in with `withResourceRepository()`; authorization-only, configuration, and early-rejection paths should leave it unused. The harness uses the production allow-all relations adapter unless the test explicitly supplies real SpiceDB with `withRelations(...)`.
+
 ### Authorization Testing Patterns
 
 **Authentication Stubs:**
@@ -89,7 +91,7 @@ auth := &DenyAuthenticator{}
 ```
 
 **Relations Repository** (for resource-level authorization):
-- **Simple relations repo**: `data.NewSimpleRelationsRepository()` - in-memory implementation with real tuple storage and authorization logic
+- **Real SpiceDB**: `relationstest.New(t)` from `internal/testutil/relations` - production adapter with an isolated in-memory `serve-testing` datastore. Seed schema-valid tuples with `relationstest.Grant` or `CreateTuples`; stop the shared container from `TestMain` via `relationstest.TerminateSharedSpiceDB()` and check its error.
 - **Allow all**: `&data.AllowAllRelationsRepository{}` - bypasses all authorization checks for logic tests
 
 **Meta-Authorization** (for endpoint/CRUD-level authorization):

@@ -319,53 +319,40 @@ const SQLiteInMemoryPattern = "file:%s?mode=memory&cache=shared"
 ```
 
 ### Transaction Manager Testing
-Use `fakeTransactionManager` with call tracking for unit tests.
+Use `NewGormTransactionManager` with an isolated test database. Verify persisted state after commit and rollback, error propagation, and PostgreSQL serialization-conflict handling rather than tracking method calls.
 
 ### Test Double Strategy
 
-**Prefer real instances and fakes over mocks.** The codebase provides a rich set of in-memory fakes that serve as both test infrastructure and a feature of the application itself:
+**Prefer real instances over test doubles.** Resource persistence tests, including use-case and service tests, must use the real resource repository and transaction manager with a migrated database. Do not reintroduce fake persistence implementations that duplicate SQL semantics. Lightweight doubles remain useful for unrelated collaborators:
 
 | Implementation | Location | Purpose |
 |----------------|----------|---------|
-| `NewFakeResourceRepository()` | `internal/data/fake_resource_repository.go` | Full in-memory resource storage with mutex and transaction ID tracking |
-| `NewFakeTransactionManager()` | `internal/data/fake_transaction_manager.go` | No-op transaction handling for tests that don't need real DB transactions |
+
 | `NewFakeMetricsCollector()` | `internal/metricscollector/fake_metricscollector.go` | No-op OTEL counters for tests that need a `MetricsCollector` shape |
-| `NewSimpleRelationsRepository()` | `internal/data/relations_simple.go` | In-process relations behavior (tuples, checks, snapshots) |
+Relations behavior uses `relationstest.New(t)` from `internal/testutil/relations`,
+which constructs the production SpiceDB adapter against an isolated in-memory
+`serve-testing` datastore. Do not reintroduce a fake tuple store, permission
+engine, consistency snapshot implementation, or fencing implementation. Narrow
+stubs remain appropriate for faults that cannot be produced deterministically
+with the real server. See `test/GUIDELINES.md` for lifecycle and consistency rules.
 
 Note: `NewInMemorySchemaRepository()` (`internal/data/schema_inmemory.go`) is the **production** schema store, not a fake. It is used directly in tests as a real instance — a good example of preferring the real thing when no external I/O is involved.
 
-These fakes are not throw-away test code — they are **reusable, evolvable implementations** that encode domain knowledge and can be used to run the service with zero external dependencies.
+Production in-memory adapters are real implementations, not replacements for testing database-backed persistence.
 
 ### Contract Testing
 
-When implementing a fake, define contract tests that run against both the real and fake implementations. This ensures the fake faithfully implements the interface contract.
+Exercise resource repository contracts against the real adapter. Use `setupResourceRepository(t)` in `internal/data/resource_repository_test.go` to construct a migrated database, real transaction manager, and backend-appropriate outbox publisher. Use the same database handle for repository operations and explicit transactions. Assert observable results rather than implementation call counts.
 
-```go
-// Contract testing - test both real and fake implementations
-implementations := []struct {
-    name string
-    repo func() bizmodel.ResourceRepository
-}{
-    {"Real Repository", func() { return NewResourceRepository(db, tm, publisher) }},
-    {"Fake Repository", func() { return NewFakeResourceRepository() }},
-}
-
-for _, impl := range implementations {
-    t.Run(impl.name, func(t *testing.T) {
-        testRepositoryContract(t, impl.repo())
-    })
-}
-```
-
-See `internal/data/resource_repository_test.go` for the canonical example of this pattern.
+When a port has multiple supported production adapters, share contract tests across those adapters where practical; do not add a fake persistence adapter just for tests.
 
 ### Database Testing
-- **Backend selection**: Use `testutil.NewTestDB(t, cfg, migrate)` (see `resource_repository_test.go`'s `setupRepositoryDB`) to get a fully migrated database on the backend selected through `TEST_DB`: PostgreSQL via Testcontainers (the default, matching production, RHCLOUD-51816) or in-memory SQLite (the explicit fallback, selected with `TEST_DB=sqlite`, for environments without a container runtime). Pass `nil` as migrate for tests that need no schema (see `transaction_manager_test.go`).
+- **Backend selection**: Use `testutil.NewTestDB(t, cfg, migrate)` (see `resource_repository_test.go`'s `setupRepositoryDB`) to get a fully migrated database on the backend selected through `TEST_DB`: PostgreSQL via Testcontainers (the default, matching production, RHCLOUD-51816) or in-memory SQLite (the explicit persistence fallback, selected with `TEST_DB=sqlite`; SpiceDB relations tests are explicitly excluded regardless of runtime availability). Pass `nil` as migrate for tests that need no schema (see `transaction_manager_test.go`).
 - **PostgreSQL path**: one testcontainer per test binary, one migrated template database per migrate function, and a private database per test copied from that template; run through `make test` or `scripts/testcontainers-run.sh` so the container runtime is detected
 - **Isolation**: Each test gets a private database on PostgreSQL and a unique in-memory database on SQLite; databases are dropped with `WITH (FORCE)` on cleanup
 - **Migrations**: `NewTestDB` runs them for you (once per test binary on PostgreSQL, per test on SQLite); pass a package-level migrate function so the PostgreSQL template is reused
 - **Pattern**: `setupRepositoryDB(t)` / `setupTestDB(t)` helpers in test files replace the old `setupInMemoryDB`
-- **When to use SQLite vs fake**: Use the fake repo for business logic tests. Use the real database backend when the test specifically needs SQL/GORM behavior (e.g., testing query construction, migration logic, or constraint handling)
+- **Business logic tests**: Use the real database repository and transaction manager when persistence is involved. PostgreSQL is the default; SQLite is a portability fallback, not a substitute for PostgreSQL-specific coverage
 - **Deliberate SQLite-only tests**: `migrations/locks_test.go`'s `TestWithAdvisoryLock_Sqlite*` verify the no-locking fallback outside PostgreSQL; the PostgreSQL locking behavior is verified by `TestWithAdvisoryLock_PostgresHoldsLock` on the postgres backend.
 
 ### Schema Testing

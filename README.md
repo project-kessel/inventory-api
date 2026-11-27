@@ -323,14 +323,36 @@ Tests can be run using:
 make test
 
 # Same short-mode suite and exclusions, with database-backed tests on
-# in-memory SQLite (no container runtime needed; PostgreSQL-specific tests
-# are skipped and PostgreSQL behavior is not reproduced)
+# in-memory SQLite (works without Docker or Podman; PostgreSQL-specific
+# tests and SpiceDB tests are intentionally skipped, even with a runtime)
 make test-sqlite
 
 # Run resource lifecycle performance tests and print a summary (ensure Docker or Podman is running)
 make test-performance
 ```
 
+
+Relations tests use real SpiceDB's in-memory `serve-testing` server, sharing one
+container per test package with an isolated datastore per repository fixture.
+`TEST_DB=sqlite` intentionally skips SpiceDB-dependent tests, even when a
+container runtime is available. `make test-sqlite` runs Go tests directly with
+that setting and needs no runtime. The default/PostgreSQL suite requires a
+working runtime: missing or unhealthy providers and SpiceDB startup or schema
+failures fail tests rather than automatically skipping them. `make test` uses
+the strict runtime-detection wrapper, which preserves command failures.
+See [testing guidelines](test/GUIDELINES.md#spicedb-relations-testing) for setup
+and consistency semantics.
+
+To inspect shared PostgreSQL or SpiceDB test fixtures (including the legacy
+non-short data suite), enable `TEST_CONTAINERS_DEBUG=1`. Stdout contains only
+nonsecret metadata. `TEST_CONTAINERS_DEBUG_FILE=<base>` additionally creates an
+exclusive, owner-only `<base>.<binary>.<pid>.jsonl` credentials registry;
+`TEST_CONTAINERS_KEEP_ON_FAILURE=1` retains containers after failures. Either
+option implies debug output; passing runs still clean up normally. Use `-v` and
+`-count=1` to see fresh diagnostics. See the [test-container debugging
+guide](docs/dev-guides/test-container-debugging.md) for commands, host `psql` and
+Authzed `zed` access, retention behavior, and manual cleanup of containers and
+credential-sensitive files.
 
 For end-to-test info see [here](./test/README.md).
 

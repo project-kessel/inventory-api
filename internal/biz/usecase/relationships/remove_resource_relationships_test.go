@@ -17,9 +17,9 @@ import (
 	"github.com/project-kessel/inventory-api/internal/metricscollector"
 )
 
-// newRemoveTestHarness creates a test harness with a fake resource repository,
-// in-memory schema repository, and configurable meta-authorizer for exercising
-// the RemoveResourceRelationships use case in isolation.
+// newRemoveTestHarness creates a test harness with an isolated database-backed
+// resource repository, in-memory schema repository, and configurable
+// meta-authorizer for exercising the RemoveResourceRelationships use case.
 func newRemoveTestHarness(t *testing.T, opts ...removeHarnessOption) *removeTestHarness {
 	t.Helper()
 	cfg := &removeHarnessConfig{}
@@ -27,12 +27,12 @@ func newRemoveTestHarness(t *testing.T, opts ...removeHarnessOption) *removeTest
 		o(cfg)
 	}
 
-	resourceRepo := data.NewFakeResourceRepository()
+	mc := metricscollector.NewFakeMetricsCollector()
+	resourceRepo := newTestResourceRepository(t, mc)
 	schemaRepo := newFakeSchemaRepository(t)
 	if cfg.schemaRepo != nil {
 		schemaRepo = cfg.schemaRepo
 	}
-	mc := metricscollector.NewFakeMetricsCollector()
 	var metaAuth metaauthorizer.MetaAuthorizer
 	if cfg.meta != nil {
 		metaAuth = cfg.meta

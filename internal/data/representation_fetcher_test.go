@@ -6,6 +6,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	bizmodel "github.com/project-kessel/inventory-api/internal/biz/model"
+	"github.com/project-kessel/inventory-api/internal/metricscollector"
 )
 
 // stubRepresentationFetcher satisfies representationFetcher without touching
@@ -58,15 +59,18 @@ func TestFetchCurrentAndPreviousRepresentations_AcceptsReporterCoordinates(t *te
 	require.NoError(t, err)
 }
 
-// TestInMemoryFetcher_FetchReporterReturnsVersionForTombstone pins the fake to the
-// SQL repository's contract: a row that exists with empty data is a tombstone, so
-// its version is returned alongside nil data. Only a missing row returns nil, nil.
-func TestInMemoryFetcher_FetchReporterReturnsVersionForTombstone(t *testing.T) {
-	fetcher := &inMemoryRepresentationFetcher{
-		reporterReps: map[uint]map[uint]*storedReporterRepresentation{
-			3: {0: {version: 3, generation: 0, tombstone: true}},
-		},
-	}
+// TestSQLFetcher_FetchReporterReturnsVersionForTombstone verifies that an existing
+// tombstone returns its version alongside nil data. Only a missing row returns nil, nil.
+func TestSQLFetcher_FetchReporterReturnsVersionForTombstone(t *testing.T) {
+	db := setupRepositoryDB(t)
+	repo := NewResourceRepository(db, NewGormTransactionManager(metricscollector.NewFakeMetricsCollector(), 3), testOutboxPublisher())
+	resource := createTestResourceWithLocalId(t, "fetcher-tombstone")
+	require.NoError(t, repo.Save(db, resource, bizmodel.OperationTypeCreated, bizmodel.NewTransactionId("fetcher-tombstone-seed")))
+	key := createContractReporterResourceKey(t, "fetcher-tombstone", "k8s_cluster", "ocm", "ocm-instance-1")
+	require.NoError(t, db.Exec(`INSERT INTO reporter_representations
+		(reporter_resource_id, generation, version, tombstone, data)
+		SELECT id, 0, 3, true, NULL FROM reporter_resources`).Error)
+	fetcher := &sqlRepresentationFetcher{db: db, key: key, repo: repo.(*resourceRepository)}
 
 	data, version, err := fetcher.fetchReporter(3, 0)
 	require.NoError(t, err)

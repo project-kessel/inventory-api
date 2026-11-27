@@ -12,6 +12,7 @@ import (
 
 	"github.com/project-kessel/inventory-api/internal/biz/model"
 	"github.com/project-kessel/inventory-api/internal/metricscollector"
+	relationstest "github.com/project-kessel/inventory-api/internal/testutil/relations"
 )
 
 const (
@@ -97,8 +98,12 @@ func TestProcessMessage_RecordsLatencyHistograms(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			var relationsRepo model.RelationsRepository
+			if test.localResourceId != "" {
+				relationsRepo = relationstest.New(t)
+			}
 			tester := TestCase{}
-			require.Nil(t, tester.TestSetup(t))
+			require.Nil(t, tester.TestSetup(t, relationsRepo))
 
 			reader := sdkmetric.NewManualReader()
 			provider := sdkmetric.NewMeterProvider(sdkmetric.WithReader(reader))

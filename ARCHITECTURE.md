@@ -87,14 +87,15 @@ Forbidden:
 - Asking an adapter "what type are you?" instead of reading a config/capability method
 
 Tests follow the same direction with one exception: infrastructure tests may
-construct other adapters (in-memory schema repo, simple relations repo).
-Application- and Presentation-layer tests also commonly construct concrete
-`internal/data` fakes/adapters (`data.NewFakeResourceRepository()`,
-`data.AllowAllRelationsRepository{}`, `data.NewSimpleRelationsRepository()`,
-`data.NewInMemorySchemaRepository()`) as **test doubles**, since this repo has
-no dedicated in-`model` fakes for these ports yet — this is the established
-convention, not a new violation. **Domain tests must not import
-`internal/data`.** Inject `nil` or a domain-level fake when the port is unused.
+construct other adapters (in-memory schema repo, real SpiceDB relations repo).
+Application- and Presentation-layer tests may construct concrete
+`internal/data` adapters, including the real resource repository and transaction
+manager backed by an isolated migrated test database. Resource persistence must
+not be replaced by an in-memory fake: duplicated storage logic can hide bugs in
+the production adapter. Relations behavior uses the real SpiceDB adapter backed
+by an isolated `serve-testing` datastore, not an in-process reimplementation.
+The production in-memory schema adapter may still be reused where appropriate. **Domain tests must not import
+`internal/data`.** Inject `nil` or a domain-level dummy when the port is unused.
 
 Known pre-existing exceptions (do not re-file unless a PR adds *more* of these):
 
@@ -104,7 +105,7 @@ Known pre-existing exceptions (do not re-file unless a PR adds *more* of these):
 - `internal/biz/model/schema_service_test.go` imports `internal/data`
 - `internal/biz/usecase/resources/resource_service_test.go` and
   `internal/biz/usecase/tuples/tuple_crud_usecase_test.go` import `internal/data`
-  to construct fakes (see note above)
+  to construct test adapters (see note above)
 - `internal/service/resources/kesselinventoryservice_test.go` imports `internal/data`
   for the same reason, at the Presentation layer
 - `internal/consumer` mixes Kafka I/O with use-case orchestration and imports `data`/`gorm`
@@ -215,12 +216,14 @@ compiled check can.
 |---|---|
 | Main | Config meaning/validation; rare hermetic command tests |
 | Presentation | Protocol, error mapping, serialization; in-memory transport (bufconn) |
-| Application | Use cases with fake repos; hit branches reachable from the external API |
+| Application | Use cases with real database-backed resource repos and transactions; hit branches reachable from the external API |
 | Domain | Small, instant unit tests; full-object `assert.Equal`; no I/O |
 | Infrastructure | Adapter tests; contract tests defined next to the port, run per adapter |
 
-No method-verifying mocks (`EXPECT().Times(1)`). Prefer real instances, then
-fakes, then recording fakes/spies for decorator argument capture.
+No method-verifying mocks (`EXPECT().Times(1)`). Prefer real instances. Use real
+database adapters for persistence at every test layer that exercises it, and
+real SpiceDB for relations behavior; keep pure domain tests free of I/O. Lightweight stubs or recording spies remain
+appropriate for unused collaborators or decorator argument capture.
 
 ## Report format for reviewers (human or AI)
 

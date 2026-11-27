@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"net"
 	"os"
 	"reflect"
 	"regexp"
@@ -17,6 +18,7 @@ import (
 	_ "github.com/jackc/pgx/v5/stdlib" // Register the pgx driver for database/sql maintenance connections
 	"github.com/moby/moby/api/types/container"
 	inventoryerrors "github.com/project-kessel/inventory-api/internal/errors"
+	"github.com/project-kessel/inventory-api/internal/testutil/containerdebug"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"
 	"gorm.io/driver/postgres"
@@ -55,6 +57,16 @@ type postgresServer struct {
 	admin       *sql.DB
 	maintenance *gorm.DB // identifier-aware statements over the same admin pool
 	dsnArgs     string   // host/port/credentials; dbname is appended per database
+
+	pendingMu sync.Mutex
+	// Keep-mode decisions wait until all cleanups have run, including those
+	// registered before the fixture that can still fail the test.
+	pendingDatabases []postgresTestDatabase
+}
+
+type postgresTestDatabase struct {
+	test *testing.T
+	name string
 }
 
 var (
@@ -106,8 +118,9 @@ func NewPostgresTestDB(t *testing.T, migrate func(*gorm.DB) error, cfg *gorm.Con
 // for each distinct migrate function, builds a template database by running
 // migrate once. Every call then copies the template into a private database,
 // giving tests full schema isolation without paying the migration cost per
-// test. Databases are dropped when their test finishes; the container is
-// stopped by TerminateSharedPostgres.
+// test. Databases are dropped when their test finishes. In debug keep mode,
+// TerminateSharedPostgres instead resolves retention after all test cleanups,
+// dropping passing tests' databases and preserving failed tests' data.
 //
 // Pass a stable function value (a package-level function, not a fresh
 // closure) as migrate so its template is reused; distinct functions get
@@ -116,6 +129,7 @@ func NewPostgresTestDB(t *testing.T, migrate func(*gorm.DB) error, cfg *gorm.Con
 func PostgresTestDSN(t *testing.T, migrate func(*gorm.DB) error) string {
 	t.Helper()
 
+	containerdebug.Observe(t)
 	srv := sharedPostgresServer(t)
 	tpl := templateFor(migrate)
 	tpl.ensure(t, srv, migrate)
@@ -125,7 +139,18 @@ func PostgresTestDSN(t *testing.T, migrate func(*gorm.DB) error) string {
 		t.Fatalf("create postgres test database: %v", err)
 	}
 
-	t.Cleanup(func() { dropDatabase(t, srv, name) })
+	if containerdebug.KeepEnabled() {
+		srv.pendingMu.Lock()
+		srv.pendingDatabases = append(srv.pendingDatabases, postgresTestDatabase{test: t, name: name})
+		srv.pendingMu.Unlock()
+	} else {
+		t.Cleanup(func() { dropDatabase(t, srv, name) })
+	}
+	if err := containerdebug.RegisterFixture(containerdebug.Fixture{
+		Kind: "postgres", ContainerID: srv.container.GetContainerID(), Test: t.Name(), Database: name,
+	}); err != nil {
+		t.Fatalf("register postgres test database: %v", err)
+	}
 
 	return srv.dsn(name)
 }
@@ -135,17 +160,50 @@ func PostgresTestDSN(t *testing.T, migrate func(*gorm.DB) error) string {
 // was created. Call it from TestMain after m.Run so the container is removed
 // even when Ryuk is disabled, which scripts/testcontainers-run.sh does for
 // Podman. Report any returned error and fail the test binary, even if m.Run
-// succeeded. Call only after all tests and their database cleanup have finished.
+// succeeded. Debug keep-on-failure mode closes the maintenance pool but retains
+// the container and failed databases for inspection. Call only after all tests
+// and their database cleanup have finished.
 func TerminateSharedPostgres() error {
 	postgresOnce.Do(func() {}) // never start the server just to stop it
 	if postgresShared == nil {
 		return nil
 	}
 
+	var cleanupErrors []error
+	postgresShared.pendingMu.Lock()
+	pending := postgresShared.pendingDatabases
+	postgresShared.pendingDatabases = nil
+	postgresShared.pendingMu.Unlock()
+	// Test failure status is final only after m.Run, not during LIFO cleanup.
+	// Drain before closing the maintenance pool, even if another test failed.
+	for _, database := range pending {
+		if !containerdebug.PreserveTest(database.test) {
+			if err := dropPostgresDatabase(postgresShared, database.name); err != nil {
+				cleanupErrors = append(cleanupErrors, err)
+			}
+		}
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	if err := postgresShared.terminate(ctx); err != nil {
-		return err // retain the container handle so cleanup can be retried
+	if containerdebug.KeepOnFailure() {
+		if err := postgresShared.admin.Close(); err != nil {
+			cleanupErrors = append(cleanupErrors, fmt.Errorf("close postgres maintenance connection: %w", err))
+		}
+		if err := containerdebug.Retained(postgresShared.container.GetContainerID()); err != nil {
+			cleanupErrors = append(cleanupErrors, fmt.Errorf("report retained postgres container: %w", err))
+		}
+	} else {
+		if err := postgresShared.terminate(ctx); err != nil {
+			cleanupErrors = append(cleanupErrors, err)
+		} else {
+			// A failed deferred DROP must not leave a successfully removed
+			// container eligible for retention on a subsequent cleanup call.
+			postgresShared = nil
+		}
+	}
+	if len(cleanupErrors) > 0 {
+		return inventoryerrors.NewAggregate(cleanupErrors)
 	}
 
 	postgresShared = nil
@@ -188,6 +246,9 @@ func sharedPostgresServer(t *testing.T) *postgresServer {
 // maintenance pool. Failed setup cleans up the container; on success, the caller
 // owns termination.
 func startPostgresServer() (server *postgresServer, err error) {
+	if err := containerdebug.Configure(); err != nil {
+		return nil, fmt.Errorf("configure postgres container debugging: %w", err)
+	}
 	image := strings.TrimSpace(os.Getenv(PostgresImageEnvVar))
 	if image == "" {
 		image = DefaultPostgresImage
@@ -271,6 +332,13 @@ func startPostgresServer() (server *postgresServer, err error) {
 		_ = admin.Close()
 		return nil, fmt.Errorf("initialize postgres maintenance statements: %w", err)
 	}
+	if err := containerdebug.RegisterContainer(containerdebug.Container{
+		Kind: "postgres", ID: ctr.GetContainerID(), Endpoint: net.JoinHostPort(host, port.Port()),
+		Username: postgresTestUser, Password: password,
+	}); err != nil {
+		_ = admin.Close()
+		return nil, fmt.Errorf("register postgres container: %w", err)
+	}
 	srv.admin = admin
 	srv.maintenance = maintenance
 
@@ -333,6 +401,13 @@ func (tpl *postgresTemplate) ensure(t *testing.T, srv *postgresServer, migrate f
 		tpl.err = buildTemplate(tpl, srv, migrate)
 	})
 	if tpl.err != nil {
+		// Migration errors can leave useful schema and data in the template.
+		// Associate it with the failing test before reporting the setup error.
+		if err := containerdebug.RegisterFixture(containerdebug.Fixture{
+			Kind: "postgres", ContainerID: srv.container.GetContainerID(), Test: t.Name(), Database: tpl.name,
+		}); err != nil {
+			t.Fatalf("register failed postgres template database: %v (setup error: %v)", err, tpl.err)
+		}
 		t.Fatalf("prepare postgres template database: %v", tpl.err)
 	}
 }
@@ -421,19 +496,27 @@ func createDatabase(srv *postgresServer, name, templateName string) error {
 func dropDatabase(t *testing.T, srv *postgresServer, name string) {
 	t.Helper()
 
+	if err := dropPostgresDatabase(srv, name); err != nil {
+		t.Logf("%v (container termination will clean it up)", err)
+	}
+}
+
+// dropPostgresDatabase returns errors to TestMain without logging to a finished test.
+func dropPostgresDatabase(srv *postgresServer, name string) error {
+	var dropErr error
 	for attempt := 1; attempt <= 3; attempt++ {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		err := srv.maintenance.WithContext(ctx).Exec("DROP DATABASE ? WITH (FORCE)", clause.Table{Name: name}).Error
 		cancel()
 		if err == nil {
-			return
+			return nil
 		}
-		if attempt == 3 {
-			t.Logf("drop test database %s: %v (container termination will clean it up)", name, err)
-			return
+		dropErr = err
+		if attempt < 3 {
+			time.Sleep(100 * time.Millisecond)
 		}
-		time.Sleep(100 * time.Millisecond)
 	}
+	return fmt.Errorf("drop test database %s: %w", name, dropErr)
 }
 
 // closePostgresTestDB closes the test handle's pool before the database-drop

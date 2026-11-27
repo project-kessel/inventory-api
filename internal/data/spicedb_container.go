@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -15,6 +16,7 @@ import (
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
 	"github.com/project-kessel/inventory-api/internal/config/relations/spicedb"
+	"github.com/project-kessel/inventory-api/internal/testutil/containerdebug"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/network"
 	"github.com/testcontainers/testcontainers-go/wait"
@@ -46,6 +48,7 @@ func uniqueNetworkAlias() string {
 type LocalSpiceDbContainer struct {
 	logger         log.Logger
 	port           string
+	endpoint       string
 	container      *testcontainers.DockerContainer
 	name           string
 	networkAlias   string
@@ -60,6 +63,10 @@ type ContainerOptions struct {
 
 // CreateContainer creates a new SpiceDbContainer using testcontainers-go
 func CreateContainer(ctx context.Context, opts *ContainerOptions) (*LocalSpiceDbContainer, error) {
+	if err := containerdebug.Configure(); err != nil {
+		return nil, err
+	}
+
 	var (
 		_, b, _, _ = runtime.Caller(0)
 		basepath   = filepath.Dir(b)
@@ -88,19 +95,28 @@ func CreateContainer(ctx context.Context, opts *ContainerOptions) (*LocalSpiceDb
 
 	ctr, err := testcontainers.Run(ctx, image, runOpts...)
 	if err != nil {
-		return nil, fmt.Errorf("could not start spicedb resource: %w", err)
+		return nil, cleanupFailedSpiceDBStart(ctr, err)
 	}
 
 	port, err := ctr.MappedPort(ctx, "50051")
 	if err != nil {
-		_ = testcontainers.TerminateContainer(ctr)
-		return nil, fmt.Errorf("could not get spicedb port: %w", err)
+		return nil, cleanupFailedSpiceDBStart(ctr, fmt.Errorf("could not get spicedb port: %w", err))
+	}
+
+	host, err := ctr.Host(ctx)
+	if err != nil {
+		return nil, cleanupFailedSpiceDBStart(ctr, fmt.Errorf("could not get spicedb host: %w", err))
+	}
+	endpoint := net.JoinHostPort(host, port.Port())
+	if err := containerdebug.RegisterContainer(containerdebug.Container{
+		Kind: "spicedb", ID: ctr.GetContainerID(), Endpoint: endpoint,
+	}); err != nil {
+		return nil, cleanupFailedSpiceDBStart(ctr, fmt.Errorf("register spicedb container: %w", err))
 	}
 
 	inspect, err := ctr.Inspect(ctx)
 	if err != nil {
-		_ = testcontainers.TerminateContainer(ctr)
-		return nil, fmt.Errorf("could not inspect spicedb container: %w", err)
+		return nil, cleanupFailedSpiceDBStart(ctr, fmt.Errorf("could not inspect spicedb container: %w", err))
 	}
 	name := inspect.Name
 
@@ -114,9 +130,26 @@ func CreateContainer(ctx context.Context, opts *ContainerOptions) (*LocalSpiceDb
 		networkAlias:   alias,
 		logger:         opts.Logger,
 		port:           port.Port(),
+		endpoint:       endpoint,
 		container:      ctr,
 		schemaLocation: schemaPath,
 	}, nil
+}
+
+// cleanupFailedSpiceDBStart owns any container left by a startup or setup
+// failure. It is not a usable fixture, so clean it up even in keep mode.
+func cleanupFailedSpiceDBStart(ctr *testcontainers.DockerContainer, startErr error) error {
+	err := fmt.Errorf("could not start spicedb resource: %w", startErr)
+	if ctr != nil {
+		cleanupCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		// In the pinned Testcontainers API, StopContext only bounds stopping;
+		// direct Terminate also passes this deadline to removal and its hooks.
+		if cleanupErr := ctr.Terminate(cleanupCtx); cleanupErr != nil {
+			return errors.Join(err, fmt.Errorf("terminate partially started spicedb container %s (remove manually): %w", ctr.GetContainerID(), cleanupErr))
+		}
+	}
+	return err
 }
 
 // Port returns the port the container is listening on (host-mapped)
@@ -175,10 +208,16 @@ func NewSpiceDBConfigFromCompleted(c spicedb.CompletedConfig) *SpiceDBConfig {
 }
 
 // CreateSpiceDbRepository creates a repository that connects to the containerized SpiceDB instance
-func (l *LocalSpiceDbContainer) CreateSpiceDbRepository() (*SpiceDBRelationsRepository, error) {
+func (l *LocalSpiceDbContainer) CreateSpiceDbRepository(testName string) (*SpiceDBRelationsRepository, error) {
 	randomKey, err := l.NewToken()
 	if err != nil {
 		return nil, err
+	}
+
+	if err := containerdebug.RegisterFixture(containerdebug.Fixture{
+		Kind: "spicedb", ContainerID: l.container.GetContainerID(), Test: testName, Token: randomKey,
+	}); err != nil {
+		return nil, fmt.Errorf("register spicedb fixture: %w", err)
 	}
 
 	tmpDir, err := os.MkdirTemp("", "inventory-api")
@@ -208,7 +247,7 @@ func (l *LocalSpiceDbContainer) CreateSpiceDbRepository() (*SpiceDBRelationsRepo
 
 	config := &SpiceDBConfig{
 		UseTLS:          false,
-		Endpoint:        "localhost:" + l.port,
+		Endpoint:        l.endpoint,
 		TokenFile:       tmpFileName,
 		SchemaFile:      l.schemaLocation,
 		FullyConsistent: FullyConsistent,
@@ -222,8 +261,14 @@ func (l *LocalSpiceDbContainer) CreateSpiceDbRepository() (*SpiceDBRelationsRepo
 	return repo, nil
 }
 
-// Close terminates the container
+// Close terminates the container unless keep-on-failure mode retains it.
 func (l *LocalSpiceDbContainer) Close() {
+	if containerdebug.KeepOnFailure() {
+		if err := containerdebug.Retained(l.container.GetContainerID()); err != nil {
+			log.NewHelper(l.logger).Errorf("Could not report retained SpiceDB container: %v", err)
+		}
+		return
+	}
 	if err := testcontainers.TerminateContainer(l.container); err != nil {
 		log.NewHelper(l.logger).Errorf("Could not terminate SpiceDB container, please remove manually: %v", err)
 	}

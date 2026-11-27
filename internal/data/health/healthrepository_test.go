@@ -10,10 +10,12 @@ import (
 	"github.com/stretchr/testify/assert"
 	"gorm.io/gorm"
 
+	"github.com/project-kessel/inventory-api/internal/biz/model"
 	"github.com/project-kessel/inventory-api/internal/config/relations"
 	relationsGrpc "github.com/project-kessel/inventory-api/internal/config/relations/kessel"
 	"github.com/project-kessel/inventory-api/internal/data"
 	"github.com/project-kessel/inventory-api/internal/testutil"
+	relationstest "github.com/project-kessel/inventory-api/internal/testutil/relations"
 )
 
 // migrateHealthDB brings a fresh test database up to the current schema. It
@@ -31,6 +33,16 @@ func migrateHealthDB(db *gorm.DB) error {
 func setupGorm(t *testing.T) *gorm.DB {
 	t.Helper()
 	return testutil.NewTestDB(t, &gorm.Config{TranslateError: true}, migrateHealthDB)
+}
+
+// healthErrorRelations isolates the backend health failure while retaining the
+// real adapter for every other operation.
+type healthErrorRelations struct {
+	model.RelationsRepository
+}
+
+func (healthErrorRelations) Health(context.Context) (model.HealthResult, error) {
+	return model.HealthResult{}, errors.New("RELATIONS-API UNHEALTHY")
 }
 
 func TestHealthInit(t *testing.T) {
@@ -82,8 +94,8 @@ func TestHealthRepo_IsBackendAvailable_AllCases(t *testing.T) {
 	assert.Contains(t, resp.Status(), "RELATIONS-API UNHEALTHY")
 
 	db1 := setupGorm(t)
-	simpleRelations1 := data.NewSimpleRelationsRepository()
-	healthRepo1 := New(db1, simpleRelations1, relationsConfig)
+	realRelations1 := relationstest.New(t)
+	healthRepo1 := New(db1, realRelations1, relationsConfig)
 	resp, err = healthRepo1.IsBackendAvailable(ctx)
 	assert.NoError(t, err)
 	assert.Equal(t, 200, resp.Code())
@@ -92,12 +104,12 @@ func TestHealthRepo_IsBackendAvailable_AllCases(t *testing.T) {
 	assert.Contains(t, resp.Status(), fmt.Sprintf("Storage type %s", testutil.TestDBBackend()))
 
 	db2 := setupGorm(t)
-	simpleRelations2 := data.NewSimpleRelationsRepository()
+	realRelations2 := relationstest.New(t)
 	sqlDB2, _ := db2.DB()
 	if err := sqlDB2.Close(); err != nil {
 		t.Logf("Warning: failed to close db: %v", err)
 	}
-	healthRepo2 := New(db2, simpleRelations2, relationsConfig)
+	healthRepo2 := New(db2, realRelations2, relationsConfig)
 	resp, err = healthRepo2.IsBackendAvailable(ctx)
 	assert.NoError(t, err)
 	assert.Equal(t, 500, resp.Code())
@@ -105,9 +117,8 @@ func TestHealthRepo_IsBackendAvailable_AllCases(t *testing.T) {
 	assert.NotContains(t, resp.Status(), "RELATIONS-API UNHEALTHY")
 
 	db3 := setupGorm(t)
-	simpleRelations3 := data.NewSimpleRelationsRepository()
-	simpleRelations3.SetHealthError(errors.New("RELATIONS-API UNHEALTHY"))
-	healthRepo3 := New(db3, simpleRelations3, relationsConfig)
+	unhealthyRelations := healthErrorRelations{RelationsRepository: relationstest.New(t)}
+	healthRepo3 := New(db3, unhealthyRelations, relationsConfig)
 	resp, err = healthRepo3.IsBackendAvailable(ctx)
 	assert.NoError(t, err)
 	assert.Equal(t, 500, resp.Code())

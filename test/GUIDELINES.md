@@ -128,7 +128,15 @@ this documentation file and lifecycle heading exist. A missing or invalid root
 or a stale documentation target fails the check rather than silently scanning
 an unrelated directory. Fixture API names remain explicit rule configuration.
 Source discovery skips hidden directories, `vendor`, `node_modules`, and
-`testdata`.
+`testdata`. Before constructing each symbol graph, it uses Go's build-file
+matching rules to exclude files with nonmatching build constraints or platform
+suffixes. The guard checks separate contexts for the current platform's default
+build and the `integration`, `test`, `sanity`, and `performance` suites, each with
+and without the `race` tag. It does not infer command-line `go test -tags` flags
+from the running test binary: add new supported tag sets to
+`TestSharedContainerLifecycle` explicitly. Cleanup registrations never carry
+between contexts; exception usage is combined across contexts before checking
+for stale exceptions.
 
 There are no package-wide exceptions. One declaration-specific PostgreSQL
 exception is recorded with a reason in

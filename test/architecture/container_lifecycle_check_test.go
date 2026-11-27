@@ -3,9 +3,11 @@ package architecture
 import (
 	"fmt"
 	"go/ast"
+	"go/build"
 	"go/parser"
 	"go/token"
 	"go/types"
+	"io"
 	"io/fs"
 	"path"
 	"sort"
@@ -77,18 +79,51 @@ var lifecycleExceptions = []lifecycleException{
 }
 
 func checkContainerLifecycle(tree fs.FS, exceptions ...lifecycleException) ([]string, error) {
-	modulePath, err := lifecycleRepositoryModule(tree)
-	if err != nil {
-		return nil, err
-	}
-	fixtureRules := lifecycleFixtureRules(modulePath)
-	runner := symbol{modulePath + "/internal/testutil/testlifecycle", "Run"}
+	return checkContainerLifecycleBuilds(tree, []build.Context{build.Default}, exceptions...)
+}
+
+// Check each configuration independently, but validate exception usage across all
+// configurations so a declaration excluded from one build is not reported stale.
+func checkContainerLifecycleBuilds(tree fs.FS, contexts []build.Context, exceptions ...lifecycleException) ([]string, error) {
 	usedExceptions := make([]bool, len(exceptions))
 	for _, exception := range exceptions {
 		if strings.TrimSpace(exception.reason) == "" {
 			return nil, fmt.Errorf("lifecycle exception %s:%s requires a reason", exception.file, exception.declaration)
 		}
 	}
+	var problems []string
+	for _, context := range contexts {
+		buildProblems, err := checkContainerLifecycleForBuild(tree, context, usedExceptions, exceptions...)
+		if err != nil {
+			return nil, err
+		}
+		for _, problem := range buildProblems {
+			problems = append(problems, fmt.Sprintf("%s/%s tags=%v: %s", context.GOOS, context.GOARCH, context.BuildTags, problem))
+		}
+	}
+	for i, used := range usedExceptions {
+		if !used {
+			exception := exceptions[i]
+			problems = append(problems, fmt.Sprintf("%s:%s: stale lifecycle exception for %s (%s); remove or update the exception because the declaration no longer requires it. See %s", exception.file, exception.declaration, exception.fixture, exception.reason, lifecycleDocLink))
+		}
+	}
+	sort.Strings(problems)
+	return problems, nil
+}
+
+func checkContainerLifecycleForBuild(tree fs.FS, context build.Context, usedExceptions []bool, exceptions ...lifecycleException) ([]string, error) {
+	// MatchFile must read the same filesystem as the parser, including synthetic
+	// regression inputs. Filter before building the graph: excluded declarations
+	// must neither supply cleanup nor overwrite an active helper of the same name.
+	context.UseAllFiles = false
+	context.JoinPath = path.Join
+	context.OpenFile = func(name string) (io.ReadCloser, error) { return tree.Open(name) }
+	modulePath, err := lifecycleRepositoryModule(tree)
+	if err != nil {
+		return nil, err
+	}
+	fixtureRules := lifecycleFixtureRules(modulePath)
+	runner := symbol{modulePath + "/internal/testutil/testlifecycle", "Run"}
 	fset := token.NewFileSet()
 	var files []*sourceFile
 	packageNames := map[string]string{}
@@ -103,6 +138,13 @@ func checkContainerLifecycle(tree fs.FS, exceptions ...lifecycleException) ([]st
 			return nil
 		}
 		if !strings.HasSuffix(name, ".go") {
+			return nil
+		}
+		matches, err := context.MatchFile(path.Dir(name), path.Base(name))
+		if err != nil {
+			return fmt.Errorf("match build constraints for %s: %w", name, err)
+		}
+		if !matches {
 			return nil
 		}
 		content, err := fs.ReadFile(tree, name)
@@ -244,12 +286,6 @@ func checkContainerLifecycle(tree fs.FS, exceptions ...lifecycleException) ([]st
 		})
 	}
 	var problems []string
-	for i, used := range usedExceptions {
-		if !used {
-			exception := exceptions[i]
-			problems = append(problems, fmt.Sprintf("%s:%s: stale lifecycle exception for %s (%s); remove or update the exception because the declaration no longer requires it. See %s", exception.file, exception.declaration, exception.fixture, exception.reason, lifecycleDocLink))
-		}
-	}
 	for directory, needed := range required {
 		registered := map[symbol]bool{}
 		for _, main := range mains[directory] {
